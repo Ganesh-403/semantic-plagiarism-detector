@@ -5,8 +5,11 @@ faiss-cpu>=1.8.0                # FAISS ANN search (use faiss-gpu if CUDA availa
 sentence-transformers>=2.7.0    # Transformer embeddings (all-MiniLM-L6-v2)
 torch>=2.0.0                    # PyTorch backend for sentence-transformers
 
-# ── PDF Parsing ───────────────────────────────────────────────────────────────
+# ── PDF & Document Parsing ────────────────────────────────────────────────────
 PyPDF2>=3.0.1                   # Extract text from PDF files
+pdfplumber>=0.11.0              # Robust PDF text extraction
+python-docx>=1.1.0              # Extract text from Word documents
+
 
 # ── Web UI ────────────────────────────────────────────────────────────────────
 streamlit>=1.35.0               # Dashboard framework

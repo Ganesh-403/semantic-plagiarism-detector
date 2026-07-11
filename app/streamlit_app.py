@@ -10,7 +10,7 @@ import streamlit as st
 from sklearn.metrics.pairwise import cosine_similarity
 from typing import Any
 
-from utils.pdf_reader      import extract_text_from_pdf
+from utils.document_parser import extract_text
 from utils.text_chunking   import chunk_documents
 from utils.embedding_model import embed_documents
 from utils.similarity      import (
@@ -60,25 +60,25 @@ with st.sidebar:
 # ── Header ────────────────────────────────────────────────────────────────────
 st.title("🔍 Semantic Plagiarism Detection System")
 st.markdown(
-    "Upload student PDFs. Detects **semantic similarity** (even paraphrased text) "
+    "Upload student documents. Detects **semantic similarity** (even paraphrased text) "
     "using transformer embeddings + **FAISS vector search**."
 )
 st.divider()
 
 # ── File uploader ─────────────────────────────────────────────────────────────
 uploaded_files = st.file_uploader(
-    "📂 Upload Assignment PDFs", type=["pdf"],
-    accept_multiple_files=True, help="Upload 2 or more PDF files.",
+    "📂 Upload Assignment Documents", type=["pdf", "docx", "txt"],
+    accept_multiple_files=True, help="Upload 2 or more files (PDF, DOCX, TXT).",
 )
 if not uploaded_files or len(uploaded_files) < 2:
-    st.info("👆 Please upload **at least 2** PDF assignment files to begin.")
+    st.info("👆 Please upload **at least 2** document files to begin.")
     st.stop()
 
 # ── Pipeline (cached) ─────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def run_pipeline(file_bytes_dict: dict):
     raw_texts = {
-        name: extract_text_from_pdf(_io.BytesIO(data))
+        name: extract_text(_io.BytesIO(data), name)
         for name, data in file_bytes_dict.items()
     }
     chunked_docs = chunk_documents(raw_texts)
@@ -107,10 +107,10 @@ with st.spinner("🧠 Processing PDFs, building embeddings and FAISS index…"):
     raw_texts, chunked_docs, embeddings, sim_df, chunk_sim_df, faiss_index, registry = \
         run_pipeline(file_bytes_dict)
 
-# Check for empty PDFs (e.g. scanned images with no OCR)
+# Check for empty documents (e.g. scanned images with no OCR, blank files)
 empty_docs = [name for name, text in raw_texts.items() if not text.strip()]
 if empty_docs:
-    st.warning(f"⚠️ **Could not extract text from:** {', '.join(empty_docs)}. These might be scanned images or password-protected PDFs.")
+    st.warning(f"⚠️ **Could not extract text from:** {', '.join(empty_docs)}. These might be scanned images, password-protected files, or empty documents.")
 
 active_sim_df = chunk_sim_df if use_chunk_matrix else sim_df
 flags         = flag_plagiarism(active_sim_df, threshold=threshold)

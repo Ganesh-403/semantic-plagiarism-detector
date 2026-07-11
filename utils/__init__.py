@@ -1,5 +1,10 @@
 # utils/__init__.py
-from .pdf_reader import extract_text_from_pdf, extract_texts_from_pdfs
+from .document_parser import (
+    extract_text_from_pdf,
+    extract_texts_from_pdfs,
+    extract_text,
+    extract_texts,
+)
 from .text_chunking import chunk_document, chunk_documents
 from .embedding_model import embed_chunks, embed_documents, get_document_embedding
 from .similarity import (
@@ -21,6 +26,7 @@ from .faiss_index import (
 
 __all__ = [
     "extract_text_from_pdf", "extract_texts_from_pdfs",
+    "extract_text", "extract_texts",
     "chunk_document", "chunk_documents",
     "embed_chunks", "embed_documents", "get_document_embedding",
     "document_similarity_matrix", "chunk_similarity_matrix",
