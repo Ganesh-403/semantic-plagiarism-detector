@@ -80,6 +80,16 @@ if not st.session_state.get("authenticated", False):
                 st.error("Invalid Username or Password.")
     st.stop()
 
+# Initialize session page if not exists
+if "current_page" not in st.session_state:
+    st.session_state.current_page = "main"
+
+# Custom routing interceptor
+if st.session_state.current_page == "about":
+    from app.about_page import render_about_page
+    render_about_page()
+    st.stop()
+
 # Get secure role for this active interaction
 user_role = st.session_state.get("role", "user")
 
@@ -416,4 +426,30 @@ else:
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.divider()
+
+# Setup interactive multi-column footer layout
+f_col1, f_col2, f_col3, f_col4, f_col5 = st.columns(5)
+
+with f_col1:
+    if st.button("🕵️‍♂️ About / Info", key="footer_about", use_container_width=True):
+        st.session_state.current_page = "about"
+        st.rerun()
+
+with f_col2:
+    if st.button("🚧 Help & FAQs", key="footer_help", use_container_width=True):
+        st.info("Help page is under construction.")
+
+with f_col3:
+    if st.button("🚧 Terms of Use", key="footer_terms", use_container_width=True):
+        st.info("Terms & Conditions page is under construction.")
+
+with f_col4:
+    if st.button("🚧 Privacy Policy", key="footer_privacy", use_container_width=True):
+        st.info("Privacy Policy page is under construction.")
+
+with f_col5:
+    if st.button("🚧 Security", key="footer_security", use_container_width=True):
+        st.info("Security Policy page is under construction.")
+
+st.markdown("<br>", unsafe_allow_html=True)
 st.caption("🎓 Semantic Plagiarism Detection System · Sentence Transformers + FAISS · Streamlit")
