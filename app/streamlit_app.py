@@ -1071,6 +1071,15 @@ else:
     with tab_drill:
         st.subheader("🔬 Pair Drill-Down")
         st.caption("Inspect chunk-level similarity between any two documents.")
+
+        if "expand_all_drill" not in st.session_state:
+            st.session_state.expand_all_drill = False
+        expand_all_drill = st.toggle(
+            "Expand All",
+            value=st.session_state.expand_all_drill,
+            key="toggle_expand_all_drill",
+        )
+        st.session_state.expand_all_drill = expand_all_drill
         if n_docs < 2:
             st.warning("Need at least 2 documents.")
         else:
@@ -1111,7 +1120,10 @@ else:
                 if top_pairs:
                     st.subheader("🔑 Top Suspicious Paragraph Pairs")
                     for rank, (ca, cb, sim) in enumerate(top_pairs, 1):
-                        with st.expander(f"#{rank} — Similarity: {sim:.1%}", expanded=(rank == 1)):
+                        with st.expander(
+                            f"#{rank} — {doc_a} ↔ {doc_b} — {sim:.1%}",
+                            expanded=st.session_state.expand_all_drill or (rank == 1),
+                        ):
                             col1, col2 = st.columns(2)
                             with col1:
                                 st.markdown(f"**From {doc_a}**")
@@ -1154,7 +1166,10 @@ else:
                 else:
                     st.success("No paragraph pairs above the threshold for this pair.")
 
-            with st.expander("📄 View Raw Extracted Text"):
+            with st.expander(
+                "📄 View Raw Extracted Text",
+                expanded=st.session_state.expand_all_drill,
+            ):
                 t1, t2 = st.columns(2)
                 with t1:
                     st.markdown(f"**{doc_a}**")
