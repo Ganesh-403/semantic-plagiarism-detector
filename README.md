@@ -451,3 +451,11 @@ methods miss entirely.
 ## 📄 License
 
 MIT License. Free for academic and educational use.
+
+## Setup
+
+Copy the example environment file and adjust values:
+
+```bash
+cp .env.example .env
+```
