@@ -369,6 +369,15 @@ def inject_css() -> None:
             border-left: 4px solid var(--success) !important;
         }}
 
+        /* ── Warning list container animation (#369) ─────────────────
+           The threshold slider re-filters the warning list on every
+           change. This transition smooths out the resulting layout /
+           opacity shifts on the container instead of snapping instantly. */
+
+        .st-key-warning_list_container {{
+            transition: all 0.3s ease;
+        }}
+
         /* ── Similarity score pill ──────────────────────────────────── */
 
         .sim-pill {{

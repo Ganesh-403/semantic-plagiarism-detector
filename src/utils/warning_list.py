@@ -397,46 +397,52 @@ def render_warning_controls(
             disabled=export_df.empty,
         )
 
-    for flag in current_page.items:
-        tier = tier_from_severity_label(flag["severity"])
-        with st.container(border=True):
-            c1, c2, c3 = st.columns([3, 1, 1])
-            with c1:
-                if _has_exact_match(flag["doc_a"], flag["doc_b"]):
-                    exact_badge = " <span style='background-color: #E8F5E9; color: #2E7D32; border: 1px solid #2E7D32; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-left: 8px; vertical-align: middle;'>Exact Match</span>"
+    # ── Warning list container (#369) ────────────────────────────────
+    # A stable `key` makes Streamlit attach a `st-key-warning_list_container`
+    # class to this container's wrapping div, which theme.py's CSS targets
+    # with a transition so re-filtered/re-sorted results animate smoothly
+    # instead of snapping instantly.
+    with st.container(key="warning_list_container"):
+        for flag in current_page.items:
+            tier = tier_from_severity_label(flag["severity"])
+            with st.container(border=True):
+                c1, c2, c3 = st.columns([3, 1, 1])
+                with c1:
+                    if _has_exact_match(flag["doc_a"], flag["doc_b"]):
+                        exact_badge = " <span style='background-color: #E8F5E9; color: #2E7D32; border: 1px solid #2E7D32; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-left: 8px; vertical-align: middle;'>Exact Match</span>"
+                        st.markdown(
+                            f"**{flag['doc_a']}** ↔ **{flag['doc_b']}**{exact_badge}",
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.markdown(f"**{flag['doc_a']}** ↔ **{flag['doc_b']}**")
+
+                    # Replaced the standard similarity text with your matched length display logic
+                    matched_words = flag.get("matched_length", 0)
+                    display_text = f"[{flag['similarity'] * 100:.1f}% Similarity | {matched_words} words matched]"
+                    st.progress(
+                        min(1.0, max(0.0, float(flag["similarity"]))),
+                        text=display_text,
+                    )
+
+                    # Display AI probabilities if available
+                    if ai_probabilities:
+                        ai_a = ai_probabilities.get(flag["doc_a"], {}).get("overall", 0.0)
+                        ai_b = ai_probabilities.get(flag["doc_b"], {}).get("overall", 0.0)
+                        if ai_a > 0 or ai_b > 0:
+                            st.caption(
+                                f"🤖 AI Prob: {flag['doc_a']}: {ai_a:.1%} | "
+                                f"{flag['doc_b']}: {ai_b:.1%}"
+                            )
+                with c2:
                     st.markdown(
-                        f"**{flag['doc_a']}** ↔ **{flag['doc_b']}**{exact_badge}",
+                        f"<div style='text-align:right;'>{badge_html(tier, flag['severity'])}</div>",
                         unsafe_allow_html=True,
                     )
-                else:
-                    st.markdown(f"**{flag['doc_a']}** ↔ **{flag['doc_b']}**")
-
-                # Replaced the standard similarity text with your matched length display logic
-                matched_words = flag.get("matched_length", 0)
-                display_text = f"[{flag['similarity'] * 100:.1f}% Similarity | {matched_words} words matched]"
-                st.progress(
-                    min(1.0, max(0.0, float(flag["similarity"]))),
-                    text=display_text,
-                )
-
-                # Display AI probabilities if available
-                if ai_probabilities:
-                    ai_a = ai_probabilities.get(flag["doc_a"], {}).get("overall", 0.0)
-                    ai_b = ai_probabilities.get(flag["doc_b"], {}).get("overall", 0.0)
-                    if ai_a > 0 or ai_b > 0:
-                        st.caption(
-                            f"🤖 AI Prob: {flag['doc_a']}: {ai_a:.1%} | "
-                            f"{flag['doc_b']}: {ai_b:.1%}"
-                        )
-            with c2:
-                st.markdown(
-                    f"<div style='text-align:right;'>{badge_html(tier, flag['severity'])}</div>",
-                    unsafe_allow_html=True,
-                )
-            with c3:
-                if st.button("Dismiss", key=f"dismiss_{flag['doc_a']}_{flag['doc_b']}"):
-                    add_false_positive(flag["doc_a"], flag["doc_b"])
-                    st.rerun()
+                with c3:
+                    if st.button("Dismiss", key=f"dismiss_{flag['doc_a']}_{flag['doc_b']}"):
+                        add_false_positive(flag["doc_a"], flag["doc_b"])
+                        st.rerun()
 
     if current_page.total_items == 0:
         return
