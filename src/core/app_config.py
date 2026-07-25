@@ -26,9 +26,24 @@ def get_welcome_message() -> str:
     Empty or whitespace-only values return an empty string, meaning no
     banner is shown by default.
     """
-    return os.getenv("APP_WELCOME_MESSAGE", "").strip()    """Return the configured lock timeout in seconds (default 30)."""
+    return os.getenv("APP_WELCOME_MESSAGE", "").strip()
+
+
+def get_lock_timeout() -> int:
+    """Return the configured lock timeout in seconds (default 30)."""
     try:
         timeout = int(os.getenv("LOCK_TIMEOUT_SECONDS", "30"))
         return max(1, timeout)
     except ValueError:
         return 30
+
+
+DEFAULT_PDF_FOOTER_TEXT: Final[str] = ""
+
+
+def get_pdf_footer_text() -> str:
+    """Return the configured PDF footer text.
+
+    If not set, returns an empty string.
+    """
+    return os.getenv("PDF_FOOTER_TEXT", DEFAULT_PDF_FOOTER_TEXT).strip()

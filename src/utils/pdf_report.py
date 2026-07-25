@@ -11,6 +11,7 @@ from io import BytesIO
 from typing import List, Optional, Tuple
 
 from reportlab.pdfgen import canvas
+from src.core.app_config import get_pdf_footer_text
 from reportlab.lib import colors
 from reportlab.lib.colors import HexColor
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
@@ -280,6 +281,16 @@ def generate_plagiarism_report(
                 )
             except Exception:
                 pass
+
+        footer_text = get_pdf_footer_text()
+        if footer_text:
+            canvas_obj.setFont("Helvetica", 9)
+            if dark_mode:
+                canvas_obj.setFillColor(HexColor("#94a3b8"))
+            else:
+                canvas_obj.setFillColor(HexColor("#6b7280"))
+            canvas_obj.drawCentredString(_doc.pagesize[0] / 2.0, 0.5 * inch, footer_text)
+
         canvas_obj.restoreState()
 
     # Build story (PDF content)
