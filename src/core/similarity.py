@@ -10,6 +10,7 @@ cosine similarity reduces to the dot product, making this very fast.
 """
 
 from typing import Dict, List, Optional, Tuple, Union
+
 import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
@@ -123,9 +124,9 @@ def hybrid_similarity_matrix(
     Combine semantic and lexical similarity matrices using a weighted formula.
     """
     if not (0.0 <= w <= 1.0):
-        from src.errors import SIM_WEIGHT_OUT_OF_RANGE
+        from src.errors import sim_weight_out_of_range
 
-        raise ValueError(SIM_WEIGHT_OUT_OF_RANGE.format(w=w))
+        raise ValueError(sim_weight_out_of_range(w=w))
 
     if semantic_df.shape != lexical_df.shape:
         from src.errors import SIM_SHAPE_MISMATCH
@@ -219,13 +220,11 @@ def flag_plagiarism(
     flags = []
     doc_names = similarity_df.columns.tolist()
 
-
     for i in range(len(doc_names)):
         for j in range(i + 1, len(doc_names)):
             score = float(similarity_df.iloc[i, j])
 
             if is_plagiarism(score, threshold):
-
 
                 doc_a = doc_names[i]
                 doc_b = doc_names[j]
@@ -240,7 +239,6 @@ def flag_plagiarism(
                     chunk_text = chunked_docs[doc_a][idx_a]
                     matched_length = len(chunk_text.split())
 
-
                 flags.append(
                     {
                         "doc_a": doc_a,
@@ -254,7 +252,6 @@ def flag_plagiarism(
                         ),
                     }
                 )
-
 
     flags.sort(key=lambda x: x["similarity"], reverse=True)
 

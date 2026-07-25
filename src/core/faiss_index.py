@@ -298,10 +298,10 @@ def load_or_rebuild_index(filepath: str) -> Tuple[faiss.Index, List[ChunkRecord]
     n_registry = len(registry)
 
     if n_matrix != n_registry:
-        from src.errors import FAISS_EMB_REGISTRY_MISMATCH
+        from src.errors import faiss_emb_registry_mismatch
 
         raise ValueError(
-            FAISS_EMB_REGISTRY_MISMATCH.format(emb_count=n_matrix, reg_count=n_registry)
+            faiss_emb_registry_mismatch(emb_count=n_matrix, reg_count=n_registry)
         )
 
     if os.path.exists(filepath):

@@ -208,7 +208,6 @@ except Exception:
     from src.utils.json_export import export_similarity_matrix_to_json
 except ImportError:
 
-    from utils.excel_export import export_similarity_matrix_to_excel  # type: ignore[import-untyped,reportMissingImports]
     from utils.excel_export import export_similarity_matrix_to_excel  # type: ignore
     from utils.json_export import export_similarity_matrix_to_json
 
@@ -276,7 +275,6 @@ except Exception:
 # -----------------------------------------------------------------------------
 # Page Configuration & Session State
 # -----------------------------------------------------------------------------
-
 
 
 # Page Configuration
@@ -753,6 +751,7 @@ def save_preferences_callback():
         theme_val = st.session_state.get("theme_selector", "Light")
         set_user_theme(st.session_state.username, theme_val)
 
+
 with st.sidebar:
     st.markdown(f"👤 Logged in as **{st.session_state.get('username', '')}**")
 
@@ -1075,15 +1074,14 @@ if user_role != "admin":
                         )
 
             except Exception as e:
-                from src.errors import UI_INDEX_LOAD_FAILED
+                from src.errors import ui_index_load_failed
 
-                st.error(UI_INDEX_LOAD_FAILED.format(error=str(e)))
+                st.error(ui_index_load_failed(error=str(e)))
                 st.info(
                     "Please ensure documents have been indexed by an administrator."
                 )
 else:
     # ADMINISTRATOR ACCESS: Full Upload Pipeline & Evaluation Dashboards
-
 
     if "analysis_results" not in st.session_state:
         st.session_state.analysis_results = None
@@ -1152,7 +1150,6 @@ if (
             ),
         ]
 
-
         tour = Tour(steps=tour_steps)
         tour.start()
 
@@ -1188,8 +1185,6 @@ if user_role != "admin":
     )
 
     if st.button("🔍 Run Quick Verification", key="user_query") and query_text.strip():
-
-
 
         with st.spinner("Loading index and searching..."):
             try:
@@ -1416,10 +1411,8 @@ else:
         if cached_signature is not None:
             st.session_state.analysis_file_signature = cached_signature
 
-
     if "failed_documents" not in st.session_state:
         st.session_state.failed_documents = {}
-
 
     # 1. LOCAL FILE UPLOADER (Dynamic Title Translation)
     uploaded_files = st.file_uploader(
@@ -2065,7 +2058,6 @@ if not st.session_state.authenticated:
             failed_files,
         )
 
-
     with st.spinner("🧠 Processing files and building embeddings…"):
         analysis_results = run_pipeline(file_bytes_dict, ocr_language, ocr_dpi)
 
@@ -2090,7 +2082,6 @@ if not st.session_state.authenticated:
     # ── Summary Metrics ───────────────────────────────────────────────────────────
 
     has_enough_files = (len(file_bytes_dict) + (1 if url_text else 0)) >= 2
-
 
     # Run Pipeline if files uploaded
     def compute_pipeline_signature(
@@ -2171,7 +2162,6 @@ if not st.session_state.authenticated:
                 unsafe_allow_html=True,
             )
         st.divider()
-
 
     for flag in flags:
 
@@ -2281,7 +2271,6 @@ if not st.session_state.authenticated:
                 f'<div class="{CLASS_SKELETON} {CLASS_SKELETON_TABLE}"></div>',
                 unsafe_allow_html=True,
             )
-
 
         try:
             with st.spinner("🧠 Processing files and building embeddings…"):
