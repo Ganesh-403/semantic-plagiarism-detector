@@ -19,8 +19,14 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
-from reportlab.platypus import (PageBreak, Paragraph, SimpleDocTemplate,
-                                Spacer, Table, TableStyle)
+from reportlab.platypus import (
+    PageBreak,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 try:
     import fitz  # PyMuPDF
@@ -289,7 +295,9 @@ def generate_plagiarism_report(
                 canvas_obj.setFillColor(HexColor("#94a3b8"))
             else:
                 canvas_obj.setFillColor(HexColor("#6b7280"))
-            canvas_obj.drawCentredString(_doc.pagesize[0] / 2.0, 0.5 * inch, footer_text)
+            canvas_obj.drawCentredString(
+                _doc.pagesize[0] / 2.0, 0.5 * inch, footer_text
+            )
 
         canvas_obj.restoreState()
 
