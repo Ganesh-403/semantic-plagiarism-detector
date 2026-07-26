@@ -1,8 +1,9 @@
-import time
 import logging
-
+import time
 from typing import Optional
-from src.db.auth import get_user_count, get_user_preferences, update_user_preferences
+
+from src.db.auth import (get_user_count, get_user_preferences,
+                         update_user_preferences)
 from src.db.corpus_db import get_all_documents
 from src.utils.redis_cache import get_cache, set_cache
 

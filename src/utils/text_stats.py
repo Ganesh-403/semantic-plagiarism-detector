@@ -1,5 +1,6 @@
 import re
 
+
 def get_word_count(text: str) -> int:
     return len(re.findall(r'\w+', text))
 

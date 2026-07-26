@@ -10,15 +10,17 @@ import pandas as pd
 import streamlit as st
 
 from app.theme import badge_html, tier_from_severity_label
-from src.core.config import normalize_severity_label, severity_from_score, severity_rank
-from src.db.incidents import _normalise_pair, add_false_positive, get_false_positives
-
+from src.core.config import (normalize_severity_label, severity_from_score,
+                             severity_rank)
+from src.db.incidents import (_normalise_pair, add_false_positive,
+                              get_false_positives)
 
 try:
     from thefuzz import fuzz
 except ImportError:
     try:
-        from fuzzywuzzy import fuzz  # type: ignore[import-untyped,reportMissingImports]
+        from fuzzywuzzy import \
+            fuzz  # type: ignore[import-untyped,reportMissingImports]
     except ImportError:
         fuzz = None
 
@@ -478,8 +480,8 @@ def render_warning_controls(
         .replace("\n", "\\n")
     )
 
-    left, middle, right = st.columns([3, 2, 2])
-    with left:
+    info_col, copy_col, md_col, csv_col = st.columns([2, 2, 2, 2])
+    with info_col:
         if current_page.total_items:
             st.markdown(
                 f"Showing **{current_page.start_index}–{current_page.end_index}** "
@@ -487,7 +489,7 @@ def render_warning_controls(
             )
         else:
             st.info("No warnings match the current search.")
-    with middle:
+    with copy_col:
         html_code = f"""
         <style>
             body {{
@@ -550,9 +552,17 @@ def render_warning_controls(
         </script>
         """
         st.components.v1.html(html_code, height=45)
-    with right:
+    with md_col:
         st.download_button(
-            "⬇️ Download filtered report (CSV)",
+            "📝 Download Summary (MD)",
+            markdown_text.encode("utf-8"),
+            "plagiarism_report_summary.md",
+            "text/markdown",
+            use_container_width=True,
+        )
+    with csv_col:
+        st.download_button(
+            "⬇️ Download filtered (CSV)",
             export_df.to_csv(index=False).encode("utf-8"),
             "plagiarism_warnings_filtered.csv",
             "text/csv",
@@ -566,10 +576,46 @@ def render_warning_controls(
     # with a transition so re-filtered/re-sorted results animate smoothly
     # instead of snapping instantly.
     with st.container(key="warning_list_container"):
+        if "selected_warnings" not in st.session_state:
+            st.session_state.selected_warnings = set()
+
+        current_page_ids = {f"{flag['doc_a']}_{flag['doc_b']}" for flag in current_page.items}
+        all_selected = bool(current_page_ids) and current_page_ids.issubset(st.session_state.selected_warnings)
+
+        def toggle_select_all():
+            if all_selected:
+                st.session_state.selected_warnings.difference_update(current_page_ids)
+            else:
+                st.session_state.selected_warnings.update(current_page_ids)
+
+        if current_page_ids:
+            st.checkbox(
+                "Select All on Current Page",
+                value=all_selected,
+                on_change=toggle_select_all,
+                key=f"select_all_page_{current_page.page}",
+            )
+
         for flag in current_page.items:
             tier = tier_from_severity_label(flag["severity"])
+            flag_id = f"{flag['doc_a']}_{flag['doc_b']}"
+            
+            def toggle_item(item_id=flag_id):
+                if item_id in st.session_state.selected_warnings:
+                    st.session_state.selected_warnings.remove(item_id)
+                else:
+                    st.session_state.selected_warnings.add(item_id)
+
             with st.container(border=True):
-                c1, c2, c3 = st.columns([3, 1, 1])
+                c0, c1, c2, c3 = st.columns([0.3, 3, 1, 1])
+                with c0:
+                    st.checkbox(
+                        "Select",
+                        value=flag_id in st.session_state.selected_warnings,
+                        on_change=toggle_item,
+                        key=f"select_{flag_id}",
+                        label_visibility="collapsed"
+                    )
                 with c1:
                     if _has_exact_match(flag["doc_a"], flag["doc_b"]):
                         exact_badge = " <span style='background-color: #E8F5E9; color: #2E7D32; border: 1px solid #2E7D32; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-left: 8px; vertical-align: middle;'>Exact Match</span>"
@@ -628,12 +674,13 @@ def render_warning_controls(
             st.rerun()
 
     with page_col:
-        selected_page = st.selectbox(
+        selected_page = st.number_input(
             "Page",
-            list(range(1, current_page.total_pages + 1)),
-            index=current_page.page - 1,
-            key=f"warning_page_selector_{current_page.total_pages}",
-            format_func=lambda value: f"Page {value} of {current_page.total_pages}",
+            min_value=1,
+            max_value=current_page.total_pages,
+            value=current_page.page,
+            step=1,
+            key=f"warning_page_input_{current_page.total_pages}",
             label_visibility="collapsed",
         )
         if selected_page != current_page.page:

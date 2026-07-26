@@ -2,10 +2,8 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from app.components.faiss_results import (
-    RESULT_COLUMNS,
-    faiss_results_dataframe,
-)
+from app.components.faiss_results import (RESULT_COLUMNS,
+                                          faiss_results_dataframe)
 
 
 @dataclass
@@ -91,3 +89,30 @@ def test_empty_results_return_empty_table():
     assert isinstance(dataframe, pd.DataFrame)
     assert dataframe.empty
     assert list(dataframe.columns) == RESULT_COLUMNS
+
+
+def test_faiss_results_filtering_by_similarity_range():
+    records = [
+        (Record("doc1.pdf", 0, "Match 1"), 0.50),
+        (Record("doc2.pdf", 1, "Match 2"), 0.85),
+        (Record("doc3.pdf", 2, "Match 3"), 0.95),
+    ]
+
+    # No filter (default)
+    df_all = faiss_results_dataframe(records)
+    assert len(df_all) == 3
+
+    # Min filter
+    df_min = faiss_results_dataframe(records, min_similarity=0.80)
+    assert len(df_min) == 2
+    assert "doc1.pdf" not in df_min["Target Document"].tolist()
+
+    # Max filter
+    df_max = faiss_results_dataframe(records, max_similarity=0.90)
+    assert len(df_max) == 2
+    assert "doc3.pdf" not in df_max["Target Document"].tolist()
+
+    # Min and Max filter range
+    df_range = faiss_results_dataframe(records, min_similarity=0.60, max_similarity=0.90)
+    assert len(df_range) == 1
+    assert df_range.iloc[0]["Target Document"] == "doc2.pdf"

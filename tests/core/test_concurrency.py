@@ -1,9 +1,12 @@
 import os
-import time
-import pytest
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
-from src.core.concurrency import FAISSLock, faiss_write_lock, ConcurrencyTimeoutError
+
+import pytest
+
+from src.core.concurrency import (ConcurrencyTimeoutError, FAISSLock,
+                                  faiss_write_lock)
 
 # ---------------------------------------------------------------------------
 # Test Locking Mechanics
@@ -97,3 +100,19 @@ def test_concurrent_faiss_rebuild_sequencing(tmp_path):
     assert len(shared_resource) == num_threads
     assert -1 not in shared_resource # No timeouts occurred
     assert sorted(shared_resource) == list(range(num_threads)) # All threads executed sequentially
+
+
+def test_faiss_lock_configurable_timeout(mocker):
+    mocker.patch('src.core.app_config.get_lock_timeout', return_value=15)
+    from src.core.concurrency import FAISSLock
+    lock = FAISSLock()
+    assert lock.timeout == 15
+
+def test_faiss_write_lock_context_configurable_timeout(mocker):
+    mocker.patch('src.core.app_config.get_lock_timeout', return_value=45)
+    from src.core.concurrency import faiss_write_lock
+    with mocker.patch('src.core.concurrency.FAISSLock') as mock_lock:
+        mock_lock.return_value.acquire.return_value = None
+        with faiss_write_lock():
+            pass
+        mock_lock.assert_called_with(lock_file='corpus.index.lock', timeout=45)

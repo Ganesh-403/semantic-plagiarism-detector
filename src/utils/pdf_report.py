@@ -5,10 +5,12 @@ Generates professional PDF plagiarism reports using ReportLab.
 Provides side-by-side comparison of suspicious paragraph pairs with visual similarity indicators.
 """
 
+from __future__ import annotations
 from datetime import datetime
 from io import BytesIO
 from typing import List, Optional, Tuple
 
+from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.lib.colors import HexColor
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
@@ -16,14 +18,8 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
-from reportlab.platypus import (
-    PageBreak,
-    Paragraph,
-    SimpleDocTemplate,
-    Spacer,
-    Table,
-    TableStyle,
-)
+from reportlab.platypus import (PageBreak, Paragraph, SimpleDocTemplate,
+                                Spacer, Table, TableStyle)
 
 try:
     import fitz  # PyMuPDF
@@ -121,6 +117,44 @@ def compress_pdf_buffer(pdf_buffer: BytesIO) -> BytesIO:
         except Exception:
             pass
         return pdf_buffer
+
+
+class NumberedCanvas(canvas.Canvas):
+    """
+    Canvas that renders dynamic page numbers in the format:
+    'Page X of Y'
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_page_states = []
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        # Save the final page before calculating total pages
+        self._saved_page_states.append(dict(self.__dict__))
+
+        total_pages = len(self._saved_page_states)
+
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self.draw_page_number(total_pages)
+            super().showPage()
+
+        super().save()
+
+    def draw_page_number(self, total_pages):
+        self.setFont("Helvetica", 9)
+        self.setFillColor(colors.grey)
+
+        self.drawRightString(
+            A4[0] - 72,
+            15,
+            f"Page {self._pageNumber} of {total_pages}",
+        )
 
 
 def generate_plagiarism_report(
@@ -436,7 +470,12 @@ def generate_plagiarism_report(
     )
 
     # Build PDF
-    doc.build(story, onFirstPage=_draw_header, onLaterPages=_draw_header)
+    doc.build(
+        story,
+        onFirstPage=_draw_header,
+        onLaterPages=_draw_header,
+        canvasmaker=NumberedCanvas,
+    )
     return compress_pdf_buffer(buffer)
 
 

@@ -1,4 +1,6 @@
-from src.utils.text_stats import get_word_count, get_char_count, get_reading_time_minutes, format_text_stats
+from src.utils.text_stats import (format_text_stats, get_char_count,
+                                  get_reading_time_minutes, get_word_count)
+
 
 def test_get_word_count():
     assert get_word_count("This is a test.") == 4

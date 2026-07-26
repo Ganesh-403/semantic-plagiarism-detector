@@ -11,7 +11,8 @@ import sys
 from io import BytesIO
 
 from src.core.cross_lingual import prepare_text_for_embedding
-from src.core.document_parser import DEFAULT_OCR_DPI, DEFAULT_OCR_LANGUAGE, extract_text
+from src.core.document_parser import (DEFAULT_OCR_DPI, DEFAULT_OCR_LANGUAGE,
+                                      extract_text)
 from src.core.embedding_model import embed_documents
 from src.core.similarity import document_similarity_matrix, flag_plagiarism
 from src.core.synchronization import verify_and_repair_index

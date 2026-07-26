@@ -4,11 +4,8 @@ import numpy as np
 import pytest
 
 import src.core.embedding_model as embedding_model
-from src.core.embedding_model import (
-    embed_chunks,
-    embed_documents,
-    get_document_embedding,
-)
+from src.core.embedding_model import (embed_chunks, embed_documents,
+                                      get_document_embedding)
 
 
 def _mock_encode(

@@ -1,10 +1,7 @@
 import pytest
 
-from src.utils.filename import (
-    sanitize_filename,
-    sanitize_filename_mapping,
-    unique_filename,
-)
+from src.utils.filename import (sanitize_filename, sanitize_filename_mapping,
+                                unique_filename)
 
 
 @pytest.mark.parametrize(

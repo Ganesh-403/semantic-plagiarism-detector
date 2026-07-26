@@ -7,11 +7,9 @@ import pytest
 from reportlab.pdfgen import canvas
 from streamlit.testing.v1 import AppTest
 
-
 # Mock streamlit_tour globally during test import to avoid StreamlitAPIException
 sys.modules["streamlit_tour"] = MagicMock()
 from tests.conftest import MockDataFactory
-
 
 # Paths to stale artifacts that can pollute test runs
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))

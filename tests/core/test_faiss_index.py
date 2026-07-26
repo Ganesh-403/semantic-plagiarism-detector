@@ -2,14 +2,9 @@ import faiss
 import numpy as np
 import pytest
 
-from src.core.faiss_index import (
-    ChunkRecord,
-    build_index,
-    find_plagiarised_chunks,
-    load_index,
-    save_index,
-    search_similar_chunks,
-)
+from src.core.faiss_index import (ChunkRecord, build_index,
+                                  find_plagiarised_chunks, load_index,
+                                  save_index, search_similar_chunks)
 
 
 def _unit_vecs(n, dim=384):

@@ -4,17 +4,10 @@ import sqlite3
 
 import pytest
 
-from src.db.migrations import (
-    AUTH_SCHEMA_VERSION,
-    CORPUS_SCHEMA_VERSION,
-    column_exists,
-    get_user_version,
-    index_exists,
-    migrate_auth_database,
-    migrate_corpus_database,
-    run_migrations,
-    table_exists,
-)
+from src.db.migrations import (AUTH_SCHEMA_VERSION, CORPUS_SCHEMA_VERSION,
+                               column_exists, get_user_version, index_exists,
+                               migrate_auth_database, migrate_corpus_database,
+                               run_migrations, table_exists)
 
 
 def connect(path) -> sqlite3.Connection:

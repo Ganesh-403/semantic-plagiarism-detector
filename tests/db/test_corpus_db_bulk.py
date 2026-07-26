@@ -1,6 +1,10 @@
-import pytest
 import sqlite3
-from src.db.corpus_db import add_documents_bulk, get_all_documents, init_corpus_db, clear_all_data
+
+import pytest
+
+from src.db.corpus_db import (add_documents_bulk, clear_all_data,
+                              get_all_documents, init_corpus_db)
+
 
 @pytest.fixture(autouse=True)
 def setup_teardown():

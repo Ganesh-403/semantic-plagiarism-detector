@@ -35,7 +35,8 @@ def _get_model_and_tokenizer():
         logger.info(f"[ai_detector] Loading model: {model_name} …")
 
         try:
-            from transformers import AutoModelForSequenceClassification, AutoTokenizer
+            from transformers import (AutoModelForSequenceClassification,
+                                      AutoTokenizer)
 
             _tokenizer = AutoTokenizer.from_pretrained(model_name)
             _model = AutoModelForSequenceClassification.from_pretrained(model_name)

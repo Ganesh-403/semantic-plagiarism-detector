@@ -4,12 +4,10 @@ test_ai_detector.py
 Tests for AI-generated text detection functionality.
 """
 
-from src.core.ai_detector import (
-    detect_ai_probability,
-    detect_ai_probability_batch,
-    detect_document_ai_probability,
-    detect_documents_ai_probability,
-)
+from src.core.ai_detector import (detect_ai_probability,
+                                  detect_ai_probability_batch,
+                                  detect_document_ai_probability,
+                                  detect_documents_ai_probability)
 
 
 def test_detect_ai_probability_empty_text():

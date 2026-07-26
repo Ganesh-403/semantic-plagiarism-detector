@@ -7,13 +7,9 @@ from typing import Any, Mapping, Sequence
 import pandas as pd
 import streamlit as st
 
-from src.db.incidents import (
-    DEFAULT_DB_PATH,
-    get_all_incidents,
-    incidents_to_csv,
-    sync_flagged_incidents,
-    update_review_status,
-)
+from src.db.incidents import (DEFAULT_DB_PATH, get_all_incidents,
+                              incidents_to_csv, sync_flagged_incidents,
+                              update_review_status)
 
 
 def render_incident_export_panel(

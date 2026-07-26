@@ -9,13 +9,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.utils.daily_summary_email import (
-    format_daily_summary,
-    get_admin_emails,
-    get_incidents_last_24h,
-    send_daily_summary,
-    send_email,
-)
+from src.utils.daily_summary_email import (format_daily_summary,
+                                           get_admin_emails,
+                                           get_incidents_last_24h,
+                                           send_daily_summary, send_email)
 
 
 @pytest.fixture

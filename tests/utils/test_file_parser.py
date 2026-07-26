@@ -4,9 +4,10 @@ tests/utils/test_file_parser.py
 Unit tests for password-protected PDF parsing.
 """
 
-import pytest
 import fitz
-from src.utils.file_parser import extract_text_from_pdf, EncryptedPDFError
+import pytest
+
+from src.utils.file_parser import EncryptedPDFError, extract_text_from_pdf
 
 
 def test_encrypted_pdf_handling():

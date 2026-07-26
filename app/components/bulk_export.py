@@ -1,6 +1,9 @@
-import streamlit as st
 from typing import List
+
+import streamlit as st
+
 from src.core.tag_manager import TagManager
+
 
 def render_bulk_tag_actions(selected_documents: List[str]):
     """

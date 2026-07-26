@@ -26,6 +26,7 @@ import shutil
 import sys
 import types
 from unittest.mock import MagicMock
+
 import numpy as np
 
 # ── Redis Test Database Isolation ─────────────────────────────────────────
@@ -145,9 +146,9 @@ def mock_db(tmp_path):
         
         # Initialize schemas
         try:
+            from src.db.auth import init_db
             from src.db.corpus_db import init_corpus_db
             from src.db.incidents import init_incidents_db
-            from src.db.auth import init_db
             init_corpus_db()
             init_incidents_db()
             init_db()

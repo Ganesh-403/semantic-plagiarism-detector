@@ -1,19 +1,12 @@
 import numpy as np
 import pytest
 
-from src.db.corpus_db import (
-    add_chunks,
-    add_document,
-    clear_all_data,
-    delete_document,
-    get_all_documents,
-    get_all_embeddings,
-    get_chunk_registry,
-    get_document_by_hash,
-    get_document_chunks_count,
-    get_documents_by_class,
-    get_unique_class_sections,
-)
+from src.db.corpus_db import (add_chunks, add_document, clear_all_data,
+                              delete_document, get_all_documents,
+                              get_all_embeddings, get_chunk_registry,
+                              get_document_by_hash, get_document_chunks_count,
+                              get_documents_by_class,
+                              get_unique_class_sections)
 
 
 @pytest.fixture(autouse=True)
@@ -204,12 +197,8 @@ def test_clear_all_data_clears_incidents():
 def test_get_document_word_counts():
     import numpy as np
 
-    from src.db.corpus_db import (
-        add_chunks,
-        add_document,
-        clear_all_data,
-        get_document_word_counts,
-    )
+    from src.db.corpus_db import (add_chunks, add_document, clear_all_data,
+                                  get_document_word_counts)
 
     clear_all_data()
 

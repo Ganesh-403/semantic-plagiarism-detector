@@ -18,6 +18,7 @@ RESULT_COLUMNS: list[str] = [
     "Chunk",
     "Similarity Score",
     "Matching Text",
+    "Stats",
 ]
 
 
@@ -40,32 +41,33 @@ def _record_value(record: Any, name: str, default: Any = None) -> Any:
 
 def faiss_results_dataframe(
     results: Iterable[tuple[Any, float]],
+    min_similarity: float | None = None,
+    max_similarity: float | None = None,
 ) -> pd.DataFrame:
     """
     Convert FAISS records into a sortable display DataFrame.
 
     Args:
         results: An iterable of tuples containing a record and a raw similarity score.
+        min_similarity: Minimum similarity score to include.
+        max_similarity: Maximum similarity score to include.
 
     Returns:
         A pandas DataFrame containing the formatted search results.
     """
     rows: list[dict[str, Any]] = []
 
-    RESULT_COLUMNS: list[str] = [
-        "Rank",
-        "Target Document",
-        "Chunk",
-        "Similarity Score",
-        "Matching Text",
-        "Stats",
-    ]
-
     for record, raw_score in results:
+        score: float = float(raw_score)
+
+        if min_similarity is not None and score < min_similarity:
+            continue
+        if max_similarity is not None and score > max_similarity:
+            continue
+
         document: str = str(_record_value(record, "doc_name", "Unknown document"))
         chunk_index: int = int(_record_value(record, "chunk_index", 0))
         chunk_text: str = str(_record_value(record, "chunk_text", ""))
-        score: float = float(raw_score)
 
         from src.utils.text_stats import format_text_stats
 
@@ -88,6 +90,7 @@ def faiss_results_dataframe(
         ascending=[False, True, True],
         kind="stable",
     ).reset_index(drop=True)
+
     dataframe.insert(0, "Rank", range(1, len(dataframe) + 1))
 
     return dataframe[RESULT_COLUMNS]

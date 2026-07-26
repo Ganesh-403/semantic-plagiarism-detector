@@ -1,7 +1,10 @@
 import os
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
-from src.core.synchronization import verify_and_repair_index, _backup_corrupted_index
+
+from src.core.synchronization import (_backup_corrupted_index,
+                                      verify_and_repair_index)
 
 # ---------------------------------------------------------------------------
 # Test Verification & Desync Scenarios

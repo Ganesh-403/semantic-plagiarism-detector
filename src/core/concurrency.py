@@ -1,6 +1,6 @@
+import logging
 import os
 import time
-import logging
 from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,11 @@ class FAISSLock:
     simultaneously, the .index file will corrupt.
     """
     
-    def __init__(self, lock_file: str = "faiss_rebuild.lock", timeout: int = 30):
+    def __init__(self, lock_file: str = "faiss_rebuild.lock", timeout: int = None):
+        if timeout is None:
+            from src.core.app_config import get_lock_timeout
+            timeout = get_lock_timeout()
+            
         self.lock_file = lock_file
         self.timeout = timeout
         
@@ -78,7 +82,7 @@ class FAISSLock:
             logger.warning(f"Failed to release FAISS lock gracefully: {e}")
 
 @contextmanager
-def faiss_write_lock(lock_path: str = "corpus.index.lock", timeout: int = 30):
+def faiss_write_lock(lock_path: str = "corpus.index.lock", timeout: int = None):
     """
     Context manager for safely locking FAISS I/O operations.
     

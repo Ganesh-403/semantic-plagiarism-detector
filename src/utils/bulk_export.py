@@ -1,12 +1,12 @@
 import io
-import zipfile
 import json
 import logging
+import zipfile
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
-from src.utils.pdf_report import generate_plagiarism_report
 from src.core.similarity import find_most_similar_chunks
+from src.utils.pdf_report import generate_plagiarism_report
 
 logger = logging.getLogger(__name__)
 

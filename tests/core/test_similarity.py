@@ -2,23 +2,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.core.lexical_similarity import (  # noqa: E402
-    STOPWORDS,
-    jaccard_similarity,
-    lexical_similarity_matrix,
-    remove_stopwords,
-    tokenize,
-)
-from src.core.similarity import (
-    chunk_max_similarity,
-    chunk_similarity_matrix,
-    document_similarity_matrix,
-    find_most_similar_chunks,
-    flag_plagiarism,
-    hybrid_similarity_matrix,
-)
-
-
+from src.core.lexical_similarity import (STOPWORDS,  # noqa: E402
+                                         jaccard_similarity,
+                                         lexical_similarity_matrix,
+                                         remove_stopwords, tokenize)
+from src.core.similarity import (chunk_max_similarity, chunk_similarity_matrix,
+                                 document_similarity_matrix,
+                                 find_most_similar_chunks, flag_plagiarism,
+                                 hybrid_similarity_matrix)
 
 
 def test_chunk_max_similarity(dummy_embeddings):

@@ -9,11 +9,8 @@ from unittest.mock import patch
 
 from PyPDF2 import PdfReader
 
-from src.utils.pdf_report import (
-    generate_plagiarism_report,
-    get_similarity_color,
-    wrap_text,
-)
+from src.utils.pdf_report import (generate_plagiarism_report,
+                                  get_similarity_color, wrap_text)
 
 FIXTURE_DIR = os.path.join(os.path.dirname(__file__), "..", "fixtures")
 GOLDEN_PATH = os.path.join(FIXTURE_DIR, "pdf_report_golden.hash")
@@ -317,3 +314,35 @@ def test_generate_plagiarism_report_auto_detect_dark_mode():
     pdf_bytes = pdf_buffer.getvalue()
     assert pdf_bytes.startswith(b"%PDF")
     st.session_state.theme = "Light"
+
+
+def test_pdf_generation_memory_leak():
+    """Verify that generating multiple PDFs sequentially does not leak memory."""
+    import gc
+    import psutil
+
+    # 1. Warm-up run to initialize any lazy-loaded libraries (fonts, caches)
+    _ = generate_plagiarism_report(**SNAPSHOT_INPUTS)
+    
+    # 2. Force garbage collection and take baseline
+    gc.collect()
+    process = psutil.Process(os.getpid())
+    baseline_rss = process.memory_info().rss
+    
+    # 3. Generate 100 PDF reports sequentially
+    iterations = 100
+    for _ in range(iterations):
+        buffer = generate_plagiarism_report(**SNAPSHOT_INPUTS)
+        buffer.close()
+        del buffer
+        
+    # 4. Force garbage collection again
+    gc.collect()
+    
+    # 5. Measure final RSS
+    final_rss = process.memory_info().rss
+    growth_mb = (final_rss - baseline_rss) / (1024 * 1024)
+    
+    # 6. Assert memory growth is bounded
+    # Allow 25 MB growth for normal Python allocator and caching behaviour
+    assert growth_mb < 25.0, f"Memory leak detected: growth {growth_mb:.2f} MB exceeds threshold of 25.0 MB"

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import json
 
 """
@@ -381,7 +382,8 @@ def record_failed_login(username: str) -> None:
 
 def clear_login_attempts(username: str) -> None:
     """Clear failed login attempts after successful login."""
-    from src.utils.redis_cache import clear_login_attempts as redis_clear_login_attempts
+    from src.utils.redis_cache import \
+        clear_login_attempts as redis_clear_login_attempts
 
     identifier = username.lower()
     redis_clear_login_attempts(identifier)

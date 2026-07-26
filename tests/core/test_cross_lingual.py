@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from src.core.cross_lingual import (
-    detect_language,
-    prepare_chunks_for_embedding,
-    prepare_documents_for_embedding,
-    prepare_text_for_embedding,
-)
+from src.core.cross_lingual import (detect_language,
+                                    prepare_chunks_for_embedding,
+                                    prepare_documents_for_embedding,
+                                    prepare_text_for_embedding)
 
 
 def test_detects_english_text():

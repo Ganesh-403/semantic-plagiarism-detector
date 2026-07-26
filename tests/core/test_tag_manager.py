@@ -1,5 +1,7 @@
 import pytest
+
 from src.core.tag_manager import TagManager
+
 
 def test_parse_tags_empty():
     assert TagManager.parse_tags("") == ""

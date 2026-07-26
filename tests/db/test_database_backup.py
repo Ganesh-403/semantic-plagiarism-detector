@@ -2,10 +2,7 @@ import sqlite3
 
 import pytest
 
-from src.db.database_backup import (
-    SQLITE_HEADER,
-    create_sqlite_snapshot,
-)
+from src.db.database_backup import SQLITE_HEADER, create_sqlite_snapshot
 
 
 def create_test_database(path):

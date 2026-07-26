@@ -7,6 +7,7 @@ and translation API integration with SQLite caching.
 """
 
 from typing import Optional
+
 from src.db.translation_cache import cache_translation, get_cached_translation
 
 TRANSLATIONS = {

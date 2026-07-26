@@ -48,6 +48,8 @@ OCR_LANGUAGE_UNSUPPORTED = (
 OCR_DEPENDENCIES_MISSING = "OCR dependencies are missing. Install pytesseract, PyMuPDF and Pillow using: python -m pip install pytesseract pymupdf pillow"
 OCR_TESSERACT_NOT_FOUND = "Tesseract OCR was not found. Install Tesseract and either add it to PATH or set TESSERACT_CMD to tesseract.exe."
 BADGE_PIL_REQUIRED = "PIL/Pillow is required for PNG badge generation"
+PARSER_BATCH_LIMIT_EXCEEDED = "Batch parsing limit exceeded. Maximum allowed files per batch is {limit} documents."
+
 
 # Similarity & FAISS Errors
 SIM_BATCH_SIZE_INVALID = "batch_size must be an integer"

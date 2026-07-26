@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-import os
-import sys
 import argparse
-import subprocess
 import json
+import os
+import subprocess
+import sys
 from datetime import datetime
+
 
 def check_dependencies():
     """Ensure pytest and coverage are installed."""
     try:
-        import pytest
         import coverage
+        import pytest
     except ImportError as e:
         print(f"Error: Missing dependency. {e}")
         print("Please install requirements: pip install -r requirements.txt")

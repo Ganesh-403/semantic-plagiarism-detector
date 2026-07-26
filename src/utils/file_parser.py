@@ -5,8 +5,9 @@ Utility functions for parsing PDF, DOCX, and TXT files.
 Supports decrypted and password-protected PDF parsing using PyMuPDF (fitz).
 """
 
+from typing import Optional, Tuple
+
 import fitz  # PyMuPDF
-from typing import Tuple, Optional
 
 
 class EncryptedPDFError(Exception):

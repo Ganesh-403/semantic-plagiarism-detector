@@ -140,13 +140,8 @@ def generate_mock_data(
     from src.core.embedding_model import embed_documents
     from src.core.faiss_index import build_index, save_index
     from src.core.text_chunking import chunk_documents
-    from src.db.corpus_db import (
-        add_chunks,
-        add_document,
-        get_all_embeddings,
-        get_chunk_registry,
-        init_corpus_db,
-    )
+    from src.db.corpus_db import (add_chunks, add_document, get_all_embeddings,
+                                  get_chunk_registry, init_corpus_db)
 
     # Ensure the DB schema is initialised
     init_corpus_db()

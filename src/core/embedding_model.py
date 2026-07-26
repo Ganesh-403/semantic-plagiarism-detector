@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 embedding_model.py
 ------------------

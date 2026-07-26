@@ -5,18 +5,16 @@ import os
 from typing import Dict
 
 import numpy as np
-from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile, status
+from fastapi import (Depends, FastAPI, File, HTTPException, Query, UploadFile,
+                     status)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from src.core.document_parser import extract_text
 from src.core.embedding_model import embed_chunks, get_document_embedding
-from src.core.similarity import (
-    PLAGIARISM_THRESHOLD,
-    chunk_max_similarity,
-    find_most_similar_chunks,
-)
+from src.core.similarity import (PLAGIARISM_THRESHOLD, chunk_max_similarity,
+                                 find_most_similar_chunks)
 from src.core.text_chunking import chunk_document
 from src.db.auth import get_user_role
 from src.db.corpus_db import _connect, clear_all_data, init_corpus_db

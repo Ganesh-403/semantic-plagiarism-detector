@@ -1,9 +1,5 @@
-from src.utils.warning_list import (
-    filter_warnings,
-    paginate_warnings,
-    prepare_warning_page,
-    sort_warnings,
-)
+from src.utils.warning_list import (filter_warnings, paginate_warnings,
+                                    prepare_warning_page, sort_warnings)
 
 WARNINGS = [
     {"doc_a": "Zeta.pdf", "doc_b": "Alpha.pdf", "similarity": 0.91, "severity": "High"},

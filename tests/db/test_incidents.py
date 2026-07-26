@@ -3,14 +3,9 @@ import io
 
 import pytest
 
-from src.db.incidents import (
-    build_incident_id,
-    export_current_flags_csv,
-    get_all_incidents,
-    incidents_to_csv,
-    sync_flagged_incidents,
-    update_review_status,
-)
+from src.db.incidents import (build_incident_id, export_current_flags_csv,
+                              get_all_incidents, incidents_to_csv,
+                              sync_flagged_incidents, update_review_status)
 
 
 @pytest.fixture(autouse=True)

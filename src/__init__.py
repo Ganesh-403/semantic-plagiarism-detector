@@ -52,11 +52,14 @@ from .db import (
     verify_user,
 )
 from .visualization import (
+    build_network_data,
     plot_chunk_similarity_comparison,
     plot_similarity_heatmap,
     plot_similarity_heatmap_plotly,
     plot_similarity_network,
+    render_network_plotly,
 )
+
 
 __all__ = [
     "extract_text_from_pdf",
@@ -76,7 +79,10 @@ __all__ = [
     "plot_similarity_heatmap",
     "plot_similarity_heatmap_plotly",
     "plot_chunk_similarity_comparison",
+    "build_network_data",
+    "render_network_plotly",
     "plot_similarity_network",
+
     "translate_text",
     "send_plagiarism_alert",
     "dispatch_plagiarism_alert",

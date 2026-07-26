@@ -1,3 +1,23 @@
+from __future__ import annotations
+
+import time
+from contextlib import contextmanager
+
+class ProcessingTimer:
+    def __init__(self):
+        self.durations = []
+        self._active_timers = 0
+
+    @contextmanager
+    def time_block(self):
+        start = time.perf_counter()
+        self._active_timers += 1
+        try:
+            yield self
+        finally:
+            end = time.perf_counter()
+            self._active_timers -= 1
+            self.durations.append(end - start)
 """Helpers for estimating and formatting document processing time."""
 
 from __future__ import annotations
@@ -6,7 +26,6 @@ import math
 from collections.abc import Iterable
 from numbers import Real
 from typing import Any
-
 
 BYTES_PER_MB = 1024 * 1024
 DEFAULT_SECONDS_PER_MB = 2.0

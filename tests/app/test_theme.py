@@ -1,10 +1,5 @@
-from app.theme import (
-    COLORS,
-    badge_html,
-    severity_tier,
-    tier_color,
-    tier_from_severity_label,
-)
+from app.theme import (COLORS, badge_html, severity_tier, tier_color,
+                       tier_from_severity_label)
 
 
 def test_severity_tier():

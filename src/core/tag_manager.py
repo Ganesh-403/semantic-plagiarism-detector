@@ -1,6 +1,6 @@
+import logging
 import re
 from typing import List, Set
-import logging
 
 logger = logging.getLogger(__name__)
 

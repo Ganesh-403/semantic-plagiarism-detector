@@ -8,7 +8,6 @@ from pathlib import Path
 
 from src.db.corpus_db import get_corpus_db_path
 
-
 SQLITE_HEADER = b"SQLite format 3\x00"
 
 

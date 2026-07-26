@@ -10,7 +10,6 @@ from collections.abc import Collection, Mapping
 from pathlib import PurePath
 from typing import TypeVar
 
-
 DEFAULT_FILENAME = "document"
 MAX_FILENAME_LENGTH = 255
 

@@ -5,6 +5,7 @@ Builds and searches FAISS vector index for fast similarity lookup.
 """
 
 from typing import Dict, List, Tuple, Union
+
 import faiss
 import numpy as np
 

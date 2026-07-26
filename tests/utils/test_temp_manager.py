@@ -5,11 +5,10 @@ Unit tests for automatic temporary file and folder cleanup via atexit.
 """
 
 import os
-from src.utils.temp_manager import (
-    create_managed_temp_file,
-    register_temp_path,
-    cleanup_registered_temp_paths,
-)
+
+from src.utils.temp_manager import (cleanup_registered_temp_paths,
+                                    create_managed_temp_file,
+                                    register_temp_path)
 
 
 def test_managed_temp_file_creation_and_cleanup():

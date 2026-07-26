@@ -1,9 +1,9 @@
-import socket
-import urllib.parse
 import ipaddress
 import logging
-from typing import Optional, Dict
+import socket
 import time
+import urllib.parse
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 

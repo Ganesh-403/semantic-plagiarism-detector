@@ -5,6 +5,7 @@ Highlights overlapping phrases/sentences in a PDF file using PyMuPDF (fitz).
 """
 
 from typing import List, Optional
+
 import fitz  # PyMuPDF
 
 

@@ -13,25 +13,22 @@ import pandas as pd
 import plotly.graph_objects as go
 
 
-def plot_similarity_network(
+def build_network_data(
     similarity_df: pd.DataFrame,
     threshold: float = 0.59,
-    title: str = "Document Plagiarism Network",
     theme_colors: Optional[dict] = None,
-) -> go.Figure:
+) -> dict:
     """
-    Builds a networkx graph from the similarity matrix and returns an interactive Plotly figure.
+    Processes similarity matrix data, constructs NetworkX graph layout, and formats node and edge traces.
 
     Args:
         similarity_df: Square N×N DataFrame of similarity scores.
         threshold: Edge threshold; pairs with similarity >= threshold are connected.
-        title: Title of the graph.
         theme_colors: Optional dictionary containing theme colors.
 
     Returns:
-        Plotly Graph Objects Figure.
+        Dictionary containing shapes, edge_hover_trace, node_trace, graph, and pos coordinates.
     """
-
     # Create networkx graph
     G = nx.Graph()
 
@@ -91,11 +88,24 @@ def plot_similarity_network(
 
         # Color based on severity
         if score >= 0.90:
-            color = theme_colors["danger"] if theme_colors else "#ff4b4b"
+            color = (
+                theme_colors.get("danger", "#ff4b4b")
+                if theme_colors
+                else "#ff4b4b"
+            )
         elif score >= 0.75:
-            color = theme_colors["warning"] if theme_colors else "#ffa500"
+            color = (
+                theme_colors.get("warning", "#ffa500")
+                if theme_colors
+                else "#ffa500"
+            )
         else:
-            color = theme_colors["success"] if theme_colors else "#21c55d"
+            color = (
+                theme_colors.get("success", "#21c55d")
+                if theme_colors
+                else "#21c55d"
+            )
+
 
         shapes.append(
             dict(
@@ -262,7 +272,34 @@ def plot_similarity_network(
         name="Documents",
     )
 
-    # ── Figure Layout ──────────────────────────────────────────────────────────
+    return {
+        "shapes": shapes,
+        "edge_hover_trace": edge_hover_trace,
+        "node_trace": node_trace,
+        "graph": G,
+        "pos": pos,
+    }
+
+
+def render_network_plotly(
+    network_data: dict,
+    title: str = "Document Plagiarism Network",
+    theme_colors: Optional[dict] = None,
+) -> go.Figure:
+    """
+    Renders an interactive Plotly figure layout using preformatted graph data.
+
+    Args:
+        network_data: Dictionary containing shapes, edge_hover_trace, and node_trace.
+        title: Title of the graph.
+        theme_colors: Optional dictionary containing theme colors.
+
+    Returns:
+        Plotly Graph Objects Figure.
+    """
+    shapes = network_data.get("shapes", [])
+    edge_hover_trace = network_data.get("edge_hover_trace")
+    node_trace = network_data.get("node_trace")
 
     bg_color = (
         theme_colors.get(
@@ -282,11 +319,14 @@ def plot_similarity_network(
         else "#0F172A"
     )
 
+    traces = []
+    if edge_hover_trace is not None:
+        traces.append(edge_hover_trace)
+    if node_trace is not None:
+        traces.append(node_trace)
+
     fig = go.Figure(
-        data=[
-            edge_hover_trace,
-            node_trace,
-        ],
+        data=traces,
         layout=go.Layout(
             title=dict(
                 text=title,
@@ -325,3 +365,34 @@ def plot_similarity_network(
     )
 
     return fig
+
+
+def plot_similarity_network(
+    similarity_df: pd.DataFrame,
+    threshold: float = 0.59,
+    title: str = "Document Plagiarism Network",
+    theme_colors: Optional[dict] = None,
+) -> go.Figure:
+    """
+    Builds a networkx graph from the similarity matrix and returns an interactive Plotly figure.
+
+    Args:
+        similarity_df: Square N×N DataFrame of similarity scores.
+        threshold: Edge threshold; pairs with similarity >= threshold are connected.
+        title: Title of the graph.
+        theme_colors: Optional dictionary containing theme colors.
+
+    Returns:
+        Plotly Graph Objects Figure.
+    """
+    network_data = build_network_data(
+        similarity_df=similarity_df,
+        threshold=threshold,
+        theme_colors=theme_colors,
+    )
+    return render_network_plotly(
+        network_data=network_data,
+        title=title,
+        theme_colors=theme_colors,
+    )
+

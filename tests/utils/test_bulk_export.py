@@ -1,7 +1,9 @@
-import zipfile
 import io
 import json
+import zipfile
+
 from src.utils.bulk_export import generate_bulk_reports_zip
+
 
 def test_generate_bulk_reports_zip():
     flags = [

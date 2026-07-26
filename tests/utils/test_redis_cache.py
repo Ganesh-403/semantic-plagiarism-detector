@@ -9,17 +9,11 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from src.utils.redis_cache import (
-    RedisCache,
-    cache_analysis_results,
-    cache_faiss_index,
-    cache_session_state,
-    clear_session,
-    get_analysis_results,
-    get_cache,
-    get_faiss_index,
-    get_session_state,
-)
+from src.utils.redis_cache import (RedisCache, cache_analysis_results,
+                                   cache_faiss_index, cache_session_state,
+                                   clear_session, get_analysis_results,
+                                   get_cache, get_faiss_index,
+                                   get_session_state)
 
 
 class TestRedisCache:

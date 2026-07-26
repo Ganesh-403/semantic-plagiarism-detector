@@ -2,18 +2,11 @@ import math
 
 import pytest
 
-from src.core.config import (
-    DEFAULT_THRESHOLDS,
-    PLAGIARISM_THRESHOLD,
-    SimilarityThresholds,
-    is_plagiarism,
-    normalize_score,
-    normalize_severity_label,
-    severity_from_score,
-    severity_key,
-    severity_rank,
-    validate_thresholds,
-)
+from src.core.config import (DEFAULT_THRESHOLDS, PLAGIARISM_THRESHOLD,
+                             SimilarityThresholds, is_plagiarism,
+                             normalize_score, normalize_severity_label,
+                             severity_from_score, severity_key, severity_rank,
+                             validate_thresholds)
 
 
 def test_defaults_are_single_source_of_truth():

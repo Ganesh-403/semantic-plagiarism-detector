@@ -3,20 +3,10 @@ import uuid
 
 import pytest
 
-from src.db.auth import (
-    add_user,
-    delete_user,
-    disable_2fa,
-    enable_2fa,
-    get_2fa_status,
-    get_user_active_status,
-    get_user_role,
-    init_db,
-    is_user_active,
-    set_user_active_status,
-    update_password,
-    verify_user,
-)
+from src.db.auth import (add_user, delete_user, disable_2fa, enable_2fa,
+                         get_2fa_status, get_user_active_status, get_user_role,
+                         init_db, is_user_active, set_user_active_status,
+                         update_password, verify_user)
 
 
 @pytest.fixture(autouse=True)
@@ -156,7 +146,7 @@ def test_user_theme(mock_db):
     add_user(user, "password123")
     
     from src.db.auth import get_user_theme, set_user_theme
-    
+
     # Default should be light
     assert get_user_theme(user) == "light"
     

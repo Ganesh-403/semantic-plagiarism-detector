@@ -228,6 +228,17 @@ class RedisCache:
             return 0
 
 
+    def close(self) -> None:
+        """Explicitly close the Redis connection."""
+        if self._client is not None:
+            try:
+                self._client.close()
+                self._client = None
+            except Exception as e:
+                print(f"[RedisCache] Error closing Redis connection: {e}")
+                logger.error(f"[RedisCache] Error closing Redis connection: {e}")
+
+
 # Global cache instance
 _cache = RedisCache()
 
@@ -329,3 +340,13 @@ def get_upload_count(username: str) -> int:
 def is_upload_rate_limited(username: str) -> bool:
     """Check if a user has exceeded the upload rate limit (100 uploads/hour)."""
     return get_upload_count(username) >= 100
+
+
+import atexit
+
+def _cleanup_redis() -> None:
+    """Close the global Redis connection when the process terminates."""
+    if _cache:
+        _cache.close()
+
+atexit.register(_cleanup_redis)

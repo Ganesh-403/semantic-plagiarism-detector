@@ -9,11 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from src.core.config import (
-    normalize_score,
-    normalize_severity_label,
-    severity_from_score,
-)
+from src.core.config import (normalize_score, normalize_severity_label,
+                             severity_from_score)
 from src.db.migrations import migrate_corpus_database
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "corpus.db"

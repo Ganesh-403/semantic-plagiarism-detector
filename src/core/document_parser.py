@@ -11,14 +11,12 @@ import subprocess
 import tempfile
 from collections import Counter
 from pathlib import Path
-from typing import BinaryIO, Dict, List, Union
+from typing import BinaryIO, Dict, List, Optional, Union
+
 from urllib.parse import urlparse
 
-import defusedxml.lxml
-
-defusedxml.lxml.monkey_patch()
-
 import docx
+
 import pdfplumber
 from langdetect import LangDetectException, detect
 from striprtf.striprtf import rtf_to_text
@@ -35,8 +33,26 @@ DEFAULT_OCR_DPI = 250
 MIN_OCR_DPI = 150
 MAX_OCR_DPI = 400
 DEFAULT_OCR_LANGUAGE = "eng"
+MAX_BATCH_SIZE = 50
+
+
+def check_batch_rate_limit(file_count: int, session_id: Optional[str] = None) -> None:
+    """
+    Validates batch file collection size against session rate limits.
+
+    Raises:
+        ValueError: If file count exceeds MAX_BATCH_SIZE (50 documents).
+    """
+    if file_count > MAX_BATCH_SIZE:
+        from src.errors import PARSER_BATCH_LIMIT_EXCEEDED
+
+        raise ValueError(
+            PARSER_BATCH_LIMIT_EXCEEDED.format(limit=MAX_BATCH_SIZE)
+        )
+
 
 # Tesseract language packs intentionally exposed by the administrator UI.
+
 # More values may be added later without changing the extraction API.
 SUPPORTED_OCR_LANGUAGES = {
     "eng": "English",
@@ -426,6 +442,7 @@ def extract_texts_parallel(
     *,
     ocr_language: str = DEFAULT_OCR_LANGUAGE,
     ocr_dpi: int = DEFAULT_OCR_DPI,
+    session_id: Optional[str] = None,
 ) -> tuple[Dict[str, str], Dict[str, Exception]]:
     """
     Extract text from multiple files in parallel using ProcessPoolExecutor.
@@ -433,6 +450,8 @@ def extract_texts_parallel(
     Returns:
         tuple of (results_dict, errors_dict)
     """
+    check_batch_rate_limit(len(files_dict) if files_dict else 0, session_id=session_id)
+
     ocr_language, ocr_dpi = normalize_ocr_settings(
         language=ocr_language,
         dpi=ocr_dpi,
@@ -926,6 +945,35 @@ def extract_text_from_md(file: PDFInput) -> str:
     return strip_markdown_syntax(raw_text)
 
 
+def extract_text_from_image(
+    file: PDFInput, *, ocr_language: str = DEFAULT_OCR_LANGUAGE
+) -> str:
+    """Extract text from an image (PNG, JPG) using Tesseract OCR."""
+    try:
+        import pytesseract
+        from PIL import Image
+    except ImportError as exc:
+        from src.errors import OCR_DEPENDENCIES_MISSING
+        raise OCRDependencyError(OCR_DEPENDENCIES_MISSING) from exc
+
+    _configure_tesseract(pytesseract)
+
+    file_bytes = _read_pdf_bytes(file)
+    try:
+        image = Image.open(io.BytesIO(file_bytes))
+        return pytesseract.image_to_string(
+            image,
+            lang=ocr_language,
+            config="--oem 3 --psm 3",
+        ).strip()
+    except pytesseract.TesseractNotFoundError as exc:
+        from src.errors import OCR_TESSERACT_NOT_FOUND
+        raise OCRDependencyError(OCR_TESSERACT_NOT_FOUND) from exc
+    except Exception as exc:
+        logger.error(f"[document_parser] Error reading image: {exc}")
+        return ""
+
+
 def extract_text(
     file: PDFInput,
     filename: str,
@@ -955,19 +1003,23 @@ def extract_text(
 
     elif extension == "epub":
         raw = extract_text_from_epub(file)
+    elif extension in ("png", "jpg", "jpeg"):
+        raw = extract_text_from_image(file, ocr_language=ocr_language)
     else:
         raw = extract_text_from_txt(file)
 
     return strip_bibliography(raw)
 
 
-def extract_texts_from_pdfs(files: list) -> Dict[str, str]:
+def extract_texts_from_pdfs(files: list, session_id: Optional[str] = None) -> Dict[str, str]:
     """Legacy compatibility wrapper."""
-    return extract_texts(files)
+    return extract_texts(files, session_id=session_id)
 
 
-def extract_texts(files: list) -> Dict[str, str]:
+def extract_texts(files: list, session_id: Optional[str] = None) -> Dict[str, str]:
     """Extract text from multiple uploaded files."""
+    check_batch_rate_limit(len(files) if files else 0, session_id=session_id)
+
     files_dict = {}
     for idx, file in enumerate(files):
         if hasattr(file, "name"):
@@ -985,7 +1037,7 @@ def extract_texts(files: list) -> Dict[str, str]:
             logger.error(f"[document_parser] Error reading file data for {name}: {exc}")
             files_dict[name] = b""
 
-    raw_texts, errors = extract_texts_parallel(files_dict)
+    raw_texts, errors = extract_texts_parallel(files_dict, session_id=session_id)
     if errors:
         raise next(iter(errors.values()))
 
@@ -994,3 +1046,4 @@ def extract_texts(files: list) -> Dict[str, str]:
         results[name] = raw_texts.get(name, "")
 
     return results
+

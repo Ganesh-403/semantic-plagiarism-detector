@@ -1,7 +1,10 @@
-import pytest
 import socket
 from unittest.mock import patch
+
+import pytest
+
 from src.security.ssrf_protector import SSRFProtector, SSRFSecurityException
+
 
 @pytest.fixture(autouse=True)
 def clear_cache():
