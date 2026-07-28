@@ -15,7 +15,8 @@ from io import BytesIO
 from typing import List, Optional, Tuple
 
 from reportlab.lib import colors
-from src.core.app_config import get_pdf_footer_text
+from src.core.app_config import get_pdf_footer_text, get_verification_base_url
+import qrcode
 from reportlab.lib.colors import HexColor
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.pagesizes import A4
@@ -198,6 +199,7 @@ def generate_plagiarism_report(
     logo_image: Optional[bytes] = None,
     brand_color: Optional[str] = None,
     dark_mode: Optional[bool] = None,
+    report_id: Optional[str] = None,
 ) -> BytesIO:
 
     brand_hex = brand_color or "#1e3a8a"
@@ -320,6 +322,33 @@ def generate_plagiarism_report(
             except Exception:
                 pass
 
+        if report_id:
+            try:
+                base_url = get_verification_base_url()
+                verification_url = f"{base_url}?report_id={report_id}"
+                qr_img = qrcode.make(verification_url, box_size=10, border=1)
+                qr_buffer = BytesIO()
+                qr_img.save(qr_buffer, format="PNG")
+                qr_buffer.seek(0)
+                qr_reader = ImageReader(qr_buffer)
+                
+                qr_display_w = 1.0 * inch
+                qr_display_h = 1.0 * inch
+                x_qr = _doc.pagesize[0] - _doc.rightMargin - qr_display_w
+                y_qr = _doc.pagesize[1] - 36 - qr_display_h
+                
+                canvas_obj.drawImage(
+                    qr_reader,
+                    x_qr,
+                    y_qr,
+                    width=qr_display_w,
+                    height=qr_display_h,
+                    preserveAspectRatio=True,
+                    mask="auto",
+                )
+            except Exception:
+                pass
+
         footer_text = get_pdf_footer_text()
         if footer_text:
             canvas_obj.setFont("Helvetica", 9)
@@ -334,16 +363,6 @@ def generate_plagiarism_report(
         canvas_obj.restoreState()
 
 
-
-        if footer_text:
-            canvas_obj.saveState()
-            canvas_obj.setFont("Helvetica", 9)
-            if dark_mode:
-                canvas_obj.setFillColor(HexColor("#9CA3AF"))
-            else:
-                canvas_obj.setFillColor(HexColor("#6B7280"))
-            canvas_obj.drawCentredString(_doc.pagesize[0] / 2.0, 20, footer_text)
-            canvas_obj.restoreState()
 
     # Build story (PDF content)
 
@@ -566,18 +585,10 @@ def generate_plagiarism_report(
     )
 
 
+
     doc.build(story, onFirstPage=_draw_header, onLaterPages=_draw_header)
     buffer.seek(0)
     return buffer
-
-    # Build PDF
-    doc.build(
-        story,
-        onFirstPage=_draw_header,
-        onLaterPages=_draw_header,
-        canvasmaker=NumberedCanvas,
-    )
-    return compress_pdf_buffer(buffer)
 
 
 

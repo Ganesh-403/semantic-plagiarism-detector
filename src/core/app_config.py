@@ -55,4 +55,6 @@ def get_lock_timeout() -> int:
         return 30
 
 
-
+def get_verification_base_url() -> str:
+    """Return the configured base URL for report verification."""
+    return os.getenv("VERIFICATION_BASE_URL", "https://example.com/verify").strip()
