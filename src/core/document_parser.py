@@ -326,8 +326,48 @@ def _configure_tesseract(pytesseract_module) -> None:
         pytesseract_module.pytesseract.tesseract_cmd = configured_path
 
 
-def _ocr_pdf_page(
+def _is_blank_scanned_page(
     pdf_bytes: bytes,
+    page_index: int,
+    *,
+    dpi: int = DEFAULT_OCR_DPI,
+    variance_threshold: float = 5.0,
+) -> bool:
+    """Return True if a rendered page looks blank (very low pixel variance)."""
+    try:
+        import fitz  # PyMuPDF
+        from PIL import Image
+    except ImportError:
+        return False
+
+    try:
+        with fitz.open(stream=pdf_bytes, filetype="pdf") as document:
+            page = document.load_page(page_index)
+            scale = dpi / 72
+            pixmap = page.get_pixmap(
+                matrix=fitz.Matrix(scale, scale),
+                alpha=False,
+            )
+            image = Image.frombytes(
+                "RGB",
+                (pixmap.width, pixmap.height),
+                pixmap.samples,
+            ).convert("L")
+
+        histogram = image.histogram()
+        pixel_count = image.width * image.height
+        if pixel_count == 0:
+            return True
+
+        mean = sum(i * count for i, count in enumerate(histogram)) / pixel_count
+        variance = (
+            sum(count * ((i - mean) ** 2) for i, count in enumerate(histogram))
+            / pixel_count
+        )
+        return variance < variance_threshold
+    except Exception as exc:
+        logger.error(f"[document_parser] Error checking blank page {page_index}: {exc}")
+        return False    pdf_bytes: bytes,
     page_index: int,
     *,
     dpi: int = DEFAULT_OCR_DPI,
@@ -393,6 +433,20 @@ def _should_use_parallel() -> bool:
     return True
 
 
+def _format_table_as_text(table: List[List[Optional[str]]]) -> str:
+    """Format a pdfplumber-extracted table into clean, readable text.
+
+    Each row's cells are joined with ' | ' so the structure stays
+    readable instead of being merged into one chaotic string.
+    """
+    lines: List[str] = []
+    for row in table:
+        cells = [str(cell).strip() if cell is not None else "" for cell in row]
+        if any(cells):
+            lines.append(" | ".join(cells))
+    return "\n".join(lines)
+
+
 def _parse_pdf_page(
     pdf_bytes: bytes,
     page_index: int,
@@ -404,13 +458,42 @@ def _parse_pdf_page(
 
     import pdfplumber
 
-    try:
+try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
             page = pdf.pages[page_index]
-            native_text = (page.extract_text() or "").strip()
-            selected_text = native_text
+
 
             if not _has_meaningful_text(native_text):
+                if _is_blank_scanned_page(pdf_bytes, page_index, dpi=ocr_dpi):
+                    return []
+
+
+            tables = page.find_tables()
+
+            # Pull normal text, but exclude the regions covered by tables
+            # so table cells don't also show up mashed together in the
+            # regular text (which is what caused the chaotic strings).
+            text_page = page
+            for table in tables:
+                text_page = text_page.outside_bbox(table.bbox)
+            native_text = (text_page.extract_text() or "").strip()
+
+            table_texts = []
+            for table in tables:
+                extracted_rows = table.extract()
+                if extracted_rows:
+                    formatted = _format_table_as_text(extracted_rows)
+                    if formatted:
+                        table_texts.append(formatted)
+
+            combined_text = native_text
+            if table_texts:
+                combined_text = "\n\n".join([combined_text, *table_texts]).strip()
+
+            selected_text = combined_text
+
+            if not _has_meaningful_text(selected_text):
+
                 selected_text = _ocr_pdf_page(
                     pdf_bytes,
                     page_index,
@@ -418,10 +501,8 @@ def _parse_pdf_page(
                     language=ocr_language,
                 )
 
-            return _clean_page_text(selected_text)
-    except OCRDependencyError:
+            return _clean_page_text(selected_text)    except OCRDependencyError:
         raise
-    # Requires generic catch because pdfplumber/pdfminer raise various deeply nested exceptions (e.g. PdfminerException, PDFPasswordIncorrect) for encrypted/malformed PDFs
     except Exception as exc:
         logger.error(f"[document_parser] Error parsing page {page_index}: {exc}")
         return []
@@ -604,7 +685,6 @@ def extract_text_from_pdf(
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
             num_pages = len(pdf.pages)
-    # Requires generic catch because pdfplumber/pdfminer raise various deeply nested exceptions (e.g. PdfminerException, PDFPasswordIncorrect) for encrypted/malformed PDFs
     except Exception as exc:
         logger.error(f"[document_parser] Error reading PDF: {exc}")
         return ""
@@ -1046,4 +1126,3 @@ def extract_texts(files: list, session_id: Optional[str] = None) -> Dict[str, st
         results[name] = raw_texts.get(name, "")
 
     return results
-

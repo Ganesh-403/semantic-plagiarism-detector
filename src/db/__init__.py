@@ -7,7 +7,10 @@ from .corpus_db import (add_chunks, add_document, clear_all_data,
                         get_all_embeddings, get_all_tags, get_chunk_registry,
                         get_document_by_hash, get_document_chunks_count,
                         get_document_word_counts, get_documents_by_class,
-                        get_unique_class_sections, init_corpus_db)
+                        get_unique_class_sections, init_corpus_db,
+                        get_deleted_documents, soft_delete_document,
+                        restore_document, permanently_delete_document,
+                        empty_trash)
 
 __all__ = [
     "init_db",
@@ -38,6 +41,11 @@ __all__ = [
     "get_unique_class_sections",
     "get_documents_by_class",
     "get_document_word_counts",
+    "get_deleted_documents",
+    "soft_delete_document",
+    "restore_document",
+    "permanently_delete_document",
+    "empty_trash",
 ]
 
 

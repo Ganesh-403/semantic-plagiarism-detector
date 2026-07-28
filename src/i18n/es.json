@@ -21,5 +21,7 @@
   "download_csv": "⬇️ Descargar CSV",
   "download_excel": "📊 Exportar como Excel Estilizado (.xlsx)",
   "document_word_counts": "📊 Recuentos de Palabras del Documento",
-  "no_documents_db": "No hay documentos actualmente en la base de datos."
+  "no_documents_db": "No hay documentos actualmente en la base de datos.",
+  "tab_trash": "🗑️ Papelera",
+  "trash_empty_msg": "La papelera está vacía."
 }

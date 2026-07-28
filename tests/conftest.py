@@ -61,19 +61,20 @@ def sqlite_database_path(tmp_path):
 @pytest.fixture(autouse=True)
 def clean_test_env():
     """
-    Globally auto-used fixture that cleans up the FAISS index and SQLite DB 
+    Globally auto-used fixture that cleans up the FAISS index and SQLite DB
     before and after every test, preventing state leakage across test cases.
     """
     try:
-        from src.db.corpus_db import clear_all_data
+        from src.db.corpus_db import clear_all_data, close_connections
         clear_all_data()
+        close_connections()  # Flush the connection pool so mock_db starts clean
     except ImportError:
         pass
-        
+
     index_path = os.path.join(str(_REPO_ROOT), "corpus.index")
     db_path = os.path.join(str(_REPO_ROOT), "corpus.db")
     users_db_path = os.path.join(str(_REPO_ROOT), "users.db")
-    
+
     for path in [index_path, db_path, users_db_path]:
         if os.path.exists(path):
             try:
@@ -82,8 +83,9 @@ def clean_test_env():
                 pass
     yield
     try:
-        from src.db.corpus_db import clear_all_data
+        from src.db.corpus_db import clear_all_data, close_connections
         clear_all_data()
+        close_connections()
     except ImportError:
         pass
     for path in [index_path, db_path, users_db_path]:
@@ -109,7 +111,7 @@ class MockDataFactory:
     Generalized factory pattern for generating test mocks.
     Consolidates multiple disparate mocking functions.
     """
-    
+
     @staticmethod
     def embed_chunks(chunks, batch_size=64):
         """Standardized fast embedding mock for streamlit app tests."""
@@ -132,27 +134,40 @@ def mock_embed_chunks():
 def mock_db(tmp_path):
     """
     Provides an isolated, empty, and writable SQLite database schema for tests.
-    Patches the global database paths in src.db modules to use a temporary file.
+    Patches the global database paths in src.db modules to use temporary files.
     Ensures safe teardown and no interference with production databases.
+
+    Corpus and auth use *separate* files because they each rely on PRAGMA
+    user_version for migration tracking and would collide on the same file.
     """
-    db_file = tmp_path / "test_isolated.db"
-    
+    corpus_db_file = tmp_path / "test_corpus.db"
+    auth_db_file = tmp_path / "test_users.db"
+
     # We patch the database path at the module level for all db modules
     import unittest.mock
-    
-    with unittest.mock.patch("src.db.corpus_db._DB_PATH", str(db_file)), \
-         unittest.mock.patch("src.db.incidents.DEFAULT_DB_PATH", str(db_file)), \
-         unittest.mock.patch("src.db.auth._DB_PATH", str(db_file)):
-        
-        # Initialize schemas
+
+    with unittest.mock.patch("src.db.corpus_db._DB_PATH", str(corpus_db_file)), \
+         unittest.mock.patch("src.db.incidents.DEFAULT_DB_PATH", str(corpus_db_file)), \
+         unittest.mock.patch("src.db.auth._DB_PATH", str(auth_db_file)):
+
+        # Initialize schemas – each init is isolated so a single import
+        # failure does not prevent the other schemas from being created.
+        try:
+            from src.db.corpus_db import init_corpus_db
+            init_corpus_db()
+        except ImportError:
+            pass
+
+        try:
+            from src.db.incidents import init_incident_db
+            init_incident_db(str(corpus_db_file))
+        except ImportError:
+            pass
+
         try:
             from src.db.auth import init_db
-            from src.db.corpus_db import init_corpus_db
-            from src.db.incidents import init_incidents_db
-            init_corpus_db()
-            init_incidents_db()
             init_db()
         except ImportError:
             pass
-            
-        yield str(db_file)
+
+        yield str(corpus_db_file)

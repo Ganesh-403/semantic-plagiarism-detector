@@ -113,13 +113,27 @@ def init_corpus_db() -> None:
             conn.execute("ALTER TABLE documents ADD COLUMN pdf_creation_date TEXT")
         if "pdf_title" not in columns:
             conn.execute("ALTER TABLE documents ADD COLUMN pdf_title TEXT")
-        if "tags" not in columns:
-            conn.execute("ALTER TABLE documents ADD COLUMN tags TEXT")
+        if "is_deleted" not in columns:
+            conn.execute("ALTER TABLE documents ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0")
+        if "deleted_at" not in columns:
+            conn.execute("ALTER TABLE documents ADD COLUMN deleted_at TEXT")
 
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS chunks (
                 vector_id    INTEGER PRIMARY KEY,
+                filename     TEXT    NOT NULL,
+                chunk_index  INTEGER NOT NULL,
+                chunk_text   TEXT    NOT NULL,
+                embedding    BLOB    NOT NULL,
+                FOREIGN KEY (filename) REFERENCES documents(filename) ON DELETE CASCADE
+            )
+        """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS deleted_chunks (
+                vector_id    INTEGER,
                 filename     TEXT    NOT NULL,
                 chunk_index  INTEGER NOT NULL,
                 chunk_text   TEXT    NOT NULL,
@@ -191,26 +205,47 @@ def get_document_by_hash(file_hash: str) -> str | None:
     return row[0] if row else None
 
 
-def get_all_documents() -> list:
+def get_all_documents(include_deleted: bool = False) -> list:
     """Return all indexed documents sorted by upload date descending."""
     with _connect() as conn:
-        rows = conn.execute(
-            "SELECT filename, file_hash, upload_date, class_section, student_name, assignment_title, pdf_author, pdf_creation_date, pdf_title FROM documents ORDER BY upload_date DESC"
-        ).fetchall()
-    return [
-        {
-            "filename": r[0],
-            "file_hash": r[1],
-            "upload_date": r[2],
-            "class_section": r[3],
-            "student_name": r[4],
-            "assignment_title": r[5],
-            "pdf_author": r[6],
-            "pdf_creation_date": r[7],
-            "pdf_title": r[8],
-        }
-        for r in rows
-    ]
+        if include_deleted:
+            rows = conn.execute(
+                "SELECT filename, file_hash, upload_date, class_section, student_name, assignment_title, pdf_author, pdf_creation_date, pdf_title, is_deleted, deleted_at FROM documents ORDER BY upload_date DESC"
+            ).fetchall()
+            return [
+                {
+                    "filename": r[0],
+                    "file_hash": r[1],
+                    "upload_date": r[2],
+                    "class_section": r[3],
+                    "student_name": r[4],
+                    "assignment_title": r[5],
+                    "pdf_author": r[6],
+                    "pdf_creation_date": r[7],
+                    "pdf_title": r[8],
+                    "is_deleted": r[9],
+                    "deleted_at": r[10],
+                }
+                for r in rows
+            ]
+        else:
+            rows = conn.execute(
+                "SELECT filename, file_hash, upload_date, class_section, student_name, assignment_title, pdf_author, pdf_creation_date, pdf_title FROM documents WHERE is_deleted = 0 ORDER BY upload_date DESC"
+            ).fetchall()
+            return [
+                {
+                    "filename": r[0],
+                    "file_hash": r[1],
+                    "upload_date": r[2],
+                    "class_section": r[3],
+                    "student_name": r[4],
+                    "assignment_title": r[5],
+                    "pdf_author": r[6],
+                    "pdf_creation_date": r[7],
+                    "pdf_title": r[8],
+                }
+                for r in rows
+            ]
 
 
 def add_chunks(chunks_to_add: list) -> None:
@@ -264,12 +299,109 @@ def delete_document(filename: str) -> None:
     After deletion, vector_ids will have gaps, so we need to compact the vector IDs.
     """
     with _connect() as conn:
-        # Delete document (triggers cascading delete on chunks)
+        # Delete related plagiarism incidents and false positives manually since there are no FK cascades
+        conn.execute("DELETE FROM plagiarism_incidents WHERE document_a = ? OR document_b = ?", (filename, filename))
+        conn.execute("DELETE FROM false_positives WHERE document_a = ? OR document_b = ?", (filename, filename))
+        # Delete document (triggers cascading delete on chunks and deleted_chunks)
         conn.execute("DELETE FROM documents WHERE filename = ?", (filename,))
         conn.commit()
 
     # Re-index all remaining chunks so vector_ids are sequential [0, 1, ..., N-1]
     _compact_vector_ids()
+
+
+def soft_delete_document(filename: str) -> None:
+    """
+    Soft delete a document by setting is_deleted=1, moving its chunks to deleted_chunks,
+    and compacting vector IDs for the remaining active chunks.
+    """
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE documents SET is_deleted = 1, deleted_at = ? WHERE filename = ?",
+            (datetime.now().isoformat(), filename),
+        )
+        conn.execute(
+            """
+            INSERT INTO deleted_chunks (vector_id, filename, chunk_index, chunk_text, embedding)
+            SELECT vector_id, filename, chunk_index, chunk_text, embedding
+            FROM chunks
+            WHERE filename = ?
+            """,
+            (filename,),
+        )
+        conn.execute("DELETE FROM chunks WHERE filename = ?", (filename,))
+        conn.commit()
+    _compact_vector_ids()
+
+
+def get_deleted_documents() -> list:
+    """Return all soft-deleted documents sorted by deleted_at descending."""
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT filename, file_hash, upload_date, class_section, student_name, assignment_title, pdf_author, pdf_creation_date, pdf_title, deleted_at FROM documents WHERE is_deleted = 1 ORDER BY deleted_at DESC"
+        ).fetchall()
+    return [
+        {
+            "filename": r[0],
+            "file_hash": r[1],
+            "upload_date": r[2],
+            "class_section": r[3],
+            "student_name": r[4],
+            "assignment_title": r[5],
+            "pdf_author": r[6],
+            "pdf_creation_date": r[7],
+            "pdf_title": r[8],
+            "deleted_at": r[9],
+        }
+        for r in rows
+    ]
+
+
+def restore_document(filename: str) -> None:
+    """
+    Restore a soft-deleted document by setting is_deleted=0, moving its chunks back
+    to chunks, and re-compacting vector IDs.
+    """
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE documents SET is_deleted = 0, deleted_at = NULL WHERE filename = ?",
+            (filename,),
+        )
+        # Fetch restored chunks (ignoring their stale vector_ids)
+        restored = conn.execute(
+            "SELECT filename, chunk_index, chunk_text, embedding FROM deleted_chunks WHERE filename = ?",
+            (filename,),
+        ).fetchall()
+        # Append them after the current max vector_id
+        max_id_row = conn.execute("SELECT COALESCE(MAX(vector_id), -1) FROM chunks").fetchone()
+        next_id = max_id_row[0] + 1
+        for i, row in enumerate(restored):
+            conn.execute(
+                "INSERT INTO chunks (vector_id, filename, chunk_index, chunk_text, embedding) VALUES (?, ?, ?, ?, ?)",
+                (next_id + i, row[0], row[1], row[2], row[3]),
+            )
+        conn.execute("DELETE FROM deleted_chunks WHERE filename = ?", (filename,))
+        conn.commit()
+    _compact_vector_ids()
+
+
+def permanently_delete_document(filename: str) -> None:
+    """Permanently delete a document (alias to delete_document)."""
+    delete_document(filename)
+
+
+def empty_trash() -> None:
+    """Permanently delete all soft-deleted documents."""
+    with _connect() as conn:
+        # Get all filenames of soft-deleted documents to manually clean up plagiarism_incidents and false_positives
+        deleted_docs = [
+            r[0] for r in conn.execute("SELECT filename FROM documents WHERE is_deleted = 1").fetchall()
+        ]
+        for filename in deleted_docs:
+            conn.execute("DELETE FROM plagiarism_incidents WHERE document_a = ? OR document_b = ?", (filename, filename))
+            conn.execute("DELETE FROM false_positives WHERE document_a = ? OR document_b = ?", (filename, filename))
+        conn.execute("DELETE FROM documents WHERE is_deleted = 1")
+        conn.commit()
 
 
 def _compact_vector_ids() -> None:
@@ -321,6 +453,7 @@ def clear_all_data() -> None:
     with _connect() as conn:
         conn.execute("PRAGMA foreign_keys = ON")
         delete_all_if_table_exists(conn, "chunks")
+        delete_all_if_table_exists(conn, "deleted_chunks")
         delete_all_if_table_exists(conn, "documents")
         delete_all_if_table_exists(conn, "plagiarism_incidents")
         conn.commit()

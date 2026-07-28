@@ -103,11 +103,15 @@ def _fetch_all_incidents(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
         """
-        SELECT incident_id, document_a, document_b, similarity_score,
-               severity_rank, review_status, date_flagged, last_seen,
-               threshold_at_time_of_flag
-        FROM plagiarism_incidents
-        ORDER BY date_flagged DESC, incident_id ASC
+        SELECT pi.incident_id, pi.document_a, pi.document_b, pi.similarity_score,
+               pi.severity_rank, pi.review_status, pi.date_flagged, pi.last_seen,
+               pi.threshold_at_time_of_flag
+        FROM plagiarism_incidents pi
+        LEFT JOIN documents da ON pi.document_a = da.filename
+        LEFT JOIN documents db ON pi.document_b = db.filename
+        WHERE (da.is_deleted IS NULL OR da.is_deleted = 0)
+          AND (db.is_deleted IS NULL OR db.is_deleted = 0)
+        ORDER BY pi.date_flagged DESC, pi.incident_id ASC
         """
     ).fetchall()
 
@@ -137,7 +141,7 @@ def sync_flagged_incidents(
                     continue
 
                 first, second = _normalise_pair(doc_a, doc_b)
-                
+
                 bulk_records.append((
                     build_incident_id(first, second),
                     first,
@@ -170,12 +174,16 @@ def sync_flagged_incidents(
 
             rows = conn.execute(
                 """
-                SELECT incident_id, document_a, document_b,
-                       similarity_score, severity_rank,
-                       review_status, date_flagged, last_seen,
-                       threshold_at_time_of_flag
-                FROM plagiarism_incidents
-                ORDER BY date_flagged DESC, incident_id ASC
+                SELECT pi.incident_id, pi.document_a, pi.document_b,
+                       pi.similarity_score, pi.severity_rank,
+                       pi.review_status, pi.date_flagged, pi.last_seen,
+                       pi.threshold_at_time_of_flag
+                FROM plagiarism_incidents pi
+                LEFT JOIN documents da ON pi.document_a = da.filename
+                LEFT JOIN documents db ON pi.document_b = db.filename
+                WHERE (da.is_deleted IS NULL OR da.is_deleted = 0)
+                  AND (db.is_deleted IS NULL OR db.is_deleted = 0)
+                ORDER BY pi.date_flagged DESC, pi.incident_id ASC
                 """
             ).fetchall()
 
@@ -203,12 +211,16 @@ def get_all_incidents_above_threshold_for_export(
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             """
-            SELECT document_a as doc_a, document_b as doc_b,
-                   similarity_score as similarity,
-                   threshold_at_time_of_flag
-            FROM plagiarism_incidents
-            WHERE similarity_score >= ?
-            ORDER BY similarity_score DESC
+            SELECT pi.document_a as doc_a, pi.document_b as doc_b,
+                   pi.similarity_score as similarity,
+                   pi.threshold_at_time_of_flag
+            FROM plagiarism_incidents pi
+            LEFT JOIN documents da ON pi.document_a = da.filename
+            LEFT JOIN documents db ON pi.document_b = db.filename
+            WHERE pi.similarity_score >= ?
+              AND (da.is_deleted IS NULL OR da.is_deleted = 0)
+              AND (db.is_deleted IS NULL OR db.is_deleted = 0)
+            ORDER BY pi.similarity_score DESC
             """,
             (threshold,)
         ).fetchall()
@@ -284,12 +296,16 @@ def get_high_severity_trends(
         rows = conn.execute(
             """
             SELECT
-                DATE(date_flagged) as date,
+                DATE(pi.date_flagged) as date,
                 COUNT(*) as count
-            FROM plagiarism_incidents
-            WHERE severity_rank = 'High'
-                AND date_flagged >= datetime('now', '-' || ? || ' days')
-            GROUP BY DATE(date_flagged)
+            FROM plagiarism_incidents pi
+            LEFT JOIN documents da ON pi.document_a = da.filename
+            LEFT JOIN documents db ON pi.document_b = db.filename
+            WHERE pi.severity_rank = 'High'
+                AND pi.date_flagged >= datetime('now', '-' || ? || ' days')
+                AND (da.is_deleted IS NULL OR da.is_deleted = 0)
+                AND (db.is_deleted IS NULL OR db.is_deleted = 0)
+            GROUP BY DATE(pi.date_flagged)
             ORDER BY date ASC
             """,
             (days,),
@@ -312,9 +328,19 @@ def get_most_plagiarized_documents(
                 document_name,
                 COUNT(*) as incident_count
             FROM (
-                SELECT document_a as document_name FROM plagiarism_incidents
+                SELECT pi.document_a as document_name
+                FROM plagiarism_incidents pi
+                LEFT JOIN documents da ON pi.document_a = da.filename
+                LEFT JOIN documents db ON pi.document_b = db.filename
+                WHERE (da.is_deleted IS NULL OR da.is_deleted = 0)
+                  AND (db.is_deleted IS NULL OR db.is_deleted = 0)
                 UNION ALL
-                SELECT document_b as document_name FROM plagiarism_incidents
+                SELECT pi.document_b as document_name
+                FROM plagiarism_incidents pi
+                LEFT JOIN documents da ON pi.document_a = da.filename
+                LEFT JOIN documents db ON pi.document_b = db.filename
+                WHERE (da.is_deleted IS NULL OR da.is_deleted = 0)
+                  AND (db.is_deleted IS NULL OR db.is_deleted = 0)
             )
             GROUP BY document_name
             ORDER BY incident_count DESC
