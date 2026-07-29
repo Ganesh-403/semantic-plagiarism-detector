@@ -342,3 +342,49 @@ def find_most_similar_chunks(
 
     pairs.sort(key=lambda x: x[2], reverse=True)
     return pairs[:top_k]
+
+
+# ── Per-Paragraph Similarity Breakdown ────────────────────────────────────────
+
+
+def calculate_paragraph_similarity_breakdown(
+    emb_a: np.ndarray,
+    emb_b: np.ndarray,
+) -> List[Tuple[int, int, float]]:
+    """
+    Compute a per-paragraph similarity breakdown between two documents.
+
+    For each paragraph (chunk) in Document A, finds the single best-matching
+    paragraph in Document B using cosine similarity and returns a structured list
+    of ``(paragraph_a_idx, paragraph_b_idx, score)`` tuples, sorted by
+    descending similarity score.
+
+    Args:
+        emb_a: Paragraph embedding matrix for Document A. Shape ``(n_paragraphs, dim)``
+               or ``(dim,)`` for a single paragraph.
+        emb_b: Paragraph embedding matrix for Document B. Shape ``(m_paragraphs, dim)``
+               or ``(dim,)`` for a single paragraph.
+
+    Returns:
+        A list of ``(paragraph_a_idx, paragraph_b_idx, score)`` tuples, sorted
+        by descending score. Returns an empty list when either input is empty.
+    """
+    if emb_a.size == 0 or emb_b.size == 0:
+        return []
+
+    # Ensure 2-D matrices so cosine_similarity works uniformly.
+    matrix_a = emb_a.reshape(1, -1) if emb_a.ndim == 1 else emb_a
+    matrix_b = emb_b.reshape(1, -1) if emb_b.ndim == 1 else emb_b
+
+    # shape: (n_paragraphs_a, n_paragraphs_b)
+    sim_matrix = cosine_similarity(matrix_a, matrix_b)
+
+    breakdown: List[Tuple[int, int, float]] = []
+    for idx_a in range(sim_matrix.shape[0]):
+        idx_b = int(np.argmax(sim_matrix[idx_a]))
+        score = float(np.clip(sim_matrix[idx_a, idx_b], 0.0, 1.0))
+        breakdown.append((idx_a, idx_b, score))
+
+    breakdown.sort(key=lambda t: t[2], reverse=True)
+    return breakdown
+

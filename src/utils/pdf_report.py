@@ -682,4 +682,27 @@ def highlight_pdf_matches(
 
     output_bytes = doc.tobytes()
     doc.close()
+
     return output_bytes
+import os
+
+def truncate_filename(filename: str, max_len: int = 30) -> str:
+    """
+    Truncates a filename to max_len characters with an ellipsis if needed,
+    preserving its file extension.
+    """
+    if len(filename) <= max_len:
+        return filename
+
+    name, ext = os.path.splitext(filename)
+    needed_len = max_len - len(ext) - 3
+
+    if needed_len <= 2:
+        return filename[: max_len - 3] + "..."
+
+    half = needed_len // 2
+    truncated_name = f"{name[:half]}...{name[-(needed_len - half):]}"
+    return f"{truncated_name}{ext}"
+
+    return output_bytes
+

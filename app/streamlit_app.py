@@ -59,6 +59,37 @@ from src.core.similarity import (
     flag_plagiarism,
 )
 from src.core.webhook import send_plagiarism_alert
+from src.i18n.translator import _SUPPORTED_LANGUAGES
+from src.visualization.network_graph import plot_similarity_network
+from src.utils.storage_metrics import calculate_storage_usage
+
+
+class OCRFileBatchError(Exception):
+    """Exception raised when OCR extraction fails on one or more files in a batch."""
+
+    def __init__(self, failed_files: list[str], failure_details: list[str]):
+        self.failed_files = failed_files
+        self.failure_details = failure_details
+        super().__init__(f"OCR failed for files: {failed_files}")
+
+
+from src.core.export_engine import LMSExportEngine
+from src.core.telemetry import TelemetryService
+from src.db import (
+    clear_all_data,
+    delete_document,
+    get_all_documents,
+    get_all_embeddings,
+    get_chunk_registry,
+    get_unique_class_sections,
+    get_documents_by_class,
+)
+from src.utils.pdf_report import generate_plagiarism_report, highlight_pdf_matches
+from src.utils.badge_generator import (
+    generate_badge_png,
+    generate_badge_pdf,
+)
+
 from src.db.auth import (
     authenticate_user,
     disable_2fa,
@@ -156,6 +187,7 @@ if "lang" not in st.session_state:
 
 st.markdown(back_to_top_html(), unsafe_allow_html=True)
 inject_css()
+
 
 # ── SESSION TIMEOUT & ROUTE PROTECTION ────────────────────────────────────────
 TIMEOUT_LIMIT = 15 * 60  # 15 minutes

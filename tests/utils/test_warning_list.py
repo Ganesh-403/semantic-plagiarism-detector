@@ -1,5 +1,9 @@
+import pytest
+
 from src.utils.warning_list import (
+    build_key_extractor,
     filter_warnings,
+    matches_query_predicate,
     paginate_warnings,
     prepare_warning_page,
     sort_warnings,
@@ -26,6 +30,24 @@ WARNINGS = [
         "severity": "Medium",
     },
 ]
+
+
+def test_matches_query_predicate():
+    predicate_alpha = matches_query_predicate("alpha")
+    predicate_empty = matches_query_predicate("   ")
+
+    assert predicate_alpha(WARNINGS[0]) is True  # doc_b matches
+    assert predicate_alpha(WARNINGS[1]) is False # no match
+    assert predicate_alpha(WARNINGS[2]) is True  # doc_a matches
+    assert predicate_empty(WARNINGS[1]) is True  # empty query matches all
+
+
+def test_build_key_extractor():
+    extractor_doc_a = build_key_extractor("doc_a")
+    extractor_sim = build_key_extractor("similarity")
+
+    assert extractor_doc_a(WARNINGS[0]) == "zeta.pdf"
+    assert extractor_sim(WARNINGS[0]) == 0.91
 
 
 def test_search_matches_either_document_case_insensitively():
@@ -125,6 +147,8 @@ def test_filtering_occurs_before_pagination():
     assert len(page.items) == 2
     assert page.total_pages == 2
 
+    
+
 
 def test_filter_warnings_by_minimum_match_length():
     warnings = [
@@ -183,3 +207,4 @@ def test_page_size_clamping_to_max_100():
     assert page.page_size == 100
     assert len(page.items) == 100
     assert page.total_pages == 2
+

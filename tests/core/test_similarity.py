@@ -6,7 +6,8 @@ from src.core.lexical_similarity import (STOPWORDS,  # noqa: E402
                                          jaccard_similarity,
                                          lexical_similarity_matrix,
                                          remove_stopwords, tokenize)
-from src.core.similarity import (chunk_max_similarity, chunk_similarity_matrix,
+from src.core.similarity import (calculate_paragraph_similarity_breakdown,
+                                 chunk_max_similarity, chunk_similarity_matrix,
                                  document_similarity_matrix,
                                  find_most_similar_chunks, flag_plagiarism,
                                  hybrid_similarity_matrix)
@@ -445,3 +446,104 @@ def test_stopwords_set_is_nonempty_and_contains_core_words():
     assert len(STOPWORDS) > 0
     for word in ("the", "and", "is"):
         assert word in STOPWORDS
+
+
+# ── Per-Paragraph Similarity Breakdown Tests ──────────────────────────────────
+
+
+def test_calculate_paragraph_similarity_breakdown_matches_highest_pairs():
+    """Each paragraph in Doc A must map to the highest-matching paragraph in Doc B."""
+    # emb_a: 3 paragraphs in a 3-dim space (identity-like rows)
+    emb_a = np.array([
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ])
+    # emb_b: 3 paragraphs – para 0 matches A[1], para 1 matches A[0], para 2 matches A[2]
+    emb_b = np.array([
+        [0.0, 1.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ])
+
+    breakdown = calculate_paragraph_similarity_breakdown(emb_a, emb_b)
+
+    # Must return one tuple per paragraph in Doc A
+    assert len(breakdown) == 3
+
+    # Each result must be (paragraph_a_idx, paragraph_b_idx, score)
+    for item in breakdown:
+        assert len(item) == 3
+        idx_a, idx_b, score = item
+        assert isinstance(idx_a, int)
+        assert isinstance(idx_b, int)
+        assert 0.0 <= score <= 1.0
+
+    # Build a lookup: paragraph_a_idx → (paragraph_b_idx, score)
+    lookup = {idx_a: (idx_b, score) for idx_a, idx_b, score in breakdown}
+
+    # A[0] = [1,0,0] → best match is B[1] = [1,0,0] (score ~1.0)
+    assert lookup[0][0] == 1
+    assert np.isclose(lookup[0][1], 1.0, atol=1e-5)
+
+    # A[1] = [0,1,0] → best match is B[0] = [0,1,0] (score ~1.0)
+    assert lookup[1][0] == 0
+    assert np.isclose(lookup[1][1], 1.0, atol=1e-5)
+
+    # A[2] = [0,0,1] → best match is B[2] = [0,0,1] (score ~1.0)
+    assert lookup[2][0] == 2
+    assert np.isclose(lookup[2][1], 1.0, atol=1e-5)
+
+    # Sorted by descending score
+    scores = [s for _, _, s in breakdown]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_calculate_paragraph_similarity_breakdown_empty_embeddings():
+    """Returns empty list when either embedding matrix is empty."""
+    emb_a = np.array([[1.0, 0.0, 0.0]])
+    emb_empty = np.array([])
+
+    assert calculate_paragraph_similarity_breakdown(emb_empty, emb_a) == []
+    assert calculate_paragraph_similarity_breakdown(emb_a, emb_empty) == []
+    assert calculate_paragraph_similarity_breakdown(emb_empty, emb_empty) == []
+
+
+def test_calculate_paragraph_similarity_breakdown_single_paragraph_1d():
+    """Handles 1-D (single paragraph) embeddings for both documents."""
+    emb_a = np.array([1.0, 0.0, 0.0])   # 1-D – single paragraph
+    emb_b = np.array([1.0, 0.0, 0.0])   # identical paragraph
+
+    breakdown = calculate_paragraph_similarity_breakdown(emb_a, emb_b)
+
+    assert len(breakdown) == 1
+    idx_a, idx_b, score = breakdown[0]
+    assert idx_a == 0
+    assert idx_b == 0
+    assert np.isclose(score, 1.0, atol=1e-5)
+
+
+def test_calculate_paragraph_similarity_breakdown_asymmetric_doc_sizes():
+    """Doc A may have a different number of paragraphs than Doc B."""
+    # 2 paragraphs in A, 4 paragraphs in B
+    emb_a = np.array([
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ])
+    emb_b = np.array([
+        [0.0, 1.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 0.5, 0.5],
+        [0.0, 0.0, 1.0],
+    ])
+
+    breakdown = calculate_paragraph_similarity_breakdown(emb_a, emb_b)
+
+    # One result per paragraph in Doc A (= 2)
+    assert len(breakdown) == 2
+    para_a_indices = {t[0] for t in breakdown}
+    assert para_a_indices == {0, 1}
+
+    # All para_b_idx values must be valid indices into emb_b
+    for _, idx_b, _ in breakdown:
+        assert 0 <= idx_b < emb_b.shape[0]

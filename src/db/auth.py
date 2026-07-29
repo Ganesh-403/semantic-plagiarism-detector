@@ -477,6 +477,43 @@ def update_user_preferences(username: str, preferences: dict) -> None:
         conn.commit()
 
 
+def get_notification_preferences(username: str) -> dict:
+    """Return user notification preferences dict with defaults."""
+    username = _validate_username(username)
+    prefs = get_user_preferences(username)
+    email_val = prefs.get("email_notifications", True)
+    webhook_val = prefs.get("webhook_notifications", True)
+
+    if type(email_val) is not bool:
+        email_val = True
+    if type(webhook_val) is not bool:
+        webhook_val = True
+
+    return {
+        "email_notifications": email_val,
+        "webhook_notifications": webhook_val,
+    }
+
+
+def update_notification_preferences(
+    username: str,
+    email_notifications: bool = True,
+    webhook_notifications: bool = True,
+) -> dict:
+    """Update notification preferences for a user."""
+    if type(email_notifications) is not bool:
+        raise TypeError("email_notifications must be a boolean")
+    if type(webhook_notifications) is not bool:
+        raise TypeError("webhook_notifications must be a boolean")
+
+    username = _validate_username(username)
+    prefs = get_user_preferences(username)
+    prefs["email_notifications"] = email_notifications
+    prefs["webhook_notifications"] = webhook_notifications
+    update_user_preferences(username, prefs)
+    return prefs
+
+
 def get_user_theme(username: str) -> str:
     """Return the user's theme preference (default 'light')."""
     username = username.lower()
@@ -571,3 +608,33 @@ def get_user_count() -> int:
         cursor = conn.execute("SELECT COUNT(*) FROM users")
         row = cursor.fetchone()
         return row[0] if row else 0
+
+def get_notification_preferences(username: str) -> dict:
+    """
+    Retrieve notification preferences (email & webhook) for a given user.
+    """
+    user_prefs = get_user_preferences(username)
+    return {
+        "email_notifications": user_prefs.get("email_notifications", True),
+        "webhook_notifications": user_prefs.get("webhook_notifications", True),
+    }
+
+def get_notification_preferences(username: str) -> dict:
+    """Retrieve notification preferences (email & webhook) for a given user."""
+    user_prefs = get_user_preferences(username)
+    return {
+        "email_notifications": user_prefs.get("email_notifications", True),
+        "webhook_notifications": user_prefs.get("webhook_notifications", True),
+    }
+
+
+def update_notification_preferences(
+    username: str, email_notifications: bool, webhook_notifications: bool
+) -> dict:
+    """Update notification preferences for a given user."""
+    prefs = {
+        "email_notifications": email_notifications,
+        "webhook_notifications": webhook_notifications,
+    }
+    update_user_preferences(username, prefs)
+    return prefs

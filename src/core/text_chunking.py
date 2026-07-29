@@ -14,6 +14,26 @@ class ChunkString(str):
         return obj
 
 
+def _character_fallback_chunking(
+    text: str, chunk_size: int, chunk_overlap: int
+) -> List[str]:
+    """Fallback character-based chunking for non-space or single-token texts (CJK, emojis, long words)."""
+    text = text.strip()
+    if not text:
+        return []
+
+    chunks = []
+    step = max(1, chunk_size - chunk_overlap)
+    for start in range(0, len(text), step):
+        end = min(len(text), start + chunk_size)
+        chunk = text[start:end]
+        if chunk:
+            chunks.append(ChunkString(chunk))
+        if end >= len(text):
+            break
+    return chunks
+
+
 def chunk_text(
     text: str,
     chunk_size: int = 500,
@@ -82,8 +102,12 @@ def chunk_text(
         if len(chunk_str.split()) >= min_words:
             chunks.append(ChunkString(chunk_str, metadata=metadata))
 
-    return chunks
+    # Fallback to character-based chunking if no valid word chunks were formed
+    # (e.g. single long words, CJK text without spaces, or emoji sequences)
+    if not chunks:
+        chunks = _character_fallback_chunking(text, chunk_size, chunk_overlap)
 
+    return chunks
 
 
 # Alias for backward compatibility with src/core/__init__.py

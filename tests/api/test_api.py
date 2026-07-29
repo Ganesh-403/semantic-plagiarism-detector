@@ -109,14 +109,14 @@ def test_scan_matching_corpus_flag(mock_embed, mock_corpus):
 
 
 def test_scan_empty_file_upload():
-    """Verify that uploading an empty file returns 400 Bad Request."""
+    """Verify that uploading an empty file returns 422 Unprocessable Entity."""
     expected_token = get_expected_bearer_token()
     response = client.post(
         "/api/v1/scan",
         headers={"Authorization": f"Bearer {expected_token}"},
         files={"file": ("empty.txt", b"", "text/plain")},
     )
-    assert response.status_code == 400
+    assert response.status_code == 422
     assert "Uploaded file is empty" in response.json()["detail"]
 
 

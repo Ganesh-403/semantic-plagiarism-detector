@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from math import isfinite
 from numbers import Real
 from typing import Final, Mapping
@@ -21,6 +22,9 @@ SEVERITY_ORDER: Final[tuple[str, ...]] = (
 SEVERITY_RANK: Final[Mapping[str, int]] = {
     label: rank for rank, label in enumerate(SEVERITY_ORDER)
 }
+
+# Embedding batch size configuration (default: 32)
+EMBEDDING_BATCH_SIZE: Final[int] = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
 
 
 @dataclass(frozen=True)
@@ -42,8 +46,6 @@ class SimilarityThresholds:
                 "0.0 <= plagiarism <= medium <= high <= 1.0."
             )
 
-        # Normalize all validated Real values to floats while preserving
-        # the public immutability of this frozen dataclass.
         object.__setattr__(self, "plagiarism", plagiarism)
         object.__setattr__(self, "medium", medium)
         object.__setattr__(self, "high", high)
@@ -106,14 +108,7 @@ def severity_from_score(
     score: Real,
     thresholds: SimilarityThresholds = DEFAULT_THRESHOLDS,
 ) -> str:
-    """
-    Return the canonical Low, Medium, or High severity label.
-
-    Scores below the plagiarism threshold are not considered plagiarism,
-    but retain Low severity so callers can continue using the canonical
-    three-level severity scale. Scores from the plagiarism threshold up
-    to the medium threshold represent flagged plagiarism with Low severity.
-    """
+    """Return the canonical Low, Medium, or High severity label."""
     validate_thresholds(thresholds)
     normalized = normalize_score(score)
 

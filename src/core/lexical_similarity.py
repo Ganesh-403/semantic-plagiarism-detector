@@ -13,6 +13,9 @@ Filtering is applied both in the TF-IDF vectorizer (via ``stop_words``)
 and in the standalone ``jaccard_similarity`` / ``remove_stopwords``
 helpers, so any Jaccard-style fallback comparison benefits from the same
 filtering.
+
+Issue #845: Supports custom_stopwords parameter to extend stop-word sets
+for domain-specific academic filler words (e.g. "ibid", "figure", "table").
 """
 
 import functools
@@ -26,18 +29,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 # ── Stop-word handling (issue #222) ───────────────────────────────────────────
-#
-# We prefer NLTK's English stop-word list when it is available (it is the
-# canonical list the issue asks for), but fall back to a built-in compact
-# list so the module stays importable and testable in environments where
-# NLTK data hasn't been downloaded yet. Either way, the list is resolved
-# ONCE at import time and reused for every comparison.
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+(?:'[a-z]+)?")
 
-# Compact fallback list — covers the high-frequency English function words
-# that most inflate lexical similarity. Kept intentionally short; NLTK's
-# list (179 words) is used when available.
+# Compact fallback list — covers high-frequency English function words.
 _FALLBACK_STOPWORDS: Set[str] = {
     "a",
     "an",
@@ -161,43 +156,31 @@ _FALLBACK_STOPWORDS: Set[str] = {
 
 
 def _load_stopwords() -> Set[str]:
-    """Resolve the English stop-word set.
-
-    Tries NLTK first (per the issue's definition-of-done); falls back to a
-    built-in list if NLTK or its corpus is unavailable so the module never
-    hard-fails at import time in CI / fresh environments.
-    """
+    """Resolve the English stop-word set."""
     try:
         from nltk.corpus import stopwords as _nltk_stopwords  # type: ignore
 
         return set(_nltk_stopwords.words("english"))
     except Exception:
-        # NLTK not installed, or the 'stopwords' corpus not downloaded.
-        # The fallback list still removes the vast majority of function
-        # words that inflate Jaccard/TF-IDF similarity.
         return set(_FALLBACK_STOPWORDS)
 
 
-#: Module-level stop-word set resolved once at import. Exposed publicly so
-#: callers (and tests) can inspect / override it without re-importing NLTK.
+#: Module-level stop-word set resolved once at import.
 STOPWORDS: Set[str] = _load_stopwords()
 
 
+def _get_combined_stopwords(
+    custom_stopwords: Optional[Iterable[str]] = None,
+) -> Set[str]:
+    """Combine base STOPWORDS with optional custom stop-words."""
+    combined = set(STOPWORDS)
+    if custom_stopwords:
+        combined.update(w.lower() for w in custom_stopwords)
+    return combined
+
+
 def remove_stopwords(text: str, stopwords: Optional[Iterable[str]] = None) -> str:
-    """Return ``text`` with stop-words removed (case-insensitive).
-
-    Tokenizes on word boundaries, lower-cases, drops any token that appears
-    in the stop-word set, and re-joins with single spaces. Punctuation and
-    casing are not preserved because TF-IDF / Jaccard ignore them anyway.
-
-    Args:
-        text: Raw input text.
-        stopwords: Optional custom stop-word iterable. Defaults to the
-            module-level ``STOPWORDS`` set (NLTK English when available).
-
-    Returns:
-        Filtered string. Empty if the input was empty or all stop-words.
-    """
+    """Return ``text`` with stop-words removed (case-insensitive)."""
     if not text:
         return ""
     stop_set = set(stopwords) if stopwords is not None else STOPWORDS
@@ -206,10 +189,7 @@ def remove_stopwords(text: str, stopwords: Optional[Iterable[str]] = None) -> st
 
 
 def tokenize(text: str, stopwords: Optional[Iterable[str]] = None) -> Set[str]:
-    """Tokenize ``text`` into a set of lower-cased non-stop-word tokens.
-
-    Used by :func:`jaccard_similarity` for the set-intersection comparison.
-    """
+    """Tokenize ``text`` into a set of lower-cased non-stop-word tokens."""
     if not text:
         return set()
     stop_set = set(stopwords) if stopwords is not None else STOPWORDS
@@ -219,18 +199,7 @@ def tokenize(text: str, stopwords: Optional[Iterable[str]] = None) -> Set[str]:
 def jaccard_similarity(
     text_a: str, text_b: str, stopwords: Optional[Iterable[str]] = None
 ) -> float:
-    """Jaccard similarity over stop-word-filtered token sets.
-
-    ``|A ∩ B| / |A ∪ B|``, where A and B are the non-stop-word token sets
-    of the two documents. Returns 0.0 if both documents reduce to empty
-    sets (e.g. they contained only stop-words).
-
-    Args:
-        text_a: First document text.
-        text_b: Second document text.
-        stopwords: Optional custom stop-word iterable. Defaults to
-            ``STOPWORDS``.
-    """
+    """Jaccard similarity over stop-word-filtered token sets."""
     set_a = tokenize(text_a, stopwords=stopwords)
     set_b = tokenize(text_b, stopwords=stopwords)
     if not set_a and not set_b:
@@ -241,40 +210,56 @@ def jaccard_similarity(
     return len(set_a & set_b) / len(union)
 
 
-def _make_documents_hash(documents: Dict[str, str]) -> str:
+def calculate_lexical_similarity(
+    text_a: str,
+    text_b: str,
+    custom_stopwords: Optional[Set[str]] = None,
+) -> float:
     """
-    Create a stable hash from document contents for caching.
+    Calculate lexical similarity between two text strings using TF-IDF cosine similarity.
 
     Args:
-        documents: Dict mapping doc name → raw text content.
+        text_a: First document text.
+        text_b: Second document text.
+        custom_stopwords: Optional set of custom stop-words (e.g. "ibid", "figure")
+            to merge with default NLTK stop-words.
 
     Returns:
-        SHA256 hash string of the sorted document contents.
+        Float score between 0.0 and 1.0.
     """
-    # Sort by document name to ensure consistent hashing
+    if not text_a.strip() or not text_b.strip():
+        return 0.0
+
+    stop_words_list = list(_get_combined_stopwords(custom_stopwords))
+
+    try:
+        vectorizer = TfidfVectorizer(stop_words=stop_words_list)
+        tfidf_matrix = vectorizer.fit_transform([text_a, text_b])
+        sim = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
+        return float(np.clip(sim, 0.0, 1.0))
+    except ValueError:
+        # Handles case where documents contain only stop-words or empty vocabulary
+        return 0.0
+
+
+def _make_documents_hash(
+    documents: Dict[str, str],
+    custom_stopwords: Optional[Set[str]] = None,
+) -> str:
+    """Create a stable hash from document contents and custom stopwords for caching."""
     sorted_items = sorted(documents.items())
-    hash_input = str(sorted_items).encode("utf-8")
+    sorted_custom = sorted(custom_stopwords) if custom_stopwords else []
+    hash_input = str((sorted_items, sorted_custom)).encode("utf-8")
     return hashlib.sha256(hash_input).hexdigest()
 
 
 @functools.lru_cache(maxsize=32)
 def _cached_lexical_similarity_matrix(
-    documents_hash: str, documents_tuple: tuple
+    documents_hash: str,
+    documents_tuple: tuple,
+    custom_stopwords_tuple: tuple,
 ) -> pd.DataFrame:
-    """
-    Internal cached implementation of lexical similarity matrix.
-
-    This function uses lru_cache for Python-level caching. The documents
-    are passed as a tuple to make them hashable for the cache.
-
-    Args:
-        documents_hash: Hash of the document contents (for cache key).
-        documents_tuple: Tuple of (doc_name, doc_text) pairs.
-
-    Returns:
-        Symmetric pandas DataFrame with document names as index and columns.
-        Values range 0.0 – 1.0 (1.0 = identical).
-    """
+    """Internal cached implementation of lexical similarity matrix."""
     documents = dict(documents_tuple)
     doc_names = list(documents.keys())
     n = len(doc_names)
@@ -282,71 +267,53 @@ def _cached_lexical_similarity_matrix(
     if n == 0:
         return pd.DataFrame()
 
-    # Extract texts in the same order as doc_names
     texts = [documents[name] for name in doc_names]
+    stop_words_list = list(
+        _get_combined_stopwords(set(custom_stopwords_tuple) if custom_stopwords_tuple else None)
+    )
 
-    # Fit a single TfidfVectorizer across all documents.
-    # stop_words=list(STOPWORDS) filters common English function words so
-    # they cannot inflate similarity between unrelated essays (issue #222).
-    vectorizer = TfidfVectorizer(stop_words=list(STOPWORDS))
-    tfidf_matrix = vectorizer.fit_transform(texts)  # (N, vocab_size)
+    try:
+        vectorizer = TfidfVectorizer(stop_words=stop_words_list)
+        tfidf_matrix = vectorizer.fit_transform(texts)
+        sim_matrix = cosine_similarity(tfidf_matrix)
+        sim_matrix = np.clip(sim_matrix, 0.0, 1.0)
+    except ValueError:
+        sim_matrix = np.zeros((n, n))
 
-    # Compute cosine similarity matrix
-    sim_matrix = cosine_similarity(tfidf_matrix)  # (N, N)
-    sim_matrix = np.clip(sim_matrix, 0.0, 1.0)  # Numerical safety
-
-    df = pd.DataFrame(sim_matrix, index=doc_names, columns=doc_names)
-    return df
+    return pd.DataFrame(sim_matrix, index=doc_names, columns=doc_names)
 
 
 def lexical_similarity_matrix(
-    documents: Dict[str, str], use_cache: bool = True
+    documents: Dict[str, str],
+    use_cache: bool = True,
+    custom_stopwords: Optional[Set[str]] = None,
 ) -> pd.DataFrame:
-    """
-    Build an N×N TF-IDF cosine similarity matrix between all document pairs.
+    """Build an N×N TF-IDF cosine similarity matrix between all document pairs."""
+    custom_tuple = tuple(sorted(custom_stopwords)) if custom_stopwords else ()
 
-    A single TfidfVectorizer is fitted across all documents to ensure
-    consistent vocabulary across the entire corpus, then cosine similarity
-    is computed between all document pairs.
-
-    Stop-words (the, and, is, …) are filtered out before vectorization so
-    they cannot artificially inflate similarity (issue #222).
-
-    Args:
-        documents: Dict mapping doc name → raw text content.
-        use_cache: If True (default), use LRU cache to avoid recomputing
-                   TF-IDF matrices for identical document sets. Set to False
-                   to force recomputation.
-
-    Returns:
-        Symmetric pandas DataFrame with document names as index and columns.
-        Values range 0.0 – 1.0 (1.0 = identical).
-    """
     if use_cache:
-        # Convert dict to tuple for hashability
         documents_tuple = tuple(sorted(documents.items()))
-        documents_hash = _make_documents_hash(documents)
-        return _cached_lexical_similarity_matrix(documents_hash, documents_tuple)
+        documents_hash = _make_documents_hash(documents, custom_stopwords)
+        return _cached_lexical_similarity_matrix(
+            documents_hash, documents_tuple, custom_tuple
+        )
     else:
-        # Uncached path for testing or when cache should be bypassed
         doc_names = list(documents.keys())
         n = len(doc_names)
 
         if n == 0:
             return pd.DataFrame()
 
-        # Extract texts in the same order as doc_names
         texts = [documents[name] for name in doc_names]
+        stop_words_list = list(_get_combined_stopwords(custom_stopwords))
 
-        # Fit a single TfidfVectorizer across all documents.
-        # stop_words=list(STOPWORDS) filters common English function words
-        # so they cannot inflate similarity between unrelated essays (#222).
-        vectorizer = TfidfVectorizer(stop_words=list(STOPWORDS))
-        tfidf_matrix = vectorizer.fit_transform(texts)  # (N, vocab_size)
+        try:
+            vectorizer = TfidfVectorizer(stop_words=stop_words_list)
+            tfidf_matrix = vectorizer.fit_transform(texts)
+            sim_matrix = cosine_similarity(tfidf_matrix)
+            sim_matrix = np.clip(sim_matrix, 0.0, 1.0)
+        except ValueError:
+            sim_matrix = np.zeros((n, n))
 
-        # Compute cosine similarity matrix
-        sim_matrix = cosine_similarity(tfidf_matrix)  # (N, N)
-        sim_matrix = np.clip(sim_matrix, 0.0, 1.0)  # Numerical safety
-
-        df = pd.DataFrame(sim_matrix, index=doc_names, columns=doc_names)
-        return df
+        return pd.DataFrame(sim_matrix, index=doc_names, columns=doc_names)
+    

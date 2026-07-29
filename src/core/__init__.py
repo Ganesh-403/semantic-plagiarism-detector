@@ -7,9 +7,9 @@ from .embedding_model import (embed_chunks, embed_documents,
 from .faiss_index import (ChunkRecord, build_index, build_index_from_matrix,
                           find_plagiarised_chunks, load_index, save_index,
                           search_similar_chunks)
-from .similarity import (PLAGIARISM_THRESHOLD, chunk_similarity_matrix,
-                         document_similarity_matrix, find_most_similar_chunks,
-                         flag_plagiarism)
+from .similarity import (PLAGIARISM_THRESHOLD, calculate_paragraph_similarity_breakdown,
+                         chunk_similarity_matrix, document_similarity_matrix,
+                         find_most_similar_chunks, flag_plagiarism)
 from .text_chunking import chunk_document, chunk_documents
 from .translator import translate_text
 from .webhook import send_plagiarism_alert
@@ -29,6 +29,7 @@ __all__ = [
     "chunk_similarity_matrix",
     "flag_plagiarism",
     "find_most_similar_chunks",
+    "calculate_paragraph_similarity_breakdown",
     "PLAGIARISM_THRESHOLD",
     "build_index",
     "search_similar_chunks",

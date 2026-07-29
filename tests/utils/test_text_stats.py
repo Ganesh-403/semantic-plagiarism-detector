@@ -1,7 +1,7 @@
 from src.utils.text_stats import (format_text_stats, get_char_count,
                                    get_reading_time_minutes, get_word_count,
                                    get_sentence_count, get_syllable_count,
-                                   get_readability_metrics)
+                                   get_readability_metrics, get_text_stats)
 
 
 def test_get_word_count():
@@ -54,3 +54,36 @@ def test_format_text_stats():
     assert "**Est. Reading Time:** 1 min" in stats
     assert "**Flesch Reading Ease:**" in stats
     assert "**Flesch-Kincaid Grade:**" in stats
+
+
+def test_get_text_stats():
+    # Empty text
+    stats = get_text_stats("")
+    assert stats == {
+        "words": 0,
+        "characters": 0,
+        "sentences": 0,
+        "syllables": 0,
+        "reading_ease": 0.0,
+        "grade_level": 0.0,
+        "reading_time": 0,
+    }
+
+    # Whitespace-only
+    stats = get_text_stats("   \n   ")
+    assert stats == {
+        "words": 0,
+        "characters": 7,
+        "sentences": 0,
+        "syllables": 0,
+        "reading_ease": 0.0,
+        "grade_level": 0.0,
+        "reading_time": 0,
+    }
+
+    # Punctuation-only
+    stats = get_text_stats("... !!! ???")
+    assert stats["words"] == 0
+    assert stats["reading_ease"] == 0.0
+    assert stats["grade_level"] == 0.0
+

@@ -1,8 +1,15 @@
+"""
+src/__init__.py
+---------------
+Package initialization for the Semantic Plagiarism Detector core utilities, database handlers, and visualization routines.
+"""
+
 from .core import (
     PLAGIARISM_THRESHOLD,
     ChunkRecord,
     build_index,
     build_index_from_matrix,
+    calculate_paragraph_similarity_breakdown,
     chunk_document,
     chunk_documents,
     chunk_similarity_matrix,
@@ -77,6 +84,7 @@ __all__ = [
     "chunk_similarity_matrix",
     "flag_plagiarism",
     "find_most_similar_chunks",
+    "calculate_paragraph_similarity_breakdown",
     "PLAGIARISM_THRESHOLD",
     "plot_similarity_heatmap",
     "plot_similarity_heatmap_plotly",
