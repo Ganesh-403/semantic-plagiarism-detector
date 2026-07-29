@@ -57,6 +57,27 @@ MAX_BATCH_SIZE = 50
 
 ZERO_WIDTH_CHARS_PATTERN = re.compile(r"[\u200B\u200C\u200D\uFEFF\u2060\u200E\u200F]")
 
+# Special unicode characters that can cause inconsistent text matches
+_UNICODE_NORMALIZE_PATTERN = re.compile(r"[\u00A0\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u200B\u202F\u205F\u2060\u3000]")
+_SOFT_HYPHEN_PATTERN = re.compile(r"[\u00AD]")
+
+
+def normalize_unicode_spaces(text: str) -> str:
+    """Normalize special Unicode characters to their standard equivalents.
+
+    Converts non-breaking spaces, thin spaces, soft hyphens, and full-width
+    punctuation to standard spaces or empty strings for consistent text matching.
+    """
+    if not text:
+        return text
+    # Replace soft hyphens with empty string
+    text = _SOFT_HYPHEN_PATTERN.sub("", text)
+    # Replace special spaces with standard space
+    text = _UNICODE_NORMALIZE_PATTERN.sub(" ", text)
+    # Collapse multiple spaces into one
+    text = re.sub(r" +", " ", text)
+    return text
+
 
 def sanitize_zero_width_characters(text: str, filename: Optional[str] = None) -> str:
     """
@@ -1282,6 +1303,7 @@ def extract_text(
         raw = extract_text_from_txt(file)
 
     raw = strip_bibliography(raw)
+    raw = normalize_unicode_spaces(raw)
     raw = sanitize_zero_width_characters(raw, filename=filename)
     lang_code = detect_text_language(raw)
 
