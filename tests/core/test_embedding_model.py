@@ -33,6 +33,20 @@ def test_embed_chunks_empty():
     assert result.size == 0
 
 
+def test_embed_chunks_zero_length_text(mock_model):
+    """Test embedding when input chunks contain zero-length / empty string."""
+    chunks = [""]
+    result = embed_chunks(chunks)
+    assert result.shape == (1, 384)
+
+
+def test_embed_chunks_mixed_zero_length(mock_model):
+    """Test embedding when zero-length text is mixed with valid text chunks."""
+    chunks = ["Valid sentence.", "", "   "]
+    result = embed_chunks(chunks)
+    assert result.shape == (3, 384)
+
+
 def test_embed_chunks_returns_float32(mock_model):
     mock_model.encode.side_effect = lambda texts, **kw: np.ones(
         (len(texts), 384), dtype="float32"
