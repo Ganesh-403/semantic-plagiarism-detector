@@ -6,7 +6,7 @@ import sqlite3
 
 from .common import column_exists, run_migrations
 
-CORPUS_SCHEMA_VERSION = 7
+CORPUS_SCHEMA_VERSION = 8
 
 
 def migration_001_create_base_schema(
@@ -128,33 +128,28 @@ def migration_006_add_incident_threshold_snapshot(
         )
 
 
-
-def migration_007_add_soft_delete(
+def migration_007_add_document_language(
     connection: sqlite3.Connection,
 ) -> None:
-    """Add is_deleted and deleted_at columns to documents, and create deleted_chunks table."""
+    """Store the primary detected language code of each document."""
+    if not column_exists(connection, "documents", "detected_language"):
+        connection.execute(
+            "ALTER TABLE documents ADD COLUMN detected_language TEXT"
+        )
+
+
+def migration_008_add_soft_delete(
+    connection: sqlite3.Connection,
+) -> None:
+    """Add is_deleted and deleted_at columns to documents for soft-delete support."""
     if not column_exists(connection, "documents", "is_deleted"):
         connection.execute(
-            "ALTER TABLE documents ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0"
+            "ALTER TABLE documents ADD COLUMN is_deleted INTEGER DEFAULT 0"
         )
     if not column_exists(connection, "documents", "deleted_at"):
         connection.execute(
             "ALTER TABLE documents ADD COLUMN deleted_at TEXT"
         )
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS deleted_chunks (
-            vector_id   INTEGER,
-            filename    TEXT NOT NULL,
-            chunk_index INTEGER NOT NULL,
-            chunk_text  TEXT NOT NULL,
-            embedding   BLOB NOT NULL,
-            FOREIGN KEY (filename)
-                REFERENCES documents(filename)
-                ON DELETE CASCADE
-        )
-        """
-    )
 
 
 CORPUS_MIGRATIONS = {
@@ -164,7 +159,8 @@ CORPUS_MIGRATIONS = {
     4: migration_004_add_plagiarism_incidents,
     5: migration_005_add_false_positives,
     6: migration_006_add_incident_threshold_snapshot,
-    7: migration_007_add_soft_delete,
+    7: migration_007_add_document_language,
+    8: migration_008_add_soft_delete,
 }
 
 

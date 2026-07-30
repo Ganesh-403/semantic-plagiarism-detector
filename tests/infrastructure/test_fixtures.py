@@ -22,7 +22,8 @@ def test_mock_db_provides_isolated_schema(mock_db):
     # 1. Verify paths are patched to the temporary file
     assert CORPUS_DB_PATH == mock_db
     assert INCIDENTS_DB_PATH == mock_db
-    assert AUTH_DB_PATH == mock_db
+    assert AUTH_DB_PATH != mock_db
+    assert AUTH_DB_PATH.endswith("test_users.db")
 
     # 2. Verify we can connect and write
     conn = sqlite3.connect(mock_db)
@@ -40,9 +41,13 @@ def test_mock_db_provides_isolated_schema(mock_db):
     )
     assert cursor.fetchone() is not None
 
+    # Connect to the auth database for testing the users table
+    auth_conn = sqlite3.connect(AUTH_DB_PATH)
+    auth_cursor = auth_conn.cursor()
+
     # Check that users table exists (from init_auth_db)
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
-    assert cursor.fetchone() is not None
+    auth_cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+    assert auth_cursor.fetchone() is not None
 
     # 3. Verify emptiness
     cursor.execute("SELECT COUNT(*) FROM documents")
@@ -51,20 +56,21 @@ def test_mock_db_provides_isolated_schema(mock_db):
     cursor.execute("SELECT COUNT(*) FROM incidents")
     assert cursor.fetchone()[0] == 0
 
-    cursor.execute("SELECT COUNT(*) FROM users")
-    assert cursor.fetchone()[0] == 0
+    auth_cursor.execute("SELECT COUNT(*) FROM users")
+    assert auth_cursor.fetchone()[0] == 0
 
     # 4. Verify writability
-    cursor.execute(
-        "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
+    auth_cursor.execute(
+        "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
         ("test_admin", "hash", "admin"),
     )
-    conn.commit()
+    auth_conn.commit()
 
-    cursor.execute("SELECT username FROM users")
-    assert cursor.fetchone()[0] == "test_admin"
+    auth_cursor.execute("SELECT username FROM users")
+    assert auth_cursor.fetchone()[0] == "test_admin"
 
     conn.close()
+    auth_conn.close()
 
 
 def test_mock_db_teardown_isolation(tmp_path):

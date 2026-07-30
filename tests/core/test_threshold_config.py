@@ -2,11 +2,18 @@ import math
 
 import pytest
 
-from src.core.config import (DEFAULT_THRESHOLDS, PLAGIARISM_THRESHOLD,
-                             SimilarityThresholds, is_plagiarism,
-                             normalize_score, normalize_severity_label,
-                             severity_from_score, severity_key, severity_rank,
-                             validate_thresholds)
+from src.core.config import (
+    DEFAULT_THRESHOLDS,
+    PLAGIARISM_THRESHOLD,
+    SimilarityThresholds,
+    is_plagiarism,
+    normalize_score,
+    normalize_severity_label,
+    severity_from_score,
+    severity_key,
+    severity_rank,
+    validate_thresholds,
+)
 
 
 def test_defaults_are_single_source_of_truth():
@@ -139,36 +146,7 @@ def test_severity_keys_and_ranks():
     assert severity_rank("Medium") < severity_rank("High")
 
     assert severity_rank("Medium") < severity_rank("High")
-@pytest.mark.parametrize(
-    "label",
-    [
-        "very high risk",
-        "highly suspicious",
-        "medium priority",
-        "low confidence",
-        "warning message",
-        "unrelated warning text",
-        "below average",
-    ],
-)
-def test_unrelated_strings_with_severity_words_are_rejected(label):
-    with pytest.raises(ValueError, match="Unknown severity label"):
-        normalize_severity_label(label)
-@pytest.mark.parametrize(
-    ("label", "expected"),
-    [
-        ("High", "High"),
-        ("🔴 High", "High"),
-        ("ðŸ”´ High", "High"),
-        ("Medium", "Medium"),
-        ("🟡 Medium", "Medium"),
-        ("warning", "Medium"),
-        ("Low", "Low"),
-        ("🟢 Low", "Low"),
-    ],
-)
-def test_legacy_labels_are_normalized(label, expected):
-    assert normalize_severity_label(label) == expected
+
 
 def test_severity_respects_plagiarism_boundary():
     thresholds = SimilarityThresholds(

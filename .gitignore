@@ -54,10 +54,7 @@ coverage.xml
 .pytest_cache/
 cover/
 nosetests.xml
-.coverage.*
-*.cover
 */.coverage
-.coverage*
 
 # ── Translations ──────────────────────────────────────────────────────────────
 *.mo
@@ -170,6 +167,7 @@ corpus.db
 *.db
 *.sqlite
 *.sqlite3
+data/
 
 # ── Streamlit secrets (sensitive credentials) ─────────────────────────────────
 .streamlit/secrets.toml
@@ -183,12 +181,12 @@ test_uploads/
 # ── Docker ────────────────────────────────────────────────────────────────────
 .docker/
 
-# ── Coverage ──────────────────────────────────────────────────────────────────
-.coverage
-.coverage.*
-htmlcov/
-
 # ── Branding assets (user-provided) ───────────────────────────────────────────
 branding_logo.png
+branding_config.json
 
 CampusConnect/
+
+# ── Root level files to ignore ────────────────────────────────────────────────
+package-lock.json
+test_sandbox.py

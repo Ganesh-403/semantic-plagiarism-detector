@@ -1,11 +1,40 @@
-import json
 import os
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-import responses
+import pytest
+import requests
 
-import src.core.webhook as webhook
 from src.core.webhook import send_plagiarism_alert
+
+
+WEBHOOK_URL = "https://mock-webhook.url"
+
+
+def make_response(status_code: int) -> MagicMock:
+    response = MagicMock(spec=requests.Response)
+    response.status_code = status_code
+
+    if status_code >= 400:
+        response.raise_for_status.side_effect = (
+            requests.exceptions.HTTPError(
+                f"{status_code} response",
+                response=response,
+            )
+        )
+
+    return response
+
+
+@pytest.fixture(autouse=True)
+def disable_retry_wait(monkeypatch):
+    """Keep retry tests immediate while retaining production backoff."""
+    from src.core import webhook
+
+    monkeypatch.setattr(
+        webhook._post_webhook.retry,
+        "sleep",
+        lambda _seconds: None,
+    )
 
 
 @patch.dict(os.environ, {}, clear=True)
@@ -16,27 +45,33 @@ def test_send_plagiarism_alert_no_url():
 @patch.dict(
     os.environ,
     {
-        "PLAGIARISM_WEBHOOK_URL": "https://mock-webhook.url",
+        "PLAGIARISM_WEBHOOK_URL": WEBHOOK_URL,
         "APP_BASE_URL": "http://test-dashboard",
     },
 )
-@responses.activate
-def test_send_plagiarism_alert_success():
-    responses.add(
-        responses.POST,
-        "https://mock-webhook.url",
-        json={"ok": True},
-        status=200,
+@patch("src.core.webhook.SSRFProtector.validate_webhook_url")
+@patch("src.core.webhook.requests.post")
+def test_send_plagiarism_alert_success(
+    mock_post,
+    mock_validate_url,
+):
+    mock_post.return_value = make_response(200)
+
+    result = send_plagiarism_alert(
+        "student_essay.pdf",
+        "wikipedia_source.pdf",
+        0.925,
     )
 
-    result = send_plagiarism_alert("student_essay.pdf", "wikipedia_source.pdf", 0.925)
-
     assert result is True
-    assert len(responses.calls) == 1
-    request = responses.calls[0].request
-    assert request.url == "https://mock-webhook.url"
-    assert request.method == "POST"
-    payload = json.loads(request.body)
+    mock_validate_url.assert_called_once_with(WEBHOOK_URL)
+    mock_post.assert_called_once()
+
+    args, kwargs = mock_post.call_args
+    assert args[0] == WEBHOOK_URL
+    assert kwargs["timeout"] == 10
+
+    payload = kwargs["json"]
     assert "text" in payload
     assert "content" in payload
     assert "student_essay.pdf" in payload["text"]
@@ -45,51 +80,109 @@ def test_send_plagiarism_alert_success():
     assert "http://test-dashboard" in payload["text"]
 
 
-@patch.dict(os.environ, {"PLAGIARISM_WEBHOOK_URL": "https://mock-webhook.url"})
-@responses.activate
-def test_send_plagiarism_alert_network_failure():
-    responses.add(
-        responses.POST,
-        "https://mock-webhook.url",
-        body=responses.ConnectionError("Connection timed out"),
+@patch.dict(
+    os.environ,
+    {"PLAGIARISM_WEBHOOK_URL": WEBHOOK_URL},
+)
+@patch("src.core.webhook.SSRFProtector.validate_webhook_url")
+@patch("src.core.webhook.requests.post")
+def test_connection_error_retries_three_times(
+    mock_post,
+    mock_validate_url,
+):
+    mock_post.side_effect = requests.exceptions.ConnectionError(
+        "Connection timed out"
     )
 
     result = send_plagiarism_alert("DocA", "DocB", 0.99)
 
     assert result is False
-    assert len(responses.calls) == 1
+    assert mock_post.call_count == 3
+    mock_validate_url.assert_called_once_with(WEBHOOK_URL)
 
-def test_dispatch_plagiarism_alert_background(mocker):
-    from src.core.webhook import dispatch_plagiarism_alert
-    
-    mock_run = mocker.patch('src.core.synchronization.run_background')
-    
-    dispatch_plagiarism_alert("DocA", "DocB", 0.99)
-    
-    assert mock_run.call_count == 1
-    # Check that a function was passed to run_background
-    func = mock_run.call_args[0][0]
-    assert callable(func)
 
-def test_dispatch_plagiarism_alert_handles_exceptions(mocker):
-    from src.core.webhook import dispatch_plagiarism_alert
-    
-    mock_send = mocker.patch('src.core.webhook.send_plagiarism_alert', side_effect=Exception("API Down"))
-    mock_logger = mocker.patch('src.core.webhook.logger.exception')
-    
-    # We call the wrapped inner function manually to simulate background thread execution
-    # First we intercept it
-    inner_func = None
-    def mock_run_bg(func, *args, **kwargs):
-        nonlocal inner_func
-        inner_func = func
-    
-    mocker.patch('src.core.synchronization.run_background', side_effect=mock_run_bg)
-    
-    dispatch_plagiarism_alert("DocA", "DocB", 0.99)
-    
-    # Simulate the thread executing it
-    inner_func()
-    
-    mock_send.assert_called_once_with("DocA", "DocB", 0.99)
-    mock_logger.assert_called_once_with("Webhook dispatch failed")
+@patch.dict(
+    os.environ,
+    {"PLAGIARISM_WEBHOOK_URL": WEBHOOK_URL},
+)
+@patch("src.core.webhook.SSRFProtector.validate_webhook_url")
+@patch("src.core.webhook.requests.post")
+def test_502_retries_then_succeeds(
+    mock_post,
+    mock_validate_url,
+):
+    mock_post.side_effect = [
+        make_response(502),
+        make_response(502),
+        make_response(200),
+    ]
+
+    result = send_plagiarism_alert("DocA", "DocB", 0.91)
+
+    assert result is True
+    assert mock_post.call_count == 3
+    mock_validate_url.assert_called_once_with(WEBHOOK_URL)
+
+
+@patch.dict(
+    os.environ,
+    {"PLAGIARISM_WEBHOOK_URL": WEBHOOK_URL},
+)
+@patch("src.core.webhook.SSRFProtector.validate_webhook_url")
+@patch("src.core.webhook.requests.post")
+def test_timeout_retries_then_succeeds(
+    mock_post,
+    mock_validate_url,
+):
+    mock_post.side_effect = [
+        requests.exceptions.Timeout("temporary timeout"),
+        make_response(200),
+    ]
+
+    result = send_plagiarism_alert("DocA", "DocB", 0.93)
+
+    assert result is True
+    assert mock_post.call_count == 2
+    mock_validate_url.assert_called_once_with(WEBHOOK_URL)
+
+
+@patch.dict(
+    os.environ,
+    {"PLAGIARISM_WEBHOOK_URL": WEBHOOK_URL},
+)
+@patch("src.core.webhook.SSRFProtector.validate_webhook_url")
+@patch("src.core.webhook.requests.post")
+def test_permanent_400_error_is_not_retried(
+    mock_post,
+    mock_validate_url,
+):
+    mock_post.return_value = make_response(400)
+
+    result = send_plagiarism_alert("DocA", "DocB", 0.94)
+
+    assert result is False
+    mock_post.assert_called_once()
+    mock_validate_url.assert_called_once_with(WEBHOOK_URL)
+
+
+@patch.dict(
+    os.environ,
+    {"PLAGIARISM_WEBHOOK_URL": WEBHOOK_URL},
+)
+@patch("src.core.webhook.requests.post")
+@patch("src.core.webhook.SSRFProtector.validate_webhook_url")
+def test_ssrf_failure_does_not_send_or_retry(
+    mock_validate_url,
+    mock_post,
+):
+    from src.security.ssrf_protector import SSRFSecurityException
+
+    mock_validate_url.side_effect = SSRFSecurityException(
+        "blocked destination"
+    )
+
+    result = send_plagiarism_alert("DocA", "DocB", 0.96)
+
+    assert result is False
+    mock_validate_url.assert_called_once_with(WEBHOOK_URL)
+    mock_post.assert_not_called()

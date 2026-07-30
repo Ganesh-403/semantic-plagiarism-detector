@@ -1,8 +1,8 @@
 import pytest
 
+from src.core.app_config import SUPPORTED_OCR_LANGUAGES
 from src.core.document_parser import (DEFAULT_OCR_DPI, DEFAULT_OCR_LANGUAGE,
                                       MAX_OCR_DPI, MIN_OCR_DPI,
-                                      SUPPORTED_OCR_LANGUAGES,
                                       normalize_ocr_settings, validate_ocr_dpi,
                                       validate_ocr_language)
 

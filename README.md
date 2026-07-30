@@ -750,8 +750,35 @@ Existing database files should not be deleted during an application upgrade.
 
 ---
 
+## Documentation
+
+- [Architecture Overview](docs/ARCHITECTURE.md)
+
+- [NLP Architecture & Similarity Algorithm Guide](docs/ALGORITHMS.md)
+
+
+- [Bulk Export Formats & Data Fields](docs/EXPORTS.md)
+
+- [UI Customization and Theme Guide](docs/THEMING.md)
+
+
+---
+
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+MIT License. Free for academic and educational use.
 
-See the [`LICENSE`](LICENSE) file for the full license text.
+
+## Webhook retry behaviour
+
+Plagiarism webhook delivery automatically retries temporary failures up to
+three times with exponential backoff.
+
+Retries apply to:
+
+- connection failures and request timeouts,
+- HTTP 408, 425, and 429,
+- HTTP 500, 502, 503, and 504.
+
+Permanent client errors such as HTTP 400 and 401 are not retried. Webhook SSRF
+validation runs before dispatch and is never bypassed or retried.

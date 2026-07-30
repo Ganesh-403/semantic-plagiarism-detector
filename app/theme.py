@@ -1,12 +1,60 @@
+import re
 import streamlit as st
 
-from app.css_constants import (CLASS_AVATAR, CLASS_BADGE, CLASS_EMPTY_DESC,
+HEX_COLOR_PATTERN = re.compile(r"^#(?:[0-9a-fA-F]{3}){1,2}$")
+
+
+def sanitize_hex_color(color_val: str, fallback: str = "#000000") -> str:
+    """
+    Validates and sanitizes a hex color string against ^#(?:[0-9a-fA-F]{3}){1,2}$.
+    Returns fallback if invalid.
+    """
+    if isinstance(color_val, str) and HEX_COLOR_PATTERN.match(color_val.strip()):
+        return color_val.strip()
+    return fallback
+
+
+def sanitize_theme_colors(colors: dict) -> dict:
+    """Sanitize all color values in a theme dictionary."""
+    sanitized = {}
+    fallback_map = {
+        "background": "#FFFFFF",
+        "surface": "#F8FAFC",
+        "card": "#FFFFFF",
+        "ink": "#0F172A",
+        "muted": "#64748B",
+        "accent": "#0D9488",
+        "border": "#E2E8F0",
+        "input": "#FFFFFF",
+        "neutral_soft": "#F1F5F9",
+        "danger": "#FF4B4B",
+        "danger_soft": "#FEE2E2",
+        "warning": "#FFA500",
+        "warning_soft": "#FEF3C7",
+        "success": "#21C55D",
+        "success_soft": "#DCFCE7",
+    }
+    for k, v in colors.items():
+        fallback = fallback_map.get(k, "#000000")
+        sanitized[k] = sanitize_hex_color(str(v), fallback=fallback)
+    return sanitized
+
+try:
+    from app.css_constants import (CLASS_AVATAR, CLASS_BADGE, CLASS_EMPTY_DESC,
+                                   CLASS_EMPTY_ICON, CLASS_EMPTY_STATE,
+                                   CLASS_EMPTY_TITLE, CLASS_PIPELINE_ACTIVE,
+                                   CLASS_PIPELINE_ARROW, CLASS_PIPELINE_DONE,
+                                   CLASS_PIPELINE_ETA, CLASS_PIPELINE_STEP,
+                                   CLASS_PIPELINE_STEPS, CLASS_SIDEBAR_USER_BADGE,
+                                   CLASS_SIM_PILL, CLASS_WELCOME_BANNER)
+except ImportError:
+    from css_constants import (CLASS_AVATAR, CLASS_BADGE, CLASS_EMPTY_DESC,
                                CLASS_EMPTY_ICON, CLASS_EMPTY_STATE,
                                CLASS_EMPTY_TITLE, CLASS_PIPELINE_ACTIVE,
                                CLASS_PIPELINE_ARROW, CLASS_PIPELINE_DONE,
                                CLASS_PIPELINE_ETA, CLASS_PIPELINE_STEP,
                                CLASS_PIPELINE_STEPS, CLASS_SIDEBAR_USER_BADGE,
-                               CLASS_SIM_PILL)
+                               CLASS_SIM_PILL, CLASS_WELCOME_BANNER)
 from src.core.config import (DEFAULT_THRESHOLDS, normalize_severity_label,
                              severity_key)
 
@@ -49,12 +97,47 @@ THEMES = {
 # Backward-compatible default palette used by existing tests and callers.
 COLORS = THEMES["Light"]
 
+# ── Colormap Mappings & Constants ──────────────────────────────────────────────
+# Moved here from src/visualization/heatmap.py (Issue #633) so all
+# color/theme-related generation logic lives in one place.
+
+# Standard colormap options required by UI/UX specifications.
+UI_COLORMAP_OPTIONS: list[str] = ["Viridis", "Plasma", "Coolwarm", "YlOrRd"]
+
+# Map UI display names to exact Matplotlib/Seaborn string identifiers.
+MATPLOTLIB_CMAP_MAPPING: dict[str, str] = {
+    "Viridis": "viridis",
+    "Plasma": "plasma",
+    "Coolwarm": "coolwarm",
+    "YlOrRd": "YlOrRd",
+    # Legacy fallback mapping
+    "Legacy Red/Green": "RdYlGn_r",
+}
+
+# Map UI display names to exact Plotly string identifiers.
+PLOTLY_CMAP_MAPPING: dict[str, str] = {
+    "Viridis": "Viridis",
+    "Plasma": "Plasma",
+    "Coolwarm": "RdBu_r",  # Coolwarm equivalent in standard plotly
+    "YlOrRd": "YlOrRd",
+    # Legacy fallback mapping
+    "Legacy Red/Green": "RdYlGn_r",
+}
+
+DEFAULT_UI_COLORMAP: str = "Viridis"
+
 
 def initialize_theme() -> None:
     """Initialize the active theme for the current session."""
     try:
         if "theme" not in st.session_state:
-            st.session_state.theme = "Light"
+            query_theme = st.query_params.get("theme")
+            if query_theme and query_theme.lower() == "dark":
+                st.session_state.theme = "Dark"
+            elif query_theme and query_theme.lower() == "light":
+                st.session_state.theme = "Light"
+            else:
+                st.session_state.theme = "Light"
         if "theme_colors" not in st.session_state:
             st.session_state.theme_colors = THEMES[st.session_state.theme]
     except Exception:
@@ -76,6 +159,7 @@ def set_theme(theme_name: str) -> None:
         try:
             st.session_state.theme = theme_name
             st.session_state.theme_colors = THEMES[theme_name]
+            st.query_params["theme"] = theme_name.lower()
         except Exception:
             pass
 
@@ -91,7 +175,7 @@ def get_colors() -> dict:
 
 def inject_css() -> None:
     """Inject CSS for the currently selected Light or Dark theme."""
-    colors = get_colors()
+    colors = sanitize_theme_colors(get_colors())
 
     css = f"""
     <style>
@@ -482,6 +566,16 @@ def inject_css() -> None:
             border-color: #ff3333 !important;
         }}
 
+        .{CLASS_WELCOME_BANNER} {{
+    background-color: {colors["surface"]};
+    border: 1px solid {colors["border"]};
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    color: {colors["ink"]};
+    font-size: 0.95rem;
+}}
+
         [data-testid="stExpander"],
         [data-testid="stForm"] {{
             background-color: var(--card) !important;
@@ -608,8 +702,17 @@ def inject_css() -> None:
 
         /* ── Back to Top Button ─────────────────────────────────────── */
 
-        #back-to-top-btn {{
-            position: fixed;
+.sr-only {{
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }}            position: fixed;
             bottom: max(2rem, env(safe-area-inset-bottom, 2rem));
             right: max(2rem, env(safe-area-inset-right, 2rem));
             z-index: 9999;
@@ -753,6 +856,19 @@ def inject_css() -> None:
         }}
     </style>
     """
+
+    if st.session_state.get("privacy_mode", False):
+        css = css.replace("</style>", """
+        /* Privacy Mode: Blur student name labels */
+        [class*="st-key-student_"] {
+            filter: blur(4px) !important;
+            transition: filter 0.3s ease;
+        }
+        [class*="st-key-student_"]:hover {
+            filter: none !important;
+        }
+    </style>
+        """)
 
     st.markdown(css, unsafe_allow_html=True)
 
@@ -899,63 +1015,17 @@ def pipeline_progress_html(
     return f"{progress}{eta}"
 
 
-def back_to_top_html() -> str:
-    """Return HTML and JavaScript for a floating back-to-top button.
-
-    The button is hidden by default and fades in once the user scrolls past
-    the configured threshold.  Clicking it smoothly scrolls the page to the top.
-
-    Streamlit (>= 1.28) scrolls inside a container whose parent holds
-    ``[data-testid="block-container"]``, not the window viewport.
-
-    The IIFE guards against duplicate listener registration across Streamlit
-    reruns.  The click handler uses event delegation and the scroll handler
-    re-queries the button on each event so that Streamlit reruns (which
-    recreate the DOM) do not break the feature.
+def back_to_top_html(scroll_threshold: int = 250) -> str:
+    """Return HTML for a floating back-to-top button.
+    Uses anchor navigation to smoothly scroll to the top of the page without
+    leaking raw script strings in Streamlit 1.60+.
     """
     return """
-    <button id="back-to-top-btn"
-            type="button"
-            aria-label="Back to top"
-            title="Back to top">
+    <a id="back-to-top-btn" class="visible" href="#top" aria-label="Back to top" title="Back to top">
         ⬆️ Top
-    </button>
-    <script>
-    (function () {
-        if (window.__backToTopInitialized) return;
-        window.__backToTopInitialized = true;
-
-        var SCROLL_THRESHOLD = 250;
-
-        /* Streamlit >= 1.28 scrolls inside the parent of
-           [data-testid="block-container"], not the window. */
-        var scrollContainer =
-            document.querySelector('[data-testid="block-container"]')
-                ?.parentElement
-            || document.querySelector('section.main > div')
-            || window;
-
-        /* Event delegation — works even after Streamlit recreates the
-           button element on a rerun. */
-        scrollContainer.addEventListener('click', function (e) {
-            if (e.target.closest('#back-to-top-btn')) {
-                scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-        });
-
-        /* Re-query the button every scroll tick so the .visible class
-           is always applied to the live element, not a detached one. */
-        scrollContainer.addEventListener('scroll', function () {
-            var btn = document.getElementById('back-to-top-btn');
-            if (!btn) return;
-            var scrollTop = scrollContainer === window
-                ? window.scrollY
-                : scrollContainer.scrollTop;
-            btn.classList.toggle('visible', scrollTop > SCROLL_THRESHOLD);
-        }, { passive: true });
-    })();
-    </script>
+    </a>
     """
+
 
 
 def version_check_widget_html(

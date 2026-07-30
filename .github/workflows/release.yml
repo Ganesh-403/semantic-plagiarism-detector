@@ -1,0 +1,73 @@
+# Automated Release Generation Workflow
+#
+# This workflow is triggered automatically whenever a semantic version tag 
+# (e.g., v1.2.0, v2.0.1-beta) is pushed to the repository. It performs a checkout,
+# extracts release notes based on the git commit history, and leverages the
+# softprops/action-gh-release action to create a GitHub Release draft.
+#
+# This establishes a standardized and automated release process, reducing manual overhead.
+
+name: Release Draft Generator
+
+on:
+  push:
+    # Trigger on strictly semver compatible tag pushes
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+
+# Require write permissions to create a release in the repository
+permissions:
+  contents: write
+
+jobs:
+  create-draft-release:
+    name: Create GitHub Draft Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch all history so changelog generators can see previous tags
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Validate Tag Format
+        id: validate_tag
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          echo "Processing release for tag: $TAG_NAME"
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+
+
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          # Placeholder for changelog generation logic
+          # A simple git log command capturing commits since the previous tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          echo "### Changelog" > CHANGELOG.md
+          if [ -z "$PREVIOUS_TAG" ]; then
+            git log --pretty=format:"* %s (%h)" >> CHANGELOG.md
+          else
+            git log ${PREVIOUS_TAG}..HEAD --pretty=format:"* %s (%h)" >> CHANGELOG.md
+          fi
+          echo "Changelog generated."
+
+      - name: Create Release Draft
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.validate_tag.outputs.tag_name }}
+          name: Release ${{ steps.validate_tag.outputs.tag_name }}
+          body_path: CHANGELOG.md
+          draft: true
+          prerelease: ${{ contains(github.ref, '-') }}
+        env:
+          # GitHub token is provided automatically by Actions
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

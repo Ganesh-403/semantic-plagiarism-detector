@@ -5,7 +5,10 @@ import re
 
 
 def highlight_overlap(
-    text_a: str, text_b: str, min_match_len: int = 10
+    text_a: str,
+    text_b: str,
+    min_match_len: int = 10,
+    theme_colors: dict | None = None,
 ) -> tuple[str, str]:
     """Compare two text chunks at the word/token level and wrap exact matching
 
@@ -52,9 +55,9 @@ def highlight_overlap(
                 highlight_b[i] = True
 
     return (
-        _build_html(tokens_a, highlight_a),
-        _build_html(tokens_b, highlight_b),
-    )
+    _build_html(tokens_a, highlight_a, theme_colors),
+    _build_html(tokens_b, highlight_b, theme_colors),
+)
 
 
 def _escape_text(text: str) -> str:
@@ -65,7 +68,11 @@ def _escape_text(text: str) -> str:
     return escaped
 
 
-def _build_html(tokens: list[str], highlight_mask: list[bool]) -> str:
+def _build_html(
+    tokens: list[str],
+    highlight_mask: list[bool],
+    theme_colors: dict | None = None,
+) -> str:
     """Build the final HTML string by grouping highlighted tokens inside <mark> tags."""
     parts = []
     in_highlight = False
@@ -75,11 +82,18 @@ def _build_html(tokens: list[str], highlight_mask: list[bool]) -> str:
 
         if should_highlight:
             if not in_highlight:
+                highlight_bg = (
+                    theme_colors.get("warning_soft", "rgba(250, 204, 21, 0.3)")
+                    if theme_colors
+                    else "rgba(250, 204, 21, 0.3)"
+                )
+
                 parts.append(
-                    "<mark style='background-color: rgba(250, 204, 21, 0.3); "
+                    f"<mark style='background-color: {highlight_bg}; "
                     "color: inherit; padding: 1px 3px; border-radius: 3px;'>"
                 )
                 in_highlight = True
+
             parts.append(escaped_token)
         else:
             if in_highlight:

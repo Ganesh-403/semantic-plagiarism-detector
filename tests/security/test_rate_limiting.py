@@ -9,11 +9,11 @@ import pytest
 from src.db.auth import check_login_rate_limit
 from src.db.auth import clear_login_attempts as auth_clear_login_attempts
 from src.db.auth import record_failed_login
-from src.utils.redis_cache import (clear_login_attempts, get_cache,
-                                   get_login_attempts, get_upload_count,
-                                   increment_login_attempts,
-                                   increment_upload_count, is_login_locked_out,
-                                   is_upload_rate_limited)
+from src.utils.redis_cache import (CacheKeyPrefix, clear_login_attempts,
+                                   get_cache, get_login_attempts,
+                                   get_upload_count, increment_login_attempts,
+                                   increment_upload_count,
+                                   is_login_locked_out, is_upload_rate_limited)
 
 
 @pytest.fixture(autouse=True)
@@ -89,7 +89,7 @@ def test_upload_rate_limiting():
     from src.utils.redis_cache import get_cache
 
     cache = get_cache()
-    cache.delete(f"uploads:{username}")
+    cache.delete(f"{CacheKeyPrefix.LEGACY_UPLOADS_PREFIX.value}{username}")
 
     # Initially should not be rate limited
     assert not is_upload_rate_limited(username)

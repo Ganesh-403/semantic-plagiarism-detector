@@ -5,7 +5,10 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
-from typing import TypeAlias
+try:
+    from typing import TypeAlias
+except ImportError:
+    from typing_extensions import TypeAlias
 
 Migration: TypeAlias = Callable[[sqlite3.Connection], None]
 

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import argparse
-import json
 import os
 import subprocess
 import sys
@@ -9,11 +8,9 @@ from datetime import datetime
 
 def check_dependencies():
     """Ensure pytest and coverage are installed."""
-    try:
-        import coverage
-        import pytest
-    except ImportError as e:
-        print(f"Error: Missing dependency. {e}")
+    import importlib.util
+    if not (importlib.util.find_spec("coverage") and importlib.util.find_spec("pytest")):
+        print("Error: Missing dependency.")
         print("Please install requirements: pip install -r requirements.txt")
         sys.exit(1)
 
@@ -33,9 +30,9 @@ def run_tests(args):
     # 2. Coverage flags
     if args.enforce_coverage:
         cmd.extend([
-            f"--cov=src",
-            f"--cov=app",
-            f"--cov-report=term-missing",
+            "--cov=src",
+            "--cov=app",
+            "--cov-report=term-missing",
             f"--cov-fail-under={args.enforce_coverage}",
             f"--junitxml=test-reports/junit-{datetime.now().strftime('%Y%m%d%H%M%S')}.xml"
         ])

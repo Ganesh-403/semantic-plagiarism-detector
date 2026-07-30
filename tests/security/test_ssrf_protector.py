@@ -36,9 +36,19 @@ def test_validate_webhook_url_loopback(mock_getaddrinfo):
         SSRFProtector.validate_webhook_url("https://localhost:8080/hook")
 
 @patch("src.security.ssrf_protector.socket.getaddrinfo")
-def test_validate_webhook_url_private_ip(mock_getaddrinfo):
-    mock_getaddrinfo.return_value = [(2, 1, 6, '', ('10.0.0.5', 443))]
-    with pytest.raises(SSRFSecurityException, match="Blocked private network IP: 10.0.0.5"):
+@pytest.mark.parametrize(
+    "blocked_ip",
+    [
+        "10.0.0.1",      # 10.0.0.0/8 (DoD requirement)
+        "10.0.0.5",      # 10.0.0.0/8
+        "172.16.5.10",   # 172.16.0.0/12
+        "192.168.1.1",   # 192.168.0.0/16 (DoD requirement)
+        "192.168.1.25",  # 192.168.0.0/16
+    ],
+)
+def test_validate_webhook_url_private_ipv4_subnet_blocklist(mock_getaddrinfo, blocked_ip):
+    mock_getaddrinfo.return_value = [(2, 1, 6, '', (blocked_ip, 443))]
+    with pytest.raises(SSRFSecurityException, match="Blocked private IPv4 subnet IP"):
         SSRFProtector.validate_webhook_url("https://internal.corp.network/webhook")
 
 @patch("src.security.ssrf_protector.socket.getaddrinfo")

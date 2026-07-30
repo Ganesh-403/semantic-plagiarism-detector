@@ -1,122 +1,184 @@
-"""
-webhook.py
-----------
-Utility to dispatch notifications to a Slack or Discord webhook channel
-when high-similarity plagiarism incidents (>= 90%) are detected.
-"""
+"""Webhook notification delivery with transient-failure retries."""
+
+from __future__ import annotations
 
 import logging
 import os
-import threading
-import time
-from collections import deque
+from typing import Any
 
 import requests
 from dotenv import load_dotenv
+from tenacity import (
+    RetryCallState,
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 
-from src.security.ssrf_protector import SSRFProtector, SSRFSecurityException
+from src.security.ssrf_protector import (
+    SSRFProtector,
+    SSRFSecurityException,
+)
 
-# Set up logging
+
 logger = logging.getLogger(__name__)
 
-_WEBHOOK_RATE_LIMIT = 5
-_WEBHOOK_RATE_WINDOW_SECONDS = 60.0
-_rate_limit_lock = threading.Lock()
-_webhook_dispatches: dict[str, deque[float]] = {}
-
-# Load environment variables from .env
 load_dotenv()
 
+WEBHOOK_TIMEOUT_SECONDS = 10
+WEBHOOK_MAX_ATTEMPTS = 3
+WEBHOOK_RETRY_MIN_SECONDS = 1
+WEBHOOK_RETRY_MAX_SECONDS = 4
 
-def _allow_webhook_dispatch(webhook_url: str) -> bool:
-    """Return whether this webhook is below the per-minute dispatch limit."""
-    now = time.monotonic()
-    with _rate_limit_lock:
-        dispatches = _webhook_dispatches.setdefault(webhook_url, deque())
-        cutoff = now - _WEBHOOK_RATE_WINDOW_SECONDS
-        while dispatches and dispatches[0] <= cutoff:
-            dispatches.popleft()
+_RETRYABLE_STATUS_CODES = {
+    408,
+    425,
+    429,
+    500,
+    502,
+    503,
+    504,
+}
 
-        if len(dispatches) >= _WEBHOOK_RATE_LIMIT:
-            return False
 
-        dispatches.append(now)
+def _is_retryable_request_error(exception: BaseException) -> bool:
+    """Return whether a webhook request error is temporary.
+
+    Connection errors and timeouts are considered transient. HTTP responses
+    are retried only for throttling, request timeout, and common server-side
+    failures. Permanent client errors such as 400 or 401 are not retried.
+    """
+    if isinstance(
+        exception,
+        (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+        ),
+    ):
         return True
 
+    if isinstance(exception, requests.exceptions.HTTPError):
+        response = exception.response
+        return (
+            response is not None
+            and response.status_code in _RETRYABLE_STATUS_CODES
+        )
 
-def send_plagiarism_alert(doc_a: str, doc_b: str, similarity: float) -> bool:
+    return False
+
+
+def _log_retry(retry_state: RetryCallState) -> None:
+    """Log a webhook retry without exposing the payload or secret URL."""
+    exception = retry_state.outcome.exception()
+    wait_seconds = retry_state.next_action.sleep
+
+    logger.warning(
+        "Webhook attempt %s/%s failed with %s. Retrying in %.1f seconds.",
+        retry_state.attempt_number,
+        WEBHOOK_MAX_ATTEMPTS,
+        exception,
+        wait_seconds,
+    )
+
+
+@retry(
+    retry=retry_if_exception(_is_retryable_request_error),
+    stop=stop_after_attempt(WEBHOOK_MAX_ATTEMPTS),
+    wait=wait_exponential(
+        multiplier=1,
+        min=WEBHOOK_RETRY_MIN_SECONDS,
+        max=WEBHOOK_RETRY_MAX_SECONDS,
+    ),
+    before_sleep=_log_retry,
+    reraise=True,
+)
+def _post_webhook(
+    webhook_url: str,
+    payload: dict[str, Any],
+) -> requests.Response:
+    """POST one webhook attempt.
+
+    Tenacity retries this function for transient request failures only.
     """
-    Send an alert to the configured PLAGIARISM_WEBHOOK_URL when high-similarity matches occur.
+    response = requests.post(
+        webhook_url,
+        json=payload,
+        timeout=WEBHOOK_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    return response
+
+
+def send_plagiarism_alert(
+    doc_a: str,
+    doc_b: str,
+    similarity: float,
+) -> bool:
+    """Send a plagiarism alert to the configured webhook.
+
+    The webhook URL is validated once before any outbound request. Temporary
+    connection failures, timeouts, rate limiting, and selected 5xx responses
+    are retried up to three times with exponential backoff.
 
     Args:
         doc_a: Name of the first student document.
         doc_b: Name of the second student document.
-        similarity: Cosine similarity score (between 0.0 and 1.0).
+        similarity: Cosine similarity score between 0.0 and 1.0.
 
     Returns:
-        bool: True if the alert was successfully sent, False otherwise.
+        ``True`` when delivery succeeds; otherwise ``False``.
     """
     webhook_url = os.getenv("PLAGIARISM_WEBHOOK_URL")
 
     if not webhook_url:
-        logger.warning("PLAGIARISM_WEBHOOK_URL is not configured in the environment.")
-        return False
-
-    if not _allow_webhook_dispatch(webhook_url):
         logger.warning(
-            "Webhook rate limit reached; suppressing plagiarism alert for %s <-> %s.",
-            doc_a,
-            doc_b,
+            "PLAGIARISM_WEBHOOK_URL is not configured in the environment."
         )
         return False
 
-    # Get base URL of the Streamlit dashboard for the review link
-    base_url = os.getenv("APP_BASE_URL", "http://localhost:8501").rstrip("/")
+    base_url = os.getenv(
+        "APP_BASE_URL",
+        "http://localhost:8501",
+    ).rstrip("/")
+    similarity_percent = similarity * 100
 
-    # Format similarity percentage
-    sim_percent = similarity * 100
-
-    # Construct the message payload
     message = (
-        f"🚨 *Plagiarism Alert!* Student document *{doc_a}* matches *{doc_b}* by *{sim_percent:.1f}%*.\n"
+        "🚨 *Plagiarism Alert!* "
+        f"Student document *{doc_a}* matches *{doc_b}* by "
+        f"*{similarity_percent:.1f}%*.\n"
         f"Review details here: {base_url}"
     )
-
-    # Webhook payload compatible with both Slack (expects 'text') and Discord (expects 'content')
-    payload = {"text": message, "content": message}
+    payload = {
+        "text": message,
+        "content": message,
+    }
 
     try:
-        # Prevent Server-Side Request Forgery (Issue #301)
+        # Validate once. Retrying cannot make an unsafe URL safe.
         SSRFProtector.validate_webhook_url(webhook_url)
-        
-        response = requests.post(webhook_url, json=payload, timeout=10)
-        # Check if request returned an unsuccessful status code (4xx, 5xx)
-        response.raise_for_status()
-        logger.info(
-            f"Webhook alert successfully sent for pair: {doc_a} <-> {doc_b} ({sim_percent:.1f}%)"
-        )
-        return True
-    except SSRFSecurityException as e:
-        logger.error(f"SECURITY BLOCKED: Webhook {webhook_url} failed SSRF validation: {e}")
-        return False
-    except requests.exceptions.RequestException as e:
-        # Gracefully handle all network / request failures so indexing is not blocked
+        _post_webhook(webhook_url, payload)
+    except SSRFSecurityException as exception:
         logger.error(
-            f"Failed to send webhook notification for pair: {doc_a} <-> {doc_b}. Error: {e}"
+            "SECURITY BLOCKED: Webhook failed SSRF validation: %s",
+            exception,
+        )
+        return False
+    except requests.exceptions.RequestException as exception:
+        logger.error(
+            "Failed to send webhook notification for pair %s <-> %s "
+            "after at most %s attempts: %s",
+            doc_a,
+            doc_b,
+            WEBHOOK_MAX_ATTEMPTS,
+            exception,
         )
         return False
 
-def dispatch_plagiarism_alert(doc_a: str, doc_b: str, similarity: float) -> None:
-    """
-    Asynchronously dispatches a plagiarism alert via the background thread pool.
-    This prevents the UI from blocking during network requests.
-    """
-    from src.core.synchronization import run_background
-    
-    def _dispatch():
-        try:
-            send_plagiarism_alert(doc_a, doc_b, similarity)
-        except Exception:
-            logger.exception("Webhook dispatch failed")
-            
-    run_background(_dispatch)
+    logger.info(
+        "Webhook alert successfully sent for pair %s <-> %s (%.1f%%).",
+        doc_a,
+        doc_b,
+        similarity_percent,
+    )
+    return True

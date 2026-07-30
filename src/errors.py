@@ -29,7 +29,7 @@ ZIP_ENCRYPTED = "Password-protected or encrypted ZIP files are not supported."
 ZIP_ENTRY_CORRUPTED = "Corrupted or protected entry: {filename}"
 ZIP_INVALID = "Invalid or corrupted ZIP archive."
 ZIP_NO_SUPPORTED_DOCS = (
-    "⚠️ ZIP file '{filename}' contains no supported documents (.pdf, .docx, .doc, .txt)."
+    "⚠️ ZIP file '{filename}' contains no supported documents (.pdf, .docx, .txt)."
 )
 ZIP_FAILED_TO_PROCESS = "⚠️ Failed to process ZIP archive '{filename}': {error}"
 
@@ -48,8 +48,6 @@ OCR_LANGUAGE_UNSUPPORTED = (
 OCR_DEPENDENCIES_MISSING = "OCR dependencies are missing. Install pytesseract, PyMuPDF and Pillow using: python -m pip install pytesseract pymupdf pillow"
 OCR_TESSERACT_NOT_FOUND = "Tesseract OCR was not found. Install Tesseract and either add it to PATH or set TESSERACT_CMD to tesseract.exe."
 BADGE_PIL_REQUIRED = "PIL/Pillow is required for PNG badge generation"
-PARSER_BATCH_LIMIT_EXCEEDED = "Batch parsing limit exceeded. Maximum allowed files per batch is {limit} documents."
-
 
 # Similarity & FAISS Errors
 SIM_BATCH_SIZE_INVALID = "batch_size must be an integer"
@@ -76,8 +74,21 @@ INCIDENT_SYNC_FAILED = "Failed to synchronize incidents: {error}"
 INCIDENT_INVALID_REVIEW_STATUS = "review_status must be one of {valid_statuses}"
 INCIDENT_UPDATE_STATUS_FAILED = "Failed to update review status: {error}"
 
-# API Errors
-API_UNAUTHORIZED = "Invalid or missing authentication token."
+# SSRF / Webhook Security Errors
+SSRF_WEBHOOK_URL_EMPTY = "Webhook URL cannot be empty."
+SSRF_INSECURE_SCHEME = "Insecure scheme '{scheme}'. Webhooks must use 'https'."
+SSRF_MISSING_HOSTNAME = "Invalid URL: missing hostname."
+SSRF_INVALID_IP_FORMAT = "Resolved invalid IP address format: {error}"
+SSRF_BLOCKED_PRIVATE_SUBNET = "Blocked private IPv4 subnet IP: {ip} ({subnet})"
+SSRF_BLOCKED_LOOPBACK = "Blocked loopback IP: {ip}"
+SSRF_BLOCKED_PRIVATE_NETWORK = "Blocked private network IP: {ip}"
+SSRF_BLOCKED_LINK_LOCAL = "Blocked link-local IP: {ip}"
+SSRF_BLOCKED_MULTICAST = "Blocked multicast IP: {ip}"
+SSRF_BLOCKED_UNSPECIFIED = "Blocked unspecified IP: {ip}"
+SSRF_DNS_NO_ADDRESSES = "No addresses found for hostname '{hostname}'"
+SSRF_DNS_RESOLUTION_FAILED = "DNS resolution failed for hostname '{hostname}': {error}"
+
+# API ErrorsAPI_UNAUTHORIZED = "Invalid or missing authentication token."
 API_FILENAME_MISSING = "Filename must be provided."
 API_FILE_EMPTY = "Uploaded file is empty."
 API_TEXT_EXTRACTION_FAILED = "Failed to extract readable text from the uploaded file."
@@ -99,9 +110,9 @@ def ui_index_load_failed(error):
 UI_PDF_PREVIEW_FAILED = "Unable to render PDF preview: {error}"
 UI_PDF_PREVIEW_RESTRICTED = "PDF Preview is only available for uploaded `.pdf` files."
 UI_UPLOAD_MIN_FILES = "Upload at least 2 files to begin analysis."
-UI_UPLOAD_MIN_DOCS = "Please upload or import from Drive at least 2 PDF, DOCX, DOC, or TXT assignments to begin."
+UI_UPLOAD_MIN_DOCS = "Please upload or import from Drive at least 2 PDF, DOCX, or TXT assignments to begin."
 UI_UPLOAD_MIN_DOCS_ANALYSIS = (
-    "Please upload at least 2 PDF, DOCX, DOC, or TXT assignments to begin analysis."
+    "Please upload at least 2 PDF, DOCX, or TXT assignments to begin analysis."
 )
 UI_COMPUTE_SIMILARITY_MIN_DOCS = (
     "Ensure at least 2 documents are uploaded to compute similarities."
@@ -127,3 +138,32 @@ CLI_PARSE_FILE_FAILED = "Warning: Failed to parse '{filename}': {error}\n"
 CLI_PIPELINE_FAILED = "Error during plagiarism detection pipeline: {error}\n"
 CLI_THRESHOLD_INVALID = "Error: Threshold must be a float between 0.0 and 1.0.\n"
 CLI_INVALID_COMMAND = "Error: Invalid command '{command}'.\n"
+
+
+# SSRF Protection Errors
+SSRF_EMPTY_URL = "Webhook URL cannot be empty."
+SSRF_INSECURE_SCHEME = "Insecure scheme '{scheme}'. Webhooks must use 'https'."
+SSRF_MISSING_HOSTNAME = "Invalid URL: missing hostname."
+SSRF_NO_ADDRESSES = "No addresses found for hostname '{hostname}'"
+SSRF_DNS_RESOLUTION_FAILED = "DNS resolution failed for hostname '{hostname}': {error}"
+SSRF_INVALID_IP = "Resolved invalid IP address format: {error}"
+SSRF_BLOCKED_LOOPBACK = "Blocked loopback IP: {ip}"
+SSRF_BLOCKED_PRIVATE = "Blocked private network IP: {ip}"
+SSRF_BLOCKED_LINK_LOCAL = "Blocked link-local IP: {ip}"
+SSRF_BLOCKED_MULTICAST = "Blocked multicast IP: {ip}"
+SSRF_BLOCKED_UNSPECIFIED = "Blocked unspecified IP: {ip}"
+
+
+class ExportFailedError(RuntimeError):
+    """Raised when an export cannot be generated or written safely."""
+
+
+EXPORT_WRITE_FAILED = (
+    "Unable to write the {format_name} export to '{destination}'. "
+    "Check the destination permissions and available disk space, then try again."
+)
+
+EXPORT_GENERATION_IO_FAILED = (
+    "Unable to generate the {format_name} export because an I/O operation failed. "
+    "Please try again."
+)

@@ -3,7 +3,9 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import os
 import sqlite3
+import tempfile
 from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,7 +15,7 @@ from src.core.config import (normalize_score, normalize_severity_label,
                              severity_from_score)
 from src.db.migrations import migrate_corpus_database
 
-DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "corpus.db"
+DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "data" / "corpus.db"
 VALID_REVIEW_STATUSES = {"Pending", "Resolved"}
 CSV_COLUMNS = [
     "Incident ID",
@@ -60,11 +62,29 @@ def build_incident_id(doc_a: str, doc_b: str) -> str:
     return f"INC-{digest[:12].upper()}"
 
 
+def _get_connection(db_path: str | Path) -> sqlite3.Connection:
+    abs_path = os.path.abspath(str(db_path))
+    try:
+        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+        conn = sqlite3.connect(abs_path)
+    except (sqlite3.OperationalError, OSError, PermissionError):
+        fallback_path = os.path.join(tempfile.gettempdir(), "semantic_plagiarism_detector", "data", os.path.basename(abs_path))
+        os.makedirs(os.path.dirname(fallback_path), exist_ok=True)
+        conn = sqlite3.connect(fallback_path)
+
+    conn.execute("PRAGMA foreign_keys = ON")
+    try:
+        migrate_corpus_database(conn)
+    except Exception:
+        pass
+    return conn
+
+
 def init_incident_db(
     db_path: str | Path = DEFAULT_DB_PATH,
 ) -> None:
     """Create or upgrade the shared corpus/incident database."""
-    with closing(sqlite3.connect(str(db_path))) as conn:
+    with closing(_get_connection(db_path)) as conn:
         try:
             conn.execute("PRAGMA foreign_keys = ON")
             migrate_corpus_database(conn)
@@ -99,7 +119,8 @@ def _validate_incident(flag: Mapping[str, Any]) -> tuple[bool, str]:
     return True, ""
 
 
-def _fetch_all_incidents(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+def _fetch_all_incidents(conn: sqlite3.Connection) -> list[MatchResult]:
+    from src.db.schemas import MatchResult
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
         """
@@ -115,7 +136,20 @@ def _fetch_all_incidents(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         """
     ).fetchall()
 
-    return [dict(row) for row in rows]
+    return [
+        MatchResult(
+            incident_id=row["incident_id"],
+            document_a=row["document_a"],
+            document_b=row["document_b"],
+            similarity_score=row["similarity_score"],
+            severity_rank=row["severity_rank"],
+            review_status=row["review_status"],
+            date_flagged=row["date_flagged"],
+            last_seen=row["last_seen"],
+            threshold_at_time_of_flag=row["threshold_at_time_of_flag"],
+        )
+        for row in rows
+    ]
 
 
 def sync_flagged_incidents(
@@ -124,11 +158,12 @@ def sync_flagged_incidents(
     *,
     now: str | None = None,
     threshold: float | None = None,
-) -> list[dict[str, Any]]:
+) -> list[MatchResult]:
+    from src.db.schemas import MatchResult
     init_incident_db(db_path)
     timestamp = now or _utc_now_iso()
 
-    with closing(sqlite3.connect(str(db_path))) as conn:
+    with closing(_get_connection(db_path)) as conn:
         conn.row_factory = sqlite3.Row
 
         try:
@@ -148,9 +183,9 @@ def sync_flagged_incidents(
                     second,
                     _normalise_score(flag.get("similarity", 0.0)),
                     _severity_rank(flag),
+                    timestamp,
+                    timestamp,
                     _normalise_score(flag.get("threshold_at_time_of_flag", threshold or 0.0)),
-                    timestamp,
-                    timestamp,
                 ))
 
             if bulk_records:
@@ -187,7 +222,20 @@ def sync_flagged_incidents(
                 """
             ).fetchall()
 
-            return [dict(row) for row in rows]
+            return [
+                MatchResult(
+                    incident_id=row["incident_id"],
+                    document_a=row["document_a"],
+                    document_b=row["document_b"],
+                    similarity_score=row["similarity_score"],
+                    severity_rank=row["severity_rank"],
+                    review_status=row["review_status"],
+                    date_flagged=row["date_flagged"],
+                    last_seen=row["last_seen"],
+                    threshold_at_time_of_flag=row["threshold_at_time_of_flag"],
+                )
+                for row in rows
+            ]
 
         except sqlite3.Error as e:
             conn.rollback()
@@ -196,18 +244,19 @@ def sync_flagged_incidents(
 
 def get_all_incidents(
     db_path: str | Path = DEFAULT_DB_PATH,
-) -> list[dict[str, Any]]:
+) -> list[MatchResult]:
     init_incident_db(db_path)
-    with closing(sqlite3.connect(str(db_path))) as conn:
+    with closing(_get_connection(db_path)) as conn:
         return _fetch_all_incidents(conn)
 
 
 def get_all_incidents_above_threshold_for_export(
     threshold: float,
     db_path: str | Path = DEFAULT_DB_PATH,
-) -> list[dict[str, Any]]:
+) -> list[MatchResult]:
+    from src.db.schemas import MatchResult
     init_incident_db(db_path)
-    with closing(sqlite3.connect(str(db_path))) as conn:
+    with closing(_get_connection(db_path)) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             """
@@ -224,7 +273,15 @@ def get_all_incidents_above_threshold_for_export(
             """,
             (threshold,)
         ).fetchall()
-        return [dict(row) for row in rows]
+        return [
+            MatchResult(
+                document_a=row["doc_a"],
+                document_b=row["doc_b"],
+                similarity_score=row["similarity"],
+                threshold_at_time_of_flag=row["threshold_at_time_of_flag"],
+            )
+            for row in rows
+        ]
 
 
 def update_review_status(
@@ -291,7 +348,7 @@ def get_high_severity_trends(
     # Get daily count of High severity incidents over the specified number of days.
     # Returns list of dicts with 'date' and 'count' keys.
     init_incident_db(db_path)
-    with closing(sqlite3.connect(str(db_path))) as conn:
+    with closing(_get_connection(db_path)) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             """
@@ -320,7 +377,7 @@ def get_most_plagiarized_documents(
     # Get the most frequently plagiarized documents based on incident count.
     # Returns list of dicts with 'document_name' and 'incident_count' keys.
     init_incident_db(db_path)
-    with closing(sqlite3.connect(str(db_path))) as conn:
+    with closing(_get_connection(db_path)) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             """

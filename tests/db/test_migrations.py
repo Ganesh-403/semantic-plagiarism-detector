@@ -25,6 +25,7 @@ def test_fresh_corpus_database_reaches_latest_version(tmp_path):
         assert table_exists(connection, "documents")
         assert table_exists(connection, "chunks")
         assert table_exists(connection, "plagiarism_incidents")
+        assert column_exists(connection, "documents", "detected_language")
         assert index_exists(connection, "idx_documents_upload_date")
         assert index_exists(connection, "idx_documents_class_section")
         assert index_exists(connection, "idx_chunks_filename")

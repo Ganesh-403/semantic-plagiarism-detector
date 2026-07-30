@@ -4,13 +4,18 @@ tests/visualization/test_network_graph.py
 Unit tests for plot_similarity_network edge cases.
 """
 
+import time
 from unittest.mock import patch
 
+import networkx as nx
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
 from src.visualization.network_graph import (
     build_network_data,
+    export_graph_to_gexf,
+    export_network_to_gexf_bytes,
     plot_similarity_network,
     render_network_plotly,
 )
@@ -59,6 +64,43 @@ def test_build_network_data_with_theme_colors():
     # Similarity 0.95 >= 0.90 -> danger color
     assert net_data["shapes"][0]["line"]["color"] == "#e53935"
     assert net_data["node_trace"].textfont.color == "#ffffff"
+
+
+def test_build_network_data_hover_text():
+    """Verify hover text explicitly shows Document Title."""
+    data = {
+        "doc1": [1.0, 0.85],
+        "doc2": [0.85, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2"])
+    net_data = build_network_data(df, threshold=0.75)
+
+    hover_texts = net_data["node_trace"].hovertext
+    assert "<b>📄 Document Title:</b> doc1<br>" in hover_texts[0]
+
+
+def test_build_network_data_node_color_severity():
+    """Verify node colors are mapped by plagiarism severity (max similarity)."""
+    data = {
+        "doc_danger": [1.0, 0.95, 0.1],   # max_score=0.95 -> danger
+        "doc_warning": [0.95, 1.0, 0.8],  # max_score=0.95 -> danger
+        "doc_success": [0.1, 0.8, 1.0],   # max_score=0.8 -> warning
+    }
+    df = pd.DataFrame(data, index=["doc_danger", "doc_warning", "doc_success"])
+    custom_theme = {
+        "danger": "#ff0000",
+        "warning": "#ffff00",
+        "success": "#00ff00",
+    }
+    net_data = build_network_data(df, threshold=0.5, theme_colors=custom_theme)
+
+    # doc_danger has max_score=0.95 -> #ff0000
+    assert net_data["node_trace"].marker.color[0] == "#ff0000"
+    # doc_warning has max_score=0.95 -> #ff0000
+    assert net_data["node_trace"].marker.color[1] == "#ff0000"
+    # doc_success has max_score=0.8 -> #ffff00
+    assert net_data["node_trace"].marker.color[2] == "#ffff00"
+
 
 
 def test_render_network_plotly_construction():
@@ -172,3 +214,37 @@ def test_plot_similarity_network_layout_autosize():
 
     assert fig.layout.autosize is True
     assert fig.layout.width is None
+
+
+def test_build_network_data_highlighted_doc():
+    """Verify highlighted_doc node color and marker size are updated to bright yellow."""
+    data = {
+        "doc1": [1.0, 0.85, 0.20],
+        "doc2": [0.85, 1.0, 0.10],
+        "doc3": [0.20, 0.10, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2", "doc3"])
+
+    result = export_network_to_gexf_bytes(df, threshold=0.75)
+
+    assert isinstance(result, bytes)
+    assert len(result) > 0
+
+
+def test_export_network_to_gexf_bytes_contains_nodes_and_edges():
+    """Verify GEXF output contains expected nodes and edge attributes from similarity matrix."""
+    data = {
+        "doc1": [1.0, 0.95],
+        "doc2": [0.95, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2"])
+
+    net_data = build_network_data(df, threshold=0.75, highlighted_doc="doc1")
+    node_colors = net_data["node_trace"].marker.color
+    node_sizes = net_data["node_trace"].marker.size
+
+    # doc1 is highlighted -> color #FFFF00 and larger size
+    assert node_colors[0] == "#FFFF00"
+    assert node_colors[1] != "#FFFF00"
+    assert node_sizes[0] > node_sizes[1]
+

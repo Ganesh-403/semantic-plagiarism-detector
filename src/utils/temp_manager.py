@@ -77,3 +77,4 @@ def create_managed_temp_dir(
     temp_dir = tempfile.mkdtemp(suffix=suffix, prefix=prefix)
     register_temp_path(temp_dir)
     return temp_dir
+

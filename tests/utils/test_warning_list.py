@@ -1,5 +1,9 @@
-from src.utils.warning_list import (filter_warnings, paginate_warnings,
-                                    prepare_warning_page, sort_warnings)
+from src.utils.warning_list import (
+    filter_warnings,
+    paginate_warnings,
+    prepare_warning_page,
+    sort_warnings,
+)
 
 WARNINGS = [
     {"doc_a": "Zeta.pdf", "doc_b": "Alpha.pdf", "similarity": 0.91, "severity": "High"},
@@ -31,6 +35,15 @@ def test_search_matches_either_document_case_insensitively():
 
 def test_empty_search_returns_everything():
     assert len(filter_warnings(WARNINGS, " ")) == 4
+
+
+def test_search_query_is_truncated_to_max_length():
+    long_query = "a" * 201
+    results = filter_warnings(WARNINGS, long_query)
+    assert len(results) == 4
+
+    truncated = filter_warnings(WARNINGS, "a" * 201)
+    assert truncated == filter_warnings(WARNINGS, "a" * 200)
 
 
 def test_fuzzy_search_handles_minor_typos():
@@ -151,3 +164,22 @@ def test_filter_warnings_by_minimum_match_length():
     sorted_items, page = prepare_warning_page(warnings, min_match_length=50)
     assert len(sorted_items) == 2
     assert page.total_items == 2
+
+
+def test_page_size_clamping_to_max_100():
+    """Verify that a page_size parameter larger than 100 is clamped to 100."""
+    warnings = [
+        {
+            "doc_a": f"A-{i}.pdf",
+            "doc_b": f"B-{i}.pdf",
+            "similarity": 0.8,
+            "severity": "Medium",
+        }
+        for i in range(150)
+    ]
+    # Request a page size of 200
+    page = paginate_warnings(warnings, page=1, page_size=200)
+    # The safe_page_size must be clamped to 100
+    assert page.page_size == 100
+    assert len(page.items) == 100
+    assert page.total_pages == 2

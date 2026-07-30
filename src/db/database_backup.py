@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 import tempfile
+from contextlib import closing
 from pathlib import Path
 
 from src.db.corpus_db import get_corpus_db_path
@@ -35,12 +36,12 @@ def create_sqlite_snapshot(database_path: str | Path) -> bytes:
         snapshot_path = Path(temporary_directory) / source_path.name
         source_uri = f"{source_path.as_uri()}?mode=ro"
 
-        with sqlite3.connect(
+        with closing(sqlite3.connect(
             source_uri,
             uri=True,
             check_same_thread=False,
-        ) as source_connection:
-            with sqlite3.connect(snapshot_path) as destination:
+        )) as source_connection:
+            with closing(sqlite3.connect(snapshot_path)) as destination:
                 source_connection.backup(destination)
 
         snapshot = snapshot_path.read_bytes()

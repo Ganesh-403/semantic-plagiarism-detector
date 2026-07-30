@@ -1,4 +1,3 @@
-import sqlite3
 
 import pytest
 
@@ -20,14 +19,16 @@ def test_add_documents_bulk_success():
             "file_hash": "hash_bulk_1",
             "class_section": "Class A",
             "student_name": "Alice",
-            "assignment_title": "HW1"
+            "assignment_title": "HW1",
+            "detected_language": "en"
         },
         {
             "filename": "bulk_doc_2.pdf",
             "file_hash": "hash_bulk_2",
             "class_section": "Class B",
             "student_name": "Bob",
-            "assignment_title": "HW2"
+            "assignment_title": "HW2",
+            "detected_language": "es"
         },
         {
             "filename": "bulk_doc_3.pdf",
@@ -47,6 +48,14 @@ def test_add_documents_bulk_success():
     assert "bulk_doc_1.pdf" in filenames
     assert "bulk_doc_2.pdf" in filenames
     assert "bulk_doc_3.pdf" in filenames
+
+    # Find docs and assert language
+    doc1 = next(d for d in all_docs if d["filename"] == "bulk_doc_1.pdf")
+    doc2 = next(d for d in all_docs if d["filename"] == "bulk_doc_2.pdf")
+    doc3 = next(d for d in all_docs if d["filename"] == "bulk_doc_3.pdf")
+    assert doc1["detected_language"] == "en"
+    assert doc2["detected_language"] == "es"
+    assert doc3["detected_language"] is None
 
 def test_add_documents_bulk_duplicate_ignore():
     # Test that inserting duplicate filenames/hashes does not fail but ignores them
@@ -75,11 +84,9 @@ def test_add_documents_bulk_empty():
 def test_add_documents_bulk_missing_fields():
     # Verify defaults handle missing fields gracefully
     docs = [
-        {"filename": "missing_1.pdf"} # file_hash is missing, might trigger IntegrityError if not handled, but sqlite might just insert NULL
+        {"file_hash": "hash123"} # filename is missing, triggers IntegrityError on PRIMARY KEY which is swallowed by INSERT OR IGNORE
     ]
-    # In SQLite, UNIQUE NOT NULL on file_hash will cause an IntegrityError if it's NULL, 
-    # but we catch and rollback in the function
-    with pytest.raises(sqlite3.IntegrityError):
-        add_documents_bulk(docs)
-        
+    
+    success_count = add_documents_bulk(docs)
+    assert success_count == 0
     assert len(get_all_documents()) == 0

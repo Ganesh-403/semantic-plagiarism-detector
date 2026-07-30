@@ -27,3 +27,16 @@ def test_generate_bulk_reports_zip():
         data = json.loads(content)
         assert "similarity_score" in data
         assert "generated_at" in data
+
+
+def test_generate_bulk_reports_zip_with_progress_bar():
+    from unittest.mock import Mock
+    flags = [
+        {"doc1": "Alice.pdf", "doc2": "Bob.docx", "similarity_score": 0.85, "matched_chunks": []},
+        {"doc1": "Charlie.txt", "doc2": "Dave.pdf", "similarity_score": 0.95, "matched_chunks": ["chunk1"]}
+    ]
+    mock_pb = Mock()
+    generate_bulk_reports_zip(flags, progress_bar=mock_pb)
+    assert mock_pb.progress.call_count == 4
+    # Verify the final state was reported
+    mock_pb.progress.assert_any_call(1.0, text="ZIP archive ready!")

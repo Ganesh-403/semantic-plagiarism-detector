@@ -4,6 +4,7 @@ import logging
 import zipfile
 from datetime import datetime
 from typing import Dict, List, Optional
+import numpy as np
 
 from src.core.similarity import find_most_similar_chunks
 from src.utils.pdf_report import generate_plagiarism_report

@@ -44,26 +44,31 @@ Two entry points draw the main similarity matrix:
 - `plot_similarity_heatmap(...)` — Matplotlib/Seaborn, used for the high-res PNG download.
 - `plot_similarity_heatmap_plotly(...)` — Plotly, used for the interactive on-screen version.
 
-Both currently use a **module-level constant** for the colormap:
+Both functions accept a `colormap_name` parameter. The selected UI value is
+mapped to the appropriate Matplotlib or Plotly colormap using the mappings
+defined in `app/theme.py`. Supported options include those listed in
+`UI_COLORMAP_OPTIONS`, such as `"Viridis"`, `"Plasma"`, `"Coolwarm"`, and
+`"YlOrRd"`.
 
-```python
-_CMAP = "RdYlGn_r"
-```
 
-This is used directly inside `sns.heatmap(..., cmap=_CMAP)` and `go.Heatmap(..., colorscale="RdYlGn_r")`. Neither function currently accepts a `cmap` argument — the colormap is fixed at the module level, not passed in per-call.
+Internally, `colormap_name` is translated through `MATPLOTLIB_CMAP_MAPPING` or `PLOTLY_CMAP_MAPPING`, allowing the same UI selection to work consistently across both static and interactive heatmaps.
 
 Theme colors (background/ink/etc.) are applied conditionally with `if theme_colors:` blocks that style the figure background, axis text color, and legend — see lines 75–83 and 140–146 in `plot_similarity_heatmap`.
 
-`plot_chunk_similarity_comparison(...)` (the two-document chunk-level heatmap) reuses the same `_CMAP` constant and a similar `if theme_colors:` block.
+`plot_chunk_similarity_comparison(...)` also accepts colormap_name and maps it through MATPLOTLIB_CMAP_MAPPING, allowing the chunk-level heatmap to use the same user-selectable colormaps as the main similarity heatmaps.
 
 ### `network_graph.py`
 
 `plot_similarity_network(...)` builds a graph with NetworkX (`nx.spring_layout` for node positions) and renders it with Plotly `go.Figure`.
 
+`export_graph_to_gexf(graph)` serializes a NetworkX graph to GEXF XML format string for external tools like Gephi and Sigma.js.
+
+`export_network_to_gexf_bytes(similarity_df, threshold, min_degree)` is a convenience function that builds the network from a similarity matrix and returns GEXF bytes ready for download. It attaches similarity scores as edge attributes so Gephi can color/weight edges by plagiarism severity.
+
 Coloring logic here is threshold-based rather than a single palette lookup:
 
 - **Edges** are colored by similarity severity (lines ~92–98): `>= 0.90` uses `theme_colors["danger"]`, `>= 0.75` uses `theme_colors["warning"]`, otherwise `theme_colors["success"]` — each with a hardcoded hex fallback if `theme_colors` is `None`.
-- **Nodes** are colored by degree (number of flagged connections): degree `0` → success, degree `1` → warning, degree `2+` → danger (lines ~184–212).
+- **Nodes** are colored by document class tags (e.g. `#class_A`, `#class_B`) when tag metadata is provided via `document_tags` (or fetched from database). Each unique class tag is mapped to a discrete color from a high-contrast palette. If no document tags exist, node colors fall back to connection degree (degree `0` → success, degree `1` → warning, degree `2+` → danger).
 
 If you want to change these severity cutoffs, they are separate from `PLAGIARISM_THRESHOLD` in `src/core/similarity.py` — the `0.90`/`0.75` values are local to this function.
 
@@ -89,8 +94,110 @@ So today, dashboard charts do not follow the Light/Dark theme the way the heatma
 4. Call it from `app/streamlit_app.py`, passing `theme_colors=get_colors()` if applicable.
 5. Add a test under `tests/` (see `tests/test_heatmap.py` and `tests/visualization/test_network_graph.py` for existing patterns) and, if it's a Matplotlib figure, consider a baseline image test like `tests/baseline/test_similarity_heatmap_visual.png`.
 
-## Known Gaps (useful context for future work)
+## Exporting Graph Data
 
-- **`heatmap.py` colormap is not overridable per-call.** `app/streamlit_app.py` calls `plot_similarity_heatmap(..., cmap=heatmap_cmap, ...)` in one place (search for `# Dynamic colormap support`), but `plot_similarity_heatmap`'s signature has no `cmap` parameter — it only has `theme_colors`, not a colormap override. As written, that call site would raise a `TypeError` if it executes, since `cmap` isn't a valid keyword argument for the function. Adding a `cmap: str = _CMAP` parameter to `plot_similarity_heatmap` (and using it in place of the hardcoded `_CMAP` inside the function) would resolve this.
+The network graph module supports **GEXF export** for use in external graph analysis tools like Gephi and Sigma.js:
+
+```python
+from src.visualization.network_graph import export_network_to_gexf_bytes
+
+gexf_data = export_network_to_gexf_bytes(
+    similarity_df=similarity_df,
+    threshold=0.59,
+    min_degree=0,
+)
+```
+
+The returned bytes can be passed directly to `st.download_button` in a Streamlit app. Each edge in the GEXF output includes a `similarity` attribute with the original cosine similarity score, enabling weighted graph analysis in Gephi.
+
+## Chart Customization Examples
+
+### Choosing a heatmap colormap
+
+`plot_similarity_heatmap`, `plot_similarity_heatmap_plotly`, and `plot_chunk_similarity_comparison` all accept a `colormap_name` argument. Pick any of `UI_COLORMAP_OPTIONS` (`"Viridis"`, `"Plasma"`, `"Coolwarm"`, `"YlOrRd"`):
+
+```python
+from src.visualization.heatmap import plot_similarity_heatmap
+
+fig = plot_similarity_heatmap(
+    similarity_df,
+    colormap_name="Plasma",
+    annotate=True,
+)
+```
+
+### Showing or hiding cell annotations
+
+The Matplotlib heatmap supports numeric cell annotations through the `annotate`
+parameter. By default, annotations are enabled.
+
+Show similarity values inside each cell:
+
+```python
+from src.visualization.heatmap import plot_similarity_heatmap
+
+fig = plot_similarity_heatmap(
+    similarity_df,
+    annotate=True,
+)
+```
+
+Hide the numeric values for a cleaner visualization of larger matrices:
+
+```python
+fig = plot_similarity_heatmap(
+    similarity_df,
+    annotate=False,
+)
+```
+
+When annotations are enabled, values are displayed with two decimal places and
+automatically scaled to remain readable as the matrix size increases.
+
+### Overriding theme colors for a single chart
+
+Every visualization function accepts a `theme_colors` dict. You don't have to use `get_colors()` from `app/theme.py` — pass a custom dict to preview a one-off palette:
+
+```python
+custom_theme = {
+    "background": "#1A1A2E",
+    "surface": "#16213E",
+    "ink": "#EAEAEA",
+    "danger": "#FF6B6B",
+    "warning": "#FFD93D",
+    "success": "#6BCB77",
+}
+
+fig = plot_similarity_heatmap(similarity_df, theme_colors=custom_theme)
+```
+
+### Adding a permanent app-wide theme
+
+To make a new palette selectable app-wide (not just for one chart), add it to `THEMES` in `app/theme.py`, following the same token names used by `"Light"` and `"Dark"`:
+
+```python
+THEMES["HighContrast"] = {
+    "background": "#000000",
+    "surface": "#111111",
+    "card": "#000000",
+    "ink": "#FFFFFF",
+    "muted": "#AAAAAA",
+    "accent": "#00FFC2",
+    "border": "#333333",
+    "input": "#000000",
+    "danger": "#FF0033",
+    "danger_soft": "#330000",
+    "warning": "#FFEE00",
+    "warning_soft": "#332B00",
+    "success": "#00FF66",
+    "success_soft": "#003311",
+    "neutral_soft": "#1A1A1A",
+}
+```
+
+Once added, `set_theme("HighContrast")` makes it available through `get_colors()`, and every chart that accepts `theme_colors=get_colors()` will pick it up automatically.
+
+## Known Gaps (useful context for future work)
+- `plot_similarity_heatmap(...)`, `plot_similarity_heatmap_plotly(...)`, and `plot_chunk_similarity_comparison(...)` now support a `colormap_name` parameter. If additional heatmap visualizations are added in the future, they should follow the same `colormap_name` + mapping approach so the UI exposes a consistent set of colormap options.
 - **`plot_similarity_distribution` and `plot_document_sizes` are not exported** from `src/visualization/__init__.py`. They're defined in `analytics.py` but must currently be imported as `from src.visualization.analytics import plot_similarity_distribution` rather than `from src.visualization import plot_similarity_distribution`.
 - **`analytics.py` charts don't take `theme_colors`.** Their colors are hardcoded hex strings, so they won't shift with the Light/Dark toggle the way `heatmap.py` and `network_graph.py` do.

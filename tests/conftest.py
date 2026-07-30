@@ -34,6 +34,16 @@ import numpy as np
 # the test suite does not flush the active development session cache.
 os.environ.setdefault("REDIS_DB", "1")
 
+# ── Headless Renderer Configuration (Issue #504) ──────────────────────────────
+# Force Matplotlib to use the non-GUI Agg backend on headless CI workers
+os.environ.setdefault("MPLBACKEND", "Agg")
+try:
+    import matplotlib
+
+    matplotlib.use("Agg")
+except ImportError:
+    pass
+
 import pytest
 
 # ── Repository Root Path Bootstrap ────────────────────────────────────────────
@@ -46,6 +56,29 @@ if "sentence_transformers" not in sys.modules:
     stub = types.ModuleType("sentence_transformers")
     stub.SentenceTransformer = MagicMock  # type: ignore[attr-defined]
     sys.modules["sentence_transformers"] = stub
+
+if "torch" not in sys.modules:
+    torch_stub = types.ModuleType("torch")
+    class Tensor:
+        pass
+    torch_stub.Tensor = Tensor  # type: ignore
+    sys.modules["torch"] = torch_stub
+
+
+for mod_name in [
+    "lxml", "defusedxml", "defusedxml.lxml", "fitz", "docx", "redis", "bs4", "faker", "argon2", "argon2.exceptions",
+    "pdfplumber", "langdetect", "striprtf", "striprtf.striprtf", "src.core.translator",
+    "src.core.webhook",
+    "pypdf", "PyPDF2", "reportlab", "reportlab.pdfgen", "reportlab.lib", "reportlab.platypus", 
+    "reportlab.lib.colors", "reportlab.lib.enums", "reportlab.lib.styles", "reportlab.lib.units", 
+    "reportlab.lib.pagesizes", "reportlab.lib.utils", 
+    "matplotlib", "matplotlib.patches", "matplotlib.pyplot", "matplotlib.figure", "matplotlib.ticker",
+    "faiss", "torch", "psutil", "pytesseract", "sklearn", "sklearn.metrics", "sklearn.metrics.pairwise", "requests",
+]:
+    if mod_name not in sys.modules:
+        sys.modules[mod_name] = MagicMock()
+
+
 
 # ── Tesseract OCR Availability ────────────────────────────────────────────────
 TESSERACT_AVAILABLE = shutil.which("tesseract") is not None
@@ -65,11 +98,14 @@ def clean_test_env():
     before and after every test, preventing state leakage across test cases.
     """
     try:
-        from src.db.corpus_db import clear_all_data, close_connections
+        from src.db.corpus_db import clear_all_data
         clear_all_data()
-        close_connections()  # Flush the connection pool so mock_db starts clean
-    except ImportError:
-        pass
+    except Exception:
+        try:
+            from src.db.corpus_db import close_connections
+            close_connections()
+        except Exception:
+            pass
 
     index_path = os.path.join(str(_REPO_ROOT), "corpus.index")
     db_path = os.path.join(str(_REPO_ROOT), "corpus.db")
@@ -83,11 +119,14 @@ def clean_test_env():
                 pass
     yield
     try:
-        from src.db.corpus_db import clear_all_data, close_connections
+        from src.db.corpus_db import clear_all_data
         clear_all_data()
-        close_connections()
-    except ImportError:
-        pass
+    except Exception:
+        try:
+            from src.db.corpus_db import close_connections
+            close_connections()
+        except Exception:
+            pass
     for path in [index_path, db_path, users_db_path]:
         if os.path.exists(path):
             try:
@@ -145,29 +184,20 @@ def mock_db(tmp_path):
 
     # We patch the database path at the module level for all db modules
     import unittest.mock
-
+    
     with unittest.mock.patch("src.db.corpus_db._DB_PATH", str(corpus_db_file)), \
          unittest.mock.patch("src.db.incidents.DEFAULT_DB_PATH", str(corpus_db_file)), \
          unittest.mock.patch("src.db.auth._DB_PATH", str(auth_db_file)):
-
-        # Initialize schemas – each init is isolated so a single import
-        # failure does not prevent the other schemas from being created.
+        
         try:
             from src.db.corpus_db import init_corpus_db
-            init_corpus_db()
-        except ImportError:
-            pass
-
-        try:
             from src.db.incidents import init_incident_db
-            init_incident_db(str(corpus_db_file))
-        except ImportError:
-            pass
-
-        try:
             from src.db.auth import init_db
+            init_corpus_db()
+            init_incident_db()
             init_db()
-        except ImportError:
-            pass
-
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            
         yield str(corpus_db_file)

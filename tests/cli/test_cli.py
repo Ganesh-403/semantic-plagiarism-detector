@@ -10,7 +10,7 @@ from tests.conftest import MockDataFactory
 sys.modules["transformers"] = MagicMock()
 sys.modules["sentence_transformers"] = MagicMock()
 
-from cli import main, run_scan  # noqa: E402
+from src.cli import main, run_scan  # noqa: E402
 
 
 @pytest.fixture

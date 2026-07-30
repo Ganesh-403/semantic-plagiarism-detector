@@ -8,6 +8,7 @@ import numpy as np
 from fastapi import (Depends, FastAPI, File, HTTPException, Query, UploadFile,
                      status)
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse, JSONResponse
 from fastapi.security import HTTPBearer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -18,7 +19,7 @@ from src.core.similarity import (PLAGIARISM_THRESHOLD, chunk_max_similarity,
 from src.core.text_chunking import chunk_document
 from src.db.auth import get_user_role
 from src.db.corpus_db import _connect, clear_all_data, init_corpus_db
-from src.utils.redis_cache import get_cache
+from src.utils.redis_cache import CacheKeyPrefix, get_cache
 
 # ── API Initialization ────────────────────────────────────────────────────────
 
@@ -109,6 +110,22 @@ _HEALTHZ_DB_PATHS = (
     os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "corpus.db")),
     os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "users.db")),
 )
+
+
+@app.get("/metrics", tags=["Monitoring"], response_class=PlainTextResponse)
+def metrics_prometheus():
+    """Prometheus-format metrics export for production monitoring."""
+    from src.core.metrics import generate_latest as _gen
+
+    return PlainTextResponse(_gen().decode("utf-8"))
+
+
+@app.get("/metrics/json", tags=["Monitoring"])
+def metrics_json():
+    """JSON-format metrics export for non-Prometheus monitoring setups."""
+    from src.core.metrics import generate_metrics_json
+
+    return JSONResponse(generate_metrics_json())
 
 
 @app.get("/healthz", tags=["Health"])
@@ -319,8 +336,8 @@ async def clear_all_documents(
         try:
             cache = get_cache()
             if cache.is_available():
-                cache.delete("faiss:index:corpus_index")
-                cache.clear_pattern("analysis:*")
+                cache.delete(CacheKeyPrefix.LEGACY_FAISS_INDEX.value)
+                cache.clear_pattern(CacheKeyPrefix.LEGACY_ANALYSIS_PATTERN.value)
         except Exception as e:
             logger.error(f"Failed to clear Redis cache: {e}")
 

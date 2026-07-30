@@ -19,3 +19,21 @@ def test_translation_cache_hit_and_store():
 
     cached_result = get_cached_translation(foreign_text, source_lang="fr", target_lang="en")
     assert cached_result == expected_english
+
+
+def test_translation_cache_index_exists():
+    # Make sure DB is initialized
+    get_cached_translation("Some text")
+
+    from src.db.translation_cache import DB_PATH
+    import sqlite3
+
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        cursor = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='translation_cache'"
+        )
+        indexes = [row[0] for row in cursor.fetchall()]
+        assert "idx_translation_cache_created_at" in indexes
+    finally:
+        conn.close()

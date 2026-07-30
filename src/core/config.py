@@ -10,18 +10,20 @@ from typing import Final, Mapping
 LOW_SEVERITY: Final[str] = "Low"
 MEDIUM_SEVERITY: Final[str] = "Medium"
 HIGH_SEVERITY: Final[str] = "High"
+CRITICAL_SEVERITY: Final[str] = "Critical"
 
 SEVERITY_ORDER: Final[tuple[str, ...]] = (
     LOW_SEVERITY,
     MEDIUM_SEVERITY,
     HIGH_SEVERITY,
+    CRITICAL_SEVERITY,
 )
 SEVERITY_RANK: Final[Mapping[str, int]] = {
     label: rank for rank, label in enumerate(SEVERITY_ORDER)
 }
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class SimilarityThresholds:
     """Validated plagiarism and severity boundaries."""
 
@@ -140,6 +142,7 @@ def normalize_severity_label(label: str) -> str:
         "low": LOW_SEVERITY,
         "medium": MEDIUM_SEVERITY,
         "high": HIGH_SEVERITY,
+        "critical": CRITICAL_SEVERITY,
         "🟢 low": LOW_SEVERITY,
         "🟡 medium": MEDIUM_SEVERITY,
         "🔴 high": HIGH_SEVERITY,

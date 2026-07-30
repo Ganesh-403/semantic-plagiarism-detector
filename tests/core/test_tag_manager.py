@@ -1,4 +1,3 @@
-import pytest
 
 from src.core.tag_manager import TagManager
 
@@ -69,25 +68,25 @@ def test_extract_unique_tags_with_spaces():
 def test_has_matching_tag_spaces():
     assert TagManager.has_matching_tag(' #hw1 , #final ', '#hw1') is True
 
-def test_apply_tag_bulk(mocker):
-    mocker.patch('src.core.tag_manager.TagManager.parse_tags', return_value="#newtag")
-    get_mock = mocker.patch('src.db.corpus_db.get_document_tags', side_effect=["#oldtag", "#newtag", ""])
-    update_mock = mocker.patch('src.db.corpus_db.update_document_tags')
-    
-    from src.core.tag_manager import TagManager
-    TagManager.apply_tag(["doc1.pdf", "doc2.pdf", "doc3.pdf"], "#newtag")
-    
-    assert update_mock.call_count == 2
-    update_mock.assert_any_call("doc1.pdf", "#newtag,#oldtag")
-    update_mock.assert_any_call("doc3.pdf", "#newtag")
+from unittest.mock import patch
 
-def test_remove_tag_bulk(mocker):
-    mocker.patch('src.core.tag_manager.TagManager.parse_tags', return_value="#badtag")
-    get_mock = mocker.patch('src.db.corpus_db.get_document_tags', side_effect=["#badtag,#goodtag", "#goodtag", ""])
-    update_mock = mocker.patch('src.db.corpus_db.update_document_tags')
-    
-    from src.core.tag_manager import TagManager
-    TagManager.remove_tag(["doc1.pdf", "doc2.pdf", "doc3.pdf"], "#badtag")
-    
-    assert update_mock.call_count == 1
-    update_mock.assert_called_once_with("doc1.pdf", "#goodtag")
+
+def test_apply_tag_bulk():
+    with patch('src.core.tag_manager.TagManager.parse_tags', return_value="#newtag"), \
+         patch('src.db.corpus_db.get_document_tags', side_effect=["#oldtag", "#newtag", ""]), \
+         patch('src.db.corpus_db.update_document_tags') as update_mock:
+        from src.core.tag_manager import TagManager
+        TagManager.apply_tag(["doc1.pdf", "doc2.pdf", "doc3.pdf"], "#newtag")
+        assert update_mock.call_count == 2
+        update_mock.assert_any_call("doc1.pdf", "#newtag,#oldtag")
+        update_mock.assert_any_call("doc3.pdf", "#newtag")
+
+
+def test_remove_tag_bulk():
+    with patch('src.core.tag_manager.TagManager.parse_tags', return_value="#badtag"), \
+         patch('src.db.corpus_db.get_document_tags', side_effect=["#badtag,#goodtag", "#goodtag", ""]), \
+         patch('src.db.corpus_db.update_document_tags') as update_mock:
+        from src.core.tag_manager import TagManager
+        TagManager.remove_tag(["doc1.pdf", "doc2.pdf", "doc3.pdf"], "#badtag")
+        assert update_mock.call_count == 1
+        update_mock.assert_called_once_with("doc1.pdf", "#goodtag")

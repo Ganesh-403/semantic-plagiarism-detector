@@ -1,6 +1,4 @@
 import logging
-import time
-from typing import Optional
 
 from src.db.auth import (get_user_count, get_user_preferences,
                          update_user_preferences)

@@ -35,12 +35,19 @@ _IVF_THRESHOLD = 5_000  # Switch from flat to IVF when vectors exceed this
 class ChunkRecord:
     """Stores metadata for a single chunk stored in the FAISS index."""
 
-    __slots__ = ("doc_name", "chunk_index", "chunk_text")
+    __slots__ = ("doc_name", "chunk_index", "chunk_text", "metadata")
 
-    def __init__(self, doc_name: str, chunk_index: int, chunk_text: str):
+    def __init__(
+        self,
+        doc_name: str,
+        chunk_index: int,
+        chunk_text: str,
+        metadata: Optional[dict] = None,
+    ):
         self.doc_name = doc_name
         self.chunk_index = chunk_index
         self.chunk_text = chunk_text
+        self.metadata = metadata or getattr(chunk_text, "metadata", {})
 
     def __repr__(self):
         preview = self.chunk_text[:60].replace("\n", " ")
@@ -149,7 +156,14 @@ def search_similar_chunks(
 
     results = []
     for score, idx in zip(scores[0], indices[0]):
-        if idx < 0 or idx >= len(registry):
+        if idx < 0:
+            continue
+        if idx >= len(registry):
+            logger.warning(
+                f"[faiss_index] search returned out-of-range index {idx} "
+                f"(registry size: {len(registry)}). "
+                "Call compact_index() after removals to restore alignment."
+            )
             continue
         record = registry[idx]
         if exclude_doc and record.doc_name == exclude_doc:
@@ -223,6 +237,138 @@ def find_plagiarised_chunks(
     return matches
 
 
+def add_to_index(
+    index: faiss.Index,
+    registry: List[ChunkRecord],
+    embeddings: Dict[str, np.ndarray],
+    chunked_docs: Dict[str, List[str]],
+) -> Tuple[faiss.Index, List[ChunkRecord]]:
+    """
+    Incrementally add new chunk vectors to an existing FAISS index without a full rebuild.
+
+    Wraps the index with ``IndexIDMap`` on first call if it isn't already, then uses
+    ``add_with_ids()`` to append vectors with sequential IDs starting from the current
+    registry length.
+
+    Args:
+        index:      Existing FAISS index (bare or already IDMap-wrapped).
+        registry:   Existing chunk registry list.
+        embeddings: Dict mapping doc name -> embedding matrix (chunks x dim).
+        chunked_docs: Dict mapping doc name -> list of chunk strings.
+
+    Returns:
+        (updated_index, updated_registry) — the index may be wrapped in ``IndexIDMap``
+        if it was bare on entry.
+    """
+    new_vectors: List[np.ndarray] = []
+    new_registry: List[ChunkRecord] = []
+
+    for doc_name, emb in embeddings.items():
+        chunks = chunked_docs.get(doc_name, [])
+        if emb.ndim != 2 or emb.shape[0] == 0:
+            continue
+        for i, (vec, text) in enumerate(zip(emb, chunks)):
+            new_vectors.append(vec.astype("float32"))
+            new_registry.append(ChunkRecord(doc_name, i, text))
+
+    if not new_vectors:
+        return index, registry
+
+    matrix = np.vstack(new_vectors)
+    offset = len(registry)
+    ids = np.arange(offset, offset + len(new_vectors), dtype=np.int64)
+
+    # Wrap bare index with IndexIDMap on first incremental add
+    if not isinstance(index, faiss.IndexIDMap):
+        index = faiss.IndexIDMap(index)
+
+    index.add_with_ids(matrix, ids)
+    logger.info(
+        f"[faiss_index] Incrementally added {len(new_vectors)} vectors "
+        f"(total: {index.ntotal})"
+    )
+    return index, registry + new_registry
+
+
+def remove_vectors_by_doc(
+    index: faiss.Index,
+    registry: List[ChunkRecord],
+    doc_name: str,
+) -> Tuple[faiss.Index, List[ChunkRecord]]:
+    """
+    Remove all vectors belonging to a given document from the index.
+
+    .. note::
+
+       After removal the ID-to-registry alignment is broken.  Call
+       :func:`compact_index` to restore alignment, or call
+       :func:`load_or_rebuild_index` for a full rebuild.
+
+    Args:
+        index:    FAISS index (should be ``IndexIDMap``).
+        registry: Current chunk registry.
+        doc_name: Document whose vectors should be removed.
+
+    Returns:
+        (index, updated_registry) — the registry is filtered but ID indices may
+        no longer align with its positions.
+    """
+    if not isinstance(index, faiss.IndexIDMap):
+        logger.warning(
+            "[faiss_index] Cannot remove vectors by doc — index is not IDMap-wrapped. "
+            "Call load_or_rebuild_index() instead."
+        )
+        return index, registry
+
+    ids_to_remove = [
+        np.int64(i) for i, rec in enumerate(registry) if rec.doc_name == doc_name
+    ]
+    if not ids_to_remove:
+        return index, registry
+
+    selector = faiss.IDSelectorArray(np.array(ids_to_remove, dtype=np.int64))
+    index.remove_ids(selector)
+    updated_registry = [rec for rec in registry if rec.doc_name != doc_name]
+
+    logger.info(
+        f"[faiss_index] Removed {len(ids_to_remove)} vectors for doc '{doc_name}' "
+        f"(remaining: {index.ntotal})"
+    )
+    return index, updated_registry
+
+
+def compact_index(
+    index: faiss.Index,
+    registry: List[ChunkRecord],
+) -> Tuple[faiss.Index, List[ChunkRecord]]:
+    """
+    Rebuild the index with sequential IDs matching the current registry order.
+
+    Use after :func:`remove_vectors_by_doc` to restore ID-to-registry alignment
+    without loading embeddings from the database.
+
+    The underlying embedding matrix is reconstructed by re-wrapping the remaining
+    vectors from the index itself (for flat indexes) or by loading from the
+    database (for IVF indexes).
+    """
+    from src.db.corpus_db import get_all_embeddings
+
+    matrix = get_all_embeddings()
+    n_matrix = matrix.shape[0] if (matrix is not None and matrix.size > 0) else 0
+    if n_matrix != len(registry):
+        raise ValueError(
+            f"Embedding count ({n_matrix}) does not match registry size ({len(registry)})"
+        )
+
+    if n_matrix == 0:
+        dim = 384
+        return faiss.IndexFlatIP(dim), registry
+
+    nprobe = getattr(index, "nprobe", 10)
+    new_index = build_index_from_matrix(matrix, nprobe=nprobe)
+    return new_index, registry
+
+
 def save_index(index: faiss.Index, path: str) -> None:
     """Persist a FAISS index to disk."""
     faiss.write_index(index, path)
@@ -241,13 +387,21 @@ def build_index_from_matrix(
     index_type: str = "auto",
     nlist: Optional[int] = None,
     nprobe: int = 10,
+    *,
+    use_id_map: bool = True,
 ) -> faiss.Index:
-    """Build a FAISS index from a pre-computed 2D numpy matrix of embeddings."""
+    """Build a FAISS index from a pre-computed 2D numpy matrix of embeddings.
+
+    When *use_id_map* is True (default) the index is wrapped with ``IndexIDMap``
+    so that ``add_to_index()`` and ``remove_vectors_by_doc()`` can be used later
+    without a full rebuild.
+    """
     dim = 384
     if matrix.size == 0 or matrix.shape[0] == 0:
         return faiss.IndexFlatIP(dim)
 
     n_vectors = matrix.shape[0]
+    mat = matrix.astype("float32")
 
     # Resolve index type
     if index_type == "auto":
@@ -259,13 +413,27 @@ def build_index_from_matrix(
         nlist = min(nlist, n_vectors)
 
         quantizer = faiss.IndexFlatIP(dim)
-        index = faiss.IndexIVFFlat(quantizer, dim, nlist, faiss.METRIC_INNER_PRODUCT)
-        index.train(matrix.astype("float32"))
-        index.add(matrix.astype("float32"))
-        index.nprobe = nprobe
+        base = faiss.IndexIVFFlat(quantizer, dim, nlist, faiss.METRIC_INNER_PRODUCT)
+        base.train(mat)
+
+        if use_id_map:
+            ids = np.arange(n_vectors, dtype=np.int64)
+            index = faiss.IndexIDMap(base)
+            index.add_with_ids(mat, ids)
+            base.nprobe = nprobe
+        else:
+            base.add(mat)
+            base.nprobe = nprobe
+            index = base
     else:
-        index = faiss.IndexFlatIP(dim)
-        index.add(matrix.astype("float32"))
+        base = faiss.IndexFlatIP(dim)
+        if use_id_map:
+            ids = np.arange(n_vectors, dtype=np.int64)
+            index = faiss.IndexIDMap(base)
+            index.add_with_ids(mat, ids)
+        else:
+            base.add(mat)
+            index = base
 
     return index
 

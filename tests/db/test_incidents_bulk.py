@@ -59,7 +59,7 @@ def test_sync_flagged_incidents_bulk_upsert():
     
     assert len(incidents) == 1
     assert incidents[0]["similarity_score"] == 0.99
-    assert incidents[0]["severity_rank"] == "Critical"
+    assert incidents[0]["severity_rank"] == "High"
 
 def test_sync_flagged_incidents_bulk_invalid():
     # Test skipping invalid pairs

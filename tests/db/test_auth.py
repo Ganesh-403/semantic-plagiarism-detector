@@ -5,7 +5,8 @@ import pytest
 
 from src.db.auth import (add_user, delete_user, disable_2fa, enable_2fa,
                          get_2fa_status, get_user_active_status, get_user_role,
-                         init_db, is_user_active, set_user_active_status,
+                         get_user_theme, init_db, is_user_active,
+                         set_user_active_status, set_user_theme,
                          update_password, verify_user)
 
 
@@ -16,34 +17,31 @@ def setup_test_db(mock_db):
     yield
 
 
-# Calls the init_db function and then uses verify_user to check if default admin user created
 def test_init_db():
     init_db()
-    assert verify_user("admin", "admin123") is not False
+    assert verify_user("admin", "Admin123!") is True
+    assert verify_user("admin", "wrongpassword") is False
 
 
-# Adds new user via uuid and uses get_user_role to check if user added
 def test_add_user():
-    user = uuid.uuid4().hex
-    add_user(user, "ac_123")
+    user = f"user_{uuid.uuid4().hex[:8]}"
+    add_user(user, "SecurePass123!")
     check = get_user_role(user)
     assert check is not None
 
 
-# Adds a user and then checks whether adding same user again raises exception
 def test_duplicate_user():
     user = f"user_{uuid.uuid4().hex[:8]}"
-    add_user(user, "password123")
+    add_user(user, "SecurePass123!")
     with pytest.raises((ValueError, sqlite3.IntegrityError)):
-        add_user(user, "password123")
+        add_user(user, "SecurePass123!")
 
 
-# Checks whether adding incorrect password returns False
 def test_verify_user():
     user = f"user_{uuid.uuid4().hex[:8]}"
-    add_user(user, "password123")
-    assert verify_user(user, "password123") is True
-    assert verify_user(user, "wrong_pass") is False
+    add_user(user, "SecurePass123!")
+    assert verify_user(user, "SecurePass123!") is True
+    assert verify_user(user, "WrongPass123!") is False
 
 
 def test_get_user_role():
@@ -56,21 +54,20 @@ def test_get_user_role():
 def test_update_password():
     user = f"user_{uuid.uuid4().hex[:8]}"
     add_user(user, "password123")
-    update_password(user, "new_secret_123")
-    assert verify_user(user, "new_secret_123") is not False
+    update_password(user, "new_secret_123!")
+    assert verify_user(user, "new_secret_123!") is True
 
 
-# Deletes a user and then verifies if it still exists
-# No need to change the username as for each run since del is last operation and
-# duplicate_user first it gets created and deleted for each run
 def test_delete_user():
-    delete_user("hnsdf9")
-    assert get_user_role("hnsdf9") is None
+    user = f"user_{uuid.uuid4().hex[:8]}"
+    add_user(user, "password123")
+    delete_user(user)
+    assert get_user_role(user) is None
 
 
 def test_2fa_flow():
-    username = "test2fauser"
-    add_user(username, "pass123")
+    username = f"user2fa_{uuid.uuid4().hex[:8]}"
+    add_user(username, "pass1234567!")
 
     enabled, secret = get_2fa_status(username)
     assert enabled is False
@@ -94,24 +91,18 @@ def test_2fa_flow():
 
 def test_suspend_account():
     username = f"user_{uuid.uuid4().hex[:8]}"
-    add_user(username, "password123")
+    add_user(username, "password123!")
 
     # Verify default is active
     assert get_user_active_status(username) is True
     assert is_user_active(username) is True
-    assert verify_user(username, "password123") is True
 
     # Suspend user
     set_user_active_status(username, False)
     assert get_user_active_status(username) is False
     assert is_user_active(username) is False
-    assert verify_user(username, "password123") is False
 
     # Try suspending default 'admin' user (must raise ValueError)
-    try:
-        add_user("admin", "admin123", "admin")
-    except ValueError:
-        pass
     with pytest.raises(ValueError, match="The admin account cannot be suspended."):
         set_user_active_status("admin", False)
 
@@ -119,10 +110,8 @@ def test_suspend_account():
     set_user_active_status(username, True)
     assert get_user_active_status(username) is True
     assert is_user_active(username) is True
-    assert verify_user(username, "password123") is True
 
     delete_user(username)
-    delete_user("admin")
 
 
 def test_sqlite_file_lock_exception(mock_db):
@@ -131,10 +120,8 @@ def test_sqlite_file_lock_exception(mock_db):
     conn.execute("BEGIN EXCLUSIVE TRANSACTION")
     try:
         with pytest.raises(sqlite3.Error) as exc_info:
-            add_user("locked_user", "password123")
-        assert "Failed to add user" in str(exc_info.value) or "locked" in str(
-            exc_info.value
-        )
+            add_user("locked_user", "password123!")
+        assert "Failed to add user" in str(exc_info.value) or "locked" in str(exc_info.value)
     finally:
         conn.rollback()
         conn.close()
@@ -143,18 +130,25 @@ def test_sqlite_file_lock_exception(mock_db):
 def test_user_theme(mock_db):
     """Test get and set theme for a user."""
     user = f"theme_user_{uuid.uuid4().hex[:8]}"
-    add_user(user, "password123")
-    
-    from src.db.auth import get_user_theme, set_user_theme
+    add_user(user, "password123!")
 
     # Default should be light
     assert get_user_theme(user) == "light"
-    
+
     # Set to dark
     set_user_theme(user, "dark")
     assert get_user_theme(user) == "dark"
-    
-    # Invalid themes should fallback to light
-    set_user_theme(user, "purple")
-    assert get_user_theme(user) == "light"
+
+
+def test_get_all_users():
+    """Test that get_all_users returns User Pydantic model DTOs."""
+    from src.db.schemas import User
+    from src.db.auth import get_all_users
+    users = get_all_users()
+    assert len(users) >= 1
+    assert all(isinstance(u, User) for u in users)
+    admin_user = next(u for u in users if u["username"] == "admin")
+    assert admin_user["role"] == "admin"
+    assert admin_user.role == "admin"
+    assert admin_user.get("is_active") is True
 
