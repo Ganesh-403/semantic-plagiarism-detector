@@ -8,6 +8,7 @@ from src.db.auth import (
     delete_user,
     disable_2fa,
     enable_2fa,
+    format_user_created_date,
     get_2fa_status,
     get_user_active_status,
     get_user_role,
@@ -245,3 +246,66 @@ def test_delete_user_removes_matching_session_and_authorization_rows(mock_db):
     assert other_token_count == 1
 
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# format_user_created_date — issue #1049
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TestFormatUserCreatedDate:
+    """Tests for the format_user_created_date helper (issue #1049)."""
+
+    def test_valid_iso_datetime_with_z(self):
+        """Full ISO datetime with Z suffix must format correctly."""
+        result = format_user_created_date("2026-07-28T14:30:00Z")
+        assert result == "Jul 28, 2026"
+
+    def test_valid_iso_datetime_without_z(self):
+        """ISO datetime without Z suffix must format correctly."""
+        result = format_user_created_date("2026-07-28T14:30:00")
+        assert result == "Jul 28, 2026"
+
+    def test_valid_date_only(self):
+        """Date-only ISO string must format correctly."""
+        result = format_user_created_date("2026-07-28")
+        assert result == "Jul 28, 2026"
+
+    def test_valid_space_separated(self):
+        """Space-separated datetime (SQLite default) must format correctly."""
+        result = format_user_created_date("2026-07-28 14:30:00")
+        assert result == "Jul 28, 2026"
+
+    def test_different_date(self):
+        """Verify month and day mapping for a different date."""
+        result = format_user_created_date("2025-01-05")
+        assert result == "Jan 05, 2025"
+
+    def test_empty_string_returns_unknown(self):
+        """Empty string must return 'Unknown'."""
+        assert format_user_created_date("") == "Unknown"
+
+    def test_none_returns_unknown(self):
+        """None input must return 'Unknown'."""
+        assert format_user_created_date(None) == "Unknown"  # type: ignore[arg-type]
+
+    def test_whitespace_only_returns_unknown(self):
+        """Whitespace-only string must return 'Unknown'."""
+        assert format_user_created_date("   ") == "Unknown"
+
+    def test_invalid_string_returns_unknown(self):
+        """Garbage input must return 'Unknown', not raise."""
+        assert format_user_created_date("not-a-date") == "Unknown"
+
+    def test_partial_invalid_returns_unknown(self):
+        """Partially valid input must return 'Unknown'."""
+        assert format_user_created_date("2026-13-45") == "Unknown"
+
+    def test_returns_str_type(self):
+        """Return type must always be str."""
+        result = format_user_created_date("2026-07-28")
+        assert isinstance(result, str)
+
+    def test_non_string_input_returns_unknown(self):
+        """Non-string input (int, list) must return 'Unknown'."""
+        assert format_user_created_date(12345) == "Unknown"  # type: ignore[arg-type]
+        assert format_user_created_date([]) == "Unknown"  # type: ignore[arg-type]
