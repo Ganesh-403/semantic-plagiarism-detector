@@ -103,9 +103,11 @@ def migration_004_add_plagiarism_incidents(
     )
 
 
-def migration_005_add_false_positives(cursor):
+def migration_005_add_false_positives(
+    connection: sqlite3.Connection,
+) -> None:
     """Adds a table to track dismissed false-positive plagiarism pairs."""
-    cursor.execute(
+    connection.execute(
         """
         CREATE TABLE IF NOT EXISTS false_positives (
             document_a TEXT,
