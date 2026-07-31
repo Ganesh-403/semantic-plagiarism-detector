@@ -324,3 +324,24 @@ def processing_eta_text(
     )
     duration = format_processing_duration(seconds)
     return f"Estimated processing time: about {duration}"
+
+
+def format_duration(seconds: float) -> str:
+    """
+    Format a duration in seconds.
+
+    Examples:
+        0.0   -> "0.0s"
+        45.2  -> "45.2s"
+        125.0 -> "2m 5.0s"
+    """
+
+    seconds = _validate_non_negative_number("seconds", seconds)
+
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+
+    minutes = int(seconds // 60)
+    remaining = seconds % 60
+
+    return f"{minutes}m {remaining:.1f}s"
