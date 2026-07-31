@@ -271,3 +271,71 @@ def test_schema_inspection_helpers_handle_missing_objects():
         assert not index_exists(connection, "missing_index")
     finally:
         connection.close()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Migration logging — issue #1051
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_migration_logs_success_message_corpus(tmp_path, caplog):
+    """Verify that successful corpus migrations log an informational message."""
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="src.db.migrations.common"):
+        with connect(tmp_path / "log-test-corpus.db") as connection:
+            migrate_corpus_database(connection)
+
+    assert any(
+        "migration from version" in record.message
+        and "completed successfully" in record.message
+        for record in caplog.records
+    ), f"Expected migration success log, got: {[r.message for r in caplog.records]}"
+
+
+def test_migration_logs_success_message_auth(tmp_path, caplog):
+    """Verify that successful auth migrations log an informational message."""
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="src.db.migrations.common"):
+        with connect(tmp_path / "log-test-auth.db") as connection:
+            migrate_auth_database(connection)
+
+    assert any(
+        "migration from version" in record.message
+        and "completed successfully" in record.message
+        for record in caplog.records
+    ), f"Expected migration success log, got: {[r.message for r in caplog.records]}"
+
+
+def test_migration_log_includes_version_numbers(tmp_path, caplog):
+    """Verify the log message includes the old and new version numbers."""
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="src.db.migrations.common"):
+        with connect(tmp_path / "version-test.db") as connection:
+            migrate_corpus_database(connection)
+
+    assert any(
+        "from version 0" in record.message for record in caplog.records
+    ), f"Expected 'from version 0' in log, got: {[r.message for r in caplog.records]}"
+
+
+def test_no_migration_log_when_already_at_target(tmp_path, caplog):
+    """Verify no migration log is written when DB is already at target version."""
+    import logging
+
+    db_path = tmp_path / "no-op-test.db"
+
+    with connect(db_path) as connection:
+        migrate_corpus_database(connection)
+
+    caplog.clear()
+
+    with caplog.at_level(logging.INFO, logger="src.db.migrations.common"):
+        with connect(db_path) as connection:
+            migrate_corpus_database(connection)
+
+    assert not any(
+        "completed successfully" in record.message for record in caplog.records
+    ), f"Should not log when no migration needed, got: {[r.message for r in caplog.records]}"
