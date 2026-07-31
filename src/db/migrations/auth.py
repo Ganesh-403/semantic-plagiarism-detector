@@ -52,8 +52,10 @@ def migration_003_add_two_factor_fields(
         )
 
 
-def migration_005_add_preferences(db_cursor):
-    db_cursor.execute("ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}'")
+def migration_005_add_preferences(
+    connection: sqlite3.Connection,
+) -> None:
+    connection.execute("ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}'")
 
 
 def migration_004_add_role_index(
