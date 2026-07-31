@@ -202,14 +202,16 @@ def run_migrations(
             + ", ".join(map(str, missing_definitions))
         )
 
-    if current == target:
-        return current
-
     with migration_transaction(connection):
         for version in range(current + 1, target + 1):
-            migrations[version]()
+            migrations[version](connection)
         set_user_version(connection, target)
 
+    logger.info(
+        "Database migration from version %d to %d completed successfully.",
+        current,
+        target,
+    )
     return target
 
 
