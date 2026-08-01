@@ -59,6 +59,7 @@ def create_sqlite_snapshot(database_path: str | Path) -> bytes:
     """
     Return a transactionally consistent SQLite snapshot.
 
+    This function validates that the source database exists before creating a snapshot.
     SQLite's online backup API is used instead of reading a live database
     file directly. This includes committed pages correctly even when the
     source database uses WAL journaling.
