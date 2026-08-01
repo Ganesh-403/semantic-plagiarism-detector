@@ -327,7 +327,6 @@ def normalize_severity_label(label: str) -> str:
         "🟢 low": LOW_SEVERITY,
         "🟡 medium": MEDIUM_SEVERITY,
         "🔴 high": HIGH_SEVERITY,
-        "ðÿ”´ high": HIGH_SEVERITY,
         "warning": MEDIUM_SEVERITY,
     }
 

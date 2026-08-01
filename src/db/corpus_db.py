@@ -586,7 +586,7 @@ def update_document_tags(filename: str, tags: str) -> bool:
             return True
     except Exception as e:
         logger.error(f"Failed to update tags for '{filename}': {e}")
-return False
+    return False
 
 
 def get_tag_document_count(tag: str) -> int:
@@ -612,7 +612,8 @@ def get_tag_document_count(tag: str) -> int:
     return count
 
 
-def delete_tag(tag: str) -> int:    """Removes a specific tag from ALL documents in the database."""
+def delete_tag(tag: str) -> int:
+    """Removes a specific tag from ALL documents in the database."""
     if not tag or not isinstance(tag, str):
         return 0
     tag = tag.strip()

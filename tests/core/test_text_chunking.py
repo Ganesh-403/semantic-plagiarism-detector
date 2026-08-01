@@ -160,7 +160,7 @@ def test_chunk_by_sentences_produces_multiple_chunks_for_long_text():
     sentences = ["The algorithm processes the input data efficiently." for _ in range(40)]
     text = " ".join(sentences)
 
-chunks = chunk_by_sentences(text, max_chunk_size=150)
+    chunks = chunk_by_sentences(text, max_chunk_size=150)
     assert len(chunks) > 1
 
 

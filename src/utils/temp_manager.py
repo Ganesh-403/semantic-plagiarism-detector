@@ -79,7 +79,7 @@ def create_managed_temp_dir(
     Returns:
         str: Absolute path to the created temporary directory.
     """
-temp_dir = tempfile.mkdtemp(suffix=suffix, prefix=prefix)
+    temp_dir = tempfile.mkdtemp(suffix=suffix, prefix=prefix)
     register_temp_path(temp_dir)
     return temp_dir
 

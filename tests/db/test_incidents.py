@@ -8,11 +8,9 @@ from src.db.incidents import (
     build_incident_id,
     export_current_flags_csv,
     get_all_incidents,
- test/add-get-incidents-by-severity-1182
     get_incidents_by_severity,
 
     get_incident_by_id,
- main
     incidents_to_csv,
     purge_old_incidents,
     sync_flagged_incidents,
@@ -200,8 +198,6 @@ def test_export_current_flags_csv_exports_incidents(test_db):
     assert "doc1.pdf" in text
     assert "doc2.pdf" in text
 
- test/add-get-incidents-by-severity-1182
-
 def test_get_incidents_by_severity(test_db):
     """Verify incidents can be filtered by severity."""
     flags = [
@@ -327,5 +323,4 @@ def test_get_incident_by_id_integer(test_db):
     assert isinstance(result, dict)
     assert result["document_a"] == "int_doc_a.pdf"
     assert result["document_b"] == "int_doc_b.pdf"
- main
 
