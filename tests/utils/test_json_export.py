@@ -81,3 +81,17 @@ def test_export_similarity_matrix_to_json_unicode_filenames():
     assert len(result) == 1
     assert result[0]["document_1"] == "📄_doc.txt"
     assert result[0]["document_2"] == "doc_üñ.txt"
+
+
+def test_export_similarity_matrix_to_json_is_pretty_printed():
+    """Verify that JSON output uses two-space indentation."""
+    data = [[1.0, 0.85], [0.85, 1.0]]
+    df = pd.DataFrame(data, index=["docA", "docB"], columns=["docA", "docB"])
+
+    json_str = export_similarity_matrix_to_json(df)
+
+    lines = json_str.splitlines()
+
+    assert lines[0] == "["
+    assert lines[1].startswith("  {")
+    assert lines[-1] == "]"
