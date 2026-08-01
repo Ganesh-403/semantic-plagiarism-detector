@@ -13,7 +13,7 @@ from typing import TypeVar
 
 
 DEFAULT_FILENAME = "document"
-MAX_FILENAME_LENGTH = 150
+MAX_FILENAME_LENGTH = 128
 
 _HTML_TAG_RE = re.compile(r"<[^>]*>")
 _CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")

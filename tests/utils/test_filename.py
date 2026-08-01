@@ -43,7 +43,7 @@ def test_extension_is_preserved_and_normalized():
 def test_long_filename_preserves_extension_and_limit():
     result = sanitize_filename("a" * 400 + ".pdf")
 
-    assert len(result) == 150
+    assert len(result) == 128
     assert result.endswith(".pdf")
 
 
@@ -54,8 +54,8 @@ def test_300_plus_character_filename_truncation_and_hash_uniqueness():
     sanitized1 = sanitize_filename(file1)
     sanitized2 = sanitize_filename(file2)
 
-    assert len(sanitized1) <= 150
-    assert len(sanitized2) <= 150
+    assert len(sanitized1) <= 128
+    assert len(sanitized2) <= 128
     assert sanitized1.endswith(".pdf")
     assert sanitized2.endswith(".pdf")
     assert sanitized1 != sanitized2
@@ -93,3 +93,11 @@ def test_mapping_preserves_entries_after_sanitization_collision():
 def test_invalid_max_length_type_is_rejected(value):
     with pytest.raises(TypeError):
         sanitize_filename("file.pdf", max_length=value)
+
+def test_200_character_filename_is_truncated_preserving_extension():
+    filename = "a" * 200 + ".pdf"
+
+    sanitized = sanitize_filename(filename)
+
+    assert len(sanitized) <= 128
+    assert sanitized.endswith(".pdf")
