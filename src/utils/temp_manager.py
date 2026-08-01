@@ -6,6 +6,7 @@ on application exit using Python's atexit module and tempfile utilities.
 """
 
 import atexit
+import logging
 import os
 import shutil
 import tempfile
@@ -13,6 +14,8 @@ from typing import List, Optional
 
 # Global list of registered temporary paths to clean up
 _REGISTERED_TEMP_PATHS: List[str] = []
+
+logger = logging.getLogger(__name__)
 
 
 def register_temp_path(path: str) -> str:
@@ -39,8 +42,8 @@ def cleanup_registered_temp_paths() -> None:
                 os.remove(path)
             elif os.path.isdir(path):
                 shutil.rmtree(path, ignore_errors=True)
-        except Exception:
-            pass  # Suppress errors during process teardown
+        except OSError as exc:
+            logger.warning("Failed to clean up temp file %s: %s", path, exc)
         finally:
             if path in _REGISTERED_TEMP_PATHS:
                 _REGISTERED_TEMP_PATHS.remove(path)
@@ -60,7 +63,9 @@ def create_managed_temp_file(
         str: Absolute path to the created temporary file.
     """
     fd, temp_path = tempfile.mkstemp(suffix=suffix, prefix=prefix)
-    os.close(fd)  # Close file descriptor so other components can open/write to it freely
+    os.close(
+        fd
+    )  # Close file descriptor so other components can open/write to it freely
     register_temp_path(temp_path)
     return temp_path
 
@@ -77,4 +82,3 @@ def create_managed_temp_dir(
     temp_dir = tempfile.mkdtemp(suffix=suffix, prefix=prefix)
     register_temp_path(temp_dir)
     return temp_dir
-
