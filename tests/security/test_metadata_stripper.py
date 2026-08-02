@@ -62,3 +62,16 @@ def test_strip_image_metadata_dimension_exactly_at_limit():
     result = strip_exif_metadata(img_bytes.getvalue(), "test.png")
     assert isinstance(result, bytes)
     assert len(result) > 0
+
+
+from PIL import Image
+import pytest
+
+def test_decompression_bomb_is_rejected(monkeypatch):
+    def fake_open(*args, **kwargs):
+        raise Image.DecompressionBombError("Bomb detected")
+
+    monkeypatch.setattr(Image, "open", fake_open)
+
+    with pytest.raises(ValueError, match="Image dimensions exceed security safety limits."):
+        strip_exif_metadata(b"fake-image-data", "test.png")

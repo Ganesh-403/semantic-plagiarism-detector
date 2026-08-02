@@ -3,6 +3,7 @@ import logging
 
 import fitz  # PyMuPDF
 from PIL import Image
+Image.MAX_IMAGE_PIXELS = 50_000_000
 
 logger = logging.getLogger(__name__)
 
@@ -72,16 +73,12 @@ def _strip_image_metadata(file_bytes: bytes) -> bytes:
     Raises:
         ValueError: If the image dimensions exceed the 10,000px safety limit.
     """
-    MAX_DIMENSION = 10000
+    
 
     try:
         # Open image to inspect dimensions without fully decoding pixel data
         with Image.open(io.BytesIO(file_bytes)) as image:
-            width, height = image.size
-
-            # Safety check: prevent decompression bombs or excessive memory allocation
-            if width > MAX_DIMENSION or height > MAX_DIMENSION:
-                raise ValueError("Image dimensions exceed 10,000px safety limit")
+           
 
             # We extract only the image data, discarding info/exif
             data = list(image.getdata())
@@ -95,8 +92,11 @@ def _strip_image_metadata(file_bytes: bytes) -> bytes:
 
             return out_io.getvalue()
     except ValueError:
-        # Re-raise ValueError to ensure safety limits are strictly enforced
         raise
+
+    except Image.DecompressionBombError:
+        raise ValueError("Image dimensions exceed security safety limits.")
+
     except Exception as e:
-        logger.error(f"Failed to strip image metadata: {e}")
-        return file_bytes
+       logger.error(f"Failed to strip image metadata: {e}")
+       return file_bytes
