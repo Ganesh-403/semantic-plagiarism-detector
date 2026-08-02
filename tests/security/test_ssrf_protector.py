@@ -94,3 +94,21 @@ def test_empty_dns_resolution(mock_getaddrinfo):
     with pytest.raises(SSRFSecurityException, match="No addresses found for hostname"):
         SSRFProtector.validate_webhook_url("https://empty.domain.local/api")
 
+@patch("src.security.ssrf_protector.socket.getaddrinfo")
+def test_validate_webhook_url_hexadecimal_loopback(mock_getaddrinfo):
+    """Block hexadecimal IPv4 representation of the loopback address."""
+    mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 443))]
+
+    with pytest.raises(
+        SSRFSecurityException, match="Blocked loopback IP: 127.0.0.1"
+    ):
+        SSRFProtector.validate_webhook_url("https://0x7f000001/")
+
+
+@patch("src.security.ssrf_protector.socket.getaddrinfo")
+def test_validate_webhook_url_ipv6_loopback_literal(mock_getaddrinfo):
+    """Block an IPv6 loopback URL."""
+    mock_getaddrinfo.return_value = [(10, 1, 6, "", ("::1", 443, 0, 0))]
+
+    with pytest.raises(SSRFSecurityException, match="Blocked loopback IP: ::1"):
+        SSRFProtector.validate_webhook_url("https://[::1]/")
