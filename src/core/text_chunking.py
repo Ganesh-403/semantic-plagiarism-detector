@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 src/core/text_chunking.py
 -------------------------
@@ -110,7 +112,8 @@ def chunk_text(
 
     Returns:
         List of chunk strings.
-    """    if not text or not text.strip():
+    """
+    if not text or not text.strip():
         return []
 
     if overlap_percentage is not None:
@@ -133,7 +136,7 @@ def chunk_text(
                 if first_word_idx < len(word_headings) and word_headings[first_word_idx] is not None:
                     metadata["section_title"] = word_headings[first_word_idx]
 
-if len(chunk_str.split()) >= min_words:
+            if len(chunk_str.split()) >= min_words:
                 chunks.append(ChunkString(chunk_str, metadata=metadata))
 
             if len(chunks) >= max_chunks:

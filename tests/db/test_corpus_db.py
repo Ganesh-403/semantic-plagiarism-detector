@@ -168,11 +168,21 @@ def test_class_queries():
     assert len(class_b_docs) == 1
 
 
-def test_clear_all_data_clears_incidents(mock_db):
-    from pathlib import Path
-    from src.db.incidents import sync_flagged_incidents
+def test_batch_soft_delete_documents():
+    from src.db.corpus_db import batch_soft_delete_documents, add_document
 
-    db_path = Path(mock_db)
+    add_document("batch_test1.pdf", "batch_hash_1")
+    add_document("batch_test2.pdf", "batch_hash_2")
+
+    count = batch_soft_delete_documents([1, 2])
+    assert count == 2
+
+    count = batch_soft_delete_documents([1])
+    assert count == 1
+
+
+def test_clear_all_data_clears_incidents(mock_db):
+
 
     # 1. Add mock documents
     add_document("doc1.pdf", "hash1")
@@ -199,7 +209,9 @@ def test_clear_all_data_clears_incidents(mock_db):
     # Verify everything is cleared directly in SQLite
     assert len(get_all_documents()) == 0
     with _connect() as conn:
-        count_after = conn.execute("SELECT COUNT(*) FROM plagiarism_incidents").fetchone()[0]
+        count_after = conn.execute(
+            "SELECT COUNT(*) FROM plagiarism_incidents"
+        ).fetchone()[0]
         assert count_after == 0
 
 
@@ -245,7 +257,7 @@ def test_optimize_database_error_handling():
 
     original_path = get_corpus_db_path()
     try:
-        configure_db_path("Z:\\invalid_dir_xyz_123\\corpus.db")
+        configure_db_path("/invalid_dir_xyz_123/corpus.db")
         res = optimize_database()
         assert res["error"] is not None
         assert res["size_before"] == 0
@@ -265,7 +277,9 @@ def test_soft_delete_document():
     filename = "essay_student_a.pdf"
     file_hash = "hash_12345"
 
-    inserted = add_document(filename=filename, file_hash=file_hash, student_name="Student A")
+    inserted = add_document(
+        filename=filename, file_hash=file_hash, student_name="Student A"
+    )
     assert inserted is True
 
     dummy_embedding = np.random.rand(384).astype(np.float32)
@@ -384,8 +398,12 @@ def test_add_chunks_logs_memory_usage(mock_db, caplog):
         add_chunks(chunks)
 
     log_messages = [record.message for record in caplog.records]
-    assert any("Memory usage before batch chunk insertion:" in msg for msg in log_messages)
-    assert any("Memory usage after batch chunk insertion:" in msg for msg in log_messages)
+    assert any(
+        "Memory usage before batch chunk insertion:" in msg for msg in log_messages
+    )
+    assert any(
+        "Memory usage after batch chunk insertion:" in msg for msg in log_messages
+    )
 
 
 def test_get_document_count_by_user_returns_zero_for_unknown_user(mock_db):
@@ -442,4 +460,3 @@ def test_get_total_document_count(mock_db):
     soft_delete_document("doc1.pdf")
     assert get_total_document_count() == 1
     assert get_total_document_count(include_deleted=True) == 2
-
