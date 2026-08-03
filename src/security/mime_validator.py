@@ -6,7 +6,7 @@ import io
 import logging
 import zipfile
 from typing import Optional
-from xml.etree import ElementTree
+from defusedxml import ElementTree
 
 
 logger = logging.getLogger(__name__)
@@ -402,3 +402,51 @@ def validate_mime_type(file_bytes: bytes, filename: str) -> bool:
         extension,
         filename,
     )
+
+
+# ── Executable / Script Upload Rejection ───────────────────────────────────
+# Extensions that are always rejected outright, before any parsing is
+# attempted, because they represent executable code rather than a
+# scannable document. This check runs independently of ALLOWED_MIME_TYPES
+# above so it also blocks extensions that were never on the allow-list.
+BLOCKED_EXECUTABLE_EXTENSIONS = frozenset({
+    "exe", "dll", "sh", "bat", "cmd", "com", "msi", "bin", "app", "scr",
+})
+
+# Magic-byte / shebang signatures that identify executable or script
+# payloads even when the extension has been spoofed to look like a
+# harmless document (e.g. a ".exe" renamed to "essay.txt").
+EXECUTABLE_SIGNATURES = (
+    b"MZ",              # Windows PE / DOS executable header (.exe, .dll)
+    b"\x7fELF",         # Linux ELF binary
+    b"#!/bin/sh",       # POSIX shell script shebang
+    b"#!/bin/bash",     # Bash shebang
+    b"#!/usr/bin/env",  # Generic env-based shebang (python, sh, bash, ...)
+)
+
+
+def has_executable_signature(file_bytes: bytes) -> bool:
+    """Check whether the payload's leading bytes match a known executable
+    or shell-script signature (PE/DOS header, ELF header, or shebang line).
+    """
+    if not file_bytes:
+        return False
+
+    header = file_bytes.lstrip()[:64]
+    return any(header.startswith(sig) for sig in EXECUTABLE_SIGNATURES)
+
+
+def is_executable_upload(file_bytes: bytes, filename: str) -> bool:
+    """Return True if the upload should be rejected as an executable.
+
+    Combines a fast extension check with magic-byte / shebang inspection so
+    that renaming a binary to disguise its extension does not bypass the
+    check (e.g. uploading a PE binary as "notes.txt").
+    """
+    extension = (
+        filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    )
+    if extension in BLOCKED_EXECUTABLE_EXTENSIONS:
+        return True
+
+    return has_executable_signature(file_bytes)

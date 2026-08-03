@@ -39,7 +39,10 @@ from src.core.similarity import (
 from src.core.text_chunking import chunk_document
 from src.db.auth import get_user_role
 from src.db.corpus_db import _connect, clear_all_data, init_corpus_db
+from src.security.mime_validator import is_executable_upload
 from src.utils.redis_cache import CacheKeyPrefix, get_cache
+
+logger = logging.getLogger(__name__)
 
 # ── API Initialization ────────────────────────────────────────────────────────
 
@@ -262,22 +265,17 @@ def healthz():
         if memory.available <= 0:
             raise RuntimeError("Low memory")
 
-        from src.core.app_config import CORPUS_DB_PATH
         db_size_bytes = 0
-        db_size_mb = 0.0
-        if os.path.exists(CORPUS_DB_PATH):
-            try:
-                db_size_bytes = os.path.getsize(CORPUS_DB_PATH)
-                db_size_mb = round(db_size_bytes / (1024 * 1024), 2)
-            except OSError:
-                pass
+        for db_path in HEALTHZ_DB_PATHS:
+            if db_path.exists():
+                db_size_bytes += db_path.stat().st_size
 
         return {
             "status": "ok",
             "db": "connected",
             "memory": "ok",
             "db_size_bytes": db_size_bytes,
-            "db_size_mb": db_size_mb,
+            "db_size_mb": round(db_size_bytes / (1024 * 1024), 2),
         }
 
     except Exception:
@@ -374,6 +372,7 @@ def get_version(request: Request):
     status_code=status.HTTP_200_OK,
     responses={
         400: {"model": ErrorResponse, "description": "Bad Request"},
+        415: {"model": ErrorResponse, "description": "Unsupported Media Type"},
         422: {"model": ErrorResponse, "description": "Unprocessable Entity"},
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
@@ -406,6 +405,22 @@ async def scan_document(
 
     filename = file.filename
     file_bytes = await file.read()
+
+    # Reject executable / script uploads immediately, based on file
+    # extension and magic bytes, before any parsing is attempted.
+    if is_executable_upload(file_bytes, filename):
+        logger.warning(
+            "[api] Rejected upload '%s': detected executable file "
+            "extension or signature.",
+            filename,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=(
+                "Unsupported media type: executable and script files "
+                "(.exe, .sh, .bat, .dll, etc.) cannot be scanned."
+            ),
+        )
 
     if len(file_bytes) == 0:
         raise HTTPException(
@@ -525,7 +540,6 @@ async def scan_document(
 
 # ── System Administration ──────────────────────────────────────────────────────
 
-logger = logging.getLogger(__name__)
 # Cast to str for consistency with callers that may pass it to faiss.*
 # or other C-extension APIs that require str paths.
 INDEX_PATH = str(FAISS_INDEX_PATH)

@@ -8,7 +8,7 @@ client = TestClient(app)
 def test_rate_limit_endpoint():
     response = client.get(
         "/api/v1/rate_limit",
-        headers={"Authorization": "Bearer dummy-token"},
+        headers={"Authorization": "Bearer dev-bearer-token"},
     )
 
     assert response.status_code == 200
