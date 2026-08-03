@@ -760,4 +760,26 @@ def test_normalize_unicode_spaces():
 
     normalized = normalize_unicode_spaces(text)
 
-    assert normalized == "Hello World! Python,Testing."    
+    assert normalized == "Hello World! Python,Testing."
+
+
+class TestCleanWhitespaceOption:
+    """Test suite verifying clean_whitespace: bool = True option in extract_text() (#1039)."""
+
+    def test_clean_whitespace_enabled_by_default(self):
+        text_with_trailing_spaces = b"Header line   \n\n\n\n\nBody line with spaces   \nFooter line  "
+        result = extract_text(text_with_trailing_spaces, "sample.txt")
+        assert "Header line\n\nBody line with spaces\nFooter line" in result
+        assert "   \n" not in result
+        assert "\n\n\n" not in result
+
+    def test_clean_whitespace_explicitly_true(self):
+        text_data = b"Line 1    \n\n\n\nLine 2   "
+        result = extract_text(text_data, "sample.txt", clean_whitespace=True)
+        assert result == "Line 1\n\nLine 2"
+
+    def test_clean_whitespace_disabled(self):
+        text_data = b"Line 1    \n\n\n\nLine 2"
+        result = extract_text(text_data, "sample.txt", clean_whitespace=False)
+        assert "Line 1    " in result
+        assert "\n\n\n\nLine 2" in result    

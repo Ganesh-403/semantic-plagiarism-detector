@@ -670,9 +670,16 @@ def _extract_single_file_helper(
     name: str,
     ocr_language: str,
     ocr_dpi: int,
+    clean_whitespace: bool = True,
 ) -> str:
     """Helper running in a subprocess to extract text from a single file."""
-    return extract_text(data, name, ocr_language=ocr_language, ocr_dpi=ocr_dpi)
+    return extract_text(
+        data,
+        name,
+        ocr_language=ocr_language,
+        ocr_dpi=ocr_dpi,
+        clean_whitespace=clean_whitespace,
+    )
 
 
 def extract_texts_parallel(
@@ -680,6 +687,7 @@ def extract_texts_parallel(
     *,
     ocr_language: str = DEFAULT_OCR_LANGUAGE,
     ocr_dpi: int = DEFAULT_OCR_DPI,
+    clean_whitespace: bool = True,
     session_id: Optional[str] = None,
 ) -> tuple[Dict[str, str], Dict[str, Exception]]:
     """
@@ -705,7 +713,7 @@ def extract_texts_parallel(
         for name, data in files_dict.items():
             try:
                 results[name] = _extract_single_file_helper(
-                    data, name, ocr_language, ocr_dpi
+                    data, name, ocr_language, ocr_dpi, clean_whitespace
                 )
             except (
                 ValueError,
@@ -730,6 +738,7 @@ def extract_texts_parallel(
                     name,
                     ocr_language,
                     ocr_dpi,
+                    clean_whitespace,
                 ): name
                 for name, data in files_dict.items()
             }
@@ -759,7 +768,7 @@ def extract_texts_parallel(
         for name, data in files_dict.items():
             try:
                 results[name] = _extract_single_file_helper(
-                    data, name, ocr_language, ocr_dpi
+                    data, name, ocr_language, ocr_dpi, clean_whitespace
                 )
             except (
                 ValueError,
@@ -1046,16 +1055,17 @@ def extract_text_from_rtf(file: PDFInput) -> str:
 
 
 def extract_text_from_zip(
-    file: PDFInput,
+    file_input: Union[str, bytes, io.BytesIO],
     *,
     ocr_language: str = DEFAULT_OCR_LANGUAGE,
     ocr_dpi: int = DEFAULT_OCR_DPI,
+    clean_whitespace: bool = True,
 ) -> str:
     """Extract and aggregate text from all valid documents inside a ZIP archive.
 
     Catches zipfile.BadZipFile and reports corrupted zip files or damaged inner entries.
     """
-    raw_data = _read_pdf_bytes(file)
+    raw_data = _read_pdf_bytes(file_input)
     zip_stream = io.BytesIO(raw_data)
 
     if not zipfile.is_zipfile(zip_stream):
@@ -1074,7 +1084,13 @@ def extract_text_from_zip(
 
                 try:
                     file_bytes = archive.read(member_name)
-                    parsed = extract_text(file_bytes, member_name, ocr_language=ocr_language, ocr_dpi=ocr_dpi)
+                    parsed = extract_text(
+                        file_bytes,
+                        member_name,
+                        ocr_language=ocr_language,
+                        ocr_dpi=ocr_dpi,
+                        clean_whitespace=clean_whitespace,
+                    )
                     if parsed:
                         extracted_texts.append(parsed)
                 except Exception as exc:
@@ -1383,11 +1399,12 @@ def extract_text_from_image(
 
 
 def extract_text(
-    file: PDFInput,
+    file: Union[str, bytes, io.BytesIO],
     filename: str,
     *,
     ocr_language: str = DEFAULT_OCR_LANGUAGE,
     ocr_dpi: int = DEFAULT_OCR_DPI,
+    clean_whitespace: bool = True,
 ) -> str:
     """Route extraction according to a filename extension."""
     ocr_language, ocr_dpi = normalize_ocr_settings(
@@ -1418,7 +1435,12 @@ def extract_text(
         raw = extract_text_from_md(file)
 
     elif extension in ("zip", "7z", "tar", "gz"):
-        raw = extract_text_from_zip(file, ocr_language=ocr_language, ocr_dpi=ocr_dpi)
+        raw = extract_text_from_zip(
+            file,
+            ocr_language=ocr_language,
+            ocr_dpi=ocr_dpi,
+            clean_whitespace=clean_whitespace,
+        )
 
     elif extension == "rtf":
         raw = extract_text_from_rtf(file)
@@ -1435,6 +1457,10 @@ def extract_text(
     raw = strip_bibliography(raw)
     raw = normalize_unicode_spaces(raw)
     raw = sanitize_zero_width_characters(raw, filename=filename)
+    if clean_whitespace and raw:
+        lines = [line.rstrip() for line in raw.splitlines()]
+        raw = "\n".join(lines)
+        raw = re.sub(r"\n{3,}", "\n\n", raw)
     lang_code = detect_text_language(raw)
 
     logger.info(
