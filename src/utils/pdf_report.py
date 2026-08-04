@@ -24,6 +24,32 @@ from io import BytesIO
 from typing import List, Optional, Tuple
 from datetime import datetime
 import fitz  # PyMuPDF
+import qrcode
+from qrcode.image.pil import PilImage
+
+
+def generate_qr_code(url: str) -> BytesIO:
+    """
+    Generates a QR code image encoding the given URL.
+
+    Args:
+        url: The verification URL to encode in the QR code.
+
+    Returns:
+        BytesIO buffer containing the QR code as a PNG image.
+    """
+    qr = qrcode.QRCode(
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=4,
+        border=2,
+    )
+    qr.add_data(url)
+    qr.make(fit=True)
+    img: PilImage = qr.make_image(fill_color="black", back_color="white")
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return buf
 
 
 def get_similarity_color(score: float) -> HexColor:
@@ -122,6 +148,8 @@ def generate_plagiarism_report(
     report_title: str = "Plagiarism Detection Report",
     logo_image: Optional[bytes] = None,
     brand_color: Optional[str] = None,
+    incident_id: Optional[str] = None,
+    verification_base_url: Optional[str] = "https://verify.plagiarism-detector.example.com",
 ) -> BytesIO:
     """
     Generates a professional PDF plagiarism report for a document pair.
@@ -135,6 +163,10 @@ def generate_plagiarism_report(
         report_title: Title for the PDF report
         logo_image: Optional raw bytes of a PNG/JPG logo for the PDF header
         brand_color: Optional hex color string (e.g. "#1e3a8a") for headings
+        incident_id: Optional unique report/incident identifier used to build a
+            verification URL encoded in a QR code drawn in the top-right header.
+        verification_base_url: Base URL prefix for the verification link.
+            Defaults to "https://verify.plagiarism-detector.example.com".
 
     Returns:
         BytesIO buffer containing the generated PDF
@@ -186,29 +218,52 @@ def generate_plagiarism_report(
     normal_style.fontSize = 10
     normal_style.leading = 14
 
-    # ── Header / footer callback for logo ──────────────────────────────────
+    # ── Header / footer callback for logo and QR code ────────────────────────
     def _draw_header(canvas_obj, _doc):
-        if not logo_image:
-            return
         canvas_obj.saveState()
-        try:
-            reader = ImageReader(BytesIO(logo_image))
-            iw, ih = reader.getSize()
-            logo_display_w = 1.5 * inch
-            logo_display_h = logo_display_w * ih / iw
-            x = _doc.leftMargin
-            y = _doc.pagesize[1] - 36 - logo_display_h
-            canvas_obj.drawImage(
-                reader,
-                x,
-                y,
-                width=logo_display_w,
-                height=logo_display_h,
-                preserveAspectRatio=True,
-                mask="auto",
-            )
-        except Exception:
-            pass
+
+        # Draw logo in top-left
+        if logo_image:
+            try:
+                reader = ImageReader(BytesIO(logo_image))
+                iw, ih = reader.getSize()
+                logo_display_w = 1.5 * inch
+                logo_display_h = logo_display_w * ih / iw
+                x = _doc.leftMargin
+                y = _doc.pagesize[1] - 36 - logo_display_h
+                canvas_obj.drawImage(
+                    reader,
+                    x,
+                    y,
+                    width=logo_display_w,
+                    height=logo_display_h,
+                    preserveAspectRatio=True,
+                    mask="auto",
+                )
+            except Exception:
+                pass
+
+        # Draw QR code verification image in top-right
+        if incident_id:
+            try:
+                verification_url = f"{verification_base_url}/verify/{incident_id}"
+                qr_buf = generate_qr_code(verification_url)
+                qr_reader = ImageReader(qr_buf)
+                qr_size = 1.0 * inch
+                x_qr = _doc.pagesize[0] - _doc.rightMargin - qr_size
+                y_qr = _doc.pagesize[1] - 36 - qr_size
+                canvas_obj.drawImage(
+                    qr_reader,
+                    x_qr,
+                    y_qr,
+                    width=qr_size,
+                    height=qr_size,
+                    preserveAspectRatio=True,
+                    mask="auto",
+                )
+            except Exception:
+                pass
+
         canvas_obj.restoreState()
 
     # Build story (PDF content)
