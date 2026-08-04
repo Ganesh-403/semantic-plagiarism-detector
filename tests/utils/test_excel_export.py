@@ -1,31 +1,36 @@
-"""
-tests/utils/test_excel_export.py
----------------------------------
-Unit tests for styled Excel export utility.
-"""
-
+import inspect
 import io
-
+from typing import Generator
 import pandas as pd
-from openpyxl import load_workbook
-
-from src.utils.excel_export import export_similarity_matrix_to_excel
+from src.utils.excel_export import generate_csv_matrix_stream
 
 
-def test_export_similarity_matrix_to_excel():
+def test_generate_csv_matrix_stream():
+    # Setup test DataFrame
     data = {
-        "doc1.pdf": [1.0, 0.95, 0.20],
-        "doc2.pdf": [0.95, 1.0, 0.15],
-        "doc3.pdf": [0.20, 0.15, 1.0],
+        "DocA.txt": [1.0, 0.85, 0.12],
+        "DocB.txt": [0.85, 1.0, 0.45],
+        "DocC.txt": [0.12, 0.45, 1.0],
     }
-    df = pd.DataFrame(data, index=["doc1.pdf", "doc2.pdf", "doc3.pdf"])
+    df = pd.DataFrame(data, index=["DocA.txt", "DocB.txt", "DocC.txt"])
 
-    excel_bytes = export_similarity_matrix_to_excel(df, threshold=0.59)
-    assert isinstance(excel_bytes, bytes)
-    assert len(excel_bytes) > 0
+    # Test 1: Return type is a Generator
+    stream = generate_csv_matrix_stream(df)
+    assert inspect.isgenerator(stream)
 
-    # Read back generated Excel workbook using openpyxl
-    wb = load_workbook(filename=io.BytesIO(excel_bytes))
-    ws = wb.active
-    assert ws.title == "Similarity Matrix"
-    assert ws.cell(row=2, column=2).value == 1.0
+    # Test 2: Verify chunk output
+    chunks = list(stream)
+    assert len(chunks) == len(df) + 1  # 1 header row + 3 data rows
+
+    # Verify header line
+    assert chunks[0].strip() == "Document,DocA.txt,DocB.txt,DocC.txt"
+
+    # Verify data lines
+    assert chunks[1].strip() == "DocA.txt,1.0,0.85,0.12"
+    assert chunks[2].strip() == "DocB.txt,0.85,1.0,0.45"
+    assert chunks[3].strip() == "DocC.txt,0.12,0.45,1.0"
+
+    # Test 3: Verify complete CSV reconstruction matches Expected CSV output
+    full_csv = "".join(chunks)
+    reconstructed_df = pd.read_csv(io.StringIO(full_csv), index_col=0)
+    pd.testing.assert_frame_equal(df, reconstructed_df)

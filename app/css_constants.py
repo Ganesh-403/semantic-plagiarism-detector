@@ -1,0 +1,208 @@
+"""
+css_constants.py
+----------------
+Centralized CSS class name constants for consistent styling across the application.
+
+All CSS class names used in the application should be defined here to avoid
+hardcoded strings and ensure consistency when styling changes are needed.
+"""
+
+# ── Hero kicker ────────────────────────────────────────────────────────────────
+
+HERO_KICKER = "hero-kicker"
+"""Hero kicker element for section introductions."""
+
+# ── Badge and chip classes ─────────────────────────────────────────────────────
+
+BADGE = "badge"
+"""Standard badge class for severity indicators and status chips."""
+
+SIM_PILL = "sim-pill"
+"""Similarity score pill class for displaying similarity percentages."""
+
+META_CHIP = "meta-chip"
+"""Metadata chip class for displaying document metadata."""
+
+META_CHIP_CODE = "meta-chip code"
+"""Code element within meta-chip for syntax highlighting."""
+
+# ── Empty state classes ────────────────────────────────────────────────────────
+
+EMPTY_STATE = "empty-state"
+"""Main container for empty state messages."""
+
+EMPTY_ICON = "empty-icon"
+"""Icon element within empty state."""
+
+EMPTY_TITLE = "empty-title"
+"""Title element within empty state."""
+
+EMPTY_DESC = "empty-desc"
+"""Description element within empty state."""
+
+# ── Sidebar classes ────────────────────────────────────────────────────────────
+
+SIDEBAR_USER_BADGE = "sidebar-user-badge"
+"""User badge container in sidebar."""
+
+AVATAR = "avatar"
+"""Avatar circle element in user badge."""
+
+SIDEBAR_BRAND_TITLE = "sidebar-brand-title"
+"""Sidebar brand/title element."""
+
+SIDEBAR_BRAND_KICKER = "sidebar-brand-kicker"
+"""Sidebar brand kicker/subtitle element."""
+
+SIDEBAR_SECTION_LABEL = "sidebar-section-label"
+"""Section label in sidebar."""
+
+# ── Pipeline progress classes ──────────────────────────────────────────────────
+
+PIPELINE_STEPS = "pipeline-steps"
+"""Container for pipeline progress indicators."""
+
+PIPELINE_STEP = "pipeline-step"
+"""Individual pipeline step element."""
+
+PIPELINE_STEP_ACTIVE = "pipeline-step active"
+"""Active (currently running) pipeline step."""
+
+PIPELINE_STEP_DONE = "pipeline-step done"
+"""Completed pipeline step."""
+
+PIPELINE_ARROW = "pipeline-arrow"
+"""Arrow separator between pipeline steps."""
+
+# ── Mono text ──────────────────────────────────────────────────────────────────
+
+MONO_TEXT = "mono-text"
+"""Monospace text class for code snippets and technical content."""
+
+# ── Warning card classes ───────────────────────────────────────────────────────
+
+WARNING_CARD_HIGH = "warning-card-high"
+"""High severity warning card accent border."""
+
+WARNING_CARD_MEDIUM = "warning-card-medium"
+"""Medium severity warning card accent border."""
+
+WARNING_CARD_LOW = "warning-card-low"
+"""Low severity warning card accent border."""
+
+# ── Login container classes ────────────────────────────────────────────────────
+
+LOGIN_CONTAINER = "login-container"
+"""Login form container."""
+
+LOGIN_HEADER = "login-container login-header"
+"""Header within login container."""
+
+LOGIN_ICON = "login-container login-icon"
+"""Icon within login container."""
+
+LOGIN_TITLE = "login-container login-title"
+"""Title within login container."""
+
+LOGIN_SUBTITLE = "login-container login-subtitle"
+"""Subtitle within login container."""
+
+LOGIN_ACCENT_BAR = "login-accent-bar"
+"""Accent bar at bottom of login container."""
+
+# ── Footer classes ─────────────────────────────────────────────────────────────
+
+APP_FOOTER = "app-footer"
+"""Application footer container."""
+
+# ── Legend classes ─────────────────────────────────────────────────────────────
+
+LEGEND_CONTAINER = "legend-container"
+"""Container for legend elements."""
+
+LEGEND_ITEM = "legend-item"
+"""Individual legend item."""
+
+LEGEND_COLOR = "legend-color"
+"""Color indicator in legend."""
+
+# ── Form input classes ─────────────────────────────────────────────────────────
+
+ST_TEXT_INPUT = "stTextInput"
+"""Text input field."""
+
+ST_TEXT_AREA = "stTextArea"
+"""Text area input."""
+
+ST_NUMBER_INPUT = "stNumberInput"
+"""Number input field."""
+
+ST_BUTTON = "stButton"
+"""Button element."""
+
+ST_DOWNLOAD_BUTTON = "stDownloadButton"
+"""Download button element."""
+
+ST_FORM_SUBMIT_BUTTON = "stFormSubmitButton"
+"""Form submit button element."""
+
+ST_EXPANDER = "stExpander"
+"""Expander element."""
+
+ST_FORM = "stForm"
+"""Form container."""
+
+ST_DATAFRAME = "stDataFrame"
+"""DataFrame display element."""
+
+ST_TABLE = "stTable"
+"""Table display element."""
+
+ST_FILE_UPLOADER_DROPZONE = "stFileUploaderDropzone"
+"""File uploader dropzone."""
+
+ST_CAPTION_CONTAINER = "stCaptionContainer"
+"""Caption container element."""
+
+ST_CAPTION = "stCaption"
+"""Caption element."""
+
+# ── Tab classes ────────────────────────────────────────────────────────────────
+
+ST_TABS = "stTabs"
+"""Tabs container."""
+
+ST_TABS_BUTTON = "stTabs button"
+"""Individual tab button."""
+
+ST_TABS_BUTTON_ACTIVE = "stTabs button[aria-selected=\"true\"]"
+"""Active (selected) tab button."""
+CLASS_BADGE = "badge"
+CLASS_SIM_PILL = "sim-pill"
+
+CLASS_EMPTY_STATE = "empty-state"
+CLASS_EMPTY_ICON = "empty-icon"
+CLASS_EMPTY_TITLE = "empty-title"
+CLASS_EMPTY_DESC = "empty-desc"
+
+CLASS_SIDEBAR_USER_BADGE = "sidebar-user-badge"
+CLASS_AVATAR = "avatar"
+
+CLASS_PIPELINE_STEP = "pipeline-step"
+CLASS_PIPELINE_DONE = "done"
+CLASS_PIPELINE_ACTIVE = "active"
+CLASS_PIPELINE_ARROW = "pipeline-arrow"
+CLASS_PIPELINE_STEPS = "pipeline-steps"
+CLASS_PIPELINE_ETA = "pipeline-eta"
+
+CLASS_DOC_ROW = "doc-row"
+
+CLASS_WELCOME_BANNER = "welcome-banner"
+CLASS_SKELETON = "skeleton"
+CLASS_SKELETON_METRIC = "skeleton-metric"
+CLASS_SKELETON_TITLE = "skeleton-title"
+CLASS_SKELETON_TEXT = "skeleton-text"
+CLASS_SKELETON_TEXT_SHORT = "skeleton-text-short"
+CLASS_SKELETON_CHART = "skeleton-chart"
+CLASS_SKELETON_TABLE = "skeleton-table"
+CLASS_CLEAR_ALL_CONTAINER = "clear-all-container"

@@ -4,17 +4,10 @@ import sqlite3
 
 import pytest
 
-from src.db.migrations import (
-    AUTH_SCHEMA_VERSION,
-    CORPUS_SCHEMA_VERSION,
-    column_exists,
-    get_user_version,
-    index_exists,
-    migrate_auth_database,
-    migrate_corpus_database,
-    run_migrations,
-    table_exists,
-)
+from src.db.migrations import (AUTH_SCHEMA_VERSION, CORPUS_SCHEMA_VERSION,
+                               column_exists, get_user_version, index_exists,
+                               migrate_auth_database, migrate_corpus_database,
+                               run_migrations, table_exists)
 
 
 def connect(path) -> sqlite3.Connection:
@@ -32,10 +25,13 @@ def test_fresh_corpus_database_reaches_latest_version(tmp_path):
         assert table_exists(connection, "documents")
         assert table_exists(connection, "chunks")
         assert table_exists(connection, "plagiarism_incidents")
+        assert column_exists(connection, "documents", "detected_language")
+        assert column_exists(connection, "documents", "created_at")
         assert index_exists(connection, "idx_documents_upload_date")
         assert index_exists(connection, "idx_documents_class_section")
         assert index_exists(connection, "idx_chunks_filename")
         assert index_exists(connection, "idx_incidents_status")
+        assert index_exists(connection, "idx_documents_created_at")
 
 
 def test_fresh_auth_database_reaches_latest_version(tmp_path):
@@ -48,6 +44,7 @@ def test_fresh_auth_database_reaches_latest_version(tmp_path):
         assert column_exists(connection, "users", "tour_completed")
         assert column_exists(connection, "users", "otp_secret")
         assert column_exists(connection, "users", "two_factor_enabled")
+        assert column_exists(connection, "users", "is_active")
         assert index_exists(connection, "idx_users_role")
 
 
@@ -130,9 +127,7 @@ def test_old_corpus_database_migrates_without_data_loss(tmp_path):
             None,
         )
 
-        chunk = connection.execute(
-            "SELECT filename, chunk_text FROM chunks"
-        ).fetchone()
+        chunk = connection.execute("SELECT filename, chunk_text FROM chunks").fetchone()
         assert chunk == ("legacy.pdf", "legacy text")
         assert get_user_version(connection) == CORPUS_SCHEMA_VERSION
 
@@ -236,9 +231,7 @@ def test_failed_migration_rolls_back_schema_data_and_version():
 
     def migration_one(conn: sqlite3.Connection) -> None:
         conn.execute("CREATE TABLE preserved_test (value TEXT)")
-        conn.execute(
-            "INSERT INTO preserved_test (value) VALUES ('temporary')"
-        )
+        conn.execute("INSERT INTO preserved_test (value) VALUES ('temporary')")
 
     def migration_two(conn: sqlite3.Connection) -> None:
         conn.execute("CREATE TABLE should_rollback (id INTEGER)")
@@ -278,5 +271,118 @@ def test_schema_inspection_helpers_handle_missing_objects():
         assert not table_exists(connection, "missing")
         assert not column_exists(connection, "missing", "column")
         assert not index_exists(connection, "missing_index")
+    finally:
+        connection.close()
+
+
+# ---------------------------------------------------------------------------
+# Issue #1051 — Log informational message on successful migration execution
+# ---------------------------------------------------------------------------
+
+
+def test_successful_migration_logs_info_message(tmp_path, caplog):
+    """run_migrations must log an INFO message with the old and new versions
+    after a successful migration (issue #1051)."""
+    import logging
+
+    connection = sqlite3.connect(str(tmp_path / "log-test.db"))
+    try:
+        with caplog.at_level(logging.INFO, logger="src.db.migrations.common"):
+            run_migrations(
+                connection,
+                migrations={1: lambda conn: None},
+                target_version=1,
+            )
+
+        assert any(
+            "Database migration from version 0 to 1 completed successfully."
+            in record.message
+            for record in caplog.records
+        ), f"Expected migration log message not found in: {[r.message for r in caplog.records]}"
+    finally:
+        connection.close()
+
+
+def test_corpus_migration_logs_info_message(tmp_path, caplog):
+    """migrate_corpus_database must log an INFO message on success (issue #1051)."""
+    import logging
+
+    with connect(tmp_path / "corpus-log.db") as connection:
+        with caplog.at_level(logging.INFO, logger="src.db.migrations.common"):
+            migrate_corpus_database(connection)
+
+        assert any(
+            "completed successfully" in record.message
+            for record in caplog.records
+        ), f"Expected migration log message not found in: {[r.message for r in caplog.records]}"
+
+
+def test_auth_migration_logs_info_message(tmp_path, caplog):
+    """migrate_auth_database must log an INFO message on success (issue #1051)."""
+    import logging
+
+    with connect(tmp_path / "auth-log.db") as connection:
+        with caplog.at_level(logging.INFO, logger="src.db.migrations.common"):
+            migrate_auth_database(connection)
+
+        assert any(
+            "completed successfully" in record.message
+            for record in caplog.records
+        ), f"Expected migration log message not found in: {[r.message for r in caplog.records]}"
+
+
+def test_no_log_when_already_at_target_version(tmp_path, caplog):
+    """run_migrations must NOT log when the database is already at the target
+    version (no migration was performed)."""
+    import logging
+
+    connection = sqlite3.connect(str(tmp_path / "noop-test.db"))
+    try:
+        # First run: brings it to version 1
+        run_migrations(
+            connection,
+            migrations={1: lambda conn: None},
+            target_version=1,
+        )
+
+        caplog.clear()
+
+        # Second run: already at version 1, should be a no-op
+        with caplog.at_level(logging.INFO, logger="src.db.migrations.common"):
+            result = run_migrations(
+                connection,
+                migrations={1: lambda conn: None},
+                target_version=1,
+            )
+
+        assert result == 1
+        assert not any(
+            "completed successfully" in record.message
+            for record in caplog.records
+        ), "Should not log when no migration was performed"
+    finally:
+        connection.close()
+
+
+def test_migration_duration_logging(tmp_path, caplog):
+    """run_migrations must log the execution duration for each executed migration function."""
+    import logging
+
+    def migration_dummy_test_func(conn: sqlite3.Connection) -> None:
+        conn.execute("CREATE TABLE dummy_test (id INT)")
+
+    connection = sqlite3.connect(str(tmp_path / "duration-test.db"))
+    try:
+        with caplog.at_level(logging.INFO, logger="src.db.migrations.common"):
+            run_migrations(
+                connection,
+                migrations={1: migration_dummy_test_func},
+                target_version=1,
+            )
+
+        assert any(
+            "Migration [migration_dummy_test_func] executed in" in record.message
+            for record in caplog.records
+        ), f"Expected duration log message not found in: {[r.message for r in caplog.records]}"
     finally:
         connection.close()

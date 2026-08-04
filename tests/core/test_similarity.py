@@ -2,33 +2,25 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.core.lexical_similarity import lexical_similarity_matrix
+from src.core.lexical_similarity import (STOPWORDS,  # noqa: E402
+                                         jaccard_similarity,
+                                         lexical_similarity_matrix,
+                                         remove_stopwords, tokenize)
 from src.core.similarity import (
+    calculate_paragraph_similarity_breakdown,
+    clear_cross_encoder_cache,
     chunk_max_similarity,
     chunk_similarity_matrix,
+    compute_hybrid_similarity,
     document_similarity_matrix,
+    find_exact_matches,
     find_most_similar_chunks,
     flag_plagiarism,
+    get_cross_encoder_info,
     hybrid_similarity_matrix,
+    manhattan_similarity,
+    rerank_candidates_with_cross_encoder,
 )
-
-from src.core.lexical_similarity import (  # noqa: E402
-    STOPWORDS,
-    jaccard_similarity,
-    remove_stopwords,
-    tokenize,
-)
-
-
-@pytest.fixture
-def dummy_embeddings():
-    # 3 docs, 384-dim embeddings
-    # Doc A and B are very similar, Doc C is completely different
-    emb_a = np.array([[1.0, 0.0, 0.0], [0.8, 0.6, 0.0]])  # 2 chunks (dummy dim)
-    emb_b = np.array([[0.9, 0.1, 0.0], [0.8, 0.5, 0.0]])  # 2 chunks
-    emb_c = np.array([[0.0, 0.0, 1.0]])  # 1 chunk
-
-    return {"doc_A": emb_a, "doc_B": emb_b, "doc_C": emb_c}
 
 
 def test_chunk_max_similarity(dummy_embeddings):
@@ -94,6 +86,22 @@ def test_document_similarity_matrix_accepts_batch_size(dummy_embeddings):
 def test_document_similarity_matrix_rejects_invalid_batch_size(dummy_embeddings):
     with pytest.raises(ValueError, match="batch_size must be an integer"):
         document_similarity_matrix(dummy_embeddings, batch_size=0.5)
+
+
+def test_document_similarity_matrix_min_percentile_filters_low_scores(dummy_embeddings):
+    df = document_similarity_matrix(dummy_embeddings, min_percentile=90.0)
+
+    assert isinstance(df, pd.DataFrame)
+    # doc_C is dissimilar to doc_A/doc_B, so those pairs should be zeroed out
+    assert df.loc["doc_A", "doc_C"] == 0.0
+    assert df.loc["doc_C", "doc_A"] == 0.0
+    # doc_A and doc_B are highly similar, so that pair should survive filtering
+    assert df.loc["doc_A", "doc_B"] > 0.0
+
+
+def test_document_similarity_matrix_rejects_invalid_percentile(dummy_embeddings):
+    with pytest.raises(ValueError, match="min_percentile must be between 0 and 100"):
+        document_similarity_matrix(dummy_embeddings, min_percentile=150.0)
 
 
 def test_chunk_similarity_matrix(dummy_embeddings):
@@ -369,6 +377,7 @@ def test_hybrid_similarity_matrix_index_mismatch():
     ):
         hybrid_similarity_matrix(semantic_df, lexical_df)
 
+
 # ── Stop-word filtering (issue #222) ──────────────────────────────────────────
 # Common function words (the, and, is, …) must not inflate lexical similarity.
 # These tests exercise both the TF-IDF path and the standalone Jaccard helper.
@@ -463,3 +472,402 @@ def test_stopwords_set_is_nonempty_and_contains_core_words():
     assert len(STOPWORDS) > 0
     for word in ("the", "and", "is"):
         assert word in STOPWORDS
+
+
+# ── Per-Paragraph Similarity Breakdown Tests ──────────────────────────────────
+
+
+def test_calculate_paragraph_similarity_breakdown_matches_highest_pairs():
+    """Each paragraph in Doc A must map to the highest-matching paragraph in Doc B."""
+    # emb_a: 3 paragraphs in a 3-dim space (identity-like rows)
+    emb_a = np.array([
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ])
+    # emb_b: 3 paragraphs – para 0 matches A[1], para 1 matches A[0], para 2 matches A[2]
+    emb_b = np.array([
+        [0.0, 1.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ])
+
+    breakdown = calculate_paragraph_similarity_breakdown(emb_a, emb_b)
+
+    # Must return one tuple per paragraph in Doc A
+    assert len(breakdown) == 3
+
+    # Each result must be (paragraph_a_idx, paragraph_b_idx, score)
+    for item in breakdown:
+        assert len(item) == 3
+        idx_a, idx_b, score = item
+        assert isinstance(idx_a, int)
+        assert isinstance(idx_b, int)
+        assert 0.0 <= score <= 1.0
+
+    # Build a lookup: paragraph_a_idx → (paragraph_b_idx, score)
+    lookup = {idx_a: (idx_b, score) for idx_a, idx_b, score in breakdown}
+
+    # A[0] = [1,0,0] → best match is B[1] = [1,0,0] (score ~1.0)
+    assert lookup[0][0] == 1
+    assert np.isclose(lookup[0][1], 1.0, atol=1e-5)
+
+    # A[1] = [0,1,0] → best match is B[0] = [0,1,0] (score ~1.0)
+    assert lookup[1][0] == 0
+    assert np.isclose(lookup[1][1], 1.0, atol=1e-5)
+
+    # A[2] = [0,0,1] → best match is B[2] = [0,0,1] (score ~1.0)
+    assert lookup[2][0] == 2
+    assert np.isclose(lookup[2][1], 1.0, atol=1e-5)
+
+    # Sorted by descending score
+    scores = [s for _, _, s in breakdown]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_calculate_paragraph_similarity_breakdown_empty_embeddings():
+    """Returns empty list when either embedding matrix is empty."""
+    emb_a = np.array([[1.0, 0.0, 0.0]])
+    emb_empty = np.array([])
+
+    assert calculate_paragraph_similarity_breakdown(emb_empty, emb_a) == []
+    assert calculate_paragraph_similarity_breakdown(emb_a, emb_empty) == []
+    assert calculate_paragraph_similarity_breakdown(emb_empty, emb_empty) == []
+
+
+def test_calculate_paragraph_similarity_breakdown_single_paragraph_1d():
+    """Handles 1-D (single paragraph) embeddings for both documents."""
+    emb_a = np.array([1.0, 0.0, 0.0])   # 1-D – single paragraph
+    emb_b = np.array([1.0, 0.0, 0.0])   # identical paragraph
+
+    breakdown = calculate_paragraph_similarity_breakdown(emb_a, emb_b)
+
+    assert len(breakdown) == 1
+    idx_a, idx_b, score = breakdown[0]
+    assert idx_a == 0
+    assert idx_b == 0
+    assert np.isclose(score, 1.0, atol=1e-5)
+
+
+def test_calculate_paragraph_similarity_breakdown_asymmetric_doc_sizes():
+    """Doc A may have a different number of paragraphs than Doc B."""
+    # 2 paragraphs in A, 4 paragraphs in B
+    emb_a = np.array([
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ])
+    emb_b = np.array([
+        [0.0, 1.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 0.5, 0.5],
+        [0.0, 0.0, 1.0],
+    ])
+
+    breakdown = calculate_paragraph_similarity_breakdown(emb_a, emb_b)
+
+    # One result per paragraph in Doc A (= 2)
+    assert len(breakdown) == 2
+    para_a_indices = {t[0] for t in breakdown}
+    assert para_a_indices == {0, 1}
+
+    # All para_b_idx values must be valid indices into emb_b
+    for _, idx_b, _ in breakdown:
+        assert 0 <= idx_b < emb_b.shape[0]
+
+
+def test_find_exact_matches():
+    """Verify that find_exact_matches correctly handles case sensitivity options."""
+    text_a = "HELLO WORLD. This is a Test."
+    text_b = "hello world. this is a test."
+
+    # Default/Explicit case_sensitive=False: should match everything
+    matches_insensitive = find_exact_matches(text_a, text_b, case_sensitive=False)
+    assert "HELLO WORLD" in matches_insensitive
+    assert "This is a Test" in matches_insensitive
+
+    # case_sensitive=True: should match nothing because of casing difference
+    matches_sensitive = find_exact_matches(text_a, text_b, case_sensitive=True)
+    assert not matches_sensitive
+
+    # Matching with identical casing should work in both modes
+    text_c = "HELLO WORLD. This is a Test."
+    assert find_exact_matches(text_a, text_c, case_sensitive=True) == ["HELLO WORLD", "This is a Test"]
+
+
+
+
+def test_manhattan_similarity_identical_vectors():
+    vector = np.array([1.0, 2.0, 3.0])
+
+    assert manhattan_similarity(vector, vector) == pytest.approx(1.0)
+
+
+def test_manhattan_similarity_uses_normalized_l1_distance():
+    vector_a = np.array([0.0, 0.0])
+    vector_b = np.array([1.0, 2.0])
+
+    # L1 distance = 3, so normalized similarity = 1 / (1 + 3).
+    assert manhattan_similarity(
+        vector_a,
+        vector_b,
+    ) == pytest.approx(0.25)
+
+
+def test_manhattan_similarity_is_symmetric():
+    vector_a = np.array([-1.0, 2.5, 7.0])
+    vector_b = np.array([3.0, 0.5, -2.0])
+
+    assert manhattan_similarity(
+        vector_a,
+        vector_b,
+    ) == pytest.approx(
+        manhattan_similarity(vector_b, vector_a)
+    )
+
+
+@pytest.mark.parametrize(
+    ("vector_b", "expected_order"),
+    [
+        (np.array([0.1, 0.0]), "near"),
+        (np.array([10.0, 10.0]), "far"),
+    ],
+)
+def test_manhattan_similarity_remains_bounded(
+    vector_b,
+    expected_order,
+):
+    similarity = manhattan_similarity(
+        np.array([0.0, 0.0]),
+        vector_b,
+    )
+
+    assert 0.0 <= similarity <= 1.0
+    if expected_order == "near":
+        assert similarity > 0.5
+    else:
+        assert similarity < 0.1
+
+
+def test_manhattan_similarity_decreases_as_distance_grows():
+    origin = np.array([0.0, 0.0])
+
+    near = manhattan_similarity(
+        origin,
+        np.array([1.0, 0.0]),
+    )
+    far = manhattan_similarity(
+        origin,
+        np.array([5.0, 0.0]),
+    )
+
+    assert near > far
+
+
+def test_manhattan_similarity_supports_multidimensional_arrays():
+    array_a = np.array([[0.0, 1.0], [2.0, 3.0]])
+    array_b = np.array([[0.0, 2.0], [4.0, 3.0]])
+
+    # Flattened L1 distance is 3.
+    assert manhattan_similarity(
+        array_a,
+        array_b,
+    ) == pytest.approx(0.25)
+
+
+def test_manhattan_similarity_does_not_mutate_inputs():
+    vector_a = np.array([1.0, 2.0, 3.0])
+    vector_b = np.array([3.0, 2.0, 1.0])
+    original_a = vector_a.copy()
+    original_b = vector_b.copy()
+
+    manhattan_similarity(vector_a, vector_b)
+
+    assert np.array_equal(vector_a, original_a)
+    assert np.array_equal(vector_b, original_b)
+
+
+def test_manhattan_similarity_rejects_shape_mismatch():
+    with pytest.raises(
+        ValueError,
+        match="matching shapes",
+    ):
+        manhattan_similarity(
+            np.array([1.0, 2.0]),
+            np.array([[1.0, 2.0]]),
+        )
+
+
+def test_manhattan_similarity_rejects_empty_arrays():
+    with pytest.raises(
+        ValueError,
+        match="non-empty",
+    ):
+        manhattan_similarity(
+            np.array([]),
+            np.array([]),
+        )
+
+
+@pytest.mark.parametrize(
+    "invalid_value",
+    [np.nan, np.inf, -np.inf],
+)
+def test_manhattan_similarity_rejects_non_finite_values(
+    invalid_value,
+):
+    with pytest.raises(
+        ValueError,
+        match="finite numeric values",
+    ):
+        manhattan_similarity(
+            np.array([0.0, invalid_value]),
+            np.array([0.0, 1.0]),
+        )
+
+
+def test_manhattan_similarity_rejects_non_numeric_input():
+    with pytest.raises(
+        TypeError,
+        match="numeric array inputs",
+    ):
+        manhattan_similarity(
+            np.array(["hello"]),
+            np.array(["world"]),
+        )
+
+
+def test_manhattan_similarity_returns_python_float():
+    result = manhattan_similarity(
+        np.array([0, 1], dtype=np.int32),
+        np.array([1, 1], dtype=np.int32),
+    )
+
+    assert isinstance(result, float)
+
+
+# ── Cross-Encoder Rescoring Tests (#1355) ──────────────────────────────────────
+
+
+def test_rerank_candidates_with_cross_encoder_empty_input():
+    """Returns empty list when input pairs list is empty."""
+    clear_cross_encoder_cache()
+    res = rerank_candidates_with_cross_encoder([])
+    assert res == []
+
+
+def test_rerank_candidates_with_cross_encoder_fallback_on_model_load_failure(monkeypatch):
+    """Falls back to original bi-encoder candidates when CrossEncoder fails to load."""
+    clear_cross_encoder_cache()
+
+    pairs = [
+        ("The quick brown fox", "A fast brown fox", 0.85),
+        ("Artificial intelligence", "Machine learning algorithms", 0.60),
+    ]
+
+    # Force model load failure
+    import src.core.similarity as sim_mod
+
+    def mock_get_cross_encoder(model_name):
+        return None
+
+    monkeypatch.setattr(sim_mod, "_get_cross_encoder", mock_get_cross_encoder)
+
+    rescored = rerank_candidates_with_cross_encoder(pairs)
+
+    # Should safely return original pairs
+    assert rescored == pairs
+    assert len(rescored) == 2
+    assert rescored[0][2] == 0.85
+
+
+def test_rerank_candidates_with_cross_encoder_rescores_and_sorts():
+    """Re-scores candidate pairs and returns them sorted by Cross-Encoder score."""
+    clear_cross_encoder_cache()
+
+    pairs = [
+        ("Document text A", "Document text B", 0.50),
+        ("Identical content snippet X", "Identical content snippet X", 0.90),
+        ("Unrelated topic text 1", "Unrelated topic text 2", 0.70),
+    ]
+
+    class DummyCrossEncoder:
+        def predict(self, sentence_pairs, batch_size=32):
+            # Return raw logits: higher for pair 1, lower for pair 0 and 2
+            return np.array([-1.0, 4.0, -3.0])
+
+    import src.core.similarity as sim_mod
+
+    sim_mod._CROSS_ENCODER_MODELS["cross-encoder/ms-marco-MiniLM-L-6-v2"] = DummyCrossEncoder()
+
+    rescored = rerank_candidates_with_cross_encoder(
+        pairs, model_name="cross-encoder/ms-marco-MiniLM-L-6-v2"
+    )
+
+    assert len(rescored) == 3
+    # Top pair should be the second item ("Identical content snippet X")
+    assert rescored[0][0] == "Identical content snippet X"
+    assert rescored[0][2] > rescored[1][2]
+    assert rescored[1][2] > rescored[2][2]
+
+
+def test_rerank_candidates_with_cross_encoder_top_k_limiting():
+    """Respects top_k limits when passed."""
+    clear_cross_encoder_cache()
+
+    pairs = [
+        ("Text A", "Text B", 0.80),
+        ("Text C", "Text D", 0.70),
+        ("Text E", "Text F", 0.60),
+    ]
+
+    class DummyCrossEncoder:
+        def predict(self, sentence_pairs, batch_size=32):
+            return np.array([2.0, 1.0])
+
+    import src.core.similarity as sim_mod
+
+    sim_mod._CROSS_ENCODER_MODELS["dummy-model"] = DummyCrossEncoder()
+
+    rescored = rerank_candidates_with_cross_encoder(pairs, model_name="dummy-model", top_k=2)
+
+    assert len(rescored) == 2
+
+
+def test_get_cross_encoder_info():
+    """Diagnostic helper returns correct model load status."""
+    clear_cross_encoder_cache()
+    info = get_cross_encoder_info("test-model")
+    assert info["model_name"] == "test-model"
+    assert info["is_loaded"] is False
+    assert info["is_failed"] is False
+
+
+# ── BM25 Hybrid Lexical-Semantic Search Scoring Tests (#1477) ─────────────────
+
+
+def test_compute_hybrid_similarity_basic():
+    doc_a = "Deep neural networks for image classification and computer vision."
+    doc_b = "Convolutional neural networks for image classification tasks."
+    vector_sim = 0.85
+    hybrid_score = compute_hybrid_similarity(vector_sim, doc_a, doc_b, alpha=0.7)
+    assert 0.0 <= hybrid_score <= 1.0
+    assert hybrid_score > 0.5
+
+
+def test_compute_hybrid_similarity_alpha_bounds():
+    doc_a = "Natural language processing algorithms and models."
+    doc_b = "Language processing and transformer models."
+    vector_sim = 0.80
+
+    # alpha=1.0 returns pure vector similarity
+    assert compute_hybrid_similarity(vector_sim, doc_a, doc_b, alpha=1.0) == pytest.approx(vector_sim)
+
+    # alpha=0.0 returns pure BM25 similarity
+    bm25_only = compute_hybrid_similarity(vector_sim, doc_a, doc_b, alpha=0.0)
+    assert 0.0 <= bm25_only <= 1.0
+
+    # Invalid alpha raises ValueError
+    with pytest.raises(ValueError):
+        compute_hybrid_similarity(vector_sim, doc_a, doc_b, alpha=1.5)
+
+

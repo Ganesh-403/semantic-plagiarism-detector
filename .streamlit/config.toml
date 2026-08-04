@@ -10,3 +10,4 @@ gatherUsageStats = false
 
 [server]
 fileWatcherType = "none"
+maxUploadSize = 10

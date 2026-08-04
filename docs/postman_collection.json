@@ -1,0 +1,81 @@
+{
+  "info": {
+    "_postman_id": "9d1c5d8b-1234-4b5d-8c7f-1175abcd1234",
+    "name": "API v1 Collection",
+    "description": "Postman collection for testing API v1 endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "bearer_token",
+      "value": ""
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{bearer_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/healthz",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "healthz"]
+        }
+      }
+    },
+    {
+      "name": "Version",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/version",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "version"]
+        }
+      }
+    },
+    {
+      "name": "Scan File",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearer_token}}"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": ""
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/scan",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "scan"]
+        }
+      }
+    }
+  ]
+}

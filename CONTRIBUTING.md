@@ -1,62 +1,37 @@
-# 🤝 Contributing to Semantic Plagiarism Detection System
+# Contributing
 
-First of all, thank you for your interest in contributing! 🎉
+## Welcome
 
-Whether you're fixing a bug, improving documentation, adding a feature, or suggesting an idea, your contribution is greatly appreciated.
+Thank you for your interest in contributing to the Semantic Plagiarism Detection System! We welcome contributions from everyone, whether you're fixing a bug, improving documentation, adding a feature, or suggesting an idea.
 
-Please read this guide before getting started.
+## Getting Started
 
----
+### Fork the repository
 
-# 📌 Contribution Workflow
+Fork this repository to your GitHub account using the "Fork" button on the repository page.
 
-Every contribution should follow this workflow:
-
-```text
-Discussion (Optional)
-        ↓
-Issue Assignment
-        ↓
-Implementation Plan (if requested)
-        ↓
-Development
-        ↓
-Pull Request
-        ↓
-Code Review
-        ↓
-Merge
-```
-
-> **Please do not start working on an issue unless it has been assigned to you or approved by a maintainer.**
-
----
-
-# 🚀 Getting Started
-
-## 1. Fork the repository
-
-Fork this repository to your GitHub account.
-
-## 2. Clone your fork
+### Clone locally
 
 ```bash
-git clone https://github.com/<your-username>/<repo-name>.git
+git clone https://github.com/<your-username>/semantic-plagiarism-detector.git
+cd semantic-plagiarism-detector
 ```
 
-## 3. Create a new branch
+### Create a virtual environment
 
 ```bash
-git checkout -b feature/your-feature-name
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-## 4. Install dependencies
+### Install dependencies
 
 ```bash
 pip install -r requirements.txt
 pip install pytest-cov
 ```
 
+### Run the project
 ## 5. Run the project
 
 Ensure the project builds and runs correctly before making any changes.
@@ -149,157 +124,55 @@ For larger or more complex features, maintainers may request a short implementat
 
 Once assigned:
 
-- Provide a meaningful progress update every **2–3 days**.
-- If there is no communication or visible progress, the issue may be reassigned.
-- If you need more time, simply leave a comment.
-
-Please do **not** submit Pull Requests for unassigned issues unless a maintainer has approved it beforehand.
-
----
-
-# 🔀 Pull Request Guidelines
-
-Before opening a Pull Request:
-
-- Sync with the latest `main`
-- Test your changes locally
-- Ensure your code builds successfully
-- Add or update tests where applicable
-- Update documentation if needed
-
-Every Pull Request **must** include:
-
-## Description
-
-Briefly explain:
-
-- What changed
-- Why it changed
-- How it was tested
-
-Example:
-
-```
-src/core/parser.py
-- Added OCR preprocessing support
-
-src/db/database.py
-- Added SQLite persistence layer
+```bash
+streamlit run app/streamlit_app.py
 ```
 
----
+The application will open at http://localhost:8501. Default credentials are username `admin` and password `admin123`.
 
-## Related Issue
+## Branching Strategy
 
-Every PR **must** reference its issue using:
+Use descriptive branch names following these patterns:
 
-```text
-Fixes #<issue_number>
+- `feature/add-search` - For new features
+- `fix/login-bug` - For bug fixes
+- `docs/update-contributing` - For documentation changes
+- `refactor/embedding-model` - For code refactoring
+
+## Code Style
+
+This project uses **Ruff** for linting and formatting:
+
+- **Check code style**: `ruff check .`
+- **Format code**: `ruff format .`
+
+Follow PEP 8 conventions and keep code clean, readable, and modular.
+
+## Running Tests
+
+Run the test suite using pytest:
+
+```bash
+python -m pytest
 ```
 
----
+The project uses pytest with configuration in `pytest.ini`. Tests are located in the `tests/` directory and mirror the structure of the `src/` directory.
 
-## Checklist
+## Submitting Pull Requests
 
-- [ ] Code builds successfully
-- [ ] Tests pass
-- [ ] Documentation updated (if applicable)
-- [ ] No unnecessary dependencies introduced
-- [ ] No breaking changes
-- [ ] Issue linked using `Fixes #...`
+- Keep PRs focused on a single issue or feature
+- Write meaningful commit messages that explain "why" not just "what"
+- Link related issues using "Fixes #issue_number" in your PR description
+- Ensure all tests pass before submitting
+- Run `ruff check .` and `ruff format .` to maintain code quality
+- Respond to review feedback promptly and make requested changes
 
----
+## Reporting Issues
 
-## Screenshots / Test Results (Optional)
+When opening bug reports or feature requests:
 
-If applicable, include:
-
-- Screenshots
-- Test results
-- Benchmark results
-- Coverage reports
-
-Example:
-
-```
-Tests: 42 passed
-Coverage: 87%
-Performance: ~20% faster than previous implementation
-```
-
----
-
-# 💬 Communication
-
-Open communication helps everyone.
-
-If you:
-
-- need clarification,
-- get stuck,
-- cannot continue,
-- or wish to stop working on an issue,
-
-please leave a comment on the issue instead of disappearing.
-
-Maintainers appreciate communication far more than silence.
-
----
-
-# 🤖 AI-Assisted Contributions
-
-AI tools such as ChatGPT, GitHub Copilot, Claude, or Gemini may be used as productivity aids.
-
-However:
-
-- You must understand every line of code you submit.
-- Review and test AI-generated code thoroughly.
-- Be prepared to explain your implementation during code review.
-- Do not submit untested or blindly generated code.
-
----
-
-# 🧪 Code Style
-
-Please follow these conventions:
-
-- Follow **PEP 8**
-- Use descriptive variable and function names
-- Keep functions small and modular
-- Write reusable code where possible
-- Avoid unnecessary dependencies
-- Keep imports organized
-
----
-
-# ⏳ Review Process
-
-Maintainers aim to:
-
-- Respond to issue assignment requests within **24 hours**
-- Review Pull Requests within **24–48 hours**
-- Provide constructive feedback as quickly as possible
-
-Response times may vary depending on maintainer availability.
-
----
-
-# ❌ Pull Requests May Be Closed If
-
-A Pull Request may be closed if:
-
-- It addresses an unassigned issue without approval
-- It does not follow this contribution guide
-- It remains inactive without communication
-- Requested review changes are ignored for an extended period
-- It introduces unnecessary complexity or unrelated changes
-
-Closed Pull Requests are welcome to be improved and resubmitted.
-
----
-
-# ❤️ Thank You
-
-Every contribution—whether it's code, documentation, bug reports, feature ideas, or discussions—helps improve this project.
-
-Thank you for taking the time to contribute!
+- Search existing issues first to avoid duplicates
+- Use the provided issue templates in `.github/ISSUE_TEMPLATE/`
+- Provide clear steps to reproduce bugs
+- Include relevant error messages, logs, or screenshots
+- Describe the expected behavior versus actual behavior

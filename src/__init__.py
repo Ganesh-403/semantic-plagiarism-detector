@@ -1,8 +1,16 @@
+"""
+src/__init__.py
+---------------
+Package initialization for the Semantic Plagiarism Detector core utilities, database handlers, and visualization routines.
+"""
+
 from .core import (
     PLAGIARISM_THRESHOLD,
     ChunkRecord,
     build_index,
     build_index_from_matrix,
+    calculate_paragraph_similarity_breakdown,
+    chunk_by_sentences,
     chunk_document,
     chunk_documents,
     chunk_similarity_matrix,
@@ -19,10 +27,17 @@ from .core import (
     get_document_embedding,
     load_index,
     save_index,
-    search_similar_chunks,
-    send_plagiarism_alert,
+    sanitize_zero_width_characters,
     translate_text,
+    send_plagiarism_alert,
+    BrandingConfig,
+    get_branding_config,
+    reload_branding_config,
+    load_branding_config,
+    TagManager,
+    sanitize_tag_name,
 )
+
 from .db import (
     add_chunks,
     add_document,
@@ -41,18 +56,38 @@ from .db import (
     get_document_chunks_count,
     get_documents_by_class,
     get_unique_class_sections,
+    get_user_active_status,
     get_user_role,
     init_corpus_db,
     init_db,
+    is_user_active,
+    set_user_active_status,
     update_password,
+    update_user_profile,
     verify_user,
+    get_recent_incidents,
+    log_incident,
+    get_deleted_documents_count,
 )
-from .visualization import (
-    plot_chunk_similarity_comparison,
-    plot_similarity_heatmap,
-    plot_similarity_heatmap_plotly,
-    plot_similarity_network,
-)
+try:
+    from .visualization import (
+        build_network_data,
+        plot_chunk_similarity_comparison,
+        plot_similarity_heatmap,
+        plot_similarity_heatmap_plotly,
+        plot_similarity_network,
+        render_network_plotly,
+    )
+except ImportError:
+    build_network_data = None
+    plot_chunk_similarity_comparison = None
+    plot_similarity_heatmap = None
+    plot_similarity_heatmap_plotly = None
+    plot_similarity_network = None
+    render_network_plotly = None
+except ImportError:
+    pass
+
 
 __all__ = [
     "extract_text_from_pdf",
@@ -61,6 +96,7 @@ __all__ = [
     "extract_texts",
     "chunk_document",
     "chunk_documents",
+    "chunk_by_sentences",
     "embed_chunks",
     "embed_documents",
     "get_document_embedding",
@@ -68,13 +104,21 @@ __all__ = [
     "chunk_similarity_matrix",
     "flag_plagiarism",
     "find_most_similar_chunks",
+    "calculate_paragraph_similarity_breakdown",
     "PLAGIARISM_THRESHOLD",
     "plot_similarity_heatmap",
     "plot_similarity_heatmap_plotly",
+    "filter_heatmap_by_class_tag",
     "plot_chunk_similarity_comparison",
+    "build_network_data",
+    "export_graph_to_csv",
+    "export_network_to_csv_bytes",
+    "render_network_plotly",
     "plot_similarity_network",
+
     "translate_text",
     "send_plagiarism_alert",
+    "dispatch_plagiarism_alert",
     "build_index",
     "search_similar_chunks",
     "find_plagiarised_chunks",
@@ -92,6 +136,13 @@ __all__ = [
     "get_2fa_status",
     "enable_2fa",
     "disable_2fa",
+    "get_user_active_status",
+    "set_user_active_status",
+    "is_user_active",
+    "update_user_profile",
+    "get_recent_incidents",
+    "log_incident",
+    "get_deleted_documents_count",
     "init_corpus_db",
     "add_document",
     "get_document_by_hash",
@@ -104,4 +155,11 @@ __all__ = [
     "get_document_chunks_count",
     "get_unique_class_sections",
     "get_documents_by_class",
+    "BrandingConfig",
+    "get_branding_config",
+    "reload_branding_config",
+    "load_branding_config",
+    "sanitize_zero_width_characters",
+    "TagManager",
+    "sanitize_tag_name",
 ]

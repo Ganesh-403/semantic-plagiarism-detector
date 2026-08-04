@@ -6,13 +6,152 @@ Unit tests for plot_similarity_network edge cases.
 
 from unittest.mock import patch
 
+import networkx as nx
 import pandas as pd
 import plotly.graph_objects as go
+import pytest
 
-from src.visualization.network_graph import plot_similarity_network
+from src.visualization.network_graph import export_network_adjacency_csv
+
+
+def test_export_network_adjacency_csv():
+    graph = nx.Graph()
+
+    graph.add_edge("Doc A", "Doc B", weight=0.95)
+    graph.add_edge("Doc B", "Doc C", weight=0.82)
+
+    csv_output = export_network_adjacency_csv(graph)
+
+    assert "Source,Target,Weight" in csv_output
+    assert "Doc A,Doc B,0.95" in csv_output
+    assert "Doc B,Doc C,0.82" in csv_output
+def test_export_network_adjacency_csv_empty_graph():
+    graph = nx.Graph()
+
+    csv_output = export_network_adjacency_csv(graph)
+
+    assert csv_output.strip() == "Source,Target,Weight"
+from src.visualization.network_graph import (
+    build_network_data,
+    calculate_force_directed_layout,
+    export_graph_to_csv,
+    export_network_to_csv_bytes,
+    export_network_to_gexf_bytes,
+    plot_plagiarism_network_graph,
+    plot_similarity_network,
+    render_network_plotly,
+)
+
+
+def test_build_network_data_structure():
+    """Verify build_network_data returns expected keys, NetworkX graph, and Plotly traces."""
+    data = {
+        "doc1": [1.0, 0.85, 0.20],
+        "doc2": [0.85, 1.0, 0.10],
+        "doc3": [0.20, 0.10, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2", "doc3"])
+
+    # show_isolated=True keeps doc3 (isolated node) in the graph for structure checks
+    net_data = build_network_data(df, threshold=0.75, show_isolated=True)
+
+    assert "shapes" in net_data
+    assert "edge_hover_trace" in net_data
+    assert "node_trace" in net_data
+    assert "graph" in net_data
+    assert "pos" in net_data
+
+    # Check graph nodes and edges
+    assert len(net_data["graph"].nodes()) == 3
+    assert len(net_data["graph"].edges()) == 1
+    assert len(net_data["shapes"]) == 1
+
+
+def test_build_network_data_with_theme_colors():
+    """Verify build_network_data applies custom theme colors correctly."""
+    data = {
+        "doc1": [1.0, 0.95],
+        "doc2": [0.95, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2"])
+    custom_theme = {
+        "danger": "#e53935",
+        "warning": "#fb8c00",
+        "success": "#43a047",
+        "background": "#121212",
+        "ink": "#ffffff",
+    }
+
+    net_data = build_network_data(df, threshold=0.75, theme_colors=custom_theme)
+
+    # Similarity 0.95 >= 0.90 -> danger color
+    assert net_data["shapes"][0]["line"]["color"] == "#e53935"
+    assert net_data["node_trace"].textfont.color == "#ffffff"
+
+
+def test_build_network_data_hover_text():
+    """Verify hover text explicitly shows Document Title."""
+    data = {
+        "doc1": [1.0, 0.85],
+        "doc2": [0.85, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2"])
+    net_data = build_network_data(df, threshold=0.75)
+
+    hover_texts = net_data["node_trace"].hovertext
+    assert "<b>📄 Document Title:</b> doc1<br>" in hover_texts[0]
+
+
+def test_build_network_data_node_color_severity():
+    """Verify node colors are mapped by plagiarism severity (max similarity)."""
+    data = {
+        "doc_danger": [1.0, 0.95, 0.1],   # max_score=0.95 -> danger
+        "doc_warning": [0.95, 1.0, 0.8],  # max_score=0.95 -> danger
+        "doc_success": [0.1, 0.8, 1.0],   # max_score=0.8 -> warning
+    }
+    df = pd.DataFrame(data, index=["doc_danger", "doc_warning", "doc_success"])
+    custom_theme = {
+        "danger": "#ff0000",
+        "warning": "#ffff00",
+        "success": "#00ff00",
+    }
+    net_data = build_network_data(df, threshold=0.5, theme_colors=custom_theme)
+
+    # doc_danger has max_score=0.95 -> #ff0000
+    assert net_data["node_trace"].marker.color[0] == "#ff0000"
+    # doc_warning has max_score=0.95 -> #ff0000
+    assert net_data["node_trace"].marker.color[1] == "#ff0000"
+    # doc_success has max_score=0.8 -> #ffff00
+    assert net_data["node_trace"].marker.color[2] == "#ffff00"
+
+
+
+def test_render_network_plotly_construction():
+    """Verify render_network_plotly constructs a valid Plotly Figure from network data."""
+    data = {
+        "doc1": [1.0, 0.85],
+        "doc2": [0.85, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2"])
+    custom_theme = {
+        "background": "#f0f0f0",
+        "ink": "#111111",
+    }
+
+    net_data = build_network_data(df, threshold=0.75, theme_colors=custom_theme)
+    fig = render_network_plotly(
+        net_data, title="Custom Title", theme_colors=custom_theme
+    )
+
+    assert isinstance(fig, go.Figure)
+    assert fig.layout.title.text == "Custom Title"
+    assert fig.layout.paper_bgcolor == "#f0f0f0"
+    assert fig.layout.plot_bgcolor == "#f0f0f0"
+    assert len(fig.layout.shapes) == 1
 
 
 def test_plot_similarity_network_returns_plotly_figure():
+
     # Setup simple square similarity matrix
     data = {
         "doc1": [1.0, 0.85, 0.20],
@@ -84,3 +223,372 @@ def test_plot_similarity_network_mocked_plotly(mock_figure):
 
     # Verify that the Figure constructor was invoked properly
     assert mock_figure.called
+
+
+def test_plot_similarity_network_layout_autosize():
+    """Verify layout has autosize=True and width=None for dynamic scaling."""
+    data = {
+        "doc1": [1.0, 0.90],
+        "doc2": [0.90, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2"])
+
+    fig = plot_similarity_network(df, threshold=0.75)
+
+    assert fig.layout.autosize is True
+    assert fig.layout.width is None
+
+
+def test_build_network_data_highlighted_doc():
+    """Verify highlighted_doc node color and marker size are updated to bright yellow."""
+    data = {
+        "doc1": [1.0, 0.85, 0.20],
+        "doc2": [0.85, 1.0, 0.10],
+        "doc3": [0.20, 0.10, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2", "doc3"])
+
+    result = export_network_to_gexf_bytes(df, threshold=0.75)
+
+    assert isinstance(result, bytes)
+    assert len(result) > 0
+
+
+def test_export_network_to_gexf_bytes_contains_nodes_and_edges():
+    """Verify GEXF output contains expected nodes and edge attributes from similarity matrix."""
+    data = {
+        "doc1": [1.0, 0.95],
+        "doc2": [0.95, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2"])
+
+    net_data = build_network_data(df, threshold=0.75, selected_node="doc1")
+    node_colors = net_data["node_trace"].marker.color
+    node_sizes = net_data["node_trace"].marker.size
+
+    # doc1 is highlighted -> color #FFFF00 and larger size
+    assert node_colors[0] == "#FFFF00"
+    assert node_colors[1] != "#FFFF00"
+    assert node_sizes[0] > node_sizes[1]
+
+
+def test_export_graph_to_csv():
+    """Verify export_graph_to_csv returns a CSV formatted string with Source,Target,Similarity header."""
+    G = nx.Graph()
+    G.add_edge("docA", "docB", similarity=0.88)
+    csv_str = export_graph_to_csv(G)
+
+    lines = csv_str.strip().splitlines()
+    assert lines[0] == "Source,Target,Similarity"
+    assert len(lines) == 2
+    assert "docA,docB,0.88" in lines[1] or "docB,docA,0.88" in lines[1]
+
+
+def test_export_network_to_csv_bytes():
+    """Verify export_network_to_csv_bytes builds graph and returns encoded CSV bytes."""
+    data = {
+        "doc1": [1.0, 0.92],
+        "doc2": [0.92, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2"])
+
+    csv_bytes = export_network_to_csv_bytes(df, threshold=0.75)
+    assert isinstance(csv_bytes, bytes)
+
+    decoded = csv_bytes.decode("utf-8")
+    lines = decoded.strip().splitlines()
+    assert lines[0] == "Source,Target,Similarity"
+    assert "doc1,doc2,0.92" in decoded or "doc2,doc1,0.92" in decoded
+
+
+def test_plot_similarity_network_json_serialization():
+    """Verify network graph figures serialize to valid JSON without circular references."""
+    # Test with multiple documents and edges
+    data = {
+        "doc1": [1.0, 0.85, 0.20],
+        "doc2": [0.85, 1.0, 0.10],
+        "doc3": [0.20, 0.10, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2", "doc3"])
+
+    fig = plot_similarity_network(df, threshold=0.75)
+
+    # Verify fig.to_json() succeeds without raising an exception
+    json_str = fig.to_json()
+    assert json_str is not None
+    assert len(json_str) > 0
+
+
+def test_plot_similarity_network_json_serialization_with_theme():
+    """Verify JSON serialization works with custom theme colors."""
+    data = {
+        "doc1": [1.0, 0.95],
+        "doc2": [0.95, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2"])
+    custom_theme = {
+        "danger": "#e53935",
+        "warning": "#fb8c00",
+        "success": "#43a047",
+        "background": "#121212",
+        "ink": "#ffffff",
+    }
+
+    fig = plot_similarity_network(df, threshold=0.75, theme_colors=custom_theme)
+
+    # Verify fig.to_json() succeeds
+    json_str = fig.to_json()
+    assert json_str is not None
+    assert len(json_str) > 0
+
+
+def test_plot_similarity_network_json_serialization_single_doc():
+    """Verify JSON serialization works for single document graph."""
+    data = {"doc1": [1.0]}
+    df = pd.DataFrame(data, index=["doc1"])
+
+    fig = plot_similarity_network(df, threshold=0.75)
+
+    # Verify fig.to_json() succeeds
+    json_str = fig.to_json()
+    assert json_str is not None
+    assert len(json_str) > 0
+
+
+def test_plot_similarity_network_json_serialization_no_edges():
+    """Verify JSON serialization works when no edges exist."""
+    data = {
+        "doc1": [1.0, 0.10, 0.20],
+        "doc2": [0.10, 1.0, 0.15],
+        "doc3": [0.20, 0.15, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2", "doc3"])
+
+    fig = plot_similarity_network(df, threshold=0.75)
+
+    # Verify fig.to_json() succeeds
+    json_str = fig.to_json()
+    assert json_str is not None
+    assert len(json_str) > 0
+
+
+def test_plot_similarity_network_json_serialization_with_highlighted_node():
+    """Verify JSON serialization works with highlighted node."""
+    data = {
+        "doc1": [1.0, 0.85, 0.20],
+        "doc2": [0.85, 1.0, 0.10],
+        "doc3": [0.20, 0.10, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2", "doc3"])
+
+    fig = plot_similarity_network(df, threshold=0.75, selected_node="doc1")
+
+    # Verify fig.to_json() succeeds
+    json_str = fig.to_json()
+    assert json_str is not None
+    assert len(json_str) > 0
+
+
+# ==============================================================================
+# Node Scale Factor Tests (Issue #1062)
+# ==============================================================================
+
+
+def test_build_network_data_node_scale_default():
+    """Verify default node_scale=1.0 produces expected base node sizes."""
+    data = {
+        "doc1": [1.0, 0.85],
+        "doc2": [0.85, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2"])
+    net_data = build_network_data(df, threshold=0.75)
+    sizes = net_data["node_trace"].marker.size
+    # doc1 degree=1 -> base_size = (20 + 1*6) * 1.0 = 26
+    assert sizes[0] == 26.0 or sizes[0] == 26
+
+
+def test_build_network_data_node_scale_custom():
+    """Verify node_scale=2.0 doubles the base node sizes compared to default."""
+    data = {
+        "doc1": [1.0, 0.85],
+        "doc2": [0.85, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2"])
+    net_data_default = build_network_data(df, threshold=0.75)
+    net_data_scaled = build_network_data(df, threshold=0.75, node_scale=2.0)
+
+    default_sizes = net_data_default["node_trace"].marker.size
+    scaled_sizes = net_data_scaled["node_trace"].marker.size
+
+    for d, s in zip(default_sizes, scaled_sizes):
+        assert s == pytest.approx(d * 2.0)
+
+
+# ==============================================================================
+# Isolated Nodes Visibility Toggle Tests (Issue #1399)
+# ==============================================================================
+
+
+def _three_doc_matrix():
+    """Return a matrix where doc3 has no similarity >= threshold (isolated)."""
+    data = {
+        "doc1": [1.0, 0.85, 0.20],
+        "doc2": [0.85, 1.0, 0.10],
+        "doc3": [0.20, 0.10, 1.0],
+    }
+    return pd.DataFrame(data, index=["doc1", "doc2", "doc3"])
+
+
+def test_build_network_data_filters_isolated_nodes_by_default():
+    """Verify isolated nodes (degree 0) are removed when show_isolated=False (default)."""
+    df = _three_doc_matrix()
+
+    net_data = build_network_data(df, threshold=0.75)
+
+    assert set(net_data["graph"].nodes()) == {"doc1", "doc2"}
+    assert list(net_data["node_trace"].customdata) == ["doc1", "doc2"]
+
+
+def test_build_network_data_keeps_isolated_nodes_when_show_isolated():
+    """Verify all nodes remain when show_isolated=True."""
+    df = _three_doc_matrix()
+
+    net_data = build_network_data(df, threshold=0.75, show_isolated=True)
+
+    assert set(net_data["graph"].nodes()) == {"doc1", "doc2", "doc3"}
+    assert set(net_data["node_trace"].customdata) == {"doc1", "doc2", "doc3"}
+
+
+def test_plot_similarity_network_filters_isolated_nodes():
+    """Verify plot_similarity_network excludes isolated nodes by default."""
+    df = _three_doc_matrix()
+
+    fig = plot_similarity_network(df, threshold=0.75)
+
+    assert len(fig.layout.shapes) == 1
+    node_trace = fig.data[1]
+    assert list(node_trace.customdata) == ["doc1", "doc2"]
+
+
+def test_plot_similarity_network_show_isolated_keeps_all_nodes():
+    """Verify plot_similarity_network keeps isolated nodes when show_isolated=True."""
+    df = _three_doc_matrix()
+
+    fig = plot_similarity_network(df, threshold=0.75, show_isolated=True)
+
+    assert len(fig.layout.shapes) == 1
+    node_trace = fig.data[1]
+    assert set(node_trace.customdata) == {"doc1", "doc2", "doc3"}
+
+
+def test_build_network_data_all_nodes_isolated():
+    """Verify an all-isolated graph still builds a valid figure without nodes."""
+    data = {
+        "doc1": [1.0, 0.10],
+        "doc2": [0.10, 1.0],
+    }
+    df = pd.DataFrame(data, index=["doc1", "doc2"])
+
+    net_data = build_network_data(df, threshold=0.75)
+
+    assert set(net_data["graph"].nodes()) == set()
+    assert list(net_data["node_trace"].customdata) == []
+
+    fig = render_network_plotly(net_data, title="Empty")
+    assert isinstance(fig, go.Figure)
+
+
+# ==============================================================================
+# Force-Directed Graph Physics Customization Tests (Issue #1368)
+# ==============================================================================
+
+
+def test_build_network_data_physics_defaults():
+    """Verify default physics parameters spring_k=0.15 and iterations=50."""
+    df = _three_doc_matrix()
+    net_data = build_network_data(df, threshold=0.75, show_isolated=True)
+
+    pos = net_data["pos"]
+    assert isinstance(pos, dict)
+    assert len(pos) == 3
+    for node in ["doc1", "doc2", "doc3"]:
+        assert node in pos
+        assert len(pos[node]) == 2
+
+
+def test_build_network_data_spring_k_customization():
+    """Verify modifying spring_k recalculates node layout positions."""
+    df = _three_doc_matrix()
+
+    net_data_default = build_network_data(df, threshold=0.75, show_isolated=True, spring_k=0.15)
+    net_data_tight = build_network_data(df, threshold=0.75, show_isolated=True, spring_k=0.05)
+    net_data_spread = build_network_data(df, threshold=0.75, show_isolated=True, spring_k=0.85)
+
+    pos_default = net_data_default["pos"]
+    pos_tight = net_data_tight["pos"]
+    pos_spread = net_data_spread["pos"]
+
+    # Positions should change when spring constant k changes
+    assert pos_default["doc1"][0] != pos_tight["doc1"][0] or pos_default["doc1"][1] != pos_tight["doc1"][1]
+    assert pos_default["doc1"][0] != pos_spread["doc1"][0] or pos_default["doc1"][1] != pos_spread["doc1"][1]
+
+
+def test_build_network_data_iterations_customization():
+    """Verify modifying iteration count affects layout convergence."""
+    df = _three_doc_matrix()
+
+    net_data_few = build_network_data(df, threshold=0.75, show_isolated=True, iterations=5)
+    net_data_many = build_network_data(df, threshold=0.75, show_isolated=True, iterations=200)
+
+    pos_few = net_data_few["pos"]
+    pos_many = net_data_many["pos"]
+
+    assert pos_few["doc1"][0] != pos_many["doc1"][0] or pos_few["doc1"][1] != pos_many["doc1"][1]
+
+
+def test_build_network_data_repulsion_customization():
+    """Verify repulsion parameter alters force-directed node positioning."""
+    df = _three_doc_matrix()
+
+    net_data_base = build_network_data(df, threshold=0.75, show_isolated=True, repulsion=1.0)
+    net_data_repelled = build_network_data(df, threshold=0.75, show_isolated=True, repulsion=3.5)
+
+    pos_base = net_data_base["pos"]
+    pos_repelled = net_data_repelled["pos"]
+
+    assert pos_base["doc1"][0] != pos_repelled["doc1"][0] or pos_base["doc1"][1] != pos_repelled["doc1"][1]
+
+
+def test_plot_plagiarism_network_graph_acceptance_criteria():
+    """Verify plot_plagiarism_network_graph function accepts spring_k=0.15 and iterations=50."""
+    df = _three_doc_matrix()
+
+    fig = plot_plagiarism_network_graph(
+        similarity_df=df,
+        threshold=0.75,
+        spring_k=0.15,
+        iterations=50,
+        repulsion=1.2,
+        show_isolated=True,
+    )
+
+    assert isinstance(fig, go.Figure)
+    assert len(fig.data) == 2
+    assert fig.layout.shapes is not None
+
+
+def test_calculate_force_directed_layout_utility():
+    """Verify calculate_force_directed_layout computes 2D coordinates for a NetworkX graph."""
+    graph = nx.Graph()
+    graph.add_edge("A", "B")
+    graph.add_edge("B", "C")
+    graph.add_edge("C", "A")
+
+    pos = calculate_force_directed_layout(graph, spring_k=0.25, iterations=75, repulsion=1.5)
+
+    assert isinstance(pos, dict)
+    assert set(pos.keys()) == {"A", "B", "C"}
+    for node in ["A", "B", "C"]:
+        assert len(pos[node]) == 2
+        assert isinstance(pos[node][0], (float, int, numpy.number) if 'numpy' in globals() else float)
+

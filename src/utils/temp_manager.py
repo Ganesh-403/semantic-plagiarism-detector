@@ -1,0 +1,221 @@
+"""
+src/utils/temp_manager.py
+-------------------------
+Utility for tracking and automatically cleaning up temporary files and directories
+on application exit using Python's atexit module and tempfile utilities.
+
+Provides functions to register temporary paths for automatic cleanup,
+create managed temp files/directories, purge expired files, and calculate
+total disk space consumed by temporary work files.
+
+Recent Additions (Issue #1251):
+- Added `get_temp_directory_size_bytes` function that calculates total disk
+  space occupied by all files inside the active temp directory recursively.
+"""
+
+import atexit
+import logging
+import os
+import shutil
+import tempfile
+import time
+from typing import List, Optional
+
+# Global list of registered temporary paths to clean up
+_REGISTERED_TEMP_PATHS: List[str] = []
+
+logger = logging.getLogger(__name__)
+
+
+def register_temp_path(path: str) -> str:
+    """Registers a file or directory path for automatic cleanup on process exit."""
+    if path and path not in _REGISTERED_TEMP_PATHS:
+        _REGISTERED_TEMP_PATHS.append(path)
+    return path
+
+
+def unregister_temp_path(path: str) -> None:
+    """Removes a path from the cleanup tracking list if manually deleted earlier."""
+    if path in _REGISTERED_TEMP_PATHS:
+        _REGISTERED_TEMP_PATHS.remove(path)
+
+
+def cleanup_registered_temp_paths() -> None:
+    """
+    Cleans up all registered temporary files and directories.
+    Registered as an atexit hook.
+    """
+    for path in list(_REGISTERED_TEMP_PATHS):
+        try:
+            if os.path.isfile(path) or os.path.islink(path):
+                os.remove(path)
+            elif os.path.isdir(path):
+                shutil.rmtree(path, ignore_errors=True)
+        except OSError as exc:
+            logger.warning("Failed to clean up temp file %s: %s", path, exc)
+        finally:
+            if path in _REGISTERED_TEMP_PATHS:
+                _REGISTERED_TEMP_PATHS.remove(path)
+
+
+# Register the exit handler automatically on module import
+atexit.register(cleanup_registered_temp_paths)
+
+
+def create_managed_temp_file(
+    suffix: Optional[str] = None, prefix: Optional[str] = None
+) -> str:
+    """
+    Creates a temporary file on disk and registers it for automatic deletion on exit.
+
+    Returns:
+        str: Absolute path to the created temporary file.
+    """
+    fd, temp_path = tempfile.mkstemp(suffix=suffix, prefix=prefix)
+    os.close(
+        fd
+    )  # Close file descriptor so other components can open/write to it freely
+    register_temp_path(temp_path)
+    return temp_path
+
+
+def create_managed_temp_dir(
+    suffix: Optional[str] = None, prefix: Optional[str] = None
+) -> str:
+    """
+    Creates a temporary directory on disk and registers it for automatic deletion on exit.
+
+    Returns:
+        str: Absolute path to the created temporary directory.
+    """
+    temp_dir = tempfile.mkdtemp(suffix=suffix, prefix=prefix)
+    register_temp_path(temp_dir)
+    return temp_dir
+
+
+def purge_expired_temp_files(max_age_seconds: int = 7200) -> int:
+    """
+    Scans the system temp directory and removes files whose last modification
+    time is older than max_age_seconds (default: 2 hours). Intended to run on
+    application startup or on a periodic schedule to prevent temp file buildup.
+
+    Returns:
+        int: Number of files purged.
+    """
+    temp_dir = tempfile.gettempdir()
+    now = time.time()
+    purged_count = 0
+    freed_bytes = 0
+
+    try:
+        with os.scandir(temp_dir) as entries:
+            for entry in entries:
+                try:
+                    if not entry.is_file(follow_symlinks=False):
+                        continue
+                    file_stat = entry.stat()
+                    age_seconds = now - file_stat.st_mtime
+                    if age_seconds > max_age_seconds:
+                        file_size = file_stat.st_size
+                        os.remove(entry.path)
+                        purged_count += 1
+                        freed_bytes += file_size
+                except OSError as exc:
+                    logger.warning("Failed to purge temp file %s: %s", entry.path, exc)
+    except OSError as exc:
+        logger.warning("Failed to scan temp directory %s: %s", temp_dir, exc)
+
+    logger.info(
+        "Temp file cleanup complete: purged %d file(s), freed %d byte(s).",
+        purged_count,
+        freed_bytes,
+    )
+    return purged_count
+
+
+def get_temp_directory_size_bytes() -> int:
+    """Calculate total disk space occupied by the active temp directory.
+
+    Recursively walks through the system's active temporary directory
+    (as returned by ``tempfile.gettempdir()``) and sums the byte sizes
+    of all files found within it. This is useful for monitoring how
+    much disk space is currently consumed by temporary work files,
+    helping administrators identify potential disk space issues before
+    they cause application failures.
+
+    The function handles errors gracefully:
+    - If the temp directory does not exist or is inaccessible, returns 0.
+    - If individual files cannot be stat'd (e.g., permission denied),
+      they are skipped and logged as warnings.
+    - Symlinks are followed to count the target file size, but broken
+      symlinks are skipped.
+
+    Returns:
+        Total size in bytes of all files inside the active temp directory.
+        Returns 0 if the directory does not exist or is empty.
+
+    Examples:
+        >>> size = get_temp_directory_size_bytes()
+        >>> print(f"Temp directory uses {size / (1024*1024):.1f} MB")
+        Temp directory uses 45.3 MB
+    """
+    temp_dir = tempfile.gettempdir()
+    total_size = 0
+
+    # If the temp directory does not exist (very rare), return 0
+    if not os.path.exists(temp_dir):
+        logger.debug(
+            "get_temp_directory_size_bytes: temp directory does not exist: %s",
+            temp_dir,
+        )
+        return 0
+
+    if not os.path.isdir(temp_dir):
+        logger.warning(
+            "get_temp_directory_size_bytes: temp path is not a directory: %s",
+            temp_dir,
+        )
+        return 0
+
+    try:
+        # Use os.walk for recursive traversal of the entire temp directory tree.
+        # This counts files in all subdirectories, not just the top level.
+        for dirpath, dirnames, filenames in os.walk(temp_dir):
+            # Process each file in the current directory
+            for filename in filenames:
+                file_path = os.path.join(dirpath, filename)
+
+                try:
+                    # Use os.stat to get file size.
+                    # follow_symlinks=True means broken symlinks will raise
+                    # OSError and be caught below.
+                    file_stat = os.stat(file_path, follow_symlinks=True)
+                    total_size += file_stat.st_size
+
+                except (OSError, ValueError) as exc:
+                    # Skip files we cannot stat (permission denied,
+                    # broken symlink, file deleted during walk, etc.)
+                    logger.debug(
+                        "get_temp_directory_size_bytes: skipping %s: %s",
+                        file_path,
+                        exc,
+                    )
+                    continue
+
+    except OSError as exc:
+        # If os.walk itself fails (e.g., permission denied on temp dir),
+        # log the error and return whatever was accumulated so far.
+        logger.warning(
+            "get_temp_directory_size_bytes: failed to walk temp directory %s: %s",
+            temp_dir,
+            exc,
+        )
+
+    logger.debug(
+        "get_temp_directory_size_bytes: total size is %d bytes (%.2f MB) in %s",
+        total_size,
+        total_size / (1024 * 1024),
+        temp_dir,
+    )
+
+    return total_size

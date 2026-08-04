@@ -1,29 +1,11 @@
 import os
-import pytest
+
 from streamlit.testing.v1 import AppTest
 
 # Paths to index and DB
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 _INDEX_PATH = os.path.join(_REPO_ROOT, "corpus.index")
 _DB_PATH = os.path.join(_REPO_ROOT, "corpus.db")
-
-
-@pytest.fixture(autouse=True)
-def clean_test_env():
-    from src.db.corpus_db import clear_all_data
-    clear_all_data()
-    if os.path.exists(_INDEX_PATH):
-        try:
-            os.remove(_INDEX_PATH)
-        except Exception:
-            pass
-    yield
-    clear_all_data()
-    if os.path.exists(_INDEX_PATH):
-        try:
-            os.remove(_INDEX_PATH)
-        except Exception:
-            pass
 
 
 def test_clear_all_button_visibility():
@@ -34,7 +16,7 @@ def test_clear_all_button_visibility():
     at_admin.session_state["username"] = "admin"
     at_admin.session_state["role"] = "admin"
     at_admin.run()
-    
+
     admin_btn = any("Clear All Documents" in btn.label for btn in at_admin.button)
     assert admin_btn is True
 
@@ -44,7 +26,7 @@ def test_clear_all_button_visibility():
     at_teacher.session_state["username"] = "teacher1"
     at_teacher.session_state["role"] = "teacher"
     at_teacher.run()
-    
+
     teacher_btn = any("Clear All Documents" in btn.label for btn in at_teacher.button)
     assert teacher_btn is False
 
@@ -73,7 +55,9 @@ def test_clear_all_confirmation_modal_interaction():
     for btn in at.button:
         if "Cancel" in btn.label:
             cancel_btn = btn
-        elif "Clear All" == btn.label:  # Exact label of the confirmation button in dialog
+        elif (
+            "Clear All" == btn.label
+        ):  # Exact label of the confirmation button in dialog
             confirm_btn = btn
 
     assert cancel_btn is not None

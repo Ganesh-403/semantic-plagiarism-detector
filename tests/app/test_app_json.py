@@ -1,9 +1,10 @@
 import os
 import sys
-import pytest
-import numpy as np
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from streamlit.testing.v1 import AppTest
+
+from tests.conftest import MockDataFactory
 
 # Mock googleapiclient modules to avoid ModuleNotFoundError in environments without them installed
 sys.modules["googleapiclient"] = MagicMock()
@@ -31,42 +32,24 @@ def _cleanup_stale_artifacts():
             pass
 
 
-def mock_embed_chunks(chunks, batch_size=64):
-    if not chunks:
-        return np.array([])
-    val = 1.0 / (384**0.5)
-    return np.full((len(chunks), 384), val, dtype="float32")
-
-
-@pytest.fixture(autouse=True)
-def clean_test_env():
-    from src.db.corpus_db import clear_all_data
-    clear_all_data()
-    index_path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "corpus.index")
-    )
-    if os.path.exists(index_path):
-        try:
-            os.remove(index_path)
-        except Exception:
-            pass
-    yield
-    clear_all_data()
-    if os.path.exists(index_path):
-        try:
-            os.remove(index_path)
-        except Exception:
-            pass
-
-
-@patch("src.core.ai_detector.detect_documents_ai_probability", return_value={"assignment1.txt": {"overall": 0.1}, "assignment2.txt": {"overall": 0.1}})
+@patch(
+    "src.core.ai_detector.detect_documents_ai_probability",
+    return_value={
+        "assignment1.txt": {"overall": 0.1},
+        "assignment2.txt": {"overall": 0.1},
+    },
+)
 @patch("src.core.webhook.send_plagiarism_alert")
 @patch(
     "src.core.embedding_model.get_embedding_model_info",
     return_value=("all-MiniLM-L6-v2", 384),
 )
-@patch("src.core.embedding_model.embed_chunks", side_effect=mock_embed_chunks)
-def test_app_json_export_integration(mock_embed, mock_model_info, mock_webhook, mock_ai):
+@patch(
+    "src.core.embedding_model.embed_chunks", side_effect=MockDataFactory.embed_chunks
+)
+def test_app_json_export_integration(
+    mock_embed, mock_model_info, mock_webhook, mock_ai
+):
     _cleanup_stale_artifacts()
 
     try:
@@ -86,8 +69,12 @@ def test_app_json_export_integration(mock_embed, mock_model_info, mock_webhook, 
         assert len(at.file_uploader) > 0
 
         # Upload two files to run the plagiarism pipeline
-        at.file_uploader[0].upload("doc1.txt", b"First student assignment text.", "text/plain")
-        at.file_uploader[0].upload("doc2.txt", b"Second student assignment text.", "text/plain")
+        at.file_uploader[0].upload(
+            "doc1.txt", b"First student assignment text.", "text/plain"
+        )
+        at.file_uploader[0].upload(
+            "doc2.txt", b"Second student assignment text.", "text/plain"
+        )
 
         # Execute full pipeline
         at.run(timeout=30)

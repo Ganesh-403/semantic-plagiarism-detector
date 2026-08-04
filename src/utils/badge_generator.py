@@ -5,10 +5,11 @@ Generates "Originality Verified" badges for students with 0% similarity results.
 Supports both PNG and PDF output formats for gamification and academic integrity encouragement.
 """
 
+import html
+import re
 from datetime import datetime
 from io import BytesIO
 from typing import Optional
-
 try:
     from PIL import Image, ImageDraw, ImageFont
 except ImportError:
@@ -21,12 +22,60 @@ from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import (Paragraph, SimpleDocTemplate, Spacer, Table,
+                                TableStyle)
+
+HEX_COLOR_PATTERN = re.compile(r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$")
+DEFAULT_BADGE_COLOR = "#4f46e5"
 
 
-def generate_badge_png(
+def validate_hex_color(color: Optional[str]) -> str:
+    """Validate a hex color string, auto-prepending '#' if missing, and
+    falling back to a safe default if the value is invalid."""
+    if not color:
+        return DEFAULT_BADGE_COLOR
+    candidate = color if color.startswith("#") else f"#{color}"
+    if HEX_COLOR_PATTERN.match(candidate):
+        return candidate
+    return DEFAULT_BADGE_COLOR
+
+
+def generate_badge_svg(
     student_name: str = "Student",
     date: Optional[str] = None,
+    accent_color: Optional[str] = None,
+) -> str:
+    """
+    Generates a simple SVG "Originality Verified" badge.
+
+    The accent_color is validated (and defaulted if invalid) before being
+    inserted into the SVG markup, preventing malformed or unescaped color
+    values from producing invalid SVG.
+
+    Args:
+        student_name: Name of the student (optional, defaults to "Student")
+        date: Date string (optional, defaults to current date)
+        accent_color: Optional hex color string for the badge accent
+
+    Returns:
+        A string containing the SVG markup for the badge.
+    """
+    safe_color = validate_hex_color(accent_color)
+    if date is None:
+        date = datetime.now().strftime("%B %d, %Y")
+
+    safe_name = html.escape(student_name)
+    safe_date = html.escape(date)
+
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="400" height="120" viewBox="0 0 400 120">
+  <rect width="400" height="120" rx="12" fill="{safe_color}" />
+  <text x="20" y="45" font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#ffffff">Originality Verified</text>
+  <text x="20" y="75" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#e0e7ff">Awarded to: {safe_name}</text>
+  <text x="20" y="100" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#e0e7ff">Date: {safe_date}</text>
+</svg>"""
+
+
+def generate_badge_png(    student_name: str = "Student",    date: Optional[str] = None,
     text_preview: str = "",
 ) -> BytesIO:
     """
@@ -188,9 +237,8 @@ def generate_badge_pdf(
     Returns:
         BytesIO buffer containing the PDF certificate
     """
-    brand_hex = brand_color or "#1e3a8a"
+    brand_hex = validate_hex_color(brand_color)
     brand_clr = HexColor(brand_hex)
-
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,

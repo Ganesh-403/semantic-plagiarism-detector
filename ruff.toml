@@ -1,6 +1,7 @@
 # Ruff configuration — shared between CI and pre-commit hooks
 [lint]
+select = ["E", "F"]
 # E402: Module level import not at top of file
 #   Required because app/streamlit_app.py and evaluation/evaluate.py
 #   modify sys.path before importing project modules.
-ignore = ["E402"]
+ignore = ["E402", "E501"]

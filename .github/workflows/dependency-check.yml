@@ -1,0 +1,57 @@
+# Automated Dependency Update Checking Workflow
+#
+# This workflow checks for outdated Python dependencies on a weekly
+# schedule and uploads the outdated package report as a workflow
+# artifact, keeping the project's dependencies up to date.
+
+name: Dependency Update Check
+
+on:
+  schedule:
+    # Runs every Monday at 06:00 UTC
+    - cron: '0 6 * * 1'
+  # Allow the workflow to be triggered manually from the Actions tab
+  workflow_dispatch:
+
+# Cancel in-progress runs for the same ref (branch or tag) when a new run is triggered.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-check:
+    name: Check for Outdated Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: '**/requirements*.txt'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Check for outdated packages
+        run: |
+          mkdir -p reports
+          # Capture the list of outdated packages into a report file
+          pip list --outdated --format columns > reports/outdated-packages.txt || true
+          echo "Outdated package report written to reports/outdated-packages.txt"
+          echo "--- Report Preview ---"
+          cat reports/outdated-packages.txt
+
+      - name: Upload outdated package report
+        uses: actions/upload-artifact@v4
+        with:
+          name: outdated-packages-report
+          path: reports/outdated-packages.txt
+          if-no-files-found: error

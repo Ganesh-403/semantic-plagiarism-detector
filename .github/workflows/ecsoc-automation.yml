@@ -1,0 +1,739 @@
+name: "ECSoC Automation"
+
+on:
+  issue_comment:
+    types: [created]
+
+  issues:
+    types: [opened, edited]
+
+  pull_request_target:
+    types: [opened, closed]
+
+  schedule:
+    - cron: '0 */8 * * *'
+
+  workflow_dispatch:
+
+jobs:
+  issue-claim:
+    permissions:
+      issues: write
+    if: github.event_name == 'issue_comment'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const comment = context.payload.comment;
+
+            // 1. Ignore PR comments
+            if (issue.pull_request) return;
+
+            // 2. Only detect comments for OPEN issues
+            if (issue.state !== 'open') {
+              console.log("Issue is not open. Ignoring comment.");
+              return;
+            }
+
+            const claimer = comment.user.login;
+            const commenterType = comment.user.type;
+            const repoOwner = context.repo.owner;
+            const issueAuthor = issue.user ? issue.user.login : null;
+
+            // Helper to check if a comment is from a bot
+            const isBotComment = (c) => c.user && (c.user.type === 'Bot' || (c.user.login && c.user.login.endsWith('[bot]')));
+
+            // 3. Ignore bot comments, issue author comments, and repo owner comments
+            if (commenterType === 'Bot' || claimer.endsWith('[bot]')) {
+              console.log("Ignoring bot comment.");
+              return;
+            }
+
+            if (issueAuthor && claimer.toLowerCase() === issueAuthor.toLowerCase()) {
+              console.log(`Ignoring comment by issue author (@${claimer}).`);
+              return;
+            }
+
+            if (claimer.toLowerCase() === repoOwner.toLowerCase()) {
+              console.log(`Ignoring comment by repo owner (@${claimer}).`);
+              return;
+            }
+
+            // 4. Ignore any comments once issue is assigned (natively via assignees OR via existing bot claim)
+            if (issue.assignees && issue.assignees.length > 0) {
+              console.log("Issue already assigned natively. Ignoring comment.");
+              return;
+            }
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              per_page: 100
+            });
+
+            const botComments = comments.filter(c =>
+              isBotComment(c) && c.body && (
+                c.body.includes("thanks for your interest in contributing under *ECSoC'26*") ||
+                c.body.includes("open for anyone to claim")
+              )
+            );
+
+            if (botComments.length > 0) {
+              const lastBotComment = botComments[botComments.length - 1];
+              if (!lastBotComment.body.includes("open for anyone to claim")) {
+                console.log("Issue is already claimed via bot comment. Ignoring comment.");
+                return;
+              }
+            }
+
+            // 5. Check max 5 open claimed issues limit for user
+            try {
+              const issues = await github.paginate(github.rest.issues.listForRepo, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: 'ECSoC26',
+                state: 'open',
+                per_page: 100
+              });
+
+              let activeCount = 0;
+              for (const iss of issues) {
+                if (iss.pull_request || iss.number === issue.number) continue;
+
+                const issComments = await github.paginate(github.rest.issues.listComments, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: iss.number,
+                  per_page: 100
+                });
+
+                const issBotComments = issComments.filter(c =>
+                  isBotComment(c) && c.body && (
+                    c.body.includes("thanks for your interest in contributing under *ECSoC'26*") ||
+                    c.body.includes("open for anyone to claim")
+                  )
+                );
+
+                if (issBotComments.length > 0) {
+                  const lastBotComment = issBotComments[issBotComments.length - 1];
+                  if (!lastBotComment.body.includes("open for anyone to claim")) {
+                    const match = lastBotComment.body.match(/Hi @([a-zA-Z0-9-]+)/);
+                    if (match && match[1].toLowerCase() === claimer.toLowerCase()) {
+                      activeCount++;
+                    }
+                  }
+                } else if (iss.assignees && iss.assignees.some(a => a.login.toLowerCase() === claimer.toLowerCase())) {
+                  activeCount++;
+                }
+              }
+
+              if (activeCount >= 5) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: `⚠️ @${claimer}, you currently have **${activeCount} open issue(s)** claimed for **ECSoC'26**. The maximum allowed limit is 5. Please complete your existing open issues before claiming another one!`
+                });
+                return;
+              }
+            } catch (err) {
+              console.log("Error checking user open issue limit:", err.message);
+            }
+
+            // Assign first commenter (if user is a collaborator)
+            try {
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                assignees: [claimer]
+              });
+            } catch (err) {
+              console.log(`Could not assign ${claimer} (user might not be a collaborator):`, err.message);
+            }
+
+            // Add ECSoC26 label
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              labels: ["ECSoC26"]
+            });
+
+            // Confirmation comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: `🎉 Hi @${claimer}, thanks for your interest in contributing under *ECSoC'26*! I've assigned this issue to you. Please follow the contribution guidelines, work on a separate branch, and link your PR using Fixes #<issue_number>. You're allowed to work on only 5 issues at a time.Wishing you the best—looking forward to reviewing your contribution! Happy coding! :)`
+            });
+
+  issue-auto-label:
+    permissions:
+      issues: write
+    if: github.event_name == 'issues' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const labelRules = [
+              { label: 'UI', keywords: ['ui', 'frontend', 'css', 'style', 'sidebar', 'theme', 'dark mode', 'color', 'button', 'design', 'layout', 'responsive', 'react', 'html', 'component', 'view'] },
+              { label: 'Backend', keywords: ['backend', 'api', 'server', 'route', 'endpoint', 'database', 'db', 'sql', 'fastapi', 'flask', 'express', 'controller'] },
+              { label: 'Docs', keywords: ['docs', 'documentation', 'readme', 'guide', 'tutorial', 'docstring', 'changelog'] },
+              { label: 'Security', keywords: ['jwt', 'auth', 'security', 'token', 'password', 'login', 'permission', 'encryption', 'vulnerability', 'oauth', 'secret', 'cors'] },
+              { label: 'AI', keywords: ['ai', 'nlp', 'model', 'embedding', 'transformer', 'similarity', 'semantic', 'llm', 'bert', 'spacy', 'nltk', 'plagiarism'] },
+              { label: 'Performance', keywords: ['performance', 'speed', 'optimization', 'memory', 'cache', 'latency', 'slow', 'async', 'profiling', 'benchmark'] }
+            ];
+
+            const labelMetaData = {
+              'UI': { color: '1d76db', description: 'UI & Frontend changes' },
+              'Backend': { color: '5319e7', description: 'Backend & Server logic' },
+              'Docs': { color: '0075ca', description: 'Documentation improvements' },
+              'Security': { color: 'd93f0b', description: 'Security & Auth updates' },
+              'AI': { color: '0e8a16', description: 'AI & NLP logic' },
+              'Performance': { color: 'fbca04', description: 'Performance optimizations' }
+            };
+
+            const ensureLabelsExist = async (labels) => {
+              for (const labelName of labels) {
+                try {
+                  await github.rest.issues.getLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: labelName
+                  });
+                } catch (err) {
+                  if (err.status === 404) {
+                    try {
+                      const meta = labelMetaData[labelName] || { color: '0e8a16', description: '' };
+                      await github.rest.issues.createLabel({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        name: labelName,
+                        color: meta.color,
+                        description: meta.description
+                      });
+                      console.log(`Created missing label: ${labelName}`);
+                    } catch (createErr) {
+                      console.log(`Could not create label ${labelName}:`, createErr.message);
+                    }
+                  }
+                }
+              }
+            };
+
+            const processIssue = async (issue) => {
+              if (!issue || issue.pull_request) return;
+              const text = `${issue.title}\n${issue.body || ''}`.toLowerCase();
+              const matchingLabels = [];
+              for (const rule of labelRules) {
+                const matched = rule.keywords.some(kw => new RegExp(`\\b${kw}\\b`, 'i').test(text));
+                if (matched) {
+                  matchingLabels.push(rule.label);
+                }
+              }
+
+              if (matchingLabels.length > 0) {
+                await ensureLabelsExist(matchingLabels);
+                console.log(`Auto-labeling issue #${issue.number} with: ${matchingLabels.join(', ')}`);
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: matchingLabels
+                });
+              }
+            };
+
+            if (context.eventName === 'issues') {
+              await processIssue(context.payload.issue);
+            } else {
+              // Bulk process all existing open issues on schedule or manual trigger
+              console.log("Bulk processing all existing open issues for auto-labeling...");
+              const openIssues = await github.paginate(github.rest.issues.listForRepo, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                per_page: 100
+              });
+              for (const iss of openIssues) {
+                await processIssue(iss);
+              }
+            }
+
+  pr-automation:
+    permissions:
+      issues: write
+      pull-requests: write
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) {
+              console.log("No pull_request in context payload. Skipping.");
+              return;
+            }
+            const author = pr.user ? pr.user.login : null;
+            const action = context.payload.action;
+
+            if (action === 'opened') {
+              if (author) {
+                // Assign PR author (if user is a collaborator)
+                try {
+                  await github.rest.issues.addAssignees({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: pr.number,
+                    assignees: [author]
+                  });
+                } catch (err) {
+                  console.log(`Could not assign ${author} (user might not be a collaborator):`, err.message);
+                }
+              }
+
+              // Auto-label PR with ECSoC26
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  labels: ["ECSoC26"]
+                });
+              } catch (err) {
+                console.log(`Could not add ECSoC26 label to PR #${pr.number}:`, err.message);
+              }
+
+              // Welcome comment for PR
+              if (author) {
+                try {
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: pr.number,
+                    body: `🎉 Thanks @${author} for opening this Pull Request for **ECSoC26**! A maintainer will review it soon.`
+                  });
+                } catch (err) {
+                  console.log("Could not post welcome comment:", err.message);
+                }
+              }
+            } else if (action === 'closed' && pr.merged) {
+              // Merge thank you comment for PR
+              try {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  body: `🎉 Hey @${author || 'contributor'}!
+
+                Your PR has been merged successfully! 🚀
+
+                Thank you for investing your time and effort into improving **Semantic Plagiarism Detector**.
+
+                Open source grows because of contributors like you.
+
+                If you enjoyed contributing:
+
+                • ⭐ Star the repository
+                • 🔍 Explore more issues
+                • 💡 Suggest new ideas in Discussions
+                • 📢 Share your contribution with others
+
+                Hope to see you back soon. Happy coding! ❤️`.replace(/^[ \t]+/gm, '')
+                });
+              } catch (err) {
+                console.log("Could not post PR merge comment:", err.message);
+              }
+            }
+
+  auto-unassign-stale:
+    permissions:
+      issues: write
+      pull-requests: write
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Cleanup Excess Claims (> 5 open issues)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const maxAllowed = 5;
+            console.log("Checking for users with > 5 open claimed issues...");
+
+            const isBotComment = (c) => c.user && (c.user.type === 'Bot' || (c.user.login && c.user.login.endsWith('[bot]')));
+
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'ECSoC26',
+              state: 'open',
+              per_page: 100
+            });
+
+            const userClaimsMap = {};
+
+            for (const issue of issues) {
+              if (issue.pull_request) continue;
+
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                per_page: 100
+              });
+
+              const botComments = comments.filter(c =>
+                isBotComment(c) && c.body && (
+                  c.body.includes("thanks for your interest in contributing under *ECSoC'26*") ||
+                  c.body.includes("open for anyone to claim")
+                )
+              );
+
+              let claimer = null;
+              let claimDate = null;
+
+              if (botComments.length > 0) {
+                const lastBotComment = botComments[botComments.length - 1];
+                if (!lastBotComment.body.includes("open for anyone to claim")) {
+                  const match = lastBotComment.body.match(/Hi @([a-zA-Z0-9-]+)/);
+                  if (match) {
+                    claimer = match[1];
+                    claimDate = new Date(lastBotComment.created_at);
+                  }
+                }
+              } else if (issue.assignees && issue.assignees.length > 0) {
+                claimer = issue.assignees[0].login;
+                claimDate = new Date(issue.created_at);
+              }
+
+              if (claimer) {
+                const key = claimer.toLowerCase();
+                if (!userClaimsMap[key]) {
+                  userClaimsMap[key] = { username: claimer, issues: [] };
+                }
+                userClaimsMap[key].issues.push({ issue, claimDate });
+              }
+            }
+
+            for (const key of Object.keys(userClaimsMap)) {
+              const userObj = userClaimsMap[key];
+              const claimedItems = userObj.issues;
+              claimedItems.sort((a, b) => a.claimDate - b.claimDate);
+
+              if (claimedItems.length > maxAllowed) {
+                console.log(`User @${userObj.username} has ${claimedItems.length} active open issues. Keeping ${maxAllowed}, freeing remaining ${claimedItems.length - maxAllowed}...`);
+
+                const excessItems = claimedItems.slice(maxAllowed);
+
+                for (const item of excessItems) {
+                  const issue = item.issue;
+                  if (issue.assignees.length > 0) {
+                    try {
+                      await github.rest.issues.removeAssignees({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        issue_number: issue.number,
+                        assignees: issue.assignees.map(a => a.login)
+                      });
+                    } catch (e) {
+                      console.log("Error removing assignees:", e.message);
+                    }
+                  }
+
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    body: `⚠️ @${userObj.username} exceeded the maximum limit of ${maxAllowed} open claimed issues for **ECSoC'26**. This issue has been automatically unassigned and is now **open for anyone to claim**!`
+                  });
+                }
+              }
+            }
+
+      - name: Progressive Inactivity Reminders & Unassign (Day 2, Day 3, Day 4)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const twoDaysMs = 2 * 24 * 60 * 60 * 1000;
+            const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+            const fourDaysMs = 4 * 24 * 60 * 60 * 1000;
+            const now = new Date();
+
+            const isBotComment = (c) => c.user && (c.user.type === 'Bot' || (c.user.login && c.user.login.endsWith('[bot]')));
+
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'ECSoC26',
+              state: 'open',
+              per_page: 100
+            });
+
+            for (const issue of issues) {
+              if (issue.pull_request) continue;
+
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                per_page: 100
+              });
+
+              const botComments = comments.filter(c =>
+                isBotComment(c) && c.body && (
+                  c.body.includes("thanks for your interest in contributing under *ECSoC'26*") ||
+                  c.body.includes("open for anyone to claim")
+                )
+              );
+
+              if (botComments.length > 0) {
+                const lastBotComment = botComments[botComments.length - 1];
+                if (!lastBotComment.body.includes("open for anyone to claim")) {
+                  const claimDate = new Date(lastBotComment.created_at);
+                  const ageMs = now - claimDate;
+                  const match = lastBotComment.body.match(/Hi @([a-zA-Z0-9-]+)/);
+                  const claimer = match ? match[1] : (issue.assignees[0] ? issue.assignees[0].login : null);
+
+                  if (!claimer) continue;
+
+                  // Check 1: Recent comment activity by claimer after claiming
+                  const userHasRecentActivity = comments.some(c => {
+                    if (!c.user || isBotComment(c)) return false;
+                    if (c.user.login.toLowerCase() === claimer.toLowerCase()) {
+                      const commentDate = new Date(c.created_at);
+                      return commentDate > claimDate;
+                    }
+                    return false;
+                  });
+
+                  if (userHasRecentActivity) {
+                    console.log(`Skipping inactivity check for issue #${issue.number}: Claimer @${claimer} has posted updates since claiming.`);
+                    continue;
+                  }
+
+                  // Check 2: Linked PR check via timeline cross-references
+                  let prLinked = false;
+                  try {
+                    const events = await github.paginate(github.rest.issues.listEventsForTimeline, {
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issue.number,
+                      per_page: 100
+                    });
+
+                    prLinked = events.some(e =>
+                      e.event === 'cross-referenced' && e.source && e.source.issue && e.source.issue.pull_request
+                    );
+                  } catch (e) {
+                    console.log(`Could not check timeline for issue #${issue.number}:`, e.message);
+                  }
+
+                  if (prLinked) {
+                    console.log(`Skipping inactivity check for issue #${issue.number}: A PR is linked to this issue.`);
+                    continue;
+                  }
+
+                  const hasDay2Reminder = comments.some(c => isBotComment(c) && c.body && (c.body.includes("Friendly reminder") || c.body.includes("2 days ago")));
+                  const hasDay3Reminder = comments.some(c => isBotComment(c) && c.body && (c.body.includes("Second reminder") || c.body.includes("3 days ago")));
+
+                  if (ageMs >= fourDaysMs) {
+                    // Day 4: Unassign
+                    if (issue.assignees.length > 0) {
+                      try {
+                        await github.rest.issues.removeAssignees({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          issue_number: issue.number,
+                          assignees: issue.assignees.map(a => a.login)
+                        });
+                      } catch (e) {
+                        console.log("Error removing assignees:", e.message);
+                      }
+                    }
+
+                    await github.rest.issues.createComment({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issue.number,
+                      body: `⏰ @${claimer} has held this issue for more than 4 days without submitting a PR or posting updates. It has been automatically unassigned and is now **open for anyone to claim**!`
+                    });
+                  } else if (ageMs >= threeDaysMs && !hasDay3Reminder) {
+                    // Day 3: Second reminder
+                    await github.rest.issues.createComment({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issue.number,
+                      body: `⚠️ **Second reminder for @${claimer}**: You claimed this issue 3 days ago. If you are working on it, please post a quick update or link your PR! Otherwise, this issue will be automatically unassigned in 24 hours.`
+                    });
+                  } else if (ageMs >= twoDaysMs && !hasDay2Reminder && !hasDay3Reminder) {
+                    // Day 2: Friendly reminder
+                    await github.rest.issues.createComment({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issue.number,
+                      body: `👋 **Friendly reminder for @${claimer}**: You claimed this issue 2 days ago! Please let us know if you need any help or if you have an update on your progress.`
+                    });
+                  }
+                }
+              }
+            }
+
+      - name: Auto-close Stale PRs (Open for 72+ hours)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const seventyTwoHoursMs = 72 * 60 * 60 * 1000;
+            const now = new Date();
+            console.log("Checking for PRs open for 72 hours or more...");
+
+            const openPRs = await github.paginate(github.rest.pulls.list, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100
+            });
+
+            for (const pr of openPRs) {
+              const createdAt = new Date(pr.created_at);
+              const ageMs = now - createdAt;
+
+              if (ageMs >= seventyTwoHoursMs) {
+                const author = pr.user ? pr.user.login : 'contributor';
+                console.log(`Closing PR #${pr.number} (open for ${Math.round(ageMs / (1000 * 60 * 60))} hours)...`);
+
+                try {
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: pr.number,
+                    body: `⏰ @${author}, this Pull Request has been open for 72 hours or more without being merged. It has been automatically closed due to inactivity, and the task is unassigned and open for anyone to claim!`
+                  });
+                } catch (e) {
+                  console.log(`Error posting comment on PR #${pr.number}:`, e.message);
+                }
+
+                try {
+                  await github.rest.pulls.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: pr.number,
+                    state: 'closed'
+                  });
+                } catch (e) {
+                  console.log(`Error closing PR #${pr.number}:`, e.message);
+                }
+              }
+            }
+
+  pr-conflict-reminder:
+    permissions:
+      issues: write
+      pull-requests: write
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const isBotComment = (c) => c.user && (c.user.type === 'Bot' || (c.user.login && c.user.login.endsWith('[bot]')));
+            const eightHoursMs = 7.5 * 60 * 60 * 1000; // Buffer for 8-hour cron schedule jitter
+            const now = new Date();
+
+            let prs = [];
+            if (context.eventName === 'pull_request_target') {
+              if (context.payload.pull_request) {
+                prs = [context.payload.pull_request];
+              }
+            } else {
+              prs = await github.paginate(github.rest.pulls.list, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                per_page: 100
+              });
+            }
+
+            for (const pr of prs) {
+              if (pr.state !== 'open') continue;
+
+              // Fetch detailed PR object to get mergeable status
+              let prDetail;
+              try {
+                prDetail = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number
+                });
+
+                // GitHub calculates mergeability asynchronously; retry up to 3 times if null
+                let retries = 0;
+                while (prDetail.data.mergeable === null && retries < 3) {
+                  await new Promise(resolve => setTimeout(resolve, 2000));
+                  prDetail = await github.rest.pulls.get({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: pr.number
+                  });
+                  retries++;
+                }
+              } catch (err) {
+                console.log(`Error fetching details for PR #${pr.number}:`, err.message);
+                continue;
+              }
+
+              // Check if PR has merge conflicts
+              const hasConflict = prDetail.data.mergeable === false || prDetail.data.mergeable_state === 'dirty';
+              if (!hasConflict) {
+                console.log(`PR #${pr.number} does not have merge conflicts.`);
+                continue;
+              }
+
+              const author = pr.user ? pr.user.login : null;
+
+              // Check existing comments on the PR to enforce 6-hour reminder interval
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                per_page: 100
+              });
+
+              const conflictBotComments = comments.filter(c =>
+                isBotComment(c) && c.body && (
+                  c.body.includes("merge conflicts") ||
+                  c.body.includes("resolve them")
+                )
+              );
+
+              if (conflictBotComments.length > 0) {
+                const lastComment = conflictBotComments[conflictBotComments.length - 1];
+                const lastCommentTime = new Date(lastComment.created_at);
+                if ((now - lastCommentTime) < eightHoursMs) {
+                  console.log(`Skipping PR #${pr.number}: Merge conflict reminder already posted within the last 8 hours.`);
+                  continue;
+                }
+              }
+
+              // Post reminder comment
+              console.log(`Posting merge conflict reminder on PR #${pr.number}...`);
+              try {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  body: `⚠️ ${author ? `@${author}` : 'Contributor'}, this Pull Request has **merge conflicts** that need to be resolved before it can be merged. Please resolve the conflicts with the target branch!`
+                });
+              } catch (err) {
+                console.log(`Failed to post comment on PR #${pr.number}:`, err.message);
+              }
+            }

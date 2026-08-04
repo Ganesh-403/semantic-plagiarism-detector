@@ -4,11 +4,8 @@ import numpy as np
 import pytest
 
 import src.core.embedding_model as embedding_model
-from src.core.embedding_model import (
-    embed_chunks,
-    embed_documents,
-    get_document_embedding,
-)
+from src.core.embedding_model import (EmbeddingModelManager, embed_chunks,
+                                      embed_documents, get_document_embedding)
 
 
 def _mock_encode(
@@ -34,6 +31,14 @@ def test_embed_chunks_shape(mock_model):
 def test_embed_chunks_empty():
     result = embed_chunks([])
     assert result.size == 0
+
+def test_embed_empty_text(mock_model):
+    """Test embedding a single empty string."""
+
+    result = embedding_model.embed_chunks([""])
+
+    assert result.shape == (1, 384)
+    assert result.dtype == np.float32
 
 
 def test_embed_chunks_returns_float32(mock_model):
@@ -98,3 +103,72 @@ def test_get_model_uses_environment_override(monkeypatch):
 
     assert result is model
     sentence_transformer.assert_called_once_with("distiluse-base-multilingual-cased-v2")
+
+
+def test_embedding_model_manager_fallback(caplog, monkeypatch):
+    """Test that EmbeddingModelManager falls back to lightweight model and logs a warning on failure."""
+    import logging
+
+    monkeypatch.setattr(embedding_model, "_model", None)
+    monkeypatch.setattr(EmbeddingModelManager, "_instance", None)
+
+    primary = embedding_model._get_model_name()
+    fallback = "all-MiniLM-L6-v2"
+
+    def mock_sentence_transformer(model_name):
+        if model_name == primary:
+            raise RuntimeError("Failed to load primary model")
+        return MagicMock()
+
+    monkeypatch.setattr(embedding_model, "SentenceTransformer", mock_sentence_transformer)
+
+    with caplog.at_level(logging.WARNING):
+        manager = EmbeddingModelManager.get_instance()
+        model = manager.get_model()
+
+        assert model is not None
+        # Verify the warning was logged
+        assert any(
+            f"Primary embedding model {primary} unavailable. Falling back to {fallback}" in record.message
+            for record in caplog.records
+        )
+
+
+def test_embedding_model_device_logging(caplog, monkeypatch):
+    """Test that EmbeddingModelManager logs device selection when initializing the model."""
+    import logging
+
+    monkeypatch.setattr(embedding_model, "_model", None)
+    monkeypatch.setattr(EmbeddingModelManager, "_instance", None)
+
+    mock_model_obj = MagicMock()
+    mock_model_obj.device = "cpu"
+
+    monkeypatch.setattr(
+        embedding_model, "SentenceTransformer", MagicMock(return_value=mock_model_obj)
+    )
+
+    with caplog.at_level(logging.INFO):
+        manager = EmbeddingModelManager.get_instance()
+        model = manager.get_model()
+
+        assert model is mock_model_obj
+        expected_log = "Initializing SentenceTransformer model [paraphrase-multilingual-MiniLM-L12-v2] on device [cpu]"
+        assert any(
+            expected_log in record.message for record in caplog.records
+        ), f"Expected device log message not found in: {[r.message for r in caplog.records]}"
+
+
+def test_detect_device_helper():
+    """Test _detect_device helper logic for string device, typed device, and fallback."""
+    mock_obj = MagicMock()
+    mock_obj.device = "cuda"
+    assert embedding_model._detect_device(mock_obj) == "cuda"
+
+    mock_obj_device_type = MagicMock()
+    mock_dev = MagicMock()
+    mock_dev.type = "mps"
+    mock_obj_device_type.device = mock_dev
+    assert embedding_model._detect_device(mock_obj_device_type) == "mps"
+
+    assert embedding_model._detect_device(None) in ("cpu", "cuda", "mps")

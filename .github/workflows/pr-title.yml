@@ -1,0 +1,25 @@
+# Semantic PR Title Lint Workflow
+#
+# Validates that every pull request title follows the Conventional Commits
+# specification (e.g. feat:, fix:, chore:).  Non-conforming titles cause
+# this check to fail, blocking the PR from merging until the title is corrected.
+
+name: PR Title Lint
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  validate-title:
+    name: Validate PR Title
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check PR title format
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

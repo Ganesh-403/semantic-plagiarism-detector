@@ -1,51 +1,129 @@
 """
-auth.py
--------
-SQLite-backed authentication with bcrypt password hashing.
-
-Public API
-----------
-init_db()                            → create tables + seed default admin
-verify_user(username, password)      → bool
-get_user_role(username)              → str | None
-add_user(username, password, role)   → None
-get_all_users()                      → list[dict]
-delete_user(username)                → None
-update_password(username, password)  → None
-get_tour_completed(username)         → bool
-set_tour_completed(username, completed) → None
-check_login_rate_limit(username)   → tuple[bool, str | None]
-record_failed_login(username)      → None
-clear_login_attempts(username)     → None
+src/db/auth.py
+--------------
+SQLite-backed authentication with Argon2 password hashing (via argon2-cffi),
+automatic transparent migration from legacy bcrypt hashes, user login tracking,
+and strong password complexity policies.
 """
 
-import os
-import sqlite3
+from __future__ import annotations
+
+import datetime
 import json
+import logging
+import os
+import re
+import sqlite3
+from datetime import datetime as dt, timezone
+
 import bcrypt
+from argon2 import PasswordHasher
+from argon2.exceptions import VerificationError, VerifyMismatchError
 
+from src.core.app_config import AUTH_DB_PATH
 from src.db.migrations import migrate_auth_database
+from src.errors import StaleDataException
+import logging
 
-_DB_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "users.db")
-)
+logger = logging.getLogger(__name__)
+
+_DB_PATH = os.path.abspath(str(AUTH_DB_PATH))
 
 VALID_ROLES = {"admin", "teacher"}
 
+PASSWORD_COMPLEXITY_REGEX = re.compile(
+    r"^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_\-#^()+=\[\]{}|:<>,./~\\])[A-Za-z\d@$!%*?&_\-#^()+=\[\]{}|:<>,./~\\]{8,}$"
+)
+
+_ph = PasswordHasher()
+
+
+def configure_db_path(db_path: str | os.PathLike) -> None:
+    """Configure the SQLite database path used by the authentication module."""
+    global _DB_PATH
+    _DB_PATH = os.path.abspath(os.fspath(db_path))
+
 
 def _connect() -> sqlite3.Connection:
-    return sqlite3.connect(_DB_PATH, check_same_thread=False)
+    return sqlite3.connect(_DB_PATH, timeout=15.0, check_same_thread=False)
+
+
+def log_security_event(
+    event_type: str,
+    username: str,
+    details: str | None = None,
+) -> None:
+    """Record a security-relevant event in the security_audit_log table."""
+    timestamp = datetime.datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    try:
+        with _connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO security_audit_log (event_type, username, timestamp, details)
+                VALUES (?, ?, ?, ?)
+                """,
+                (event_type, username, timestamp, details),
+            )
+            conn.commit()
+    except Exception as exc:
+        logger.warning(
+            "Failed to write security audit log entry [%s, %s]: %s",
+            event_type,
+            username,
+            exc,
+        )
+
+
+def get_security_audit_logs(
+    username: str | None = None,
+    event_type: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[dict]:
+    """Retrieve security audit log entries with limit, offset, and optional filters."""
+    if limit < 0 or offset < 0:
+        raise ValueError("Limit and offset must be non-negative integers.")
+
+    query = (
+        "SELECT id, event_type, username, timestamp, details FROM security_audit_log"
+    )
+    params: list = []
+    conditions: list[str] = []
+
+    if username:
+        conditions.append("username = ?")
+        params.append(username.lower())
+    if event_type:
+        conditions.append("event_type = ?")
+        params.append(event_type)
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    query += " ORDER BY id DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+
+    try:
+        with _connect() as conn:
+            rows = conn.execute(query, params).fetchall()
+            return [
+                {
+                    "id": r[0],
+                    "event_type": r[1],
+                    "username": r[2],
+                    "timestamp": r[3],
+                    "details": r[4],
+                }
+                for r in rows
+            ]
+    except sqlite3.Error as e:
+        logger.error(f"Failed to query security audit logs: {e}")
+        return []
 
 
 def _hash_password(password: str) -> str:
-    """Return a bcrypt hash for the given password."""
-    try:
-        return bcrypt.hashpw(
-            password.encode(),
-            bcrypt.gensalt()
-        ).decode()
-    finally:
-        password = "REDACTED"
+    """Return an Argon2 hash for the given password."""
+    return _ph.hash(password)
 
 
 def _validate_username(username: str) -> str:
@@ -56,13 +134,27 @@ def _validate_username(username: str) -> str:
 
 
 def _validate_password(password: str) -> str:
-    try:
-        password = str(password)
-        if len(password.strip()) < 5:
-            raise ValueError("Password must be at least 5 characters long.")
-        return password
-    finally:
-        password = "REDACTED"
+    """Basic validation for authentication checks."""
+    password = str(password)
+    if not password:
+        raise ValueError("Password cannot be empty.")
+    return password
+
+
+def _validate_password_complexity(password: str) -> str:
+    """Enforce strong password policy for user creation and password updates."""
+    password = str(password)
+    if len(password) < 8:
+        raise ValueError("Password must be at least 8 characters long.")
+    if not re.search(r"[A-Z]", password):
+        raise ValueError("Password must contain at least one uppercase letter.")
+    if not re.search(r"\d", password):
+        raise ValueError("Password must contain at least one number.")
+    if not re.search(r"[@$!%*?&_\-#^()+=\[\]{}|:<>,./~\\]", password):
+        raise ValueError(
+            "Password must contain at least one special character (e.g. @$!%*?&)."
+        )
+    return password
 
 
 def _validate_role(role: str) -> str:
@@ -72,153 +164,134 @@ def _validate_role(role: str) -> str:
     return role
 
 
-def init_db() -> None:
-
-    """Create users table and seed default admin if not exists."""
-    conn = _connect()
-    try:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id       INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT    UNIQUE NOT NULL,
-                password TEXT    NOT NULL,
-                role     TEXT    NOT NULL DEFAULT 'teacher',
-                tour_completed INTEGER DEFAULT 0
-            )
-        """)
-        conn.commit()
-
-        cursor = conn.execute("PRAGMA table_info(users)")
-        columns = [row[1] for row in cursor.fetchall()]
-
-        if "tour_completed" not in columns:
-            conn.execute(
-                "ALTER TABLE users ADD COLUMN tour_completed INTEGER DEFAULT 0"
-            )
-            conn.commit()
-
-        exists = conn.execute(
-            "SELECT 1 FROM users WHERE username = ?", ("admin",)
-        ).fetchone()
-
-    """Create or upgrade users.db and seed the default administrator."""
+def _record_login_timestamp(username: str) -> None:
+    """Update last_login_at timestamp for a given user."""
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with _connect() as conn:
-        migrate_auth_database(conn)
-
-        row = conn.execute(
-            "SELECT COUNT(1) FROM users WHERE username = ?",
-            ("admin",),
-        ).fetchone()
-        exists = bool(row and row[0])
-
-
-        if not exists:
-            hashed = _hash_password("admin123")
-            conn.execute(
-                """
-                INSERT INTO users (username, password, role)
-                VALUES (?, ?, ?)
-                """,
-                ("admin", hashed, "admin"),
-            )
-
-
+        conn.execute(
+            "UPDATE users SET last_login_at = ? WHERE username = ?",
+            (now_str, username),
+        )
         conn.commit()
 
-            conn.commit()
 
+def init_db() -> None:
+    """Create or upgrade users.db and seed default administrator accounts."""
+    try:
+        with _connect() as conn:
+            migrate_auth_database(conn)
 
+            row = conn.execute(
+                "SELECT COUNT(1) FROM users WHERE username = ?",
+                ("admin",),
+            ).fetchone()
+            exists = bool(row and row[0])
+
+            if not exists:
+                hashed = _hash_password("Admin123!")
+                conn.execute(
+                    """
+                    INSERT INTO users (username, password, role)
+                    VALUES (?, ?, ?)
+                    """,
+                    ("admin", hashed, "admin"),
+                )
+                conn.commit()
     except sqlite3.Error as e:
-        conn.rollback()
-        raise sqlite3.Error(
-            f"Failed to initialize authentication database: {e}"
-        ) from e
-    finally:
-        conn.close()
+        raise sqlite3.Error(f"Failed to initialize authentication database: {e}") from e
+
+    try:
+        os.chmod(_DB_PATH, 0o600)
+    except OSError:
+        pass
 
 
 def verify_user(username: str, password: str) -> bool:
-    """Return True if username exists and password matches the stored hash."""
-
-    conn = _connect()
-    try:
-        row = conn.execute(
-            "SELECT password FROM users WHERE username = ?", (username.lower(),)
-        ).fetchone()
-
+    """Return True if username exists, account is active, and password matches."""
     try:
         username = _validate_username(username)
         password = _validate_password(password)
+    except ValueError:
+        return False
 
-        with _connect() as conn:
-            row = conn.execute(
-                "SELECT password FROM users WHERE username = ?",
-                (username,),
-            ).fetchone()
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT password, is_active FROM users WHERE username = ?",
+            (username,),
+        ).fetchone()
 
+    if not row:
+        return False
 
-        if not row:
+    stored_hash, is_active = row
+    if not is_active:
+        return False
+
+    if stored_hash.startswith("$argon2"):
+        try:
+            _ph.verify(stored_hash, password)
+            if _ph.check_needs_rehash(stored_hash):
+                hashed = _hash_password(password)
+                with _connect() as conn_rehash:
+                    conn_rehash.execute(
+                        "UPDATE users SET password = ? WHERE username = ?",
+                        (hashed, username),
+                    )
+                    conn_rehash.commit()
+            _record_login_timestamp(username)
+            return True
+        except (VerifyMismatchError, VerificationError):
             return False
 
-        return bcrypt.checkpw(password.encode(), row[0].encode())
+    if stored_hash.startswith(("$2a$", "$2b$", "$2y$")):
+        try:
+            if bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8")):
+                hashed = _hash_password(password)
+                with _connect() as conn_migrate:
+                    conn_migrate.execute(
+                        "UPDATE users SET password = ? WHERE username = ?",
+                        (hashed, username),
+                    )
+                    conn_migrate.commit()
+                _record_login_timestamp(username)
+                return True
+        except ValueError:
+            return False
+
+    return False
 
 
-    except sqlite3.Error as e:
-        raise sqlite3.Error(f"Failed to verify user: {e}") from e
-    finally:
-        conn.close()
-
-    finally:
-        password = "REDACTED"
-
-
-# Alias for compatibility
 authenticate_user = verify_user
-
 
 
 def get_user_role(username: str) -> str | None:
     """Return the role of a user, or None if not found."""
-
-    conn = _connect()
     try:
-
-    username = _validate_username(username)
-
-    with _connect() as conn:
-
-        row = conn.execute(
-            "SELECT role FROM users WHERE username = ?",
-            (username,),
-        ).fetchone()
-
-
-        return row[0] if row else None
-
+        username = _validate_username(username)
+        with _connect() as conn:
+            row = conn.execute(
+                "SELECT role FROM users WHERE username = ?",
+                (username,),
+            ).fetchone()
+            return row[0] if row else None
     except sqlite3.Error as e:
         raise sqlite3.Error(f"Failed to retrieve user role: {e}") from e
-    finally:
-        conn.close()
 
 
-def add_user(username: str, password: str, role: str = "teacher") -> None:
-    """Insert a new user with a bcrypt-hashed password."""
-
-    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt(10)).decode()
-
-    conn = _connect()
+def get_user_roles(user_ids: list[int]) -> dict[int, str]:
+    """Return a mapping of user_id -> role for the given user IDs."""
+    if not user_ids:
+        return {}
     try:
-
-    hashed = _hash_password(password)
-    with _connect() as conn:
-
-        conn.execute(
-            "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-            (username.lower(), hashed, role),
-        )
-        conn.commit()
-
-    return row[0] if row else None
+        placeholders = ",".join("?" for _ in user_ids)
+        with _connect() as conn:
+            rows = conn.execute(
+                f"SELECT id, role FROM users WHERE id IN ({placeholders})",
+                user_ids,
+            ).fetchall()
+            return {row[0]: row[1] for row in rows}
+    except sqlite3.Error as e:
+        raise sqlite3.Error(f"Failed to batch query user roles: {e}") from e
 
 
 def add_user(username: str, password: str, role: str = "teacher") -> None:
@@ -227,111 +300,77 @@ def add_user(username: str, password: str, role: str = "teacher") -> None:
         username = _validate_username(username)
         password = _validate_password(password)
         role = _validate_role(role)
-
         hashed = _hash_password(password)
-
         with _connect() as conn:
-            # The UNIQUE constraint is the source of truth. Existing callers and
-            # tests rely on sqlite3.IntegrityError for duplicate usernames.
             conn.execute(
                 "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
                 (username, hashed, role),
             )
             conn.commit()
-    finally:
-        password = "REDACTED"
-
-
     except sqlite3.IntegrityError as e:
-        conn.rollback()
         raise ValueError(f"Username '{username}' already exists.") from e
-
     except sqlite3.Error as e:
-        conn.rollback()
         raise sqlite3.Error(f"Failed to add user: {e}") from e
-
-    finally:
-        conn.close()
 
 
 def get_all_users() -> list:
     """Return all users as a list of dicts (excludes password hashes)."""
-    conn = _connect()
     try:
-        rows = conn.execute(
-            "SELECT id, username, role FROM users ORDER BY id"
-        ).fetchall()
-
-        return [{"id": r[0], "username": r[1], "role": r[2]} for r in rows]
-
+        with _connect() as conn:
+            rows = conn.execute(
+                "SELECT id, username, role, is_active, version FROM users ORDER BY id"
+            ).fetchall()
+            return [
+                {
+                    "id": r[0],
+                    "username": r[1],
+                    "role": r[2],
+                    "is_active": bool(r[3]),
+                    "version": r[4],
+                }
+                for r in rows
+            ]
     except sqlite3.Error as e:
         raise sqlite3.Error(f"Failed to retrieve users: {e}") from e
 
-    finally:
-        conn.close()
-
-    return [
-        {
-            "id": row[0],
-            "username": row[1],
-            "role": row[2],
-        }
-        for row in rows
-    ]
-
-
 
 def delete_user(username: str) -> None:
-    """Delete a user by username."""
-
-    conn = _connect()
+    """Delete a user and their associated authorization records by username."""
     try:
-        conn.execute(
-            "DELETE FROM users WHERE username = ?",
-            (username.lower(),),
+        username = _validate_username(username)
+        with _connect() as conn:
+            conn.execute("DELETE FROM users WHERE username = ?", (username,))
+            conn.execute(
+                "DELETE FROM security_audit_log WHERE username = ?", (username,)
+            )
 
-    username = _validate_username(username)
+            for table_name in ("user_sessions", "authorization_tokens"):
+                if table_exists(conn, table_name):
+                    conn.execute(
+                        f"DELETE FROM {table_name} WHERE username = ?",
+                        (username,),
+                    )
 
-    with _connect() as conn:
-        conn.execute(
-            "DELETE FROM users WHERE username = ?",
-            (username,),
-
-        )
-        conn.commit()
-
+            conn.commit()
     except sqlite3.Error as e:
-        conn.rollback()
         raise sqlite3.Error(f"Failed to delete user: {e}") from e
 
-    finally:
-        conn.close()
 
-
-def update_password(username: str, new_password: str) -> None:
-    """Update a user's password with a new bcrypt hash."""
-
-
-    hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt(10)).decode()
-
-    conn = _connect()
-    try:
-
-    hashed = _hash_password(new_password)
-    with _connect() as conn:
-
-        conn.execute(
-            "UPDATE users SET password = ? WHERE username = ?",
-            (hashed, username.lower()),
-        )
-        conn.commit()
+def update_password(
+    username: str, new_password: str, current_user: str | None = None
+) -> None:
+    """Update a user's password with a new Argon2 hash."""
+    if current_user and current_user != username:
+        if get_user_role(current_user) != "admin":
+            raise PermissionError(
+                "Unauthorized password modifications for foreign user_ids"
+            )
 
     try:
         username = _validate_username(username)
         new_password = _validate_password(new_password)
 
         with _connect() as conn:
-            # Optimized check using COUNT(1) for #185
             cursor = conn.execute(
                 "SELECT COUNT(1) FROM users WHERE username = ?",
                 (username,),
@@ -340,68 +379,59 @@ def update_password(username: str, new_password: str) -> None:
                 raise ValueError("User not found.")
 
             hashed = _hash_password(new_password)
-            conn.execute(
-                "UPDATE users SET password = ? WHERE username = ?",
-                (hashed, username),
+            password_changed_at = dt.now(timezone.utc).isoformat()
+            cursor = conn.execute(
+                """
+                UPDATE users
+                SET password = ?,
+                    password_changed_at = ?
+                WHERE username = ?
+                """,
+                (
+                    hashed,
+                    password_changed_at,
+                    username,
+                ),
             )
+            if cursor.rowcount != 1:
+                raise ValueError("User not found.")
             conn.commit()
-    finally:
-        new_password = "REDACTED"
 
-
+        log_security_event(
+            event_type="password_change",
+            username=username,
+            details="Password updated successfully.",
+        )
     except sqlite3.Error as e:
-        conn.rollback()
         raise sqlite3.Error(f"Failed to update password: {e}") from e
-
-    finally:
-        conn.close()
 
 
 def get_tour_completed(username: str) -> bool:
     """Return whether a user has completed the onboarding tour."""
-
-    conn = _connect()
     try:
-        row = conn.execute(
-            "SELECT tour_completed FROM users WHERE username = ?",
-            (username.lower(),),
-        ).fetchone()
-
-        return bool(row[0]) if row else False
-
+        username = _validate_username(username)
+        with _connect() as conn:
+            row = conn.execute(
+                "SELECT tour_completed FROM users WHERE username = ?",
+                (username,),
+            ).fetchone()
+            return bool(row[0]) if row else False
     except sqlite3.Error as e:
         raise sqlite3.Error(f"Failed to retrieve tour status: {e}") from e
-
-    finally:
-        conn.close()
-
-    username = _validate_username(username)
-
-    with _connect() as conn:
-        row = conn.execute(
-            "SELECT tour_completed FROM users WHERE username = ?",
-            (username,),
-        ).fetchone()
-
-    return bool(row[0]) if row else False
-
 
 
 def set_tour_completed(username: str, completed: bool = True) -> None:
     """Mark a user as having completed the onboarding tour."""
-
-    conn = _connect()
     try:
-
-    username = _validate_username(username)
-
-    with _connect() as conn:
-
-        conn.execute(
-            "UPDATE users SET tour_completed = ? WHERE username = ?",
-            (1 if completed else 0, username),
-        )
-        conn.commit()
+        username = _validate_username(username)
+        with _connect() as conn:
+            conn.execute(
+                "UPDATE users SET tour_completed = ? WHERE username = ?",
+                (1 if completed else 0, username),
+            )
+            conn.commit()
+    except sqlite3.Error as e:
+        raise sqlite3.Error(f"Failed to update tour status: {e}") from e
 
 
 def get_2fa_status(username: str) -> tuple[bool, str | None]:
@@ -426,14 +456,6 @@ def enable_2fa(username: str, secret: str) -> None:
         conn.commit()
 
 
-    except sqlite3.Error as e:
-        conn.rollback()
-        raise sqlite3.Error(f"Failed to update tour status: {e}") from e
-
-    finally:
-        conn.close()
-
-
 def disable_2fa(username: str) -> None:
     """Disable 2FA for a user and clear their OTP secret."""
     with _connect() as conn:
@@ -446,38 +468,40 @@ def disable_2fa(username: str) -> None:
 
 def check_login_rate_limit(username: str) -> tuple[bool, str | None]:
     """Check if username is rate limited. Returns (is_allowed, error_message)."""
-    from src.utils.redis_cache import is_login_locked_out, get_login_attempts
-    
+    from src.utils.redis_cache import get_login_attempts, is_login_locked_out
+
     identifier = username.lower()
     if is_login_locked_out(identifier):
         attempts = get_login_attempts(identifier)
-        return False, f"Account locked due to too many failed attempts. Please try again in 15 minutes. ({attempts}/5 attempts)"
+        return (
+            False,
+            f"Account locked due to too many failed attempts. Please try again in 15 minutes. ({attempts}/5 attempts)",
+        )
     return True, None
 
 
 def record_failed_login(username: str) -> None:
     """Record a failed login attempt for rate limiting."""
     from src.utils.redis_cache import increment_login_attempts
-    identifier = username.lower()
-    increment_login_attempts(identifier)
+
+    increment_login_attempts(username.lower())
 
 
 def clear_login_attempts(username: str) -> None:
     """Clear failed login attempts after successful login."""
     from src.utils.redis_cache import clear_login_attempts as redis_clear_login_attempts
-    identifier = username.lower()
-    redis_clear_login_attempts(identifier)
+
+    redis_clear_login_attempts(username.lower())
+
 
 def get_user_preferences(username: str) -> dict:
     """Return user preferences as a dictionary, or empty dict if none exist."""
-    username = _validate_username(username)
-
+    username = username.lower()
     with _connect() as conn:
         row = conn.execute(
             "SELECT preferences FROM users WHERE username = ?",
             (username,),
         ).fetchone()
-
     if row and row[0]:
         try:
             return json.loads(row[0])
@@ -488,9 +512,8 @@ def get_user_preferences(username: str) -> dict:
 
 def update_user_preferences(username: str, preferences: dict) -> None:
     """Serialize and update user preferences in the database."""
-    username = _validate_username(username)
+    username = username.lower()
     prefs_str = json.dumps(preferences)
-
     with _connect() as conn:
         conn.execute(
             "UPDATE users SET preferences = ? WHERE username = ?",
@@ -498,3 +521,260 @@ def update_user_preferences(username: str, preferences: dict) -> None:
         )
         conn.commit()
 
+
+def get_notification_preferences(username: str) -> dict:
+    """Return user notification preferences dict with defaults."""
+    username = _validate_username(username)
+    prefs = get_user_preferences(username)
+    email_val = prefs.get("email_notifications", True)
+    webhook_val = prefs.get("webhook_notifications", True)
+
+    if type(email_val) is not bool:
+        email_val = True
+    if type(webhook_val) is not bool:
+        webhook_val = True
+
+    return {
+        "email_notifications": email_val,
+        "webhook_notifications": webhook_val,
+    }
+
+
+def update_notification_preferences(
+    username: str,
+    email_notifications: bool = True,
+    webhook_notifications: bool = True,
+) -> dict:
+    """Update notification preferences for a user."""
+    if type(email_notifications) is not bool:
+        raise TypeError("email_notifications must be a boolean")
+    if type(webhook_notifications) is not bool:
+        raise TypeError("webhook_notifications must be a boolean")
+
+    username = _validate_username(username)
+    prefs = get_user_preferences(username)
+    prefs["email_notifications"] = email_notifications
+    prefs["webhook_notifications"] = webhook_notifications
+    update_user_preferences(username, prefs)
+    return prefs
+
+
+def get_user_theme(username: str) -> str:
+    """Return the user's theme preference (default 'light')."""
+    username = username.lower()
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT theme FROM users WHERE username = ?",
+            (username,),
+        ).fetchone()
+        return row[0] if row else "light"
+
+
+def set_user_theme(username: str, theme: str) -> None:
+    """Update the user's theme preference."""
+    username = username.lower()
+    if theme not in ("light", "dark"):
+        theme = "light"
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE users SET theme = ? WHERE username = ?",
+            (theme, username),
+        )
+        conn.commit()
+
+
+def get_or_create_sso_user(email: str, default_role: str = "teacher") -> str:
+    """Finds a user by email (as username) or creates a new one for SSO."""
+    username = _validate_username(email)
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT role FROM users WHERE username = ?",
+            (username,),
+        ).fetchone()
+        if row:
+            return row[0]
+        hashed = _hash_password("!")
+        role = _validate_role(default_role)
+        conn.execute(
+            "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+            (username, hashed, role),
+        )
+        conn.commit()
+        return role
+
+
+def get_user_active_status(username: str) -> bool:
+    """Return whether a user account is active."""
+    try:
+        username = _validate_username(username)
+        with _connect() as conn:
+            row = conn.execute(
+                "SELECT is_active FROM users WHERE username = ?",
+                (username,),
+            ).fetchone()
+            return bool(row[0]) if row else False
+    except sqlite3.Error as e:
+        raise sqlite3.Error(f"Failed to retrieve user active status: {e}") from e
+
+
+def set_user_active_status(username: str, is_active: bool) -> None:
+    """Set whether a user account is active (suspended or active)."""
+    try:
+        username = _validate_username(username)
+        with _connect() as conn:
+            if username == "admin" and not is_active:
+                raise ValueError("The admin account cannot be suspended.")
+            conn.execute(
+                "UPDATE users SET is_active = ? WHERE username = ?",
+                (1 if is_active else 0, username),
+            )
+            conn.commit()
+    except sqlite3.Error as e:
+        raise sqlite3.Error(f"Failed to update user active status: {e}") from e
+
+
+def update_user_profile(
+    username: str,
+    role: str,
+    is_active: bool,
+    expected_version: int,
+) -> None:
+    """Update a user's role and active status with optimistic locking.
+
+    Args:
+        username: The user to update.
+        role: The new role.
+        is_active: Active status.
+        expected_version: Expected database version.
+
+    Raises:
+        StaleDataException: If database version != expected_version.
+        ValueError: If user not found or suspension check fails.
+    """
+    username = _validate_username(username)
+    role = _validate_role(role)
+    is_active_val = 1 if is_active else 0
+
+    if username == "admin" and not is_active:
+        raise ValueError("The admin account cannot be suspended.")
+
+    try:
+        with _connect() as conn:
+            row = conn.execute(
+                "SELECT version FROM users WHERE username = ?",
+                (username,),
+            ).fetchone()
+
+            if not row:
+                raise ValueError("User not found.")
+
+            current_version = row[0]
+            if current_version != expected_version:
+                raise StaleDataException(
+                    f"Conflict detected: User profile updated by another process. "
+                    f"Expected version {expected_version}, but database has version {current_version}."
+                )
+
+            cursor = conn.execute(
+                """
+                UPDATE users
+                SET role = ?,
+                    is_active = ?,
+                    version = version + 1
+                WHERE username = ? AND version = ?
+                """,
+                (role, is_active_val, username, expected_version),
+            )
+            if cursor.rowcount == 0:
+                raise StaleDataException(
+                    "Conflict detected: User profile was updated concurrently."
+                )
+            conn.commit()
+    except sqlite3.Error as e:
+        raise sqlite3.Error(f"Failed to update user profile: {e}") from e
+
+
+def is_user_active(username: str) -> bool:
+    """Return True if username exists and is_active is 1, or if username does not exist yet."""
+    try:
+        username = _validate_username(username)
+        with _connect() as conn:
+            row = conn.execute(
+                "SELECT is_active FROM users WHERE username = ?",
+                (username,),
+            ).fetchone()
+            return bool(row[0]) if row else True
+    except sqlite3.Error:
+        return True
+
+
+def get_user_count() -> int:
+    """Returns the total number of registered users in the system."""
+    with _connect() as conn:
+        cursor = conn.execute("SELECT COUNT(*) FROM users")
+        row = cursor.fetchone()
+        return row[0] if row else 0
+
+
+def get_active_users_count() -> int:
+    """Return the total number of active users in the database."""
+    with _connect() as conn:
+        cursor = conn.execute("SELECT COUNT(*) FROM users WHERE is_active = 1")
+        row = cursor.fetchone()
+        return row[0] if row else 0
+
+
+def format_user_created_date(iso_str: str) -> str:
+    """Format an ISO date string as a human-readable date (e.g. "Jul 28, 2026")."""
+    if not iso_str or not isinstance(iso_str, str):
+        return "Unknown"
+
+    iso_str = iso_str.strip()
+    if not iso_str:
+        return "Unknown"
+
+    try:
+        from dateutil import parser as dateutil_parser
+
+        dt_obj = dateutil_parser.parse(iso_str)
+        return dt_obj.strftime("%b %d, %Y")
+    except Exception:
+        pass
+
+    cleaned = iso_str.rstrip("Z")
+    for parser_fn in (
+        dt.fromisoformat,
+        lambda s: dt.strptime(s, "%Y-%m-%d"),
+        lambda s: dt.strptime(s, "%Y-%m-%d %H:%M:%S"),
+        lambda s: dt.strptime(s, "%Y-%m-%dT%H:%M:%S"),
+    ):
+        try:
+            dt_obj = parser_fn(cleaned)
+            return dt_obj.strftime("%b %d, %Y")
+        except Exception:
+            continue
+
+    return "Unknown"
+
+
+def get_upload_count(username: str | None = None) -> int:
+    """Return total number of uploads for a user or system-wide."""
+    try:
+        with _connect() as conn:
+            if username:
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM security_audit_log WHERE username = ? AND event_type = 'file_upload'",
+                    (username.lower(),),
+                )
+            else:
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM security_audit_log WHERE event_type = 'file_upload'"
+                )
+    except sqlite3.Error:
+        return 0
+
+
+from src.utils.redis_cache import (
+    increment_upload_count,
+    is_upload_rate_limited,
+)

@@ -1,7 +1,280 @@
+# filepath: .github/dependabot.yml
+# ==============================================================================
+# DEPENDABOT CONFIGURATION
+# ==============================================================================
+# Security requirement: Restrict Dependabot to patch-level and security updates only
+# to prevent automated major/minor version upgrades from breaking the CI/CD pipeline.
+# Implements: versioning-strategy: increase-if-necessary and extensive ignore rules.
+
 version: 2
 updates:
-  # Check for updates to Python dependencies (pip)
+  # ----------------------------------------------------------------------------
+  # 1. PYTHON DEPENDENCIES (PIP)
+  # ----------------------------------------------------------------------------
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "monthly"
+      day: "monday"
+      timezone: "UTC"
+    versioning-strategy: increase-if-necessary
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "python"
+      - "security"
+    ignore:
+      # Ignore all major and minor updates globally to ensure strict patch-only
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # Explicit overrides for highly volatile scientific packages
+      - dependency-name: "numpy"
+        versions: ["> 1.20.0"]
+      - dependency-name: "pandas"
+        versions: ["> 1.5.0"]
+      - dependency-name: "scikit-learn"
+        versions: ["> 1.0.0"]
+      - dependency-name: "faiss-cpu"
+        versions: ["> 1.7.0"]
+      - dependency-name: "sentence-transformers"
+        versions: ["> 2.2.0"]
+      - dependency-name: "torch"
+        versions: ["> 2.0.0"]
+      - dependency-name: "streamlit"
+        versions: ["> 1.20.0"]
+    commit-message:
+      prefix: "fix(deps):"
+      include: "scope"
+
+  # ----------------------------------------------------------------------------
+  # 2. GITHUB ACTIONS
+  # ----------------------------------------------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "tuesday"
+      timezone: "UTC"
+    versioning-strategy: increase-if-necessary
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci-cd"
+    ignore:
+      # Ignore major/minor updates for actions
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "actions/checkout"
+        versions: ["> 3.0.0"]
+      - dependency-name: "actions/setup-python"
+        versions: ["> 4.0.0"]
+      - dependency-name: "docker/build-push-action"
+        versions: ["> 4.0.0"]
+    commit-message:
+      prefix: "ci(deps):"
+      include: "scope"
+
+  # ----------------------------------------------------------------------------
+  # 3. DOCKER
+  # ----------------------------------------------------------------------------
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "wednesday"
+      timezone: "UTC"
+    versioning-strategy: increase-if-necessary
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "docker"
+    ignore:
+      # Ignore major/minor updates for base images
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "python"
+        versions: ["> 3.11"]
+      - dependency-name: "ubuntu"
+        versions: ["> 22.04"]
+      - dependency-name: "redis"
+        versions: ["> 7.0"]
+      - dependency-name: "postgres"
+        versions: ["> 15.0"]
+    commit-message:
+      prefix: "chore(docker):"
+      include: "scope"
+
+  # ----------------------------------------------------------------------------
+  # 4. NODE.JS (NPM / FRONTEND TOOLING IF APPLICABLE)
+  # ----------------------------------------------------------------------------
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "thursday"
+      timezone: "UTC"
+    versioning-strategy: increase-if-necessary
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "javascript"
+    ignore:
+      # Ignore major/minor updates
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "react"
+        versions: ["> 18.0.0"]
+      - dependency-name: "react-dom"
+        versions: ["> 18.0.0"]
+      - dependency-name: "typescript"
+        versions: ["> 5.0.0"]
+      - dependency-name: "eslint"
+        versions: ["> 8.0.0"]
+      - dependency-name: "prettier"
+        versions: ["> 3.0.0"]
+    commit-message:
+      prefix: "fix(ui-deps):"
+      include: "scope"
+
+  # ----------------------------------------------------------------------------
+  # 5. TERRAFORM (INFRASTRUCTURE AS CODE)
+  # ----------------------------------------------------------------------------
+  - package-ecosystem: "terraform"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "friday"
+      timezone: "UTC"
+    versioning-strategy: increase-if-necessary
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "iac"
+    ignore:
+      # Ignore major/minor updates to prevent destructive infra changes
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "hashicorp/aws"
+        versions: ["> 5.0.0"]
+      - dependency-name: "hashicorp/google"
+        versions: ["> 5.0.0"]
+    commit-message:
+      prefix: "chore(iac):"
+      include: "scope"
+
+  # ----------------------------------------------------------------------------
+  # 6. RUST (CARGO IF APPLICABLE EXTENSIONS)
+  # ----------------------------------------------------------------------------
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "saturday"
+      timezone: "UTC"
+    versioning-strategy: increase-if-necessary
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "rust"
+    ignore:
+      # Ignore major/minor updates
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "serde"
+        versions: ["> 1.0.0"]
+      - dependency-name: "tokio"
+        versions: ["> 1.0.0"]
+    commit-message:
+      prefix: "fix(cargo):"
+      include: "scope"
+
+  # ----------------------------------------------------------------------------
+  # 7. GO MODULES (GOMOD IF APPLICABLE MICROSERVICES)
+  # ----------------------------------------------------------------------------
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "sunday"
+      timezone: "UTC"
+    versioning-strategy: increase-if-necessary
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "go"
+    ignore:
+      # Ignore major/minor updates
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "github.com/gin-gonic/gin"
+        versions: ["> 1.9.0"]
+      - dependency-name: "github.com/stretchr/testify"
+        versions: ["> 1.8.0"]
+    commit-message:
+      prefix: "fix(go):"
+      include: "scope"
+
+  # ----------------------------------------------------------------------------
+  # 8. RUBY GEMS (BUNDLER IF APPLICABLE TOOLS)
+  # ----------------------------------------------------------------------------
+  - package-ecosystem: "bundler"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      timezone: "UTC"
+    versioning-strategy: increase-if-necessary
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ruby"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+    commit-message:
+      prefix: "chore(gems):"
+      include: "scope"
+
+  # ----------------------------------------------------------------------------
+  # 9. JAVA (MAVEN IF APPLICABLE INTEGRATIONS)
+  # ----------------------------------------------------------------------------
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "tuesday"
+      timezone: "UTC"
+    versioning-strategy: increase-if-necessary
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "java"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "org.springframework.boot:spring-boot-starter"
+        versions: ["> 3.0.0"]
+    commit-message:
+      prefix: "fix(maven):"
+      include: "scope"
+
+  # ----------------------------------------------------------------------------
+  # 10. COMPOSER (PHP IF APPLICABLE PLUGINS)
+  # ----------------------------------------------------------------------------
+  - package-ecosystem: "composer"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "wednesday"
+      timezone: "UTC"
+    versioning-strategy: increase-if-necessary
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "php"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+    commit-message:
+      prefix: "chore(composer):"
+      include: "scope"

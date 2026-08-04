@@ -7,10 +7,13 @@ semantic space.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import asdict, dataclass
 from typing import Callable, Iterable
 
-from langdetect import DetectorFactory, LangDetectException, detect
+from langdetect import DetectorFactory, LangDetectException, detect_langs
+
+logger = logging.getLogger(__name__)
 
 from src.core.translator import translate_text
 
@@ -42,39 +45,140 @@ def _normalise_language_code(language: str | None) -> str:
     return code.split("-", 1)[0] or "unknown"
 
 
-def detect_language(text: str) -> str:
-    """Detect an ISO 639-1 language code.
+def detect_language(text: str, min_confidence: float = 0.8) -> tuple[str, bool]:
+    """Detect an ISO 639-1 language code and return a (detected_lang, is_confident) tuple.
 
-    Empty, very short, numeric, or otherwise undetectable text returns
-    ``"unknown"`` instead of raising an exception.
+    Empty, very short, numeric, or otherwise undetectable text defaults to
+    "en" with is_confident=False instead of raising an exception.
     """
     cleaned = " ".join(str(text or "").split())
     if len(cleaned) < MIN_DETECTION_CHARACTERS:
-        return "unknown"
+        return "en", False
 
     if not any(character.isalpha() for character in cleaned):
-        return "unknown"
+        return "en", False
 
     try:
-        return _normalise_language_code(detect(cleaned))
-    except (LangDetectException, ValueError, TypeError):
-        return "unknown"
+        langs = detect_langs(cleaned)
+        if not langs:
+            return "en", False
+        top_lang = langs[0]
+        detected_lang = _normalise_language_code(top_lang.lang)
+        confidence = top_lang.prob
+
+        if confidence < 0.7:
+            logger.warning(
+                "Low language detection confidence (%.2f) for input text snippet",
+                confidence,
+            )
+
+        if confidence < min_confidence:
+            logger.warning(
+                "Low-confidence language detection (%.4f < %.2f) for text: %s. Defaulting to 'en'.",
+                confidence,
+                min_confidence,
+                cleaned[:50]
+            )
+            return "en", False
+
+        return detected_lang, True
+    except (LangDetectException, ValueError, TypeError) as e:
+        logger.warning("Language detection failed: %s. Defaulting to 'en'.", e)
+        return "en", False
+
+
+def translate_to_english(
+    text: str,
+    *,
+    detector: Callable[[str], str | tuple[str, bool]] | None = None,
+    translator: Callable[..., str] | None = None,
+) -> dict[str, str | float]:
+    """Translates source text into English and returns confidence alongside metadata.
+
+    Returns:
+        dict: {
+            "translated_text": str,
+            "source_language": str,
+            "confidence": float
+        }
+    """
+    original_text = str(text or "")
+    if not original_text.strip():
+        return {
+            "translated_text": original_text,
+            "source_language": "en",
+            "confidence": 1.0,
+        }
+
+    detector_fn = detector or detect_language
+    translator_fn = translator or translate_text
+
+    source_lang = "en"
+    confidence = 1.0
+
+    try:
+        cleaned = " ".join(original_text.split())
+        if len(cleaned) >= MIN_DETECTION_CHARACTERS and any(c.isalpha() for c in cleaned):
+            langs = detect_langs(cleaned)
+            if langs:
+                top_lang = langs[0]
+                source_lang = _normalise_language_code(top_lang.lang)
+                confidence = float(top_lang.prob)
+    except Exception:
+        res = detector_fn(original_text)
+        if isinstance(res, tuple):
+            source_lang, _ = res
+        else:
+            source_lang = res
+        source_lang = _normalise_language_code(source_lang)
+
+    # If text is already in English, return confidence = 1.0
+    if source_lang in ENGLISH_CODES or source_lang == "unknown":
+        return {
+            "translated_text": original_text,
+            "source_language": "en" if source_lang in ENGLISH_CODES else source_lang,
+            "confidence": 1.0,
+        }
+
+    # Perform translation for non-English source text
+    try:
+        translated_text = translator_fn(
+            original_text,
+            target_lang="en",
+            source_lang=source_lang,
+        )
+    except TypeError:
+        try:
+            translated_text = translator_fn(original_text, target_lang="en")
+        except Exception:
+            translated_text = original_text
+            confidence = 0.0
+    except Exception:
+        translated_text = original_text
+        confidence = 0.0
+
+    translated_text_str = str(translated_text or "").strip()
+    if not translated_text_str or translated_text_str.lower().startswith("(translation error"):
+        return {
+            "translated_text": original_text,
+            "source_language": source_lang,
+            "confidence": 0.0,
+        }
+
+    return {
+        "translated_text": translated_text_str,
+        "source_language": source_lang,
+        "confidence": round(confidence, 4),
+    }
 
 
 def prepare_text_for_embedding(
     text: str,
     *,
-    detector: Callable[[str], str] | None = None,
+    detector: Callable[[str], str | tuple[str, bool]] | None = None,
     translator: Callable[..., str] | None = None,
 ) -> dict[str, object]:
-    """Prepare one source paragraph for English-aligned embedding.
-
-    Parameters are injectable to make behaviour deterministic in tests and to
-    avoid network translation calls during unit tests.
-
-    The returned ``original_text`` always matches the input.  When translation
-    fails, ``embedding_text`` safely falls back to the original text.
-    """
+    """Prepare one source paragraph for English-aligned embedding."""
     original_text = str(text or "")
     if not original_text.strip():
         return PreparedText(
@@ -88,9 +192,14 @@ def prepare_text_for_embedding(
     translator_fn = translator or translate_text
 
     try:
-        language = _normalise_language_code(detector_fn(original_text))
+        res = detector_fn(original_text)
+        if isinstance(res, tuple):
+            detected_lang, _ = res
+        else:
+            detected_lang = res
+        language = _normalise_language_code(detected_lang)
     except Exception:
-        language = "unknown"
+        language = "en"
 
     if language in ENGLISH_CODES or language == "unknown":
         return PreparedText(
@@ -107,8 +216,6 @@ def prepare_text_for_embedding(
             source_lang=language,
         )
     except TypeError:
-        # Backward compatibility with the repository's previous translator
-        # signature: translate_text(text, target_lang="en").
         try:
             translated_text = translator_fn(original_text, target_lang="en")
         except Exception:
@@ -141,12 +248,7 @@ def prepare_text_for_embedding(
 def prepare_chunks_for_embedding(
     chunks: Iterable[str],
 ) -> tuple[list[str], list[dict[str, object]]]:
-    """Prepare a sequence of chunks while preserving original display text.
-
-    Returns:
-        ``(embedding_chunks, metadata)`` where ``embedding_chunks`` contains
-        English-aligned text and ``metadata`` records language/translation state.
-    """
+    """Prepare a sequence of chunks while preserving original display text."""
     embedding_chunks: list[str] = []
     metadata: list[dict[str, object]] = []
 
