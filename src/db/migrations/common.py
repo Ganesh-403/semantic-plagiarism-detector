@@ -390,3 +390,70 @@ def verify_schema_integrity(db_path: Path, expected_tables: List[str]) -> bool:
         
     return is_valid
    
+
+def rollback_migration(
+    connection: sqlite3.Connection,
+    *,
+    down_migrations: Mapping[int, Migration],
+    target_version: int,
+) -> int:
+    """Roll back schema migrations sequentially and atomically.
+
+    Executes registered down-migration DDL scripts for each version
+    decrement, then restores the schema version integer.
+
+    Args:
+        connection: An open SQLite connection.
+        down_migrations: Mapping of version number -> callable that
+            reverts the schema FROM that version TO version-1.
+        target_version: The desired schema version after rollback.
+
+    Returns:
+        The new schema version (should equal target_version).
+
+    Raises:
+        RuntimeError: If target_version > current version or a down-migration
+            definition is missing.
+    """
+    target = int(target_version)
+    current = get_user_version(connection)
+
+    if current < target:
+        raise RuntimeError(
+            f"Cannot rollback from version {current} to higher version {target}."
+        )
+
+    if current == target:
+        logger.info(
+            "Database already at version %d -- no rollback needed.", current
+        )
+        return current
+
+    expected_versions = set(range(target + 1, current + 1))
+    missing_definitions = sorted(expected_versions.difference(down_migrations))
+    if missing_definitions:
+        raise RuntimeError(
+            "Down-migration definitions are missing for versions: "
+            + ", ".join(map(str, missing_definitions))
+        )
+
+    with migration_transaction(connection):
+        for version in range(current, target, -1):
+            down_fn = down_migrations[version]
+            down_name = getattr(down_fn, "__name__", f"v{version}_down")
+            start_time = time.perf_counter()
+            down_fn(connection)
+            elapsed_sec = time.perf_counter() - start_time
+            logger.info(
+                "Rollback migration [%s] executed in %.3f seconds.",
+                down_name,
+                elapsed_sec,
+            )
+            set_user_version(connection, version - 1)
+
+    logger.info(
+        "Database rollback from version %d to %d completed successfully.",
+        current,
+        target,
+    )
+    return target

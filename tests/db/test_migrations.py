@@ -31,7 +31,7 @@ def test_fresh_corpus_database_reaches_latest_version(tmp_path):
         assert index_exists(connection, "idx_documents_class_section")
         assert index_exists(connection, "idx_chunks_filename")
         assert index_exists(connection, "idx_incidents_status")
-assert index_exists(connection, "idx_documents_created_at")
+    assert index_exists(connection, "idx_documents_created_at")
         assert index_exists(connection, "idx_incidents_severity_time")
 
 def test_fresh_auth_database_reaches_latest_version(tmp_path):
@@ -401,4 +401,135 @@ def test_check_table_exists():
         connection.execute("CREATE TABLE test_table (id INTEGER)")
         assert check_table_exists(connection, "test_table") is True
     finally:
-        connection.close()
+        connection.close()
+
+
+def test_rollback_migration_restores_previous_version():
+    """Verify successful rollback of a test migration (issue #1358)."""
+    connection = sqlite3.connect(":memory:")
+
+    def migration_up(conn: sqlite3.Connection) -> None:
+        conn.execute("CREATE TABLE rollback_test (id INTEGER PRIMARY KEY, name TEXT)")
+        conn.execute("INSERT INTO rollback_test (name) VALUES (\'before\')")
+
+    def migration_down(conn: sqlite3.Connection) -> None:
+        conn.execute("DROP TABLE rollback_test")
+
+    try:
+        run_migrations(
+            connection,
+            migrations={1: migration_up},
+            target_version=1,
+        )
+        assert get_user_version(connection) == 1
+        assert table_exists(connection, "rollback_test")
+
+        rollback_migration(
+            connection,
+            down_migrations={1: migration_down},
+            target_version=0,
+        )
+        assert get_user_version(connection) == 0
+        assert not table_exists(connection, "rollback_test")
+    finally:
+        connection.close()
+
+
+def test_rollback_migration_no_op_when_already_at_target():
+    """Rollback to current version should be a no-op."""
+    connection = sqlite3.connect(":memory:")
+
+    def migration_up(conn: sqlite3.Connection) -> None:
+        conn.execute("CREATE TABLE noop_test (id INTEGER)")
+
+    try:
+        run_migrations(
+            connection,
+            migrations={1: migration_up},
+            target_version=1,
+        )
+        result = rollback_migration(
+            connection,
+            down_migrations={1: lambda c: None},
+            target_version=1,
+        )
+        assert result == 1
+        assert table_exists(connection, "noop_test")
+    finally:
+        connection.close()
+
+
+def test_rollback_migration_fails_when_target_higher_than_current():
+    """Rollback to a version higher than current must raise RuntimeError."""
+    connection = sqlite3.connect(":memory:")
+
+    try:
+        run_migrations(
+            connection,
+            migrations={1: lambda c: c.execute("CREATE TABLE t (id INTEGER)")},
+            target_version=1,
+        )
+        with pytest.raises(RuntimeError, match="Cannot rollback from version 1 to higher version 5"):
+            rollback_migration(
+                connection,
+                down_migrations={},
+                target_version=5,
+            )
+    finally:
+        connection.close()
+
+
+def test_rollback_migration_fails_on_missing_down_definition():
+    """Rollback must raise RuntimeError if a down-migration is missing."""
+    connection = sqlite3.connect(":memory:")
+
+    def up_1(conn: sqlite3.Connection) -> None:
+        conn.execute("CREATE TABLE a (id INTEGER)")
+
+    def up_2(conn: sqlite3.Connection) -> None:
+        conn.execute("CREATE TABLE b (id INTEGER)")
+
+    try:
+        run_migrations(
+            connection,
+            migrations={1: up_1, 2: up_2},
+            target_version=2,
+        )
+        with pytest.raises(RuntimeError, match="Down-migration definitions are missing for versions: 2"):
+            rollback_migration(
+                connection,
+                down_migrations={1: lambda c: c.execute("DROP TABLE a")},
+                target_version=1,
+            )
+    finally:
+        connection.close()
+
+
+def test_failed_rollback_migration_is_atomic():
+    """A failed down-migration must not partially modify schema or version."""
+    connection = sqlite3.connect(":memory:")
+
+    def up_1(conn: sqlite3.Connection) -> None:
+        conn.execute("CREATE TABLE atomic_test (id INTEGER)")
+
+    def bad_down_1(conn: sqlite3.Connection) -> None:
+        conn.execute("DROP TABLE atomic_test")
+        raise RuntimeError("intentional rollback failure")
+
+    try:
+        run_migrations(
+            connection,
+            migrations={1: up_1},
+            target_version=1,
+        )
+        with pytest.raises(RuntimeError, match="intentional rollback failure"):
+            rollback_migration(
+                connection,
+                down_migrations={1: bad_down_1},
+                target_version=0,
+            )
+
+        assert get_user_version(connection) == 1
+        assert table_exists(connection, "atomic_test")
+    finally:
+        connection.close()
