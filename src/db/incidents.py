@@ -865,8 +865,8 @@ def purge_old_incidents(
             """,
             (status, days_old),
         )
-conn.commit()
-        return cursor.rowcount
+    conn.commit()
+    return cursor.rowcount
 
 
 def archive_old_incidents(

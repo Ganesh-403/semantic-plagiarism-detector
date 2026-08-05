@@ -72,5 +72,9 @@
   "warn_summary_severity_label": "**Gravité :**",
   "warn_summary_similarity_label": "**Similitude :**",
   "warn_summary_title": "# 🔍 Résumé du Rapport de Plagiat",
-  "warn_summary_words_matched": "{count} mots correspondants"
+  "warn_summary_words_matched": "{count} mots correspondants",
+  "pdf_document_name": "Nom du document",
+  "pdf_similarity_score": "Score de similitude",
+  "pdf_severity_rank": "Rang de gravité",
+  "pdf_detection_threshold": "Seuil de détection"
 }

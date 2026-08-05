@@ -192,6 +192,16 @@ ISO_639_LANGUAGES: dict[str, dict[str, str]] = {
     "zu": {"name": "Zulu", "native": "isiZulu"},
 }
 
+def validate_target_language_code(lang_code: str) -> bool:
+    """Validates if lang_code is a valid ISO 639-1 language code.
+
+    Raises:
+        ValueError: If lang_code is invalid or not supported.
+    """
+    if not isinstance(lang_code, str) or lang_code.lower() not in ISO_639_LANGUAGES:
+        raise ValueError(f"Unsupported target language code: {lang_code}")
+    return True
+
 # Simple lookup map from ISO code to English name
 LANGUAGE_NAME_MAP: dict[str, str] = {
     code: info["name"] for code, info in ISO_639_LANGUAGES.items()
@@ -221,6 +231,8 @@ def translate_text(
     original = str(text)
     if not original.strip():
         return original
+
+    validate_target_language_code(target_lang)
 
     try:
         translated = GoogleTranslator(

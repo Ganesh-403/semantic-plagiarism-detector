@@ -7,7 +7,12 @@ Unit tests for the i18n translation engine.
 import json
 import os
 from unittest.mock import patch
+import pytest
+import importlib
+import src.core.translator
 
+
+from src.core.translator import validate_target_language_code
 from src.i18n.translator import _I18N_DIR, _SUPPORTED_LANGUAGES, _translations, get_text
 
 # A key that genuinely exists in the English translations
@@ -304,3 +309,21 @@ def test_get_common_translation_pairs():
     assert len(pairs) >= 5
     assert ("es", "en") in pairs
     assert ("fr", "en") in pairs
+
+def test_validate_target_language_code_valid():
+    """Test that valid ISO 639-1 language codes return True."""
+    
+
+    assert validate_target_language_code("en") is True
+    assert validate_target_language_code("es") is True
+    assert validate_target_language_code("fr") is True
+
+
+def test_validate_target_language_code_invalid():
+    """Test that an unsupported language code raises ValueError with the exact expected message."""
+
+    invalid_code = "xyz"
+    with pytest.raises(
+        ValueError, match=f"Unsupported target language code: {invalid_code}"
+    ):
+        validate_target_language_code(invalid_code)

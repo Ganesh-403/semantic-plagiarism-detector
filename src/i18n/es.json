@@ -29,7 +29,7 @@
   "pdf_document_name": "Nombre del Documento",
   "pdf_similarity_score": "Puntuación de Similitud",
   "pdf_severity_rank": "Nivel de Gravedad",
-  "pdf_detection_threshold": "Umbral de Detección"
+  "pdf_detection_threshold": "Umbral de Detección",
   "warn_ai_prob": "🤖 Prob. IA: {doc_a}: {ai_a:.1%} | {doc_b}: {ai_b:.1%}",
   "warn_ascending": "Ascendente ▲",
   "warn_col_doc_a": "Documento A",
