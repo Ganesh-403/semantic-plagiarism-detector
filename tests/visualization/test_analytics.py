@@ -173,7 +173,6 @@ def test_plot_similarity_boxplot_fallback_keys():
 
     assert len(fig.data) == 1
     assert list(fig.data[0].y) == [0.9, 0.5]
-import plotly.graph_objects as go
 
 from src.visualization.analytics import plot_similarity_histogram
 

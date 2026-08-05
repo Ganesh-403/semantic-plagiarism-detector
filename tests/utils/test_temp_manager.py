@@ -1,3 +1,4 @@
+import shutil
 """
 tests/utils/test_temp_manager.py
 --------------------------------
@@ -12,7 +13,7 @@ Includes tests for:
 
 import os
 import tempfile
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from src.utils.temp_manager import (
     cleanup_registered_temp_paths,

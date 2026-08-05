@@ -9,9 +9,7 @@ alignment on common documents, hover annotations, class tag filters, and static 
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
 import pytest
 from matplotlib.figure import Figure
 

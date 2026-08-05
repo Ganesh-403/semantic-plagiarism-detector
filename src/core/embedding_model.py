@@ -27,7 +27,6 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 import torch
 
-from src.core.config import EMBEDDING_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
 

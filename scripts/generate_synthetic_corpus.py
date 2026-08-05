@@ -24,12 +24,11 @@ Acceptance Criteria (Issue #1376):
 import argparse
 import json
 import logging
-import os
 import random
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List
 
 # Add project root to path for potential future imports
 ROOT_DIR = Path(__file__).resolve().parent.parent

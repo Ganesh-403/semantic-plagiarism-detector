@@ -18,7 +18,6 @@ from src.visualization.network_graph import (
     build_network_data,
     calculate_force_directed_layout,
     plot_plagiarism_network_graph,
-    plot_similarity_network,
 )
 
 

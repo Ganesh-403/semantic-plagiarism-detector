@@ -137,7 +137,7 @@ def _validate_incident(flag: Mapping[str, Any]) -> tuple[bool, str]:
 
 
 def _fetch_all_incidents(conn: sqlite3.Connection) -> list[MatchResult]:
-    from src.db.schemas import MatchResult
+    pass
 
 def _validate_pagination(limit: int, offset: int) -> tuple[int, int]:
     """Validate and normalize SQL pagination arguments."""

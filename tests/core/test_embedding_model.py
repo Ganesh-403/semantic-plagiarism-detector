@@ -13,8 +13,7 @@ Validates:
 - Edge cases (empty inputs, single chunks, massive batches)
 """
 
-from unittest.mock import MagicMock, patch, call
-import gc
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest

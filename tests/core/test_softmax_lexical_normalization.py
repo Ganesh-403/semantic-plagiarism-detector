@@ -8,7 +8,6 @@ strict [0.0, 1.0] output boundedness, edge cases, matrix vectorization, and prop
 
 from __future__ import annotations
 
-import math
 import numpy as np
 import pandas as pd
 import pytest

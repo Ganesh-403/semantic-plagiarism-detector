@@ -6,8 +6,6 @@ import requests
 
 from src.core.webhook import send_plagiarism_alert
 
-import hmac
-import hashlib
 import json
 import time
 

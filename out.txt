@@ -1,0 +1,128 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.14, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\Rathod milan\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\python.exe
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: C:\Users\Rathod milan\.gemini\antigravity-ide\scratch\semantic-plagiarism-detector
+configfile: pytest.ini
+plugins: anyio-4.14.2, Faker-33.1.0, hypothesis-6.161.5, asyncio-1.4.0, cov-7.1.0, django-4.12.0, split-0.11.0, xdist-3.8.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 10 items
+
+tests/security/test_metadata_stripper.py::test_strip_pdf_javascript_removes_open_action PASSED [ 10%]
+tests/security/test_metadata_stripper.py::test_strip_exif_metadata_size_within_limit PASSED [ 20%]
+tests/security/test_metadata_stripper.py::test_strip_exif_metadata_size_exceeds_default_limit PASSED [ 30%]
+tests/security/test_metadata_stripper.py::test_strip_exif_metadata_size_exceeds_custom_limit PASSED [ 40%]
+tests/security/test_metadata_stripper.py::test_strip_exif_metadata_exactly_at_custom_limit PASSED [ 50%]
+tests/security/test_metadata_stripper.py::test_strip_image_metadata_dimension_safety_limit_width PASSED [ 60%]
+tests/security/test_metadata_stripper.py::test_strip_image_metadata_dimension_safety_limit_height PASSED [ 70%]
+tests/security/test_metadata_stripper.py::test_strip_image_metadata_dimension_exactly_at_limit PASSED [ 80%]
+tests/security/test_metadata_stripper.py::test_strip_palette_image_preserves_colors PASSED [ 90%]
+tests/security/test_metadata_stripper.py::test_strip_image_metadata_decompression_bomb PASSED [100%]
+ERROR: Coverage failure: total of 7 is less than fail-under=80
+
+
+============================== warnings summary ===============================
+tests/security/test_metadata_stripper.py::test_strip_image_metadata_dimension_exactly_at_limit
+  C:\Users\Rathod milan\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\PIL\Image.py:3578: DecompressionBombWarning: Image size (100000000 pixels) exceeds limit of 50000000 pixels, could be decompression bomb DOS attack.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=============================== tests coverage ================================
+______________ coverage: platform win32, python 3.13.14-final-0 _______________
+
+Name                                   Stmts   Miss Branch BrPart  Cover   Missing
+----------------------------------------------------------------------------------
+app\__init__.py                            0      0      0      0   100%
+app\components\__init__.py                 0      0      0      0   100%
+app\components\bulk_export.py             23     23     10      0     0%   1-41
+app\components\faiss_results.py           55     55     16      0     0%   8-158
+app\components\incident_export.py         38     38      4      0     0%   1-96
+app\components\time_breakdown.py          13     13      2      0     0%   1-17
+app\css_constants.py                     122    122      0      0     0%   12-208
+app\streamlit_app.py                    1372   1372    440      0     0%   1-3145
+app\theme.py                             280    280     68      0     0%   1-1875
+src\__init__.py                           14      2      0      0    86%   88-89
+src\api\__init__.py                        2      2      0      0     0%   7-9
+src\api\app.py                           281    281     66      0     0%   3-922
+src\api\middleware.py                     47     47     20      0     0%   1-111
+src\api\schemas.py                        66     66      0      0     0%   3-174
+src\asgi_app.py                          121    121     30      0     0%   7-262
+src\cli.py                               238    238     84      0     0%   7-440
+src\core\__init__.py                      11      0      0      0   100%
+src\core\ai_detector.py                  161    161     62      0     0%   18-476
+src\core\app_config.py                    40     19      2      0    50%   94-95, 103-104, 113, 118-122, 127-131, 141-144
+src\core\concurrency.py                   61     45     10      0    23%   25-30, 37-45, 49-53, 57-75, 79-84, 96-101
+src\core\config.py                       138     77     34      4    38%   39-44, 64-65, 78-97, 106, 123-157, 173-175, 187-188, 230, 242, 246, 248, 256-265, 274-280, 288-290, 298-307, 315, 320-337, 342
+src\core\cross_lingual.py                129    129     34      0     0%   8-275
+src\core\document_parser.py              881    766    278      0    10%   31-33, 46-48, 92-104, 109, 117-128, 171-182, 190-193, 214-233, 238-247, 256, 266-274, 289-296, 306-337, 350-367, 374-392, 406-409, 416-422, 429-456, 461-464, 469-492, 497-499, 504-506, 517-550, 561-604, 609-628, 637-642, 652-701, 711, 727-810, 830-836, 846-885, 894-983, 988-1017, 1022-1057, 1062-1081, 1094-1129, 1134-1182, 1198-1243, 1266-1273, 1278-1307, 1312-1337, 1342-1345, 1359-1394, 1399-1425, 1432-1465, 1495-1527, 1540-1601, 1620, 1625, 1630-1638, 1654-1687, 1692-1719
+src\core\document_parser_upstream.py     734    734    224      0     0%   3-1385
+src\core\embedding_model.py              110     84     32      0    18%   41-69, 74, 79, 86-87, 97-99, 103-133, 138, 163-200, 222-265, 278-280
+src\core\embeddings.py                    40     40     18      0     0%   8-129
+src\core\export_engine.py                124    124     24      0     0%   3-365
+src\core\faiss_index.py                  245    223     92      0     7%   47-50, 53-54, 81-130, 155-181, 202-241, 267-298, 324-345, 362-377, 382-383, 388-390, 407-449, 456-461, 469-494, 513-564
+src\core\faiss_indexer.py                 34     34     18      0     0%   7-64
+src\core\lexical_similarity.py           179    179     50      0     0%   16-695
+src\core\logging_config.py                 5      5      0      0     0%   1-8
+src\core\metrics.py                       61     61      4      0     0%   8-168
+src\core\processing.py                    66     66     24      0     0%   9-147
+src\core\similarity.py                   305    278    138      0     6%   31-45, 57-82, 110-139, 160-198, 209, 222-239, 249-288, 311-318, 333-350, 360-378, 407-427, 450-495, 509-522, 550-567, 586-607, 619-620, 631, 653-673, 709-773
+src\core\synchronization.py               53     53     10      0     0%   1-98
+src\core\tag_manager.py                   86     68     40      0    14%   40-70, 84-93, 109-118, 130-147, 159-175, 193, 211-223
+src\core\telemetry.py                     81     81      6      0     0%   1-141
+src\core\text_chunking.py                163    149     82      0     6%   32-56, 64-66, 76-89, 119-204, 242-285, 309-361, 376-384
+src\core\translator.py                    84     68     40      0    13%   218-237, 249-252, 264-270, 282-288, 300-302, 311, 320, 332-338, 350-357, 369-375, 388-396, 405
+src\core\webhook.py                       98     69     22      0    24%   68-81, 86-89, 125-142, 178-216, 243-273, 298-355, 366
+src\core\worker.py                        48     48      4      0     0%   31-199
+src\db\__init__.py                        14      0      0      0   100%
+src\db\auth.py                           462    382    100      0    14%   44, 48, 57-69, 84-121, 126, 130-133, 138-141, 146-157, 161-164, 170-176, 181-207, 212-262, 270-279, 284-295, 301-315, 320-329, 343-361, 366-408, 414-426, 431-441, 443-453, 458-461, 469-472, 477-486, 494-497, 502-521, 526-531, 536-549, 564-572, 574-580, 588-594, 602-615, 620-632, 637-649, 673-711, 713-725, 727-733, 735-741, 743-781, 786-832, 834-861, 863-882
+src\db\common.py                          30     12      6      2    56%   42-45, 52->exit, 55-67
+src\db\corpus_db.py                      388    290     58      0    23%   37-38, 43, 61-63, 70-73, 80-82, 87-90, 95-249, 267-290, 295-299, 304-317, 337-353, 358-364, 369-378, 384-394, 400-415, 420-426, 446-465, 471, 477-493, 502-532, 538-547, 555-559, 564-573, 578-585, 602-606, 611-615, 620-622, 627-632, 638-678, 683-694, 699-707, 713-722, 727-745, 751-781, 786-793, 799-821, 832-854, 859-866, 871-875, 899-942
+src\db\database_backup.py                250    250     50      0     0%   33-776
+src\db\incidents.py                      319    251     70      0    17%   46, 50, 54-57, 61-69, 73-75, 79-95, 102-110, 116-136, 140, 144-152, 162-183, 209-297, 305-324, 340-352, 359-391, 398-417, 425-452, 458-478, 495-518, 522-538, 546-550, 565-585, 591-622, 631-660, 667-678, 683-688, 755-813, 841-869, 878-880, 891-913
+src\db\migrations\__init__.py              4      0      0      0   100%
+src\db\migrations\auth.py                 43     25     16      0    31%   16, 32-33, 45-49, 58, 65, 77-78, 90-91, 103-120, 132-133, 145-150, 162-163, 175-185, 213
+src\db\migrations\common.py              132    103     28      1    19%   19-20, 29-32, 55-60, 65-74, 79-80, 85-88, 96-130, 140-148, 158-197, 208-210, 215-227, 232-239, 244-256
+src\db\migrations\corpus.py               51     33     16      0    27%   16-26, 46-52, 59-71, 83-98, 108, 124-125, 135-136, 145-150, 159, 176-181, 193-197, 220-266, 293-294
+src\db\schemas.py                         52     10      0      0    81%   11-14, 17, 20, 23, 65, 69, 73
+src\db\translation_cache.py               88     88     10      0     0%   8-239
+src\errors.py                            111      9      0      0    92%   57, 68, 162-165, 183-185
+src\i18n\__init__.py                       2      2      0      0     0%   7-9
+src\i18n\translator.py                    47     47     12      0     0%   10-150
+src\security\__init__.py                   0      0      0      0   100%
+src\security\metadata_stripper.py         78     35     24      7    55%   26, 37-68, 86->89, 94->97, 104-106, 125-127, 130, 133->137, 134, 152->157, 153, 163-182
+src\security\mime_validator.py           113    113     44      0     0%   3-400
+src\security\rate_limiter.py              63     63      6      0     0%   1-178
+src\security\ssrf_protector.py           105     81     50      0    15%   58-79, 89-101, 126-200, 210
+src\utils\__init__.py                      3      0      0      0   100%
+src\utils\badge_generator.py             147    147     18      0     0%   8-406
+src\utils\bulk_export.py                 167    167     34      0     0%   19-499
+src\utils\daily_summary_email.py         120    120     32      0     0%   8-347
+src\utils\diff_highlighter.py             46     46     24      0     0%   2-108
+src\utils\excel_export.py                 92     92     26      0     0%   10-187
+src\utils\file_parser.py                  41     41     18      0     0%   9-148
+src\utils\filename.py                    126     95     40      0    19%   37-38, 46-60, 65, 80-131, 142-164, 174-185, 260-265, 273-275, 298-328, 339-343
+src\utils\google_drive.py                 93     93     34      0     0%   8-234
+src\utils\json_export.py                 112    112     62      0     0%   1-386
+src\utils\mock_data.py                    92     92     24      0     0%   18-255
+src\utils\pagination.py                   33     33      4      0     0%   3-94
+src\utils\pdf_highlighter.py              22     22     16      0     0%   7-48
+src\utils\pdf_report.py                  364    328     88      0     8%   39-40, 53-62, 67-73, 88-99, 109-114, 122-124, 132-175, 185-186, 189-190, 194-203, 206-209, 231-649, 669-695, 715-920, 940-1081, 1101-1113
+src\utils\processing_time.py             157    157     48      0     0%   9-362
+src\utils\redis_cache.py                 332    332     78      0     0%   10-539
+src\utils\sso.py                          53     53     18      0     0%   1-121
+src\utils\storage_metrics.py              82     82     32      0     0%   3-132
+src\utils\temp_manager.py                 84     84     26      0     0%   16-221
+src\utils\text_stats.py                  104     83     30      0    16%   31-36, 52-100, 115-123, 139-147, 164-169, 187, 199, 203, 209-211, 215-219, 224-247, 252-253, 258-259, 267-279, 287-308
+src\utils\version_check.py                46     46      4      0     0%   27-184
+src\utils\warning_list.py                278    278     96      0     0%   3-787
+src\utils\zip_processor.py                55     55     20      0     0%   1-134
+src\visualization\__init__.py              4      2      0      0    50%   10-23
+src\visualization\analytics.py           172    153     38      0     9%   41-44, 64-85, 96-147, 160-231, 248-300, 312-359, 380-451, 464-517, 532-577, 596-659
+src\visualization\heatmap.py             401    387    128      0     3%   33-1069
+src\visualization\network_graph.py       248    248    102      0     0%   8-824
+----------------------------------------------------------------------------------
+TOTAL                                  12435  11363   3518     14     7%
+Coverage XML written to file coverage.xml
+FAIL Required test coverage of 80% not reached. Total coverage: 6.87%
+================= 10 passed, 1 warning in 1296.05s (0:21:36) ==================
+<sys>:0: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002761A8EED40>

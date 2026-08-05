@@ -205,7 +205,7 @@ class CorruptedArchiveError(ValueError):
     """Raised when an uploaded zip file or inner archived document is corrupted."""
 
 
-class CorruptedArchiveError(ValueError):
+class CorruptedArchiveError(ValueError):  # noqa: F811
     """Raised when an uploaded ZIP file or inner archived document is corrupted."""
 
 
@@ -1345,7 +1345,7 @@ def extract_text_from_md(file: PDFInput) -> str:
     return strip_markdown_syntax(raw_text)
 
 
-def extract_text_from_zip(
+def extract_text_from_zip(  # noqa: F811
     file: PDFInput,
     *,
     ocr_language: str = DEFAULT_OCR_LANGUAGE,

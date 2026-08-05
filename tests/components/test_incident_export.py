@@ -5,7 +5,6 @@ Unit tests for app.components.incident_export module.
 """
 
 from unittest.mock import MagicMock, patch
-import pytest
 
 from app.components.incident_export import render_incident_export_panel
 

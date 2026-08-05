@@ -127,7 +127,7 @@ def calculate_processing_throughput(total_bytes: int, elapsed_seconds: float) ->
     if elapsed_seconds <= 0:
         return 0.0
 
-    total_kb = total_bytes / BYTES_PE # type: ignore 
+    total_kb = total_bytes / BYTES_PER_MB # type: ignore 
     throughput = total_kb / elapsed_seconds
     return round(throughput, 2)
 

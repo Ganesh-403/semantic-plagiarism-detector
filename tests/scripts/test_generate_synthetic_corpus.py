@@ -12,11 +12,10 @@ Validates:
 - CLI argument parsing and validation
 """
 
-import argparse
 import json
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import random
 
 import pytest
@@ -200,7 +199,7 @@ def test_generate_corpus_plagiarized_has_source(tmp_path):
         output_dir=tmp_path,
     )
 
-    filenames = {m["filename"] for m in manifest}
+    {m["filename"] for m in manifest}
 
     for entry in manifest:
         assert entry["type"] == "plagiarized"
