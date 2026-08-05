@@ -315,13 +315,17 @@ def add_user(username: str, password: str, role: str = "teacher") -> None:
         raise sqlite3.Error(f"Failed to add user: {e}") from e
 
 
-def get_all_users() -> list:
+def get_all_users(role: str | None = None) -> list:
     """Return all users as a list of dicts (excludes password hashes)."""
     try:
+        query = "SELECT id, username, role, is_active, version FROM users"
+        params = []
+        if role is not None:
+            query += " WHERE role = ?"
+            params.append(role)
+        query += " ORDER BY id"
         with _connect() as conn:
-            rows = conn.execute(
-                "SELECT id, username, role, is_active, version FROM users ORDER BY id"
-            ).fetchall()
+            rows = conn.execute(query, params).fetchall()
             return [
                 {
                     "id": r[0],

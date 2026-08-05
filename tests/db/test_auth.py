@@ -505,3 +505,43 @@ def test_revoke_token_and_is_token_revoked():
     assert is_token_revoked(None) is False  # type: ignore[arg-type]
     with pytest.raises(ValueError):
         revoke_token("")
+
+
+def test_get_all_users_role_filtering(mock_db):
+    import sqlite3
+    import src.db.auth as auth
+    
+    # Insert raw users with different roles since add_user might restrict to VALID_ROLES
+    with sqlite3.connect(auth._DB_PATH) as conn:
+        conn.execute("""
+            INSERT INTO users (username, password, role) 
+            VALUES ('admin_user', 'hash', 'admin'),
+                   ('instructor_user', 'hash', 'instructor'),
+                   ('student_user1', 'hash', 'student'),
+                   ('student_user2', 'hash', 'student')
+        """)
+        conn.commit()
+
+    # Test no role (should return all users including the default admin + the 4 inserted above)
+    all_users = auth.get_all_users()
+    assert len(all_users) >= 4
+
+    # Test role='admin'
+    admin_users = auth.get_all_users(role='admin')
+    assert len(admin_users) >= 1
+    assert all(u['role'] == 'admin' for u in admin_users)
+
+    # Test role='instructor'
+    instructor_users = auth.get_all_users(role='instructor')
+    assert len(instructor_users) == 1
+    assert instructor_users[0]['role'] == 'instructor'
+    assert instructor_users[0]['username'] == 'instructor_user'
+
+    # Test role='student'
+    student_users = auth.get_all_users(role='student')
+    assert len(student_users) == 2
+    assert all(u['role'] == 'student' for u in student_users)
+
+    # Test unknown role
+    unknown_users = auth.get_all_users(role='unknown_role_123')
+    assert len(unknown_users) == 0
