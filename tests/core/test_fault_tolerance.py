@@ -540,7 +540,7 @@ class TestDatabaseFaultTolerance:
             with caplog.at_level(logging.ERROR):
                 # Attempting to connect should handle the error
                 try:
-                    with _connect() as conn:
+                    with _connect() :
                         pass
                 except sqlite3.OperationalError:
                     # If it propagates, that's also acceptable as long as it's logged

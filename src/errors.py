@@ -1,3 +1,4 @@
+from typing import List, Optional
 """
 errors.py
 ---------
@@ -158,34 +159,19 @@ class ExportFailedError(RuntimeError):
 class OCRFileBatchError(Exception):
     """Raised when OCR extraction fails on one or more files in a batch."""
 
-    def __init__(self, failed_files: list, failure_details: list) -> None:
-        self.failed_files = failed_files
-        self.failure_details = failure_details
-        joined = "; ".join(failure_details) if failure_details else ", ".join(failed_files)
-        super().__init__(f"OCR extraction failed for {len(failed_files)} file(s): {joined}")
+    def __init__(
+        self, 
+        failed_files: Optional[List[str]] = None, 
+        failure_details: Optional[List[str]] = None
+    ) -> None:
+        self.failed_files = failed_files or []
+        self.failure_details = failure_details or []
 
+        if self.failure_details:
+            joined = "; ".join(self.failure_details)
+        elif self.failed_files:
+            joined = ", ".join(self.failed_files)
+        else:
+            joined = "No details provided"
 
-EXPORT_WRITE_FAILED = (
-    "Unable to write the {format_name} export to '{destination}'. "
-    "Check the destination permissions and available disk space, then try again."
-)
-
-EXPORT_GENERATION_IO_FAILED = (
-    "Unable to generate the {format_name} export because an I/O operation failed. "
-    "Please try again."
-)
-
-
-class OCRFileBatchError(Exception):
-    """Exception raised when OCR extraction fails on one or more files in a batch."""
-
-    def __init__(self, failed_files: list[str], failure_details: list[str]):
-        self.failed_files = failed_files
-        self.failure_details = failure_details
-        super().__init__(f"OCR failed for files: {failed_files}")
-
-
-class StaleDataException(Exception):
-    """Raised when an update fails because the version has changed (optimistic locking)."""
-    pass
-
+        super().__init__(f"OCR extraction failed for {len(self.failed_files)} file(s): {joined}")
