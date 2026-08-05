@@ -90,7 +90,8 @@ def test_strip_image_metadata_dimension_safety_limit_height():
 
 def test_strip_image_metadata_dimension_exactly_at_limit():
     # Create a dummy image exactly at the 10,000px limit (should pass)
-    img = Image.new("RGB", (10000, 10000), color="green")
+    # Use "L" mode (1 byte/px) so 10000x10000 = 100MB, which is exactly at/under the 100MB memory limit
+    img = Image.new("L", (10000, 10000), color=0)
     img_bytes = io.BytesIO()
     img.save(img_bytes, format="PNG")
 
@@ -133,3 +134,54 @@ def test_strip_image_metadata_decompression_bomb(monkeypatch):
         strip_exif_metadata(img_bytes, "test.jpg")
     
     assert str(excinfo.value) == "Image dimensions exceed security safety limits."
+
+
+def test_strip_image_metadata_memory_limit_exceeded(monkeypatch):
+    # Mock Image.open to return an object with large dimensions but no actual memory allocation
+    class MockImage:
+        def __init__(self, mode, size):
+            self.mode = mode
+            self.size = size
+            self.format = "PNG"
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    # A 6000x6000 RGB image = 6000 * 6000 * 3 = 108,000,000 bytes > 100 MB
+    monkeypatch.setattr(Image, "open", lambda *args, **kwargs: MockImage("RGB", (6000, 6000)))
+
+    with pytest.raises(ValueError) as excinfo:
+        strip_exif_metadata(b"fake_data", "test.png")
+    
+    assert str(excinfo.value) == "Decompressed image memory footprint exceeds 100 MB safety limit"
+
+
+def test_strip_image_metadata_memory_limit_accepted(monkeypatch):
+    # Mock an image that is just under 100 MB
+    class MockImage:
+        def __init__(self, mode, size):
+            self.mode = mode
+            self.size = size
+            self.format = "PNG"
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+        def getdata(self):
+            return []
+        def convert(self, mode):
+            return self
+
+    # A 5000x5000 RGB image = 5000 * 5000 * 3 = 75,000,000 bytes < 100 MB
+    monkeypatch.setattr(Image, "open", lambda *args, **kwargs: MockImage("RGB", (5000, 5000)))
+    
+    # We also have to mock Image.new since the function creates a new image
+    monkeypatch.setattr(Image, "new", lambda *args, **kwargs: MockImage("RGB", (5000, 5000)))
+    
+    # And mock putdata / save
+    MockImage.putdata = lambda self, data: None
+    MockImage.save = lambda self, io_obj, format: io_obj.write(b"safe_data")
+
+    result = strip_exif_metadata(b"fake_data", "test.png")
+    assert result == b"safe_data"
