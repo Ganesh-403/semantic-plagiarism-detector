@@ -1,18 +1,14 @@
 import asyncio
 import base64
-import hashlib
-import html
 import io as _io
 import logging
 import os
 import traceback
 import functools
 from pathlib import Path
-import sqlite3
 import sys
 import time
 from datetime import datetime, timezone
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -30,8 +26,6 @@ if str(ROOT_DIR) not in sys.path:
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-import base64
-import html
 import json
 
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -39,19 +33,12 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
 # Standard / Third-party imports
-import time
-from src.utils.processing_time import ProcessingTimer, StageTiming
 from src.utils.temp_manager import purge_expired_temp_files
 
-import _io
-import psutil
+import _io  # noqa: F811
 from dotenv import load_dotenv
-from datetime import datetime
 
 load_dotenv()
-import numpy as np
-import pandas as pd
-import streamlit as st
 
 from src.security.metadata_stripper import strip_exif_metadata
 from src.utils.filename import (
@@ -63,14 +50,12 @@ from src.utils.filename import (
 
 
 
-from typing import Any
 
 try:
     from streamlit_plotly_events import plotly_events # type: ignore
 except ImportError:  # pragma: no cover - optional dependency
     plotly_events = None
 
-import logging
 from src.core.logging_config import setup_logging
 
 setup_logging()
@@ -260,26 +245,21 @@ from app.theme import (
     get_theme_name,
     inject_css,
     set_theme,
-    sidebar_user_badge_html,
     version_check_widget_html,
 )
 from src.core.ai_detector import detect_documents_ai_probability
-from src.core.config import DEFAULT_THRESHOLDS, PLAGIARISM_THRESHOLD, severity_key
+from src.core.config import DEFAULT_THRESHOLDS, PLAGIARISM_THRESHOLD
 from src.core.document_parser import (
     DEFAULT_OCR_DPI,
     DEFAULT_OCR_LANGUAGE,
     SUPPORTED_OCR_LANGUAGES,
-    OCRDependencyError,
     extract_text,
     prepare_text_for_embedding,
-    remove_ignore_phrases,
 )
 from src.core.embedding_model import embed_chunks, embed_documents
-from src.core.export_engine import LMSExportEngine
 from src.core.faiss_index import (
     build_index,
     build_index_from_matrix,
-    find_plagiarised_chunks,
     load_index,
     load_or_rebuild_index,
     save_index,
@@ -297,90 +277,44 @@ from src.visualization.network_graph import (
     export_network_to_gexf_bytes,
     plot_similarity_network,
 )
-from src.core.tag_manager import TagManager
-from src.core.telemetry import TelemetryService
 from src.core.text_chunking import chunk_documents
 from src.core.webhook import send_plagiarism_alert
 from src.db import (
-    clear_all_data,
     delete_document,
     get_all_documents,
     get_all_embeddings,
     get_chunk_registry,
-    get_documents_by_class,
     get_unique_class_sections,
 )
 from src.db.auth import (
-    add_user,
     authenticate_user,
-    check_login_rate_limit,
-    clear_login_attempts,
-    delete_user,
-    disable_2fa,
-    enable_2fa,
     get_2fa_status,
     get_all_users,
-    get_notification_preferences,
     get_tour_completed,
-    get_upload_count,
     get_user_preferences,
     get_user_role,
-    increment_upload_count,
     init_db,
-    is_upload_rate_limited,
     is_user_active,
-    record_failed_login,
     set_tour_completed,
-    set_user_active_status,
-    update_notification_preferences,
-    update_password,
     update_user_preferences,
-    verify_user,
 )
 from src.db.incidents import (
     init_incident_db,
     get_all_incidents,
     sync_flagged_incidents,
 )
-from src.utils.pdf_report import generate_plagiarism_report, highlight_pdf_matches
-from src.utils.badge_generator import (
-    generate_badge_png,
-    generate_badge_pdf,
-)
-from src.db.corpus_db import get_document_tags, get_total_document_count, init_corpus_db
-from src.db.incidents import (
-    get_all_incidents_above_threshold_for_export,
-    get_high_severity_trends,
-    get_most_plagiarized_documents,
-    sync_flagged_incidents,
-)
+from src.utils.pdf_report import highlight_pdf_matches
+from src.db.corpus_db import get_total_document_count, init_corpus_db
 from src.i18n.translator import _SUPPORTED_LANGUAGES, get_text
-from src.security.metadata_stripper import strip_exif_metadata
 from src.utils.processing_time import (
     estimate_processing_seconds,
     format_processing_duration,
-    processing_eta_text,
-    uploaded_files_total_bytes,
 )
-from src.utils.badge_generator import generate_badge_pdf, generate_badge_png
 from src.utils.diff_highlighter import highlight_overlap
-from src.utils.excel_export import export_similarity_matrix_to_excel
-from src.utils.filename import (
-    InvalidFileExtensionError,
-    sanitize_filename,
-    unique_filename,
-    validate_document_extension,
-)
-from src.utils.json_export import export_similarity_matrix_to_json
 from src.utils.pdf_report import (
-    generate_audit_summary_html,
-    generate_audit_summary_pdf,
     generate_audit_summary_report,
-    generate_plagiarism_report,
 )
 from src.utils.redis_cache import (
-    cache_analysis_results,
-    cache_faiss_index,
     cache_session_state,
     clear_session,
     get_analysis_results,
@@ -389,30 +323,9 @@ from src.utils.redis_cache import (
 )
 from src.utils.storage_metrics import calculate_storage_usage
 from src.visualization.heatmap import (
-    plot_chunk_similarity_comparison,
     plot_similarity_heatmap,
 )
-from src.core.document_parser import (
-    DEFAULT_OCR_DPI,
-    DEFAULT_OCR_LANGUAGE,
-    OCRDependencyError,
-    SUPPORTED_OCR_LANGUAGES,
-    extract_text,
-    prepare_text_for_embedding,
-)
-from src.db.auth import (
-    init_db,
-    verify_user,
-    get_user_role,
-    add_user,
-    get_all_users,
-    delete_user,
-    update_password,
-    get_tour_completed,
-    set_tour_completed,
-)
 from src.core.config import get_branding_config
-from src.visualization.network_graph import plot_similarity_network
 
 try:
     from src.utils.warning_list import render_warning_controls, render_copy_button
@@ -454,7 +367,6 @@ try:
 except Exception:
     bulk_download_drive_folder = None
 
-from src.errors import OCRFileBatchError
 
 # Initialize databases
 init_corpus_db()
@@ -464,8 +376,7 @@ init_db()
 purge_expired_temp_files()
 # Start lightweight REST API server for /healthz endpoint in background
 import threading
-import time
-import datetime
+import datetime  # noqa: F811
 import uvicorn
 
 from src.api.app import app as fastapi_app
@@ -1277,7 +1188,7 @@ if not selected_classes:
                     st.caption("  Will be created on first data upload.")
 
             except Exception as db_err:
-                st.markdown(f"• **Corpus DB:** 🔴 Error")
+                st.markdown("• **Corpus DB:** 🔴 Error")
                 st.caption(f"  {db_err}")
 
             # Check Auth DB connection
@@ -1292,7 +1203,7 @@ if not selected_classes:
                     st.caption("  Will be created on first login.")
 
             except Exception as db_err:
-                st.markdown(f"• **Auth DB:** 🔴 Error")
+                st.markdown("• **Auth DB:** 🔴 Error")
                 st.caption(f"  {db_err}")
 
             # CPU load indicator (1-minute average)
@@ -2308,7 +2219,7 @@ with tab_heatmap:
                         except Exception as err:
                             st.error(f"Unable to render PDF preview: {str(err)}")
                 else:
-                    st.info(f"PDF Preview is only available for uploaded `.pdf` files.")
+                    st.info("PDF Preview is only available for uploaded `.pdf` files.")
         if active_sim_df is not None and len(doc_names) >= 2:
             c1, c2 = st.columns(2)
             with c1:
@@ -3099,7 +3010,7 @@ with tab_settings:
                     cache._client.flushdb()
                 elif hasattr(cache, "clear_pattern"):
                     cache.clear_pattern("*")
-            except Exception as e:
+            except Exception:
                 pass
             st.success("✅ Application cache cleared successfully!")
             st.toast("✅ Session cache cleared successfully!")

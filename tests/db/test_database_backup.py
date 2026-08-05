@@ -36,7 +36,7 @@ from src.db.database_backup import (
 )
 
 try:
-    import pyzipper
+    import pyzipper  # noqa: F401
     HAS_PYZIPPER = True
 except ImportError:
     HAS_PYZIPPER = False

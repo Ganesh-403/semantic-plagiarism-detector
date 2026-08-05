@@ -21,7 +21,7 @@ _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from src.db.auth import init_db, verify_user, get_user_role, get_all_users
+from src.db.auth import init_db, verify_user, get_user_role
 from src.db.corpus_db import init_corpus_db, get_all_documents
 
 

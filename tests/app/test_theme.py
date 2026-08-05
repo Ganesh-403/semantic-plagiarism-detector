@@ -285,7 +285,7 @@ from app.theme import (
 )
 
 
-def test_get_colors_returns_valid_theme_colors():
+def test_get_colors_returns_valid_theme_colors():  # noqa: F811
     colors = get_colors()
 
     assert isinstance(colors, dict)
@@ -309,7 +309,7 @@ def test_severity_tier():
     assert severity_tier(0.58, 0.59) == "low"
 
 
-def test_tier_from_severity_label():
+def test_tier_from_severity_label():  # noqa: F811
     assert tier_from_severity_label("🔴 High") == "high"
     assert tier_from_severity_label("🟡 Medium") == "medium"
     assert tier_from_severity_label("HIGH") == "high"

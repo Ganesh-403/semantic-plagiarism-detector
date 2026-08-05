@@ -1,3 +1,4 @@
+import numpy
 """
 tests/visualization/test_network_graph.py
 -------------------------------------------

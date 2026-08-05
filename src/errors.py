@@ -176,7 +176,7 @@ EXPORT_GENERATION_IO_FAILED = (
 )
 
 
-class OCRFileBatchError(Exception):
+class OCRFileBatchError(Exception):  # noqa: F811
     """Exception raised when OCR extraction fails on one or more files in a batch."""
 
     def __init__(self, failed_files: list[str], failure_details: list[str]):

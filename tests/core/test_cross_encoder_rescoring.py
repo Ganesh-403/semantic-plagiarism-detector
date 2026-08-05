@@ -8,7 +8,6 @@ and multi-tuple metadata preservation.
 
 from __future__ import annotations
 
-import unittest
 from unittest.mock import MagicMock, patch
 
 import numpy as np

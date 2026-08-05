@@ -63,8 +63,6 @@ def test_factory_exception_is_not_hidden():
 # Issue #1060 — Axis titles for plot_similarity_distribution
 # ---------------------------------------------------------------------------
 
-import numpy as np
-import plotly.graph_objects as go
 from src.visualization.analytics import plot_similarity_distribution
 
 

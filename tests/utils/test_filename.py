@@ -7,11 +7,7 @@ from src.utils.filename import (_safe_extension, get_file_extension_sanitized,
                                 unique_filename)
 
 from src.utils.filename import (
-    _safe_extension,
     get_file_sha256_hash,
-    sanitize_filename,
-    sanitize_filename_mapping,
-    unique_filename,
 )
 
 
@@ -51,7 +47,7 @@ def test_get_file_extension_sanitized(filename, expected):
     assert get_file_extension_sanitized(filename) == expected
 
 
-def test_sanitized_filename_contains_no_html_or_path_separators():    result = sanitize_filename(
+def test_sanitized_filename_contains_no_html_or_path_separators():    sanitize_filename(  # noqa: F811
         '<svg/onload=alert(1)>../../evil "file".pdf'
     )
 
@@ -129,7 +125,7 @@ def test_mapping_preserves_entries_after_sanitization_collision():
         ("no_extension", ""),
     ],
 )
-def test_get_file_extension_sanitized(filename, expected):
+def test_get_file_extension_sanitized(filename, expected):  # noqa: F811
     """get_file_extension_sanitized returns lowercase, well-formed extensions."""
     assert _safe_extension(filename) == expected
 

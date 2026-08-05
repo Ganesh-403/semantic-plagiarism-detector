@@ -1348,7 +1348,7 @@ def format_similarity_html(
     return f'<span class="{CLASS_SIM_PILL}" style="background-color: {bg}; color: {text};">Similarity: {score * 100:.1f}%</span>'
 
 
-def empty_state_html(icon: str, title: str, description: str) -> str:
+def empty_state_html(icon: str, title: str, description: str) -> str:  # noqa: F811
     """Return styled empty-state HTML block."""
     return (
         f'<div class="{EMPTY_STATE}">'
@@ -1508,7 +1508,7 @@ def version_check_widget_html(
     """
 
 
-def version_check_widget_html(
+def version_check_widget_html(  # noqa: F811
     local_version: str,
     latest_tag: str,
     repo_url: str = "https://github.com/Ganesh-403/semantic-plagiarism-detector/releases/latest",

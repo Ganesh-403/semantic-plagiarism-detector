@@ -216,7 +216,6 @@ def test_batch_soft_delete_documents():
 
 
 def test_clear_all_data_clears_incidents(mock_db):
-    from pathlib import Path
 
     # 1. Add mock documents
     add_document("doc1.pdf", "hash1")

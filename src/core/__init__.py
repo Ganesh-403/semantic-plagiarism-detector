@@ -21,7 +21,7 @@ from .config import (
     load_branding_config,
 )
 from .tag_manager import TagManager, sanitize_tag_name
-from .concurrency import with_sqlite_retry
+from src.db.common import with_sqlite_retry
 
 
 __all__ = [

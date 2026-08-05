@@ -33,7 +33,7 @@ def test_extract_zip_returns_text_from_valid_archive():
 def test_extract_zip_handles_empty_archive():
     """Verify empty ZIP returns empty string."""
     buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w") as zf:
+    with zipfile.ZipFile(buf, "w"):
         pass
     result = extract_text_from_zip(buf.getvalue())
     assert result == ""
@@ -91,10 +91,7 @@ def test_extract_zip_handles_corrupted_inner_files():
     # This will still be a valid ZIP but the corrupted.txt may fail
     result = extract_text_from_zip(zip_bytes)
     assert "valid" in result
-import io
-import zipfile
 
-import pytest
 
 from src.utils.zip_processor import MAX_SINGLE_FILE_SIZE, process_zip_file
 

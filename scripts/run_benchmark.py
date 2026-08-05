@@ -23,13 +23,11 @@ import json
 import logging
 import os
 import random
-import string
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
-import numpy as np
 
 # Add project root to path for imports
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -37,7 +35,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from src.core.embedding_model import embed_chunks, embed_documents, _detect_device
-from src.core.faiss_index import build_index, search_similar_chunks
+from src.core.faiss_index import build_index
 from src.core.text_chunking import chunk_documents
 
 # Configure logging
@@ -234,7 +232,7 @@ def benchmark_document_embedding(
     logger.info(f"Benchmarking document embedding for {num_docs} documents...")
 
     start_time = time.perf_counter()
-    doc_embeddings = embed_documents(corpus, batch_size=batch_size)
+    embed_documents(corpus, batch_size=batch_size)
     end_time = time.perf_counter()
 
     total_time_seconds = end_time - start_time
