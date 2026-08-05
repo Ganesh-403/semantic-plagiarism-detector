@@ -7,6 +7,8 @@ Tests for daily summary email functionality and HTML template generation.
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
+
+
 import pytest
 
 from src.utils.daily_summary_email import (
@@ -411,11 +413,19 @@ class TestEmailTemplateHelpers:
     def test_build_email_html_body_inline_css_compatibility(self):
         """Test that critical inline CSS properties are present for email clients."""
         html = build_email_html_body(incidents_data=[], total_scans=0)
-
         assert "max-width: 600px" in html
         assert "background-color: #f9f9f9" in html
         assert "border-radius: 8px" in html
         assert "font-family: Arial, sans-serif" in html
+
+def test_send_email_invalid_recipient():
+    """Test that an invalid recipient email raises ValueError."""
+    with pytest.raises(ValueError):
+        send_email(
+            to_emails=["notanemail"],
+            subject="Test Subject",
+            html_body="<p>Test</p>",
+        )
 
 
 def test_send_email_status_callback_success():
@@ -477,4 +487,3 @@ def test_send_email_status_callback_failure():
         success, message = callback.call_args[0]
         assert success is False
         assert "SMTP Connection Failed" in message
-

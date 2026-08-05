@@ -865,13 +865,62 @@ def purge_old_incidents(
             """,
             (status, days_old),
         )
-        conn.commit()
+conn.commit()
         return cursor.rowcount
 
 
+def archive_old_incidents(
+    cutoff_date: str,
+    db_path: str | Path = DEFAULT_DB_PATH,
+) -> int:
+    """Move incidents flagged before cutoff_date into incidents_archive.
+
+    Copies matching rows from ``plagiarism_incidents`` into
+    ``incidents_archive`` and removes them from ``plagiarism_incidents``,
+    both inside a single transaction so the operation is atomic
+    (issue #1492).
+
+    Args:
+        cutoff_date: ISO-8601 date/datetime string. Incidents with a
+            ``date_flagged`` earlier than this value are archived.
+        db_path: Path to the SQLite corpus database.
+
+    Returns:
+        int: The number of incident records archived.
+    """
+    init_incident_db(db_path)
+    with closing(_get_connection(db_path)) as conn:
+        try:
+            conn.execute(
+                """
+                INSERT INTO incidents_archive (
+                    incident_id, document_a, document_b,
+                    similarity_score, severity_rank,
+                    review_status, date_flagged, last_seen,
+                    threshold_at_time_of_flag
+                )
+                SELECT incident_id, document_a, document_b,
+                       similarity_score, severity_rank,
+                       review_status, date_flagged, last_seen,
+                       threshold_at_time_of_flag
+                FROM plagiarism_incidents
+                WHERE date_flagged < ?
+                """,
+                (cutoff_date,),
+            )
+            cursor = conn.execute(
+                "DELETE FROM plagiarism_incidents WHERE date_flagged < ?",
+                (cutoff_date,),
+            )
+            conn.commit()
+            return cursor.rowcount
+        except sqlite3.Error as exc:
+            conn.rollback()
+            raise sqlite3.Error(f"Failed to archive incidents: {exc}") from exc
+
+
 @lru_cache(maxsize=128)
-def get_recent_incidents(
-    limit: int = 5,
+def get_recent_incidents(    limit: int = 5,
     db_path: str | Path | None = None,
 ) -> list[MatchResult]:
     """Fetch recent visible plagiarism incidents, cached for performance."""

@@ -17,6 +17,7 @@ import time
 import zlib
 from enum import Enum
 from typing import Any, Optional
+import threading
 
 
 class CacheKeyPrefix(str, Enum):
@@ -181,8 +182,9 @@ class RedisCache:
                 if cls._instance is None:
                     cls._instance = super().__new__(cls)
                     cls._instance._fallback_cache = {}
+                    cls._instance._hits = 0
+                    cls._instance._misses = 0
         return cls._instance
-
     def __init__(self):
         if not hasattr(self, "_fallback_cache") or self._fallback_cache is None:
             self._fallback_cache = {}
@@ -308,6 +310,37 @@ class RedisCache:
         except Exception:
             return False, None
 
+    def get_stats(self) -> dict[str, Any]:
+        """Get cache statistics including hit ratio and total items count."""
+        total_requests = self._hits + self._misses
+        hit_ratio = (self._hits / total_requests) if total_requests > 0 else 0.0
+
+        total_items = 0
+        if self._client is not None and self.is_available():
+            try:
+                total_items = self._client.dbsize()
+            except Exception:
+                total_items = len(self.fallback_cache)
+        else:
+            total_items = len(self.fallback_cache)
+
+        return {
+            "hits": self._hits,
+            "misses": self._misses,
+            "hit_ratio": hit_ratio,
+            "total_items": total_items,
+        }
+
+    def get_hit_rate(self) -> float:
+        """Return cache hit rate as a percentage (0-100)."""
+        with self._lock:
+            hits, misses = self._hits, self._misses
+        total = hits + misses
+        if total == 0:
+            return 0.0
+        return (hits / total) * 100
+    
+
     def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
         """Store a value in Redis with optional TTL and automatic compression."""
         if self.is_available():
@@ -342,10 +375,9 @@ class RedisCache:
             try:
                 data = self._client.get(key)
                 if data is not None:
-                    # 1. Decompress if magic header is present
-                    raw_bytes = PayloadCompressor.decompress(data)
-                    # 2. Deserialize
-                    return pickle.loads(raw_bytes)
+                    with self._lock:
+                        self._hits += 1
+                    return pickle.loads(data)
             except (
                 RedisError,
                 RedisConnectionError,
@@ -358,8 +390,16 @@ class RedisCache:
                 print(f"[RedisCache] Error getting key {key}: {e}. Falling back to in-memory.")
                 logger.error(f"[RedisCache] Error getting key {key}: {e}. Falling back to in-memory.")
 
-        return self._fallback_get(key)
+        val = self._fallback_get(key)
+        if val is not None:
+            with self._lock:
+                self._hits += 1
+            return val
 
+        with self._lock:
+            self._misses += 1
+        return None
+    
     def delete(self, key: str) -> bool:
         redis_deleted = False
         if self.is_available():
@@ -395,12 +435,29 @@ class RedisCache:
             try:
                 data = self._client.get(key)
                 if data is not None:
-                    raw_bytes = PayloadCompressor.decompress(data)
-                    return json.loads(raw_bytes.decode('utf-8'))
-            except Exception as e:
-                logger.error(f"[RedisCache] Error getting JSON key {key}: {e}")
+                    with self._lock:
+                        self._hits += 1
+                    return json.loads(data)
+            except (
+                RedisError,
+                RedisConnectionError,
+                RedisTimeoutError,
+                ConnectionRefusedError,
+                ConnectionResetError,
+                json.JSONDecodeError,
+            ) as e:
+                print(f"[RedisCache] Error getting JSON key {key}: {e}. Falling back to in-memory.")
+                logger.error(f"[RedisCache] Error getting JSON key {key}: {e}. Falling back to in-memory.")
 
-        return self._fallback_get_json(key)
+        val = self._fallback_get_json(key)
+        if val is not None:
+            with self._lock:
+                self._hits += 1
+            return val
+
+        with self._lock:
+            self._misses += 1
+        return None
 
     def exists(self, key: str) -> bool:
         if self.is_available():

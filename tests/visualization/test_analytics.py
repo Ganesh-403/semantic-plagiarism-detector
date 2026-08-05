@@ -11,6 +11,7 @@ import pytest
 from src.visualization.analytics import (
     plot_severity_donut_chart,
     plot_similarity_boxplot,
+    plot_similarity_histogram,
     plot_similarity_percentiles,
 )
 
@@ -173,8 +174,11 @@ def test_plot_similarity_boxplot_fallback_keys():
 
     assert len(fig.data) == 1
     assert list(fig.data[0].y) == [0.9, 0.5]
+ fix/image-memory-limit-1594
 
 from src.visualization.analytics import plot_similarity_histogram
+
+main
 
 
 def test_plot_similarity_histogram_returns_figure():
@@ -201,3 +205,66 @@ def test_plot_similarity_histogram_empty_scores():
     assert isinstance(fig, go.Figure)
     assert len(fig.data) == 0
     assert len(fig.layout.annotations) == 1
+
+
+DARK_THEME = {
+    "background": "#0E1117",
+    "surface": "#161B22",
+    "ink": "#F8FAFC",
+    "muted": "#CBD5E1",
+    "border": "#374151",
+}
+
+
+def test_plot_similarity_percentiles_applies_dark_theme():
+    """Dark theme colors must be applied to paper, plot and font."""
+    fig = plot_similarity_percentiles([0.4, 0.6, 0.8], theme_colors=DARK_THEME)
+
+    assert fig.layout.paper_bgcolor == DARK_THEME["background"]
+    assert fig.layout.plot_bgcolor == DARK_THEME["surface"]
+    assert fig.layout.font.color == DARK_THEME["ink"]
+    assert fig.layout.yaxis.gridcolor == DARK_THEME["border"]
+    assert fig.layout.yaxis.tickfont.color == DARK_THEME["muted"]
+
+
+def test_plot_severity_donut_chart_applies_dark_theme():
+    """The donut chart must switch its background and text color in dark mode."""
+    incidents = [{"severity": "High"}, {"severity": "Medium"}]
+    fig = plot_severity_donut_chart(incidents, theme_colors=DARK_THEME)
+
+    assert fig.layout.paper_bgcolor == DARK_THEME["background"]
+    assert fig.layout.font.color == DARK_THEME["ink"]
+
+
+def test_plot_similarity_boxplot_applies_dark_theme():
+    """The boxplot must switch its background and text color in dark mode."""
+    incidents = [{"assignment_title": "Essay", "similarity_score": 0.8}]
+    fig = plot_similarity_boxplot(incidents, theme_colors=DARK_THEME)
+
+    assert fig.layout.paper_bgcolor == DARK_THEME["background"]
+    assert fig.layout.plot_bgcolor == DARK_THEME["surface"]
+    assert fig.layout.font.color == DARK_THEME["ink"]
+
+
+def test_plot_similarity_histogram_applies_dark_theme():
+    """The histogram must switch its background and text color in dark mode."""
+    fig = plot_similarity_histogram([0.1, 0.5, 0.9], theme_colors=DARK_THEME)
+
+    assert fig.layout.paper_bgcolor == DARK_THEME["background"]
+    assert fig.layout.plot_bgcolor == DARK_THEME["surface"]
+    assert fig.layout.font.color == DARK_THEME["ink"]
+
+
+def test_plot_empty_chart_annotation_uses_muted_color():
+    """Empty state annotation text should use the theme muted color."""
+    fig = plot_similarity_histogram([], theme_colors=DARK_THEME)
+
+    assert fig.layout.annotations[0].font.color == DARK_THEME["muted"]
+
+
+def test_plot_charts_default_to_light_template_without_theme_colors():
+    """Without theme_colors the layout must keep the Plotly defaults."""
+    fig = plot_similarity_percentiles([0.4, 0.6, 0.8])
+
+    assert fig.layout.paper_bgcolor is None
+    assert fig.layout.font.color is None

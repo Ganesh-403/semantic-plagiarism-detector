@@ -298,14 +298,23 @@ def test_scope_enforcement_rate_limit_endpoint():
     assert "Forbidden" in res.json()["detail"]
 
 
-def test_scope_enforcement_clear_endpoint():
+def test_scope_enforcement_clear_endpoint(tmp_path):
     """Verify scope enforcement on /api/v1/clear (requires 'admin')."""
+    from src.db.auth import configure_db_path, init_db, add_user
     from fastapi.testclient import TestClient
     from src.api.app import app
 
+    db_file = tmp_path / "test_clear_scope.db"
+    configure_db_path(db_file)
+    init_db()
+    try:
+        add_user("admin", "password123", role="admin")
+    except ValueError:
+        pass
+
     client = TestClient(app)
 
-    # 1. Token with 'admin' scope -> success (either 200 or 500 depending on actual database operations but not 401/403)
+    # 1. Token with 'admin' scope -> success
     res = client.post(
         "/api/v1/clear?username=admin",
         headers={"Authorization": "Bearer test-admin-token"},
@@ -533,3 +542,292 @@ def test_token_revocation_missing_token_returns_400(tmp_path):
     response = client.post("/api/v1/auth/revoke", json={})
     assert response.status_code == 400
     assert "token to revoke must be provided" in response.json()["detail"].lower()
+
+
+def test_streaming_multipart_upload_file_exceeds_max_size_returns_413(monkeypatch):
+    """Verify POST /api/v1/scan returns 413 Payload Too Large when payload exceeds MAX_UPLOAD_SIZE_BYTES."""
+    from fastapi.testclient import TestClient
+    from src.api.app import app
+
+    monkeypatch.setenv("MAX_UPLOAD_SIZE_BYTES", "500")
+
+    client = TestClient(app)
+    large_payload = b"A" * 2000  # 2KB payload > 500 bytes limit
+
+    files = {"file": ("large_doc.txt", large_payload, "text/plain")}
+    headers = {"Authorization": "Bearer test-write-token"}
+
+    response = client.post("/api/v1/scan", files=files, headers=headers)
+    assert response.status_code == 413
+    assert "exceeds maximum" in response.json()["detail"].lower()
+
+
+def test_streaming_multipart_upload_streams_chunks_to_disk():
+    """Verify POST /api/v1/scan streams chunks to disk and processes document scan."""
+    from fastapi.testclient import TestClient
+    from src.api.app import app
+
+    client = TestClient(app)
+    content = b"This is a test paragraph for verifying streaming chunk reader upload functionality.\n\n" * 5
+
+    files = {"file": ("stream_test.txt", content, "text/plain")}
+    headers = {"Authorization": "Bearer test-write-token"}
+
+    response = client.post("/api/v1/scan", files=files, headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["filename"] == "stream_test.txt"
+    assert data["word_count"] > 0
+
+
+def test_refresh_token_success_with_signed_refresh_token(tmp_path):
+    """Verify POST /api/v1/auth/refresh issues a new valid access token."""
+    from src.db.auth import configure_db_path, init_db
+    from src.security.jwt_utils import create_refresh_token
+    from fastapi.testclient import TestClient
+    from src.api.app import app
+
+    db_file = tmp_path / "test_refresh_success.db"
+    configure_db_path(db_file)
+    init_db()
+
+    client = TestClient(app)
+    refresh_token = create_refresh_token(sub="alice_user")
+
+    res = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+    assert res.status_code == 200
+    data = res.json()
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+    assert data["expires_in"] == 3600
+
+    # Verify newly issued access token works on an authenticated endpoint
+    access_token = data["access_token"]
+    auth_res = client.get(
+        "/api/v1/rate_limit", headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert auth_res.status_code == 200
+
+
+def test_refresh_token_success_via_authorization_header(tmp_path):
+    """Verify POST /api/v1/auth/refresh works via Authorization header."""
+    from src.db.auth import configure_db_path, init_db
+    from src.security.jwt_utils import create_refresh_token
+    from fastapi.testclient import TestClient
+    from src.api.app import app
+
+    db_file = tmp_path / "test_refresh_header.db"
+    configure_db_path(db_file)
+    init_db()
+
+    client = TestClient(app)
+    refresh_token = create_refresh_token(sub="bob_user")
+
+    res = client.post(
+        "/api/v1/auth/refresh", headers={"Authorization": f"Bearer {refresh_token}"}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+    assert data["expires_in"] == 3600
+
+
+def test_refresh_token_missing_token_returns_400(tmp_path):
+    """Verify POST /api/v1/auth/refresh returns 400 if refresh token is omitted."""
+    from src.db.auth import configure_db_path, init_db
+    from fastapi.testclient import TestClient
+    from src.api.app import app
+
+    db_file = tmp_path / "test_refresh_missing.db"
+    configure_db_path(db_file)
+    init_db()
+
+    client = TestClient(app)
+    res = client.post("/api/v1/auth/refresh", json={})
+    assert res.status_code == 400
+    assert "refresh token must be provided" in res.json()["detail"].lower()
+
+
+def test_refresh_token_invalid_signature_returns_401(tmp_path):
+    """Verify POST /api/v1/auth/refresh returns 401 for invalid refresh token signature."""
+    from src.db.auth import configure_db_path, init_db
+    from fastapi.testclient import TestClient
+    from src.api.app import app
+
+    db_file = tmp_path / "test_refresh_invalid.db"
+    configure_db_path(db_file)
+    init_db()
+
+    client = TestClient(app)
+    res = client.post(
+        "/api/v1/auth/refresh", json={"refresh_token": "invalid.jwt.signature"}
+    )
+    assert res.status_code == 401
+
+
+def test_refresh_token_expired_returns_401(tmp_path):
+    """Verify POST /api/v1/auth/refresh returns 401 for an expired refresh token."""
+    from src.db.auth import configure_db_path, init_db
+    from src.security.jwt_utils import create_jwt_token
+    from fastapi.testclient import TestClient
+    from src.api.app import app
+
+    db_file = tmp_path / "test_refresh_expired.db"
+    configure_db_path(db_file)
+    init_db()
+
+    client = TestClient(app)
+    expired_token = create_jwt_token(
+        {"sub": "charlie", "type": "refresh"}, expires_in_seconds=-100
+    )
+
+    res = client.post(
+        "/api/v1/auth/refresh", json={"refresh_token": expired_token}
+    )
+    assert res.status_code == 401
+    assert "expired" in res.json()["detail"].lower()
+
+
+def test_refresh_token_revoked_returns_401(tmp_path):
+    """Verify POST /api/v1/auth/refresh returns 401 if refresh token has been revoked."""
+    from src.db.auth import configure_db_path, init_db, revoke_token
+    from src.security.jwt_utils import create_refresh_token
+    from fastapi.testclient import TestClient
+    from src.api.app import app
+
+    db_file = tmp_path / "test_refresh_revoked.db"
+    configure_db_path(db_file)
+    init_db()
+
+    client = TestClient(app)
+    refresh_token = create_refresh_token(sub="dave")
+    revoke_token(refresh_token, details="Revoked for testing")
+
+    res = client.post(
+        "/api/v1/auth/refresh", json={"refresh_token": refresh_token}
+    )
+    assert res.status_code == 401
+    assert "revoked" in res.json()["detail"].lower()
+
+
+# ─── Tests for Structured JSON 404 Payloads (Issue #1595) ─────────────────────
+
+from fastapi.testclient import TestClient
+from src.api.app import app
+
+_client = TestClient(app)
+
+class TestStructured404Payload:
+    """Test suite for standardized HTTP 404 JSON response payloads."""
+
+    def test_404_returns_structured_json_payload(self):
+        """Requesting a non-existent route must return the standardized 404 JSON."""
+        response = _client.get("/api/v1/nonexistent/route/12345")
+        
+        assert response.status_code == 404
+        
+        data = response.json()
+        assert data["error"] is True
+        assert data["code"] == 404
+        assert data["message"] == "API endpoint or resource not found"
+
+    def test_404_payload_does_not_leak_internal_details(self):
+        """The 404 message should not contain internal FastAPI routing details."""
+        response = _client.get("/api/v1/users/99999/profile")
+        
+        data = response.json()
+        # Should not contain default FastAPI "Not Found" or path details
+        assert "Not Found" not in data["message"]
+        assert "/api/v1/users" not in data["message"]
+        assert data["message"] == "API endpoint or resource not found"
+
+    def test_404_on_post_request(self):
+        """POST requests to non-existent routes should also return structured 404."""
+        response = _client.post("/api/v1/nonexistent/action", json={"data": "test"})
+        
+        assert response.status_code == 404
+        data = response.json()
+        assert data["error"] is True
+        assert data["code"] == 404
+
+    def test_404_content_type_is_application_json(self):
+        """The 404 response must have Content-Type: application/json."""
+        response = _client.get("/api/v1/missing")
+        
+        assert response.status_code == 404
+        assert "application/json" in response.headers["content-type"]
+
+    def test_other_4xx_errors_use_original_detail(self):
+        """Non-404 4xx errors (like 405 Method Not Allowed) should preserve original detail."""
+        # POST to a GET-only endpoint should trigger 405
+        response = _client.post("/health")
+        
+        # FastAPI might return 405 or 404 depending on route definition
+        # If it's 405, it should have a different message than the standardized 404
+        if response.status_code == 405:
+            data = response.json()
+            assert data["error"] is True
+            assert data["code"] == 405
+            # Message should be the FastAPI default, not our 404 message
+            assert data["message"] != "API endpoint or resource not found"
+
+    def test_404_on_root_path(self):
+        """Requesting the root path when not defined should return structured 404."""
+        # If root is not defined, it should return our custom 404
+        response = _client.get("/")
+        
+        # Root might be defined in some configs, so check if it's 404
+        if response.status_code == 404:
+            data = response.json()
+            assert data["error"] is True
+            assert data["code"] == 404
+            assert data["message"] == "API endpoint or resource not found"
+
+    def test_404_on_deeply_nested_path(self):
+        """Deeply nested non-existent paths should return structured 404."""
+        response = _client.get("/api/v1/a/b/c/d/e/f/g")
+        
+        assert response.status_code == 404
+        data = response.json()
+        assert data["error"] is True
+        assert data["code"] == 404
+        assert data["message"] == "API endpoint or resource not found"
+
+    def test_404_payload_structure_matches_global_exception_handler(self):
+        """The 404 payload structure should match the global exception handler format."""
+        response = _client.get("/api/v1/nonexistent")
+        
+        data = response.json()
+        # Must have the same keys as the global exception handler
+        assert "error" in data
+        assert "code" in data
+        assert "message" in data
+        
+        # Types must match
+        assert isinstance(data["error"], bool)
+        assert isinstance(data["code"], int)
+        assert isinstance(data["message"], str)
+
+    def test_404_with_query_parameters(self):
+        """404 responses should work correctly even with query parameters."""
+        response = _client.get("/api/v1/missing?foo=bar&baz=qux")
+        
+        assert response.status_code == 404
+        data = response.json()
+        assert data["error"] is True
+        assert data["code"] == 404
+        assert data["message"] == "API endpoint or resource not found"
+
+    def test_404_with_path_parameters(self):
+        """404 responses should work correctly with path parameters in the URL."""
+        response = _client.get("/api/v1/scan/status/invalid_job_99999")
+        
+        # This route exists but returns 404 for invalid job IDs
+        assert response.status_code == 404
+        data = response.json()
+        assert data["error"] is True
+        assert data["code"] == 404
+        # Note: This specific route has its own 404 handler that might return
+        # a different message. If it uses HTTPException directly, our global
+        # handler will catch it and standardize it.

@@ -18,6 +18,7 @@
   "tab_drill": "🔬 Paar-Detailansicht",
   "tab_users": "👥 Benutzerverwaltung",
   "tab_settings": "⚙️ Einstellungen",
+  "tab_audit_logs": "📜 Sicherheits-Audit-Logs",
   "download_csv": "⬇️ CSV herunterladen",
   "download_excel": "📊 Als formatierte Excel-Datei exportieren (.xlsx)",
   "document_word_counts": "📊 Dokument-Wortanzahl",

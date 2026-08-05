@@ -529,3 +529,30 @@ def test_render_sidebar_navigation_menu():
     assert 'class="sidebar-nav-menu"' in menu_html
     assert 'data-tab-id="dashboard"' in menu_html
     assert "border-left: 4px solid #4f46e5" in menu_html
+
+
+def test_css_variables_injected():
+    """Test that :root and CSS variables are correctly defined and referenced."""
+    with patch("app.theme.st.markdown") as mock_markdown:
+        inject_css()
+
+    css = mock_markdown.call_args_list[0].args[0]
+    
+    # Check :root existence
+    assert ":root" in css, "Missing :root block"
+    
+    # Check variable declarations
+    assert "--primary-bg:" in css, "Missing --primary-bg declaration"
+    assert "--text-color:" in css, "Missing --text-color declaration"
+    
+    # Verify values are valid hex colors
+    import re
+    assert re.search(r"--primary-bg:\s*#[0-9a-fA-F]+", css), "--primary-bg does not have a valid hex value"
+    assert re.search(r"--text-color:\s*#[0-9a-fA-F]+", css), "--text-color does not have a valid hex value"
+    
+    # Verify component CSS uses var() instead of hardcoded
+    assert "background-color: var(--primary-bg)" in css
+    assert "color: var(--text-color)" in css
+    assert "background-color: var(--secondary-bg)" in css
+    assert "border: 1px solid var(--border-color)" in css
+    assert "var(--accent-color)" in css

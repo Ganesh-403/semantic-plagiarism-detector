@@ -397,6 +397,139 @@ def _calculate_ngram_repetitiveness(text: str, n: int = 3) -> float:
     repetition_ratio = 1.0 - (len(unique_ngrams) / len(ngrams))
     return float(repetition_ratio)
 
+def extract_stylometric_features(text: str) -> dict[str, float]:
+    """Extract stylometric features for authorship attribution and consistency analysis.
+
+    Stylometry analyzes the linguistic style of a text independent of its semantic
+    content. These features provide additional signals for distinguishing between
+    human authors and AI-generated text, as well as verifying authorship consistency
+    across multiple documents from the same writer.
+
+    Metrics Computed
+    ----------------
+    1. **Type-Token Ratio (TTR)**: Vocabulary richness. Unique words / Total words.
+       Higher values indicate a more diverse vocabulary (typical of human writers).
+    2. **Average Word Length**: Mean character count of all words.
+    3. **Average Sentence Length**: Mean word count per sentence.
+    4. **Sentence Length Variance**: Standard deviation of sentence lengths.
+       Human text typically exhibits higher variance (burstiness) than AI text.
+    5. **Yule's K**: A measure of vocabulary richness that is independent of text length.
+       Lower values indicate a richer, more diverse vocabulary.
+
+    Args:
+        text: Input text string to analyze. Must be a non-empty string for
+              meaningful stylometric extraction.
+
+    Returns:
+        Dictionary mapping feature names to their numeric float values.
+        Returns a dictionary with all values set to 0.0 if the input text
+        is empty, None, or contains no valid words/sentences.
+
+    Examples:
+        >>> features = extract_stylometric_features("The quick brown fox jumps.")
+        >>> print(features["type_token_ratio"])
+        1.0
+        >>> print(features["avg_word_length"])
+        3.6
+    """
+    # Initialize default return dictionary with 0.0 for all metrics
+    default_features = {
+        "type_token_ratio": 0.0,
+        "avg_word_length": 0.0,
+        "avg_sentence_length": 0.0,
+        "sentence_length_variance": 0.0,
+        "yules_k": 0.0,
+    }
+
+    # Validate input text
+    if not text or not isinstance(text, str) or not text.strip():
+        logger.debug(
+            "[ai_detector] extract_stylometric_features: empty or invalid input text."
+        )
+        return default_features
+
+    # Tokenize words using regex to extract alphanumeric sequences
+    # This handles punctuation and contractions reasonably well for stylometry
+    words = re.findall(r'\b\w+\b', text.lower())
+    
+    if not words:
+        return default_features
+
+    total_words = len(words)
+    unique_words = set(words)
+
+    # 1. Type-Token Ratio (TTR)
+    # Measures vocabulary diversity. Range: (0, 1]
+    type_token_ratio = len(unique_words) / total_words if total_words > 0 else 0.0
+
+    # 2. Average Word Length
+    # Mean character count across all tokens
+    total_chars = sum(len(w) for w in words)
+    avg_word_length = total_chars / total_words if total_words > 0 else 0.0
+
+    # 3. & 4. Sentence Length Metrics
+    # Split text into sentences using common punctuation delimiters
+    sentences = re.split(r'[.!?]+', text.strip())
+    # Filter out empty strings that result from trailing punctuation
+    sentences = [s.strip() for s in sentences if s.strip()]
+    
+    if not sentences:
+        # If no sentences detected (e.g., text is just a fragment without punctuation),
+        # treat the entire text as a single sentence for length calculations
+        sentences = [text.strip()]
+
+    sentence_lengths = [len(re.findall(r'\b\w+\b', s)) for s in sentences]
+    
+    avg_sentence_length = float(np.mean(sentence_lengths)) if sentence_lengths else 0.0
+    
+    # Variance measures "burstiness" - human text has higher variance
+    # Using sample variance (ddof=1) if we have >1 sentence, else 0.0
+    if len(sentence_lengths) > 1:
+        sentence_length_variance = float(np.var(sentence_lengths, ddof=1))
+    else:
+        sentence_length_variance = 0.0
+
+    # 5. Yule's K Characteristic
+    # A length-independent measure of vocabulary richness.
+    # Formula: K = 10^4 * ( (sum(f_i * i^2) / N^2) - (1/N) )
+    # where f_i is the frequency of words that appear exactly i times.
+    # Lower K = richer vocabulary. Typical human text: 100-200.
+    yules_k = 0.0
+    if total_words > 0:
+        # Calculate word frequencies
+        from collections import Counter
+        word_freqs = Counter(words)
+        
+        # Calculate frequency of frequencies (how many words appear exactly i times)
+        freq_of_freqs = Counter(word_freqs.values())
+        
+        # Compute the sum of (f_i * i^2)
+        sum_fi_i2 = sum(freq * (i ** 2) for i, freq in freq_of_freqs.items())
+        
+        # Apply Yule's K formula
+        N = total_words
+        if N > 0:
+            M2 = sum_fi_i2 / (N ** 2)
+            yules_k = 10000.0 * (M2 - (1.0 / N))
+            # Clamp to prevent negative values due to floating point inaccuracies
+            yules_k = max(0.0, yules_k)
+
+    features = {
+        "type_token_ratio": round(float(type_token_ratio), 4),
+        "avg_word_length": round(float(avg_word_length), 4),
+        "avg_sentence_length": round(float(avg_sentence_length), 4),
+        "sentence_length_variance": round(float(sentence_length_variance), 4),
+        "yules_k": round(float(yules_k), 4),
+    }
+
+    logger.debug(
+        "[ai_detector] extract_stylometric_features: computed %d features for text of length %d.",
+        len(features),
+        len(text),
+    )
+
+    return features
+
 def detect_ai_generated_text(text: str) -> Dict[str, Any]:
     """
     Detect the likelihood that a given text was AI-generated using a

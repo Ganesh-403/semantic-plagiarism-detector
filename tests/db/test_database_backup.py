@@ -12,11 +12,11 @@ This module validates:
 - Database file size inspection (issue #1047).
 """
 
+import gzip
 import logging
 import os
 import sqlite3
-import time
-from pathlib import Path
+import timefrom pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -25,9 +25,9 @@ from src.db.database_backup import (
     SQLITE_HEADER,
     BackupRestoreSecurityError,
     cleanup_old_backups,
+    create_database_backup,
     create_password_protected_backup,
-    create_sqlite_snapshot,
-    get_database_size_bytes,
+    create_sqlite_snapshot,    get_database_size_bytes,
     get_database_table_stats,
     optimize_database,
     restore,
@@ -653,3 +653,38 @@ class TestCheckpointWalLog:
         res = checkpoint_wal_log(tmp_path)
         assert res is False
 
+class TestCreateDatabaseBackup:
+    """Tests for the create_database_backup function (issue #1488)."""
+
+    def _make_sample_db(self, db_path):
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
+        conn.execute("INSERT INTO test (name) VALUES ('sample')")
+        conn.commit()
+        conn.close()
+
+    def test_creates_compressed_backup_by_default(self, tmp_path):
+        db_path = tmp_path / "source.db"
+        self._make_sample_db(db_path)
+
+        backup_path = create_database_backup(db_path, backup_dir=tmp_path / "backups")
+
+        assert backup_path.exists()
+        assert backup_path.name.endswith(".db.gz")
+
+        with gzip.open(backup_path, "rb") as gz_file:
+            decompressed = gz_file.read()
+        assert decompressed.startswith(SQLITE_HEADER)
+
+    def test_creates_uncompressed_backup_when_disabled(self, tmp_path):
+        db_path = tmp_path / "source.db"
+        self._make_sample_db(db_path)
+
+        backup_path = create_database_backup(
+            db_path, backup_dir=tmp_path / "backups", compress_backup=False
+        )
+
+        assert backup_path.exists()
+        assert backup_path.name.endswith(".db")
+        assert not backup_path.name.endswith(".db.gz")
+        assert backup_path.read_bytes().startswith(SQLITE_HEADER)

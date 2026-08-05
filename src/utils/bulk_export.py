@@ -20,6 +20,7 @@ import csv
 import io
 import json
 import logging
+import os
 import re
 import zipfile
 from datetime import datetime
@@ -98,7 +99,9 @@ def normalize_csv_headers(headers: list[str]) -> list[str]:
         ['Hello_World', 'Test_Header', 'foo_bar']
     """
     if not headers or not isinstance(headers, list):
-        logger.debug("normalize_csv_headers: empty or invalid input, returning empty list")
+        logger.debug(
+            "normalize_csv_headers: empty or invalid input, returning empty list"
+        )
         return []
 
     normalized: list[str] = []
@@ -112,7 +115,6 @@ def normalize_csv_headers(headers: list[str]) -> list[str]:
                 header = str(header)
             # Step 1: Strip leading and trailing whitespace
             cleaned = header.strip()
-
 
         # Step 2: Replace invalid characters (anything not alphanumeric,
         # underscore, or hyphen) with underscores
@@ -218,7 +220,7 @@ def stream_incidents_csv_chunks(
 ) -> Generator[str, None, None]:
     """
     Stream incidents in chunks to a CSV-formatted string generator.
-    
+
     This avoids loading all incidents into memory at once by fetching them in batches.
     The first yielded string includes the CSV headers.
     """
@@ -232,13 +234,13 @@ def stream_incidents_csv_chunks(
     )
     writer.writeheader()
     yield output.getvalue()
-    
+
     offset = 0
     while True:
         batch = query_func(limit=batch_size, offset=offset)
         if not batch:
             break
-            
+
         output = io.StringIO()
         writer = csv.DictWriter(
             output,
@@ -246,14 +248,14 @@ def stream_incidents_csv_chunks(
             extrasaction="ignore",
             lineterminator="\r\n",
         )
-        
+
         for incident in batch:
             raw_score = incident.get("similarity_score", 0.0)
             try:
                 similarity_str = f"{float(raw_score):.2%}"
             except (TypeError, ValueError):
                 similarity_str = str(raw_score)
-                
+
             writer.writerow(
                 {
                     "Incident ID": incident.get("incident_id", ""),
@@ -265,13 +267,12 @@ def stream_incidents_csv_chunks(
                     "Date": incident.get("date_flagged", ""),
                 }
             )
-            
+
         yield output.getvalue()
-        
+
         offset += batch_size
         if len(batch) < batch_size:
             break
-
 
 
 def _sanitise_filename(name: str) -> str:
@@ -435,7 +436,9 @@ def create_batch_incident_zip_archive(incidents: list[dict]) -> bytes:
             csv_bytes = export_incidents_csv_stream(incidents)
             zf.writestr("incidents_summary.csv", csv_bytes)
         except Exception as exc:
-            logger.error("Failed to generate incidents_summary.csv in bulk export zip: %s", exc)
+            logger.error(
+                "Failed to generate incidents_summary.csv in bulk export zip: %s", exc
+            )
 
         # 2. Generate and write metadata.json
         try:
@@ -455,16 +458,23 @@ def create_batch_incident_zip_archive(incidents: list[dict]) -> bytes:
             doc_b = incident.get("document_b") or incident.get("doc_b", "")
 
             if not doc_a or not doc_b:
-                logger.warning("Skipping PDF generation for incident at index %d: missing doc_a or doc_b", idx)
+                logger.warning(
+                    "Skipping PDF generation for incident at index %d: missing doc_a or doc_b",
+                    idx,
+                )
                 continue
 
-            raw_score = incident.get("similarity_score") or incident.get("similarity", 0.0)
+            raw_score = incident.get("similarity_score") or incident.get(
+                "similarity", 0.0
+            )
             try:
                 score = float(raw_score)
             except (TypeError, ValueError):
                 score = 0.0
 
-            raw_threshold = incident.get("threshold_at_time_of_flag") or incident.get("threshold", 0.59)
+            raw_threshold = incident.get("threshold_at_time_of_flag") or incident.get(
+                "threshold", 0.59
+            )
             try:
                 threshold = float(raw_threshold)
             except (TypeError, ValueError):
@@ -475,6 +485,7 @@ def create_batch_incident_zip_archive(incidents: list[dict]) -> bytes:
                 # generate a fallback incident ID
                 try:
                     from src.db.incidents import build_incident_id
+
                     incident_id = build_incident_id(doc_a, doc_b)
                 except Exception:
                     incident_id = f"unknown_{idx}"
@@ -494,7 +505,92 @@ def create_batch_incident_zip_archive(incidents: list[dict]) -> bytes:
                 )
                 zf.writestr(pdf_filename, pdf_buffer.getvalue())
             except Exception as exc:
-                logger.error("Failed to generate PDF for incident %s (%s ↔ %s): %s", incident_id, doc_a, doc_b, exc)
+                logger.error(
+                    "Failed to generate PDF for incident %s (%s ↔ %s): %s",
+                    incident_id,
+                    doc_a,
+                    doc_b,
+                    exc,
+                )
 
     return memory_file.getvalue()
 
+
+def create_documents_bulk_zip_archive(filenames: list[str]) -> bytes:
+    """Create a downloadable .zip archive containing text content and metadata manifest
+    for the specified document filenames from the corpus database.
+
+    Args:
+        filenames: List of document filenames to include in the ZIP archive.
+
+    Returns:
+        ZIP archive file bytes ready for download.
+    """
+    from src.db.corpus_db import get_all_documents, get_document_word_counts, _connect
+    from src.utils.filename import sanitize_filename
+
+    buffer = io.BytesIO()
+    raw_docs = get_all_documents(include_deleted=True)
+    all_docs = {}
+    for d in raw_docs:
+        fn = getattr(d, "filename", None) or (
+            d.get("filename") if isinstance(d, dict) else None
+        )
+        if fn:
+            all_docs[fn] = d
+
+    word_counts = get_document_word_counts()
+    manifest_rows = []
+
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zip_file:
+        for filename in filenames:
+            doc_obj = all_docs.get(filename)
+            doc_meta = {}
+            if doc_obj:
+                if hasattr(doc_obj, "model_dump"):
+                    doc_meta = doc_obj.model_dump()
+                elif hasattr(doc_obj, "__dict__"):
+                    doc_meta = doc_obj.__dict__
+                elif isinstance(doc_obj, dict):
+                    doc_meta = doc_obj
+
+            rows = []
+            text_content = ""
+            try:
+                with _connect() as conn:
+                    rows = conn.execute(
+                        "SELECT chunk_text FROM chunks WHERE filename = ? ORDER BY chunk_index",
+                        (filename,),
+                    ).fetchall()
+                    text_content = "\n\n".join(r[0] for r in rows if r[0])
+            except Exception as exc:
+                logger.error(
+                    f"Failed to fetch content for document '{filename}': {exc}"
+                )
+
+            clean_name = sanitize_filename(filename, fallback="document")
+            if not os.path.splitext(clean_name)[1]:
+                clean_name += ".txt"
+
+            zip_file.writestr(clean_name, text_content.encode("utf-8"))
+
+            manifest_rows.append(
+                {
+                    "filename": filename,
+                    "exported_as": clean_name,
+                    "student_name": doc_meta.get("student_name") or "N/A",
+                    "assignment_title": doc_meta.get("assignment_title") or "N/A",
+                    "class_section": doc_meta.get("class_section") or "N/A",
+                    "word_count": word_counts.get(filename, 0),
+                    "chunk_count": len(rows),
+                    "upload_date": doc_meta.get("upload_date") or "N/A",
+                }
+            )
+
+        if manifest_rows:
+            manifest_df = pd.DataFrame(manifest_rows)
+            manifest_csv = manifest_df.to_csv(index=False).encode("utf-8-sig")
+            zip_file.writestr("export_manifest.csv", manifest_csv)
+
+    buffer.seek(0)
+    return buffer.getvalue()

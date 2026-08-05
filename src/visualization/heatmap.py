@@ -83,6 +83,10 @@ except ImportError:
     def apply_matplotlib_theme(theme_colors=None):
         return None
 
+    # Default Plotly font family
+    DEFAULT_FONT_FAMILY: str = "Inter, sans-serif"
+
+
 
 # ── Security & Sanitization ────────────────────────────────────────────────────
 class MatplotlibInjectionError(ValueError):
@@ -534,7 +538,7 @@ def plot_similarity_heatmap_plotly(
                         font=dict(
                             size=max(9, 14 - n),
                             color=font_color,
-                            family="Arial, sans-serif",
+                            family=DEFAULT_FONT_FAMILY,
                         ),
                     )
                 )
@@ -567,7 +571,7 @@ def plot_similarity_heatmap_plotly(
     fig.update_layout(
         title=dict(
             text=safe_title,
-            font=dict(size=18, family="Arial, sans-serif", color=ink_color),
+            font=dict(size=18, family=DEFAULT_FONT_FAMILY, color=ink_color),
         ),
         height=max(500, n * cell_px + 150),
         autosize=True,
@@ -590,12 +594,42 @@ def plot_similarity_heatmap_plotly(
         hoverlabel=dict(
             bgcolor=_get_theme_color(theme_colors, "surface", "white"),
             font_size=14,
-            font_family="Arial",
+            font_family=DEFAULT_FONT_FAMILY,
         ),
     )
 
     return fig
 
+
+def plot_similarity_minimap(
+    similarity_df: pd.DataFrame,
+    colormap_name: str = DEFAULT_UI_COLORMAP,
+):
+    import plotly.graph_objects as go
+
+    clean_df = validate_similarity_matrix(similarity_df)
+
+    fig = go.Figure(
+        data=go.Heatmap(
+            z=clean_df.values,
+            colorscale=PLOTLY_CMAP_MAPPING.get(colormap_name, "Viridis"),
+            showscale=False,
+            hoverinfo="skip",
+            xgap=0,
+            ygap=0,
+        )
+    )
+
+    fig.update_layout(
+        title="Minimap",
+        height=220,
+        width=220,
+        margin=dict(l=10, r=10, t=25, b=10),
+        xaxis=dict(showticklabels=False, fixedrange=True),
+        yaxis=dict(showticklabels=False, fixedrange=True, autorange="reversed"),
+    )
+
+    return fig
 
 # ── Differential / Delta Heatmap Visualization (#1369) ─────────────────────────
 
@@ -773,7 +807,7 @@ def plot_differential_heatmap(
     fig.update_layout(
         title=dict(
             text=safe_title,
-            font=dict(size=16, family="Arial Black", color=ink_color),
+            font=dict(size=16, family=DEFAULT_FONT_FAMILY, color=ink_color),
         ),
         xaxis=dict(
             title="Documents",
@@ -1066,4 +1100,15 @@ def render_heatmap_ui(
         fig.update_xaxes(autorange=True)
         fig.update_yaxes(autorange=True)
 
-    st.plotly_chart(fig, use_container_width=True)
+    main_col, mini_col = st.columns([5, 1])
+
+    with main_col:
+        st.plotly_chart(fig, use_container_width=True)
+
+    with mini_col:
+        mini_fig = plot_similarity_minimap(
+            clean_df,
+            colormap_name=colormap_name,
+        )
+        st.plotly_chart(mini_fig, use_container_width=True)
+        

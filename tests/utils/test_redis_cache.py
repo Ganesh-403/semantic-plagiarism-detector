@@ -710,3 +710,100 @@ class TestRedisCache:
         assert stats2["hits"] == 1
         assert stats2["misses"] == 1
         assert stats2["hit_ratio"] == 0.5
+
+class TestHitRateTracking:
+    """Test hit/miss counter tracking and get_hit_rate() (Issue #714)."""
+
+    @pytest.fixture
+    def mock_redis_client(self):
+        """Create a mock Redis client."""
+        client = Mock()
+        client.ping.return_value = True
+        return client
+
+    @pytest.fixture
+    def cache_with_mock(self, mock_redis_client):
+        """Create a RedisCache instance with mocked client and reset counters."""
+        from src.utils.redis_cache import _cache
+
+        cache = RedisCache.__new__(RedisCache)
+        cache._client = mock_redis_client
+        cache._hits = 0
+        cache._misses = 0
+        cache._fallback_cache = {}
+        _cache._client = mock_redis_client
+        yield cache
+        _cache._client = None
+
+    def test_hit_rate_zero_attempts(self, cache_with_mock):
+        """No get()/get_json() calls yet -> 0.0, no ZeroDivisionError."""
+        assert cache_with_mock.get_hit_rate() == 0.0
+
+    def test_hit_rate_all_hits(self, cache_with_mock, mock_redis_client):
+        """All lookups hit -> 100.0."""
+        import pickle
+
+        mock_redis_client.get.return_value = pickle.dumps("value")
+        for _ in range(4):
+            cache_with_mock.get("some_key")
+        assert cache_with_mock.get_hit_rate() == 100.0
+
+    def test_hit_rate_all_misses(self, cache_with_mock, mock_redis_client):
+        """All lookups miss -> 0.0."""
+        mock_redis_client.get.return_value = None
+        for _ in range(4):
+            cache_with_mock.get("missing_key")
+        assert cache_with_mock.get_hit_rate() == 0.0
+
+    def test_hit_rate_mixed(self, cache_with_mock, mock_redis_client):
+        """3 hits, 1 miss -> 75.0."""
+        import pickle
+
+        mock_redis_client.get.return_value = pickle.dumps("value")
+        for _ in range(3):
+            cache_with_mock.get("hit_key")
+
+        mock_redis_client.get.return_value = None
+        cache_with_mock.get("miss_key")
+
+        assert cache_with_mock.get_hit_rate() == 75.0
+
+    def test_hit_rate_tracks_get_json(self, cache_with_mock, mock_redis_client):
+        """get_json() hits/misses are counted toward the same hit rate."""
+        mock_redis_client.get.return_value = '{"a": 1}'
+        cache_with_mock.get_json("json_key")
+        assert cache_with_mock.get_hit_rate() == 100.0
+
+        mock_redis_client.get.return_value = None
+        cache_with_mock.get_json("missing_json_key")
+        assert cache_with_mock.get_hit_rate() == 50.0
+
+    def test_hit_rate_counts_fallback_path(self, cache_with_mock):
+        """When Redis is unavailable, fallback cache hits/misses still count."""
+        cache_with_mock._client = None  # force fallback path
+        cache_with_mock._fallback_cache["fb_key"] = ("fb_value", None)
+
+        cache_with_mock.get("fb_key")          # hit via fallback
+        cache_with_mock.get("nonexistent_key")  # miss via fallback
+
+        assert cache_with_mock.get_hit_rate() == 50.0
+
+    def test_hit_rate_thread_safety(self, cache_with_mock, mock_redis_client):
+        """Concurrent get() calls must not lose counter updates."""
+        import pickle
+        import threading
+
+        mock_redis_client.get.return_value = pickle.dumps("value")
+
+        def hammer():
+            for _ in range(100):
+                cache_with_mock.get("hot_key")
+
+        threads = [threading.Thread(target=hammer) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert cache_with_mock._hits == 1000
+        assert cache_with_mock.get_hit_rate() == 100.0

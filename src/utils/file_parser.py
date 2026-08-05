@@ -3,10 +3,10 @@ src/utils/file_parser.py
 ------------------------
 Utility functions for parsing PDF, DOCX, TXT, and Markdown files.
 Supports decrypted and password-protected PDF parsing using PyMuPDF (fitz),
-along with file categorization and validation helpers.
+along with file categorization, validation helpers, and PDF metadata extraction.
 """
 
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import fitz  # PyMuPDF
 
@@ -71,6 +71,39 @@ def extract_text_from_pdf(file_bytes: bytes, password: Optional[str] = None) -> 
 
     doc.close()
     return "\n".join(text_content), is_protected
+
+
+def extract_pdf_metadata(file_bytes: bytes) -> dict[str, Any]:
+    """
+    Extract document metadata from PDF bytes.
+
+    Args:
+        file_bytes (bytes): Raw bytes of the uploaded PDF file.
+
+    Returns:
+        dict[str, Any]: Dictionary with keys 'title', 'author', 'creation_date',
+            'mod_date', and 'page_count'. Missing or empty fields default to None.
+
+    Raises:
+        EncryptedPDFError: If the PDF is encrypted and requires a password.
+    """
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+
+    if doc.is_encrypted or doc.needs_pass:
+        doc.close()
+        raise EncryptedPDFError("PDF is password-protected. Password required.")
+
+    metadata = doc.metadata or {}
+    page_count = doc.page_count
+    doc.close()
+
+    return {
+        "title": metadata.get("title") or None,
+        "author": metadata.get("author") or None,
+        "creation_date": metadata.get("creationDate") or None,
+        "mod_date": metadata.get("modDate") or None,
+        "page_count": page_count,
+    }
 
 
 def get_file_mime_category(filename: str) -> str:

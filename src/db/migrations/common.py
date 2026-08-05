@@ -14,6 +14,9 @@ from collections.abc import Callable, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 
+from pathlib import Path
+from typing import List
+
 try:
     from typing import TypeAlias
 except ImportError:
@@ -254,4 +257,122 @@ def perform_wal_checkpoint(conn: sqlite3.Connection, mode: str = "PASSIVE") -> d
     except sqlite3.Error as e:
         logger.error(f"Failed to perform WAL checkpoint: {e}")
         raise
+
+
+def verify_schema_integrity(db_path: Path, expected_tables: List[str]) -> bool:
+    """Verify that the active database schema matches the expected table definitions.
+
+    This function inspects the `sqlite_master` table of the specified SQLite database
+    and compares the user-defined table names against a list of expected tables.
+    It is designed to be used by administrators deploying updates to ensure that
+    migrations have been applied correctly and no tables are missing.
+
+    Args:
+        db_path: Path to the SQLite database file to inspect.
+        expected_tables: List of table names that must exist in the database.
+                         Internal SQLite tables (prefixed with 'sqlite_') are
+                         automatically excluded from the comparison.
+
+    Returns:
+        True if all expected tables exist in the database and no unexpected
+        user-defined tables are present. False otherwise.
+
+    Raises:
+        FileNotFoundError: If the specified database file does not exist.
+        sqlite3.DatabaseError: If the file is not a valid SQLite database.
+
+    Examples:
+        >>> from pathlib import Path
+        >>> expected = ["documents", "chunks", "plagiarism_incidents"]
+        >>> verify_schema_integrity(Path("data/corpus.db"), expected)
+        True
+    """
+    import sqlite3
     
+    # Validate input path
+    resolved_path = Path(db_path).expanduser().resolve()
+    
+    if not resolved_path.exists():
+        logger.error(
+            "verify_schema_integrity: database file does not exist: %s",
+            resolved_path,
+        )
+        raise FileNotFoundError(f"Database file not found: {resolved_path}")
+        
+    if not resolved_path.is_file():
+        logger.error(
+            "verify_schema_integrity: path is not a file: %s",
+            resolved_path,
+        )
+        raise IsADirectoryError(f"Database path is not a file: {resolved_path}")
+
+    # Normalize expected tables to lowercase for case-insensitive comparison
+    expected_set = {t.lower().strip() for t in expected_tables if t.strip()}
+    
+    actual_tables = set()
+    
+    try:
+        # Connect in read-only mode to prevent accidental modifications
+        uri = f"file:{resolved_path.as_posix()}?mode=ro"
+        with sqlite3.connect(uri, uri=True, check_same_thread=False) as conn:
+            # Query sqlite_master for all user-defined tables
+            # Exclude internal SQLite tables (sqlite_sequence, etc.) and views
+            cursor = conn.execute(
+                """
+                SELECT name 
+                FROM sqlite_master 
+                WHERE type='table' 
+                  AND name NOT LIKE 'sqlite_%'
+                ORDER BY name
+                """
+            )
+            
+            for row in cursor.fetchall():
+                table_name = row[0].lower().strip()
+                actual_tables.add(table_name)
+                
+    except sqlite3.DatabaseError as exc:
+        logger.error(
+            "verify_schema_integrity: failed to read database schema: %s",
+            exc,
+        )
+        raise
+        
+    # Compare actual tables against expected tables
+    missing_tables = expected_set - actual_tables
+    unexpected_tables = actual_tables - expected_set
+    
+    is_valid = True
+    
+    if missing_tables:
+        logger.error(
+            "verify_schema_integrity: MISSING tables in %s: %s",
+            resolved_path,
+            ", ".join(sorted(missing_tables)),
+        )
+        is_valid = False
+        
+    if unexpected_tables:
+        logger.warning(
+            "verify_schema_integrity: UNEXPECTED tables in %s: %s",
+            resolved_path,
+            ", ".join(sorted(unexpected_tables)),
+        )
+        # Unexpected tables might be acceptable in some scenarios (e.g., legacy tables),
+        # but for strict integrity verification, we flag them as invalid.
+        is_valid = False
+        
+    if is_valid:
+        logger.info(
+            "verify_schema_integrity: schema verification PASSED for %s (%d tables verified).",
+            resolved_path,
+            len(actual_tables),
+        )
+    else:
+        logger.error(
+            "verify_schema_integrity: schema verification FAILED for %s.",
+            resolved_path,
+        )
+        
+    return is_valid
+   

@@ -9,6 +9,7 @@ import pytest
 
 from src.utils.file_parser import (
     EncryptedPDFError,
+    extract_pdf_metadata,
     extract_text_from_pdf,
     get_file_size_formatted,
     get_file_mime_category,
@@ -124,3 +125,69 @@ class TestFileMimeCategory:
     def test_is_extension_supported(self, filename, allowed_categories, expected_result):
         """Test extension support validation against allowed categories."""
         assert is_extension_supported(filename, allowed_categories) == expected_result
+
+
+class TestPdfMetadataExtraction:
+    """Test suite for PDF metadata extraction."""
+
+    def _create_pdf(self, metadata: dict) -> bytes:
+        """Create an in-memory PDF with the given metadata."""
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((50, 50), "Metadata Test Content")
+        doc.set_metadata(metadata)
+        pdf_bytes = doc.tobytes()
+        doc.close()
+        return pdf_bytes
+
+    def test_extract_pdf_metadata_with_all_fields(self):
+        """Test extracting metadata from a PDF with complete metadata."""
+        pdf_bytes = self._create_pdf(
+            {
+                "title": "Test Report",
+                "author": "Rishab",
+                "creationDate": "D:20240101120000Z",
+                "modDate": "D:20240201120000Z",
+            }
+        )
+        result = extract_pdf_metadata(pdf_bytes)
+        assert result["title"] == "Test Report"
+        assert result["author"] == "Rishab"
+        assert result["creation_date"] == "D:20240101120000Z"
+        assert result["mod_date"] == "D:20240201120000Z"
+        assert result["page_count"] == 1
+
+    def test_extract_pdf_metadata_missing_fields_default_to_none(self):
+        """Test that empty or missing metadata fields become None."""
+        pdf_bytes = self._create_pdf({})
+        result = extract_pdf_metadata(pdf_bytes)
+        assert result["title"] is None
+        assert result["author"] is None
+        assert result["creation_date"] is None
+        assert result["mod_date"] is None
+        assert result["page_count"] == 1
+
+    def test_extract_pdf_metadata_page_count(self):
+        """Test that page_count reflects the number of pages in the PDF."""
+        doc = fitz.open()
+        doc.new_page()
+        doc.new_page()
+        doc.new_page()
+        pdf_bytes = doc.tobytes()
+        doc.close()
+        result = extract_pdf_metadata(pdf_bytes)
+        assert result["page_count"] == 3
+
+    def test_extract_pdf_metadata_encrypted_raises(self):
+        """Test that encrypted PDFs raise EncryptedPDFError."""
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((50, 50), "Confidential")
+        pdf_bytes = doc.tobytes(
+            encryption=fitz.PDF_ENCRYPT_AES_256,
+            user_pw="secret123",
+            owner_pw="owner123",
+        )
+        doc.close()
+        with pytest.raises(EncryptedPDFError):
+            extract_pdf_metadata(pdf_bytes)

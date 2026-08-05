@@ -596,3 +596,145 @@ def test_calculate_text_perplexity_none_loss():
         finally:
             module._model = original_model
             module._tokenizer = original_tokenizer
+
+
+# ─── Tests for Stylometric Feature Extractor (Issue #1484) ─────────────────────
+
+from src.core.ai_detector import extract_stylometric_features
+import pytest
+
+class TestExtractStylometricFeatures:
+    """Comprehensive test suite for stylometric feature extraction."""
+
+    def test_empty_string_returns_zeros(self):
+        """Empty input must return a dictionary with all values set to 0.0."""
+        features = extract_stylometric_features("")
+        assert all(v == 0.0 for v in features.values())
+
+    def test_none_input_returns_zeros(self):
+        """None input must return a dictionary with all values set to 0.0."""
+        features = extract_stylometric_features(None)
+        assert all(v == 0.0 for v in features.values())
+
+    def test_whitespace_only_returns_zeros(self):
+        """Whitespace-only input must return a dictionary with all values set to 0.0."""
+        features = extract_stylometric_features("   \n\t  ")
+        assert all(v == 0.0 for v in features.values())
+
+    def test_returns_dict_with_correct_keys(self):
+        """The returned dictionary must contain all 5 expected stylometric keys."""
+        features = extract_stylometric_features("This is a test sentence.")
+        expected_keys = {
+            "type_token_ratio",
+            "avg_word_length",
+            "avg_sentence_length",
+            "sentence_length_variance",
+            "yules_k",
+        }
+        assert set(features.keys()) == expected_keys
+
+    def test_all_values_are_floats(self):
+        """All returned metric values must be of type float."""
+        features = extract_stylometric_features("Hello world. This is a test.")
+        for key, value in features.items():
+            assert isinstance(value, float), f"{key} is not a float"
+
+    def test_type_token_ratio_perfect_diversity(self):
+        """If all words are unique, TTR should be exactly 1.0."""
+        text = "one two three four five"
+        features = extract_stylometric_features(text)
+        assert features["type_token_ratio"] == 1.0
+
+    def test_type_token_ratio_repetition(self):
+        """Repeated words should lower the TTR."""
+        text = "the the the the the"
+        features = extract_stylometric_features(text)
+        assert features["type_token_ratio"] == 0.2  # 1 unique / 5 total
+
+    def test_average_word_length_calculation(self):
+        """Verify average word length is calculated correctly."""
+        # "cat" (3), "dog" (3), "bird" (4) -> avg = 10/3 = 3.3333
+        text = "cat dog bird"
+        features = extract_stylometric_features(text)
+        assert features["avg_word_length"] == pytest.approx(3.3333, rel=1e-3)
+
+    def test_sentence_length_variance_single_sentence(self):
+        """A single sentence should have 0.0 variance."""
+        text = "This is a single sentence without terminal punctuation"
+        features = extract_stylometric_features(text)
+        assert features["sentence_length_variance"] == 0.0
+
+    def test_sentence_length_variance_multiple_sentences(self):
+        """Multiple sentences with varying lengths should produce >0 variance."""
+        text = "Short. This is a medium length sentence. And here is a significantly longer sentence for testing."
+        features = extract_stylometric_features(text)
+        assert features["sentence_length_variance"] > 0.0
+
+    def test_yules_k_positive_for_real_text(self):
+        """Yule's K should be > 0 for typical text with repeated words."""
+        text = (
+            "The quick brown fox jumps over the lazy dog. "
+            "The dog barked at the fox, but the fox ran away."
+        )
+        features = extract_stylometric_features(text)
+        assert features["yules_k"] > 0.0
+
+    def test_yules_k_zero_for_all_unique_words(self):
+        """If all words appear exactly once, Yule's K should be 0.0."""
+        # 5 unique words, each appearing once. f_1 = 5, all other f_i = 0
+        # sum(f_i * i^2) = 5 * 1^2 = 5. N = 5.
+        # K = 10000 * (5/25 - 1/5) = 10000 * (0.2 - 0.2) = 0.0
+        text = "one two three four five"
+        features = extract_stylometric_features(text)
+        assert features["yules_k"] == 0.0
+
+    def test_case_insensitivity_in_word_counting(self):
+        """Stylometric features should be case-insensitive for word counting."""
+        text_a = "The the THE"
+        text_b = "the the the"
+        feat_a = extract_stylometric_features(text_a)
+        feat_b = extract_stylometric_features(text_b)
+        assert feat_a["type_token_ratio"] == feat_b["type_token_ratio"]
+        assert feat_a["yules_k"] == feat_b["yules_k"]
+
+    def test_punctuation_does_not_affect_word_count(self):
+        """Punctuation should be stripped and not counted as words."""
+        text = "Hello, world! How are you?"
+        features = extract_stylometric_features(text)
+        # Words: hello, world, how, are, you (5 words)
+        assert features["avg_sentence_length"] == 5.0
+
+    def test_handles_text_without_punctuation(self):
+        """Text without sentence-ending punctuation should be treated as one sentence."""
+        text = "this is a long fragment without any periods or exclamation marks"
+        features = extract_stylometric_features(text)
+        # Should be treated as 1 sentence
+        assert features["avg_sentence_length"] == len(text.split())
+        assert features["sentence_length_variance"] == 0.0
+
+    @pytest.mark.parametrize(
+        "text,expected_ttr_range",
+        [
+            ("a b c d e", (0.99, 1.01)),  # All unique
+            ("a a a a a", (0.19, 0.21)),  # All same
+            ("a b a b a", (0.39, 0.41)),  # 2 unique out of 5
+        ],
+    )
+    def test_parametrized_ttr_bounds(self, text, expected_ttr_range):
+        """Verify TTR falls within expected mathematical bounds for known patterns."""
+        features = extract_stylometric_features(text)
+        assert expected_ttr_range[0] <= features["type_token_ratio"] <= expected_ttr_range[1]
+
+    def test_long_academic_text_extraction(self):
+        """Verify extraction works on a realistic paragraph of academic text."""
+        text = (
+            "Stylometry is the linguistic analysis of a person's distinctive writing style. "
+            "It has been used for authorship attribution, identifying the authors of disputed "
+            "or anonymous texts, since the 19th century. Modern computational stylometry uses "
+            "machine learning techniques to analyze large corpora of texts."
+        )
+        features = extract_stylometric_features(text)
+        
+        assert features["type_token_ratio"] > 0.5  # Academic text has rich vocabulary
+        assert features["avg_word_length"] > 4.0   # Academic words tend to be longer
+        assert features["yules_k"] > 0.0           # Some repetition expected

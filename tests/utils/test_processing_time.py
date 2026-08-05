@@ -8,6 +8,7 @@ import pytest
 from src.utils.processing_time import (
     BYTES_PER_MB,
     ProcessingTimer,
+    calculate_mb_per_minute,
     calculate_page_throughput,
     calculate_processing_throughput,
     estimate_processing_seconds,    format_duration,
@@ -347,3 +348,14 @@ def test_eta_text_uses_default_rate():
     assert processing_eta_text(2 * BYTES_PER_MB) == (
         "Estimated processing time: about 4 seconds"
     )
+def test_calculate_mb_per_minute():
+    # Test normal calculation: 10 MB in 60 seconds (1 minute) = 10.0 MB/min
+    ten_mb_in_bytes = 10 * 1024 * 1024
+    assert calculate_mb_per_minute(ten_mb_in_bytes, 60.0) == 10.0
+
+    # Test zero or negative elapsed time returns 0.0
+    assert calculate_mb_per_minute(ten_mb_in_bytes, 0.0) == 0.0
+    assert calculate_mb_per_minute(ten_mb_in_bytes, -5.0) == 0.0
+
+    # Test zero bytes processed
+    assert calculate_mb_per_minute(0, 60.0) == 0.0

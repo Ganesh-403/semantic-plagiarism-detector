@@ -249,12 +249,89 @@ def test_validate_webhook_url_max_redirects_exceeded(mock_head, monkeypatch):
         classmethod(lambda cls, hostname: "93.184.216.34"),
     )
 
-    redirect_response = type(
-        "MockResponse",
-        (),
-        {"status_code": 302, "headers": {"Location": "https://example.com/next"}},
-    )()
-    mock_head.return_value = redirect_response
+    def make_redirect_response(hop_number):
+        return type(
+            "MockResponse",
+            (),
+            {
+                "status_code": 302,
+                "headers": {"Location": f"https://example.com/hop{hop_number}"},
+            },
+        )()
+
+    # Each hop redirects to a brand-new URL (no repeats), so this
+    # exercises the "too many redirects" path rather than the loop path.
+    mock_head.side_effect = [make_redirect_response(i) for i in range(1, 6)]
 
     with pytest.raises(SSRFSecurityException, match="Maximum HTTP redirect depth exceeded"):
         SSRFProtector.validate_webhook_url("https://example.com/start")
+
+
+@patch("src.security.ssrf_protector.requests.head")
+def test_validate_webhook_url_circular_redirect_loop_detected(mock_head, monkeypatch):
+    """A -> B -> A should be caught as a circular redirect loop (issue #1496)."""
+    monkeypatch.setattr(
+        SSRFProtector,
+        "_resolve_hostname",
+        classmethod(lambda cls, hostname: "93.184.216.34"),
+    )
+
+    response_a_to_b = type(
+        "MockResponse",
+        (),
+        {"status_code": 302, "headers": {"Location": "https://example.com/b"}},
+    )()
+    response_b_to_a = type(
+        "MockResponse",
+        (),
+        {"status_code": 302, "headers": {"Location": "https://example.com/a"}},
+    )()
+    mock_head.side_effect = [response_a_to_b, response_b_to_a]
+
+    with pytest.raises(
+        SSRFSecurityException, match="Circular HTTP redirect loop detected"
+    ):
+        SSRFProtector.validate_webhook_url("https://example.com/a")
+@patch("src.security.ssrf_protector.socket.getaddrinfo")
+def test_validate_webhook_url_hexadecimal_localhost(mock_getaddrinfo, caplog):
+    """
+    Hexadecimal representation of localhost (0x7f000001) should resolve
+    to 127.0.0.1 and be blocked.
+    """
+    mock_getaddrinfo.return_value = [
+        (2, 1, 6, "", ("127.0.0.1", 443))
+    ]
+
+    with pytest.raises(
+        SSRFSecurityException,
+        match="Blocked loopback IP: 127.0.0.1",
+    ):
+        SSRFProtector.validate_webhook_url(
+            "https://0x7f000001/webhook"
+        )
+
+    assert (
+        "Blocked SSRF attempt to target URL: https://0x7f000001/webhook"
+        in caplog.text
+    )
+@patch("src.security.ssrf_protector.socket.getaddrinfo")
+def test_validate_webhook_url_ipv6_loopback_literal(mock_getaddrinfo, caplog):
+    """
+    IPv6 loopback literal (::1) should always be blocked.
+    """
+    mock_getaddrinfo.return_value = [
+        (10, 1, 6, "", ("::1", 443, 0, 0))
+    ]
+
+    with pytest.raises(
+        SSRFSecurityException,
+        match="Blocked loopback IP: ::1",
+    ):
+        SSRFProtector.validate_webhook_url(
+            "https://[::1]/webhook"
+        )
+
+    assert (
+        "Blocked SSRF attempt to target URL: https://[::1]/webhook"
+        in caplog.text
+    )

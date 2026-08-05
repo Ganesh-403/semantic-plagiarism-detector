@@ -5,9 +5,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from src.db.incidents import (
+    archive_old_incidents,
     build_incident_id,
-    export_current_flags_csv,
-    get_all_incidents,
+    export_current_flags_csv,    get_all_incidents,
     get_incident_by_id,
     get_incidents_by_date_range,
     get_incidents_by_severity,
@@ -549,3 +549,34 @@ def test_get_recent_incidents_caching_and_invalidation(test_db):
     incidents_3 = get_recent_incidents(limit=5, db_path=test_db)
     assert len(incidents_3) == 2
 
+def test_archive_old_incidents_moves_rows_to_archive_table(test_db):
+    """Test that archive_old_incidents copies old rows and removes them."""
+    import sqlite3
+
+    old_date = (datetime.now(timezone.utc) - timedelta(days=200)).isoformat()
+    recent_date = datetime.now(timezone.utc).isoformat()
+
+    old_flags = [{"doc_a": "old1.pdf", "doc_b": "old2.pdf", "similarity": 0.90}]
+    sync_flagged_incidents(old_flags, test_db, now=old_date)
+
+    recent_flags = [{"doc_a": "new1.pdf", "doc_b": "new2.pdf", "similarity": 0.80}]
+    sync_flagged_incidents(recent_flags, test_db, now=recent_date)
+
+    assert len(get_all_incidents(test_db)) == 2
+
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=100)).isoformat()
+    archived_count = archive_old_incidents(cutoff, db_path=test_db)
+
+    assert archived_count == 1
+
+    remaining = get_all_incidents(test_db)
+    assert len(remaining) == 1
+    assert remaining[0]["document_a"] == "new1.pdf"
+
+    with sqlite3.connect(test_db) as conn:
+        row = conn.execute(
+            "SELECT document_a FROM incidents_archive WHERE incident_id = ?",
+            (build_incident_id("old1.pdf", "old2.pdf"),),
+        ).fetchone()
+        assert row is not None
+        assert row[0] == "old1.pdf"

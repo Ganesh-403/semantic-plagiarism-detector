@@ -336,6 +336,12 @@ def inject_css() -> None:
         @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
 
         :root {{
+            --primary-bg: {colors["background"]};
+            --secondary-bg: {colors["surface"]};
+            --text-color: var(--text-color);
+            --secondary-text-color: {colors["muted"]};
+            --border-color: {colors["border"]};
+            --accent-color: {colors["accent"]};
             --background: {colors["background"]};
             --surface: {colors["surface"]};
             --card: {colors["card"]};
@@ -360,16 +366,16 @@ def inject_css() -> None:
         }}
 
         .stApp {{
-            background-color: var(--background) !important;
-            color: var(--ink) !important;
+            background-color: var(--primary-bg) !important;
+            color: var(--text-color) !important;
         }}
 
         [data-testid="stHeader"] {{
-            background-color: var(--background) !important;
+            background-color: var(--primary-bg) !important;
         }}
 
         [data-testid="stToolbar"] {{
-            color: var(--ink) !important;
+            color: var(--text-color) !important;
         }}
 
         h1,
@@ -379,7 +385,7 @@ def inject_css() -> None:
         h5,
         h6 {{
             font-family: 'Newsreader', Georgia, serif !important;
-            color: var(--ink) !important;
+            color: var(--text-color) !important;
             font-weight: 700 !important;
         }}
 
@@ -389,19 +395,19 @@ def inject_css() -> None:
         li,
         [data-testid="stMarkdownContainer"],
         [data-testid="stWidgetLabel"] {{
-            color: var(--ink);
+            color: var(--text-color);
         }}
 
         [data-testid="stCaptionContainer"],
         .stCaption {{
-            color: var(--muted) !important;
+            color: var(--secondary-text-color) !important;
         }}
 
         .hero-kicker {{
             font-family: 'Inter', sans-serif;
             font-size: 0.8rem;
             font-weight: 700;
-            color: var(--accent);
+            color: var(--accent-color);
             text-transform: uppercase;
             letter-spacing: 0.12em;
             margin-bottom: 0.25rem;
@@ -410,19 +416,19 @@ def inject_css() -> None:
         /* ── Sidebar ────────────────────────────────────────────────── */
 
         [data-testid="stSidebar"] {{
-            background-color: var(--surface) !important;
-            border-right: 1px solid var(--border) !important;
+            background-color: var(--secondary-bg) !important;
+            border-right: 1px solid var(--border-color) !important;
         }}
 
         [data-testid="stSidebar"] * {{
-            color: var(--ink);
+            color: var(--text-color);
         }}
 
         .sidebar-brand-title {{
             font-family: 'Newsreader', serif;
             font-size: 1.5rem;
             font-weight: 700;
-            color: var(--ink);
+            color: var(--text-color);
             text-align: center;
             line-height: 1.2;
             margin-top: 0.25rem;
@@ -433,7 +439,7 @@ def inject_css() -> None:
             font-family: 'Inter', sans-serif;
             font-size: 0.7rem;
             font-weight: 700;
-            color: var(--accent);
+            color: var(--accent-color);
             text-transform: uppercase;
             letter-spacing: 0.1em;
             text-align: center;
@@ -444,12 +450,12 @@ def inject_css() -> None:
             font-family: 'Inter', sans-serif;
             font-size: 0.75rem;
             font-weight: 700;
-            color: var(--muted);
+            color: var(--secondary-text-color);
             text-transform: uppercase;
             letter-spacing: 0.05em;
             margin-top: 1rem;
             margin-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--border-color);
             padding-bottom: 2px;
         }}
 
@@ -460,10 +466,10 @@ def inject_css() -> None:
             padding: 8px 12px;
             border-radius: 8px;
             background-color: var(--neutral-soft);
-            border: 1px solid var(--border);
+            border: 1px solid var(--border-color);
             font-size: 0.8rem;
             font-weight: 600;
-            color: var(--ink);
+            color: var(--text-color);
             margin-bottom: 0.75rem;
         }}
 
@@ -471,7 +477,7 @@ def inject_css() -> None:
             width: 28px;
             height: 28px;
             border-radius: 50%;
-            background-color: var(--accent);
+            background-color: var(--accent-color);
             color: white;
             display: flex;
             align-items: center;
@@ -500,8 +506,8 @@ def inject_css() -> None:
 
         div[data-testid="stMetric"] {{
             background-color: var(--card) !important;
-            border: 1px solid var(--border) !important;
-            border-top: 4px solid var(--accent) !important;
+            border: 1px solid var(--border-color) !important;
+            border-top: 4px solid var(--accent-color) !important;
             border-radius: 8px !important;
             padding: 14px 16px !important;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
@@ -511,7 +517,7 @@ def inject_css() -> None:
             font-family: 'Inter', sans-serif !important;
             font-size: 0.75rem !important;
             font-weight: 700 !important;
-            color: var(--muted) !important;
+            color: var(--secondary-text-color) !important;
             text-transform: uppercase !important;
             letter-spacing: 0.05em !important;
         }}
@@ -520,7 +526,7 @@ def inject_css() -> None:
             font-family: 'IBM Plex Mono', monospace !important;
             font-size: 1.6rem !important;
             font-weight: 700 !important;
-            color: var(--ink) !important;
+            color: var(--text-color) !important;
         }}
 
         div[data-testid="stMetricDelta"] > div {{
@@ -543,12 +549,12 @@ def inject_css() -> None:
 
         .meta-chip {{
             background-color: var(--neutral-soft);
-            border: 1px solid var(--border);
+            border: 1px solid var(--border-color);
             border-radius: 6px;
             padding: 4px 10px;
             font-size: 0.8rem;
             font-weight: 600;
-            color: var(--ink);
+            color: var(--text-color);
             display: inline-flex;
             align-items: center;
             gap: 6px;
@@ -558,7 +564,7 @@ def inject_css() -> None:
             font-family: 'IBM Plex Mono', monospace !important;
             background: none !important;
             padding: 0 !important;
-            color: var(--accent) !important;
+            color: var(--accent-color) !important;
             font-weight: 700 !important;
         }}
 
@@ -566,7 +572,7 @@ def inject_css() -> None:
 
         .login-container {{
             background-color: var(--card) !important;
-            border: 1px solid var(--border) !important;
+            border: 1px solid var(--border-color) !important;
             border-radius: 12px !important;
             padding: 2.5rem !important;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18) !important;
@@ -590,18 +596,18 @@ def inject_css() -> None:
             font-family: 'Newsreader', serif;
             font-size: 1.5rem;
             font-weight: 700;
-            color: var(--ink);
+            color: var(--text-color);
             margin-bottom: 0.25rem;
         }}
 
         .login-container .login-subtitle {{
             font-size: 0.85rem;
-            color: var(--muted);
+            color: var(--secondary-text-color);
         }}
 
         .login-accent-bar {{
             height: 4px;
-            background: linear-gradient(90deg, var(--accent), transparent);
+            background: linear-gradient(90deg, var(--accent-color), transparent);
             border-radius: 2px;
             margin-bottom: 1.5rem;
         }}
@@ -667,7 +673,7 @@ def inject_css() -> None:
             margin-bottom: 1rem;
             font-size: 0.8rem;
             font-weight: 500;
-            color: var(--muted);
+            color: var(--secondary-text-color);
         }}
 
         .legend-item {{
@@ -690,21 +696,21 @@ def inject_css() -> None:
         .stNumberInput input,
         [data-baseweb="select"] > div {{
             background-color: var(--input) !important;
-            color: var(--ink) !important;
-            border-color: var(--border) !important;
+            color: var(--text-color) !important;
+            border-color: var(--border-color) !important;
         }}
 
         [data-baseweb="popover"],
         [data-baseweb="menu"],
         [role="listbox"] {{
             background-color: var(--card) !important;
-            color: var(--ink) !important;
+            color: var(--text-color) !important;
         }}
 
         .stButton button,
         .stDownloadButton button,
         .stFormSubmitButton button {{
-            border-color: var(--border) !important;
+            border-color: var(--border-color) !important;
         }}
 
         .clear-all-container button {{
@@ -721,44 +727,44 @@ def inject_css() -> None:
         }}
 
         .{CLASS_WELCOME_BANNER} {{
-    background-color: {colors["surface"]};
-    border: 1px solid {colors["border"]};
+    background-color: var(--secondary-bg);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 12px 16px;
     margin-bottom: 16px;
-    color: {colors["ink"]};
+    color: var(--text-color);
     font-size: 0.95rem;
 }}
 
         [data-testid="stExpander"],
         [data-testid="stForm"] {{
             background-color: var(--card) !important;
-            border-color: var(--border) !important;
+            border-color: var(--border-color) !important;
         }}
 
         [data-testid="stDataFrame"],
         [data-testid="stTable"] {{
-            border-color: var(--border) !important;
+            border-color: var(--border-color) !important;
         }}
 
         [data-testid="stFileUploaderDropzone"] {{
-            background-color: var(--surface) !important;
-            border-color: var(--border) !important;
+            background-color: var(--secondary-bg) !important;
+            border-color: var(--border-color) !important;
         }}
 
         /* ── Tabs ───────────────────────────────────────────────────── */
 
         [data-testid="stTabs"] button {{
-            color: var(--muted) !important;
+            color: var(--secondary-text-color) !important;
         }}
 
         [data-testid="stTabs"] button[aria-selected="true"] {{
-            color: var(--accent) !important;
-            border-bottom-color: var(--accent) !important;
+            color: var(--accent-color) !important;
+            border-bottom-color: var(--accent-color) !important;
         }}
 
         hr {{
-            border-color: var(--border) !important;
+            border-color: var(--border-color) !important;
         }}
 
         /* ── Enhanced footer ────────────────────────────────────────── */
@@ -767,11 +773,11 @@ def inject_css() -> None:
             text-align: center;
             padding: 1rem 0 0.5rem;
             font-size: 0.78rem;
-            color: var(--muted);
+            color: var(--secondary-text-color);
         }}
 
         .app-footer a {{
-            color: var(--accent);
+            color: var(--accent-color);
             text-decoration: none;
         }}
 
@@ -784,7 +790,7 @@ def inject_css() -> None:
         .empty-state {{
             text-align: center;
             padding: 2.5rem 1rem;
-            color: var(--muted);
+            color: var(--secondary-text-color);
         }}
 
         .empty-state .empty-icon {{
@@ -797,7 +803,7 @@ def inject_css() -> None:
             font-family: 'Newsreader', serif;
             font-size: 1.15rem;
             font-weight: 700;
-            color: var(--ink);
+            color: var(--text-color);
             margin-bottom: 0.25rem;
         }}
 
@@ -827,14 +833,14 @@ def inject_css() -> None:
             font-size: 0.78rem;
             font-weight: 600;
             background-color: var(--neutral-soft);
-            color: var(--muted);
-            border: 1px solid var(--border);
+            color: var(--secondary-text-color);
+            border: 1px solid var(--border-color);
         }}
 
         .pipeline-step.active {{
-            background-color: var(--accent);
+            background-color: var(--accent-color);
             color: white;
-            border-color: var(--accent);
+            border-color: var(--accent-color);
             animation: pipelinePulse 1.2s ease-in-out infinite;
         }}
 
@@ -845,7 +851,7 @@ def inject_css() -> None:
         }}
 
         .pipeline-arrow {{
-            color: var(--muted);
+            color: var(--secondary-text-color);
             font-size: 0.7rem;
         }}
 
@@ -873,7 +879,7 @@ def inject_css() -> None:
             bottom: max(2rem, env(safe-area-inset-bottom, 2rem));
             right: max(2rem, env(safe-area-inset-right, 2rem));
             z-index: 9999;
-            background-color: var(--accent);
+            background-color: var(--accent-color);
             color: #fff;
             border: none;
             border-radius: 8px;
@@ -905,7 +911,7 @@ def inject_css() -> None:
         }}
 
         #back-to-top-btn:focus-visible {{
-            outline: 2px solid var(--accent);
+            outline: 2px solid var(--accent-color);
             outline-offset: 2px;
         }}
 
@@ -949,26 +955,26 @@ def inject_css() -> None:
     file_uploader_css = f"""
     /* File Uploader Drag-Zone Customization */
     .stFileUploader [data-testid="stFileUploaderDropzone"] {{
-        border: 2px dashed {colors['border']} !important;
+        border: 2px dashed var(--border-color) !important;
         border-radius: 8px !important;
-        background-color: {colors['surface']} !important;
+        background-color: var(--secondary-bg) !important;
         transition: all 0.2s ease-in-out !important;
         padding: 1.5rem !important;
     }}
 
     .stFileUploader [data-testid="stFileUploaderDropzone"]:hover {{
-        border-color: {colors['accent']} !important;
+        border-color: var(--accent-color) !important;
         background-color: {colors['neutral_soft']} !important;
         cursor: pointer !important;
     }}
 
     .stFileUploader [data-testid="stFileUploaderDropzone"] [data-testid="stFileUploaderInstruction"] {{
-        color: {colors['muted']} !important;
+        color: var(--secondary-text-color) !important;
         font-weight: 500 !important;
     }}
 
     .stFileUploader [data-testid="stFileUploaderDropzone"] [data-testid="stFileUploaderBrowseFiles"] {{
-        background-color: {colors['accent']} !important;
+        background-color: var(--accent-color) !important;
         color: #FFFFFF !important;
         border-radius: 4px !important;
         font-weight: 600 !important;
@@ -976,7 +982,7 @@ def inject_css() -> None:
     }}
 
     .stFileUploader [data-testid="stFileUploaderDropzone"] [data-testid="stFileUploaderBrowseFiles"]:hover {{
-        background-color: {colors['ink']} !important;
+        background-color: var(--text-color) !important;
     }}
     """
 
@@ -989,8 +995,8 @@ def inject_css() -> None:
     section[data-testid="stSidebar"] .stButton button.st-active,
     .stButton button[data-selected="true"] {{
         border-left: 4px solid #4f46e5 !important;
-        background-color: {colors.get('neutral_soft', '#F1F5F9')} !important;
-        color: {colors.get('accent', '#0D9488')} !important;
+        background-color: var(--neutral-soft) !important;
+        color: var(--accent-color) !important;
         font-weight: 700 !important;
         border-top-left-radius: 0 !important;
         border-bottom-left-radius: 0 !important;
@@ -1001,7 +1007,7 @@ def inject_css() -> None:
     section[data-testid="stSidebar"] .stButton button[data-selected="true"]:hover,
     .stButton button[data-selected="true"]:hover {{
         border-left: 4px solid #4f46e5 !important;
-        background-color: {colors.get('surface', '#F8FAFC')} !important;
+        background-color: var(--secondary-bg) !important;
     }}
 
     section[data-testid="stSidebar"] .stButton button:hover {{
@@ -1013,8 +1019,8 @@ def inject_css() -> None:
     base_css = f"""
     /* Global Theme Overrides */
     .stApp {{
-        background-color: {colors['background']} !important;
-        color: {colors['ink']} !important;
+        background-color: var(--primary-bg) !important;
+        color: var(--text-color) !important;
     }}
 
     .block-container {{
@@ -1026,8 +1032,8 @@ def inject_css() -> None:
     }}
 
     .stCard {{
-        background-color: {colors['card']} !important;
-        border: 1px solid {colors['border']} !important;
+        background-color: var(--card) !important;
+        border: 1px solid var(--border-color) !important;
         border-radius: 8px !important;
     }}
 
@@ -1035,26 +1041,26 @@ def inject_css() -> None:
     .{CLASS_EMPTY_STATE} {{
         text-align: center;
         padding: 2rem;
-        background-color: {colors['surface']};
+        background-color: var(--secondary-bg);
         border-radius: 8px;
-        border: 1px dashed {colors['border']};
+        border: 1px dashed var(--border-color);
     }}
 
     .{CLASS_EMPTY_ICON} {{
         font-size: 3rem;
         margin-bottom: 1rem;
-        color: {colors['muted']};
+        color: var(--secondary-text-color);
     }}
 
     .{CLASS_EMPTY_TITLE} {{
         font-size: 1.25rem;
         font-weight: 600;
-        color: {colors['ink']};
+        color: var(--text-color);
         margin-bottom: 0.5rem;
     }}
 
     .{CLASS_EMPTY_DESC} {{
-        color: {colors['muted']};
+        color: var(--secondary-text-color);
         font-size: 0.95rem;
     }}
 
@@ -1067,28 +1073,28 @@ def inject_css() -> None:
     }}
 
     .{CLASS_PIPELINE_STEP} {{
-        color: {colors['muted']};
+        color: var(--secondary-text-color);
         font-weight: 500;
         font-size: 0.9rem;
     }}
 
     .{CLASS_PIPELINE_ACTIVE} {{
-        color: {colors['accent']};
+        color: var(--accent-color);
         font-weight: 700;
     }}
 
     .{CLASS_PIPELINE_DONE} {{
-        color: {colors['success']};
+        color: var(--success);
     }}
 
     .{CLASS_PIPELINE_ARROW} {{
-        color: {colors['border']};
+        color: var(--border-color);
         margin: 0 0.5rem;
     }}
 
     .{CLASS_PIPELINE_ETA} {{
         font-size: 0.8rem;
-        color: {colors['muted']};
+        color: var(--secondary-text-color);
         margin-top: 0.5rem;
         font-style: italic;
     }}
@@ -1098,9 +1104,9 @@ def inject_css() -> None:
         display: flex;
         align-items: center;
         padding: 0.75rem;
-        background-color: {colors['surface']};
+        background-color: var(--secondary-bg);
         border-radius: 8px;
-        border: 1px solid {colors['border']};
+        border: 1px solid var(--border-color);
         margin-bottom: 1rem;
     }}
 
@@ -1108,7 +1114,7 @@ def inject_css() -> None:
         width: 32px;
         height: 32px;
         border-radius: 50%;
-        background-color: {colors['accent']};
+        background-color: var(--accent-color);
         color: #FFFFFF;
         display: flex;
         align-items: center;
@@ -1136,7 +1142,7 @@ def inject_css() -> None:
     }}
 
     .{CLASS_WELCOME_BANNER} {{
-        background: linear-gradient(135deg, {colors['accent']} 0%, {colors['success']} 100%);
+        background: linear-gradient(135deg, var(--accent-color) 0%, var(--success) 100%);
         color: #FFFFFF;
         padding: 1.5rem;
         border-radius: 8px;
@@ -1211,7 +1217,7 @@ def inject_css() -> None:
 
     st.markdown(css_html, unsafe_allow_html=True)
     st.markdown(hotkey_js, unsafe_allow_html=True)
-
+    st.markdown(back_to_top_html(), unsafe_allow_html=True)
 
 # ── Severity Helpers ───────────────────────────────────────────────────────────
 try:
@@ -1704,7 +1710,7 @@ def generate_active_tab_theme_tokens(theme_name: str | None = None) -> dict[str,
     }
 
 
-def get_sidebar_navigation_config() -> dict[str, Any]:
+def get_sidebar_navigation_config() -> dict[str, Any]: # type: ignore
     """Return central configuration parameters for sidebar active tab rendering.
 
     Returns:

@@ -333,6 +333,15 @@ def main() -> None:
             "SQLite database, then exit."
         ),
     )
+    parser.add_argument(
+        "--verify-schema",
+        metavar="DB_PATH",
+        help=(
+            "Verify that the active database schema matches expected table "
+            "definitions and exit. Returns 0 on success, 1 on failure."
+        ),
+    )
+
     subparsers = parser.add_subparsers(dest="command")
 
     scan_parser = subparsers.add_parser("scan", help="Scan a folder of assignments")
@@ -387,6 +396,41 @@ def main() -> None:
     )
 
     args = parser.parse_args(argv)
+
+    if args.verify_schema is not None:
+        if args.command is not None:
+            parser.error("--verify-schema cannot be combined with a subcommand")
+            
+        from pathlib import Path
+        from src.db.migrations.common import verify_schema_integrity
+        
+        # Define expected tables for the corpus database
+        # These should match the tables created in src/db/corpus_db.py
+        expected_corpus_tables = [
+            "documents",
+            "chunks",
+            "deleted_chunks",
+            "plagiarism_incidents",
+            "false_positives",
+        ]
+        
+        try:
+            is_valid = verify_schema_integrity(
+                Path(args.verify_schema), 
+                expected_corpus_tables
+            )
+            if is_valid:
+                print("✅ Schema verification PASSED.")
+                sys.exit(0)
+            else:
+                print("❌ Schema verification FAILED. Check logs for details.")
+                sys.exit(1)
+        except (FileNotFoundError, IsADirectoryError) as exc:
+            sys.stderr.write(f"Error: {exc}\n")
+            sys.exit(1)
+        except Exception as exc:
+            sys.stderr.write(f"Error during schema verification: {exc}\n")
+            sys.exit(1)
 
     if args.optimize is not None:
         if args.command is not None:

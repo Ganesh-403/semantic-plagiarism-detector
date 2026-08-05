@@ -13,6 +13,9 @@ from src.utils.filename import (
 # Safety limits for ZIP bomb protection
 MAX_TOTAL_DECOMPRESSED_SIZE = 200 * 1024 * 1024  # 200 MB
 MAX_SINGLE_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
+# Issue #1364: Structural zip bomb protection via decompression ratio
+MAX_DECOMPRESSION_RATIO = 100  # 100:1 ratio limit
+MAX_ABSOLUTE_UNCOMPRESSED_SIZE = 500 * 1024 * 1024  # 500 MB absolute limit
 
 
 def is_safe_zip_path(target_dir: Path, extracted_path: Path) -> bool:
@@ -55,14 +58,36 @@ def process_zip_file(zip_bytes: bytes) -> Dict[str, bytes]:
     try:
         zip_stream = io.BytesIO(zip_bytes)
         with zipfile.ZipFile(zip_stream) as zf:
-            # 1. ZIP Bomb Protection: Check sizes of all entries before reading
+            # 1. ZIP Bomb Protection: Check sizes and ratios of all entries before reading
             total_size = 0
             for zip_info in zf.infolist():
-                if zip_info.file_size > MAX_SINGLE_FILE_SIZE:
+                if zip_info.is_dir():
+                    continue
+
+                uncompressed_size = zip_info.file_size
+                compressed_size = zip_info.compress_size
+
+                # Issue #1364: Check absolute uncompressed size limit (500 MB)
+                if uncompressed_size > MAX_ABSOLUTE_UNCOMPRESSED_SIZE:
+                    raise ValueError(
+                        "Decompression ratio exceeds security limit (Zip Bomb detected)"
+                    )
+
+                # Issue #1364: Check decompression ratio (100:1)
+                # Only check ratio when compressed_size > 0 to avoid division by zero
+                # (stored/uncompressed entries have compress_size == file_size)
+                if compressed_size > 0:
+                    ratio = uncompressed_size / compressed_size
+                    if ratio > MAX_DECOMPRESSION_RATIO:
+                        raise ValueError(
+                            "Decompression ratio exceeds security limit (Zip Bomb detected)"
+                        )
+
+                if uncompressed_size > MAX_SINGLE_FILE_SIZE:
                     raise ValueError(
                         f"Entry '{zip_info.filename}' exceeds single file decompression safety limit of {MAX_SINGLE_FILE_SIZE // (1024 * 1024)}MB."
                     )
-                total_size += zip_info.file_size
+                total_size += uncompressed_size
                 if total_size > MAX_TOTAL_DECOMPRESSED_SIZE:
                     raise ValueError(
                         f"ZIP archive total decompressed size exceeds safety limit of {MAX_TOTAL_DECOMPRESSED_SIZE // (1024 * 1024)}MB."

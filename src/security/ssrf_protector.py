@@ -16,8 +16,8 @@ from src.errors import (
     SSRF_DNS_NO_ADDRESSES,
     SSRF_DNS_RESOLUTION_FAILED,
     SSRF_DOMAIN_NOT_ALLOWED,
-    SSRF_MAX_REDIRECTS_EXCEEDED,
-    SSRF_WEBHOOK_URL_EMPTY,
+SSRF_CIRCULAR_REDIRECT_LOOP,
+    SSRF_MAX_REDIRECTS_EXCEEDED,    SSRF_WEBHOOK_URL_EMPTY,
     SSRF_INSECURE_SCHEME,
     SSRF_INVALID_IP_FORMAT,
     SSRF_MISSING_HOSTNAME,
@@ -80,13 +80,15 @@ class SSRFProtector:
                 SSRF_DNS_RESOLUTION_FAILED.format(hostname=hostname, error=e)
             )
 
-    @classmethod
+@classmethod
     def _check_redirect_depth(cls, url: str, max_redirects: int = 3) -> None:
         """
-        Follows HTTP redirects (301/302/303/307/308) one hop at a time and
-        raises if the chain goes deeper than max_redirects.
+        Follows HTTP redirects (301/302/303/307/308) one hop at a time,
+        raising if the chain goes deeper than max_redirects or if a URL
+        repeats in the chain (a circular redirect loop, issue #1496).
         """
         current_url = url
+        visited_urls = {current_url}
         redirect_count = 0
         while True:
             response = requests.head(current_url, allow_redirects=False, timeout=5)
@@ -99,7 +101,9 @@ class SSRFProtector:
             if not location:
                 return
             current_url = urllib.parse.urljoin(current_url, location)
-
+            if current_url in visited_urls:
+                raise SSRFSecurityException(SSRF_CIRCULAR_REDIRECT_LOOP)
+            visited_urls.add(current_url)
     @classmethod
     def validate_webhook_url(
         cls,

@@ -11,7 +11,9 @@ import smtplib
 from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+
 from typing import Any, Callable, Dict, List, Optional
+import re
 
 from dotenv import load_dotenv
 
@@ -266,13 +268,19 @@ def send_email(
         if status_callback:
             status_callback(False, msg)
         return False
-
+    
+    
     if not to_emails:
         msg = "No recipients configured for daily summary email."
         logger.warning(msg)
         if status_callback:
             status_callback(False, msg)
         return False
+
+    email_pattern = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    for email in to_emails:
+        if not email_pattern.match(email):
+            raise ValueError(f"Invalid recipient email address: {email}")
 
     try:
         msg_obj = MIMEMultipart("alternative")

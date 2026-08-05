@@ -18,6 +18,52 @@ import plotly.graph_objects as go
 FigureT = TypeVar("FigureT")
 
 
+def _annotation_color(
+    theme_colors: dict[str, str] | None, fallback: str = "gray"
+) -> str:
+    """Return a readable annotation text color for the active theme."""
+    if not theme_colors:
+        return fallback
+    return theme_colors.get("muted", fallback)
+
+
+def _apply_theme_colors(fig: go.Figure, theme_colors: dict[str, str] | None) -> None:
+    """Apply light/dark theme colors to a Plotly figure layout.
+
+    Matches the ``theme_colors`` palette produced by ``app.theme.get_colors()``
+    so charts render on dark backgrounds in Dark mode. When ``theme_colors``
+    is ``None`` the default Plotly template is left untouched.
+
+    Args:
+        fig: Plotly figure to style.
+        theme_colors: Optional dict with ``background``, ``surface``, ``ink``,
+            ``muted`` and ``border`` color keys.
+    """
+    if not theme_colors:
+        return
+
+    background = theme_colors.get("background", "#FFFFFF")
+    surface = theme_colors.get("surface", background)
+    ink = theme_colors.get("ink", "#0F172A")
+    muted = theme_colors.get("muted", "#64748B")
+    border = theme_colors.get("border", "#E2E8F0")
+
+    fig.update_layout(
+        paper_bgcolor=background,
+        plot_bgcolor=surface,
+        font=dict(color=ink),
+    )
+    fig.update_xaxes(
+        gridcolor=border,
+        tickfont=dict(color=muted),
+        title_font=dict(color=ink),
+    )
+    fig.update_yaxes(
+        gridcolor=border,
+        tickfont=dict(color=muted),
+        title_font=dict(color=ink),
+    )
+
 
 
 def build_visualization_lazily(
@@ -83,12 +129,18 @@ def get_top_similar_pairs(
     pairs.sort(key=lambda pair: pair[2], reverse=True)
 
     return pairs[:top_n]
-def plot_high_severity_trends(trend_data: list[dict[str, Any]], show_grid: bool = True) -> go.Figure:
+def plot_high_severity_trends(
+    trend_data: list[dict[str, Any]],
+    show_grid: bool = True,
+    theme_colors: dict[str, str] | None = None,
+) -> go.Figure:
     """
     Create an interactive line chart showing High severity plagiarism incidents over time.
 
     Args:
         trend_data: List of dicts with 'date' and 'count' keys
+        show_grid: Whether to show chart gridlines.
+        theme_colors: Optional theme palette for light/dark backgrounds.
 
     Returns:
         Plotly Figure object
@@ -103,7 +155,7 @@ def plot_high_severity_trends(trend_data: list[dict[str, Any]], show_grid: bool 
             x=0.5,
             y=0.5,
             showarrow=False,
-            font=dict(size=16, color="gray"),
+            font=dict(size=16, color=_annotation_color(theme_colors)),
         )
         fig.update_layout(
             title="High Severity Plagiarism Trends (Last 30 Days)",
@@ -114,6 +166,7 @@ def plot_high_severity_trends(trend_data: list[dict[str, Any]], show_grid: bool 
         )
         fig.update_xaxes(showgrid=show_grid)
         fig.update_yaxes(showgrid=show_grid)
+        _apply_theme_colors(fig, theme_colors)
         return fig
 
     df = pd.DataFrame(trend_data)
@@ -144,15 +197,23 @@ def plot_high_severity_trends(trend_data: list[dict[str, Any]], show_grid: bool 
         line=dict(color="#ff4b4b", width=3), marker=dict(size=8, color="#ff4b4b")
     )
 
+    _apply_theme_colors(fig, theme_colors)
+
     return fig
 
 
-def plot_most_plagiarized_documents(doc_data: list[dict[str, Any]], show_grid: bool = True) -> go.Figure:
+def plot_most_plagiarized_documents(
+    doc_data: list[dict[str, Any]],
+    show_grid: bool = True,
+    theme_colors: dict[str, str] | None = None,
+) -> go.Figure:
     """
     Create a bar chart showing the most frequently plagiarized documents.
 
     Args:
         doc_data: List of dicts with 'document_name' and 'incident_count' keys
+        show_grid: Whether to show chart gridlines.
+        theme_colors: Optional theme palette for light/dark backgrounds.
 
     Returns:
         Plotly Figure object
@@ -167,7 +228,7 @@ def plot_most_plagiarized_documents(doc_data: list[dict[str, Any]], show_grid: b
             x=0.5,
             y=0.5,
             showarrow=False,
-            font=dict(size=16, color="gray"),
+            font=dict(size=16, color=_annotation_color(theme_colors)),
         )
         fig.update_layout(
             title="Most Frequently Plagiarized Documents",
@@ -178,6 +239,7 @@ def plot_most_plagiarized_documents(doc_data: list[dict[str, Any]], show_grid: b
         )
         fig.update_xaxes(showgrid=show_grid)
         fig.update_yaxes(showgrid=show_grid)
+        _apply_theme_colors(fig, theme_colors)
         return fig
 
     df = pd.DataFrame(doc_data)
@@ -228,10 +290,17 @@ def plot_most_plagiarized_documents(doc_data: list[dict[str, Any]], show_grid: b
         hovertemplate="<b>%{customdata}</b><br>Incidents: %{y}<extra></extra>"
     )
 
+    _apply_theme_colors(fig, theme_colors)
+
     return fig
 
 
-def plot_similarity_distribution(sim_matrix: pd.DataFrame, title: str = "Distribution of Similarity Scores", show_grid: bool = True) -> go.Figure:
+def plot_similarity_distribution(
+    sim_matrix: pd.DataFrame,
+    title: str = "Distribution of Similarity Scores",
+    show_grid: bool = True,
+    theme_colors: dict[str, str] | None = None,
+) -> go.Figure:
     """
     Create a histogram showing the distribution of all pairwise similarity scores.
 
@@ -241,6 +310,8 @@ def plot_similarity_distribution(sim_matrix: pd.DataFrame, title: str = "Distrib
     Args:
         sim_matrix: NxN DataFrame of pairwise similarity scores (0.0–1.0).
         title: Chart title.
+        show_grid: Whether to show chart gridlines.
+        theme_colors: Optional theme palette for light/dark backgrounds.
 
     Returns:
         Plotly Figure object with a histogram trace.
@@ -254,7 +325,7 @@ def plot_similarity_distribution(sim_matrix: pd.DataFrame, title: str = "Distrib
             x=0.5,
             y=0.5,
             showarrow=False,
-            font=dict(size=16, color="gray"),
+            font=dict(size=16, color=_annotation_color(theme_colors)),
         )
         fig.update_layout(
             title=title,
@@ -265,6 +336,7 @@ def plot_similarity_distribution(sim_matrix: pd.DataFrame, title: str = "Distrib
         )
         fig.update_xaxes(showgrid=show_grid)
         fig.update_yaxes(showgrid=show_grid)
+        _apply_theme_colors(fig, theme_colors)
         return fig
 
     mask = np.triu(np.ones(sim_matrix.shape, dtype=bool), k=1)
@@ -297,14 +369,22 @@ def plot_similarity_distribution(sim_matrix: pd.DataFrame, title: str = "Distrib
         hovertemplate="Score: %{x:.2f}<br>Pairs: %{y}<extra></extra>",
     )
 
+    _apply_theme_colors(fig, theme_colors)
+
     return fig
 
 
-def plot_document_sizes(word_counts: dict[str, int], show_grid: bool = True) -> go.Figure:
+def plot_document_sizes(
+    word_counts: dict[str, int],
+    show_grid: bool = True,
+    theme_colors: dict[str, str] | None = None,
+) -> go.Figure:
     """Create a bar chart visualizing document word counts.
 
     Args:
         word_counts: Dictionary mapping document names to word counts.
+        show_grid: Whether to show chart gridlines.
+        theme_colors: Optional theme palette for light/dark backgrounds.
 
     Returns:
         Plotly Figure object.
@@ -318,11 +398,12 @@ def plot_document_sizes(word_counts: dict[str, int], show_grid: bool = True) -> 
             x=0.5,
             y=0.5,
             showarrow=False,
-            font=dict(size=16, color="gray"),
+            font=dict(size=16, color=_annotation_color(theme_colors)),
         )
         fig.update_layout(title="Document Word Counts", height=400, autosize=True)
         fig.update_xaxes(showgrid=show_grid)
         fig.update_yaxes(showgrid=show_grid)
+        _apply_theme_colors(fig, theme_colors)
         return fig
 
     doc_names = list(word_counts.keys())
@@ -356,12 +437,15 @@ def plot_document_sizes(word_counts: dict[str, int], show_grid: bool = True) -> 
         hovertemplate="<b>%{customdata}</b><br>Words: %{y}<extra></extra>",
     )
 
+    _apply_theme_colors(fig, theme_colors)
+
     return fig
 
 
 def plot_similarity_boxplot(
     incidents: list[dict[str, Any]],
     show_grid: bool = True,
+    theme_colors: dict[str, str] | None = None,
 ) -> go.Figure:
     """Create a box plot showing similarity score distributions per assignment.
 
@@ -373,6 +457,7 @@ def plot_similarity_boxplot(
         incidents: List of dicts with 'assignment_title' and 'similarity_score'
             keys. A bare 'title'/'similarity' fallback is also accepted.
         show_grid: Whether to show chart gridlines.
+        theme_colors: Optional theme palette for light/dark backgrounds.
 
     Returns:
         Plotly Figure object with one box trace per assignment title.
@@ -401,7 +486,7 @@ def plot_similarity_boxplot(
             x=0.5,
             y=0.5,
             showarrow=False,
-            font=dict(size=16, color="gray"),
+            font=dict(size=16, color=_annotation_color(theme_colors)),
         )
         fig.update_layout(
             title="Similarity Score Distribution by Assignment",
@@ -412,6 +497,7 @@ def plot_similarity_boxplot(
         )
         fig.update_xaxes(showgrid=show_grid)
         fig.update_yaxes(showgrid=show_grid)
+        _apply_theme_colors(fig, theme_colors)
         return fig
 
     grouped: dict[str, list[float]] = {}
@@ -448,15 +534,21 @@ def plot_similarity_boxplot(
     fig.update_xaxes(showgrid=show_grid)
     fig.update_yaxes(showgrid=show_grid, range=[0.0, 1.0])
 
+    _apply_theme_colors(fig, theme_colors)
+
     return fig
 
 
-def plot_severity_donut_chart(incidents: list[dict[str, Any]]) -> go.Figure:
+def plot_severity_donut_chart(
+    incidents: list[dict[str, Any]],
+    theme_colors: dict[str, str] | None = None,
+) -> go.Figure:
     """
     Create a donut chart showing the distribution of plagiarism incident severities.
 
     Args:
         incidents: List of dicts, each representing an incident, expected to contain a 'severity' key.
+        theme_colors: Optional theme palette for light/dark backgrounds.
 
     Returns:
         Plotly Figure object
@@ -471,12 +563,13 @@ def plot_severity_donut_chart(incidents: list[dict[str, Any]]) -> go.Figure:
             x=0.5,
             y=0.5,
             showarrow=False,
-            font=dict(size=16, color="gray"),
+            font=dict(size=16, color=_annotation_color(theme_colors)),
         )
         fig.update_layout(
             title="Plagiarism Incident Severity Distribution",
             height=400,
         )
+        _apply_theme_colors(fig, theme_colors)
         return fig
 
     df = pd.DataFrame(incidents)
@@ -514,10 +607,16 @@ def plot_severity_donut_chart(incidents: list[dict[str, Any]]) -> go.Figure:
         showlegend=True,
     )
 
+    _apply_theme_colors(fig, theme_colors)
+
     return fig
 
 
-def plot_similarity_histogram(scores: list[float], n_bins: int = 20) -> go.Figure:
+def plot_similarity_histogram(
+    scores: list[float],
+    n_bins: int = 20,
+    theme_colors: dict[str, str] | None = None,
+) -> go.Figure:
     """
     Create an interactive histogram of pairwise similarity scores, with bars
     colored on a gradient based on how many pairs fall into each bin.
@@ -525,6 +624,7 @@ def plot_similarity_histogram(scores: list[float], n_bins: int = 20) -> go.Figur
     Args:
         scores: List of pairwise similarity scores (0.0-1.0).
         n_bins: Number of histogram bins to split the 0.0-1.0 range into.
+        theme_colors: Optional theme palette for light/dark backgrounds.
 
     Returns:
         Plotly Figure object with a gradient-colored bar histogram.
@@ -538,13 +638,14 @@ def plot_similarity_histogram(scores: list[float], n_bins: int = 20) -> go.Figur
             x=0.5,
             y=0.5,
             showarrow=False,
-            font=dict(size=16, color="gray"),
+            font=dict(size=16, color=_annotation_color(theme_colors)),
         )
         fig.update_layout(
             title="Similarity Score Distribution",
             height=400,
             autosize=True,
         )
+        _apply_theme_colors(fig, theme_colors)
         return fig
 
     counts, bin_edges = np.histogram(scores, bins=n_bins, range=(0.0, 1.0))
@@ -574,11 +675,14 @@ def plot_similarity_histogram(scores: list[float], n_bins: int = 20) -> go.Figur
         autosize=True,
     )
 
+    _apply_theme_colors(fig, theme_colors)
+
     return fig
 
 def plot_similarity_percentiles(
     similarity_scores: list[float],
     show_grid: bool = True,
+    theme_colors: dict[str, str] | None = None,
 ) -> go.Figure:
     """Create a horizontal bar chart of the similarity score percentile breakdown.
 
@@ -589,6 +693,7 @@ def plot_similarity_percentiles(
     Args:
         similarity_scores: List of similarity scores (0.0–1.0).
         show_grid: Whether to show chart gridlines.
+        theme_colors: Optional theme palette for light/dark backgrounds.
 
     Returns:
         Plotly Figure object with one horizontal bar per percentile.
@@ -610,7 +715,7 @@ def plot_similarity_percentiles(
             x=0.5,
             y=0.5,
             showarrow=False,
-            font=dict(size=16, color="gray"),
+            font=dict(size=16, color=_annotation_color(theme_colors)),
         )
         fig.update_layout(
             title="Similarity Score Percentile Breakdown",
@@ -621,6 +726,7 @@ def plot_similarity_percentiles(
         )
         fig.update_xaxes(showgrid=show_grid)
         fig.update_yaxes(showgrid=show_grid)
+        _apply_theme_colors(fig, theme_colors)
         return fig
 
     percentile_values = np.percentile(scores, [25, 50, 75, 90])
@@ -655,5 +761,7 @@ def plot_similarity_percentiles(
         marker_line_width=1,
         hovertemplate="<b>%{y}</b><br>Similarity Score: %{x:.2f}<extra></extra>",
     )
+
+    _apply_theme_colors(fig, theme_colors)
 
     return fig

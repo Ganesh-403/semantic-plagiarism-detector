@@ -77,10 +77,12 @@ def log_security_event(
 def get_security_audit_logs(
     username: str | None = None,
     event_type: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list[dict]:
-    """Retrieve security audit log entries with limit, offset, and optional filters."""
+    """Retrieve security audit log entries with limit, offset, and optional filters (username, event_type, start_date, end_date)."""
     if limit < 0 or offset < 0:
         raise ValueError("Limit and offset must be non-negative integers.")
 
@@ -96,6 +98,12 @@ def get_security_audit_logs(
     if event_type:
         conditions.append("event_type = ?")
         params.append(event_type)
+    if start_date:
+        conditions.append("timestamp >= ?")
+        params.append(start_date)
+    if end_date:
+        conditions.append("timestamp <= ?")
+        params.append(end_date)
 
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
@@ -118,6 +126,54 @@ def get_security_audit_logs(
             ]
     except sqlite3.Error as e:
         logger.error(f"Failed to query security audit logs: {e}")
+        return []
+
+
+def get_security_audit_log_count(
+    username: str | None = None,
+    event_type: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> int:
+    """Return total number of matching security audit log entries."""
+    query = "SELECT COUNT(*) FROM security_audit_log"
+    params: list = []
+    conditions: list[str] = []
+
+    if username:
+        conditions.append("username = ?")
+        params.append(username.lower())
+    if event_type:
+        conditions.append("event_type = ?")
+        params.append(event_type)
+    if start_date:
+        conditions.append("timestamp >= ?")
+        params.append(start_date)
+    if end_date:
+        conditions.append("timestamp <= ?")
+        params.append(end_date)
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    try:
+        with _connect() as conn:
+            row = conn.execute(query, params).fetchone()
+            return row[0] if row else 0
+    except sqlite3.Error as e:
+        logger.error(f"Failed to count security audit logs: {e}")
+        return 0
+
+
+def get_distinct_audit_event_types() -> list[str]:
+    """Return a list of all distinct event_type values from security_audit_log."""
+    try:
+        with _connect() as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT event_type FROM security_audit_log ORDER BY event_type"
+            ).fetchall()
+            return [r[0] for r in rows if r[0]]
+    except sqlite3.Error:
         return []
 
 
@@ -316,10 +372,25 @@ def add_user(username: str, password: str, role: str = "teacher") -> None:
 
 
 def get_all_users(role: str | None = None) -> list:
+fix/image-memory-limit-1594
     """Return all users as a list of dicts (excludes password hashes)."""
     try:
         query = "SELECT id, username, role, is_active, version FROM users"
         params = []
+
+    """Return all users as a list of dicts (excludes password hashes).
+
+    Args:
+        role: If provided, only return users with this role
+            (e.g. "admin" or "teacher").
+
+    Returns:
+        List of user dicts, optionally filtered by role.
+    """
+    try:
+        query = "SELECT id, username, role, is_active, version FROM users"
+        params: list = []
+ main
         if role is not None:
             query += " WHERE role = ?"
             params.append(role)

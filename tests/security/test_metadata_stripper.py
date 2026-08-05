@@ -1,8 +1,12 @@
 import io
 import pytest
+from unittest.mock import MagicMock, patch
 from PIL import Image
-from src.security.metadata_stripper import strip_exif_metadata, strip_pdf_javascript
-
+from src.security.metadata_stripper import (
+    strip_exif_metadata,
+    strip_pdf_javascript,
+    inspect_pdf_fonts,
+)
 
 def test_strip_pdf_javascript_removes_open_action():
     from pypdf import PdfReader, PdfWriter
@@ -120,6 +124,7 @@ def test_strip_palette_image_preserves_colors():
         assert out_image.mode == "RGBA"
         pixel = out_image.getpixel((5, 5))
     assert pixel == (7, 0, 248, 255)
+ fix/image-bomb-protection-1620
 
 
 def test_strip_image_metadata_decompression_bomb(monkeypatch):
@@ -135,6 +140,7 @@ def test_strip_image_metadata_decompression_bomb(monkeypatch):
     
     assert str(excinfo.value) == "Image dimensions exceed security safety limits."
 
+ fix/image-memory-limit-1594
 
 def test_strip_image_metadata_memory_limit_exceeded(monkeypatch):
     # Mock Image.open to return an object with large dimensions but no actual memory allocation
@@ -184,4 +190,33 @@ def test_strip_image_metadata_memory_limit_accepted(monkeypatch):
     MockImage.save = lambda self, io_obj, format: io_obj.write(b"safe_data")
 
     result = strip_exif_metadata(b"fake_data", "test.png")
-    assert result == b"safe_data"
+
+@patch("src.security.metadata_stripper.fitz.open")
+def test_inspect_pdf_fonts_exceeds_limit(mock_fitz_open):
+    mock_page = MagicMock()
+    mock_page.get_fonts.return_value = [(7, 0, "Type1", "F1", "Arial", "")]
+
+    mock_doc = MagicMock()
+    mock_doc.__iter__.return_value = iter([mock_page])
+    mock_doc.extract_font.return_value = ("Arial", "ttf", "Type1", b"0" * 10_000_001)
+    mock_fitz_open.return_value = mock_doc
+
+    with pytest.raises(ValueError) as excinfo:
+        inspect_pdf_fonts(b"dummy pdf bytes", max_font_bytes=10_000_000)
+    assert "Embedded PDF font stream exceeds safety limit" in str(excinfo.value)
+
+
+@patch("src.security.metadata_stripper.fitz.open")
+def test_inspect_pdf_fonts_within_limit(mock_fitz_open):
+    mock_page = MagicMock()
+    mock_page.get_fonts.return_value = [(7, 0, "Type1", "F1", "Arial", "")]
+
+    mock_doc = MagicMock()
+    mock_doc.__iter__.return_value = iter([mock_page])
+    mock_doc.extract_font.return_value = ("Arial", "ttf", "Type1", b"0" * 100)
+    mock_fitz_open.return_value = mock_doc
+
+    result = inspect_pdf_fonts(b"dummy pdf bytes")
+    assert result is True
+ main
+ main

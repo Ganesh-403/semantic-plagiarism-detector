@@ -92,6 +92,16 @@ If you have config options causing coverage failures locally:
 pytest -o addopts="" tests/db/test_database_backup.py
 ```
 
+### Generate and View the HTML Coverage Report
+Run the test suite with HTML coverage and open `htmlcov/index.html` automatically in your default browser:
+```bash
+python scripts/coverage_report.py
+```
+To generate the report without opening the browser, add `--no-open`:
+```bash
+python scripts/coverage_report.py --no-open
+```
+
 ---
 
 ## 🎨 Step 5: Formatting & Linting (Pre-commit)

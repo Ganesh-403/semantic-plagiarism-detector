@@ -13,6 +13,28 @@ class LoginResponse(BaseModel):
     token: str = Field(..., description="Authentication session token")
 
 
+class RefreshRequest(BaseModel):
+    """Request schema for token refresh."""
+
+    refresh_token: str | None = Field(
+        default=None, description="Valid OAuth2/JWT refresh token"
+    )
+
+
+class TokenResponse(BaseModel):
+    """Response schema for OAuth2 Bearer token generation/refresh."""
+
+    access_token: str = Field(
+        ..., description="Newly issued OAuth2 Bearer access token"
+    )
+    token_type: str = Field(
+        default="bearer", description="Token type (bearer)"
+    )
+    expires_in: int = Field(
+        default=3600, description="Token expiration lifetime in seconds"
+    )
+
+
 class RevokeRequest(BaseModel):
     """Request schema for token revocation."""
 

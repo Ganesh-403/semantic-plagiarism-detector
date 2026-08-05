@@ -31,8 +31,8 @@ def test_fresh_corpus_database_reaches_latest_version(tmp_path):
         assert index_exists(connection, "idx_documents_class_section")
         assert index_exists(connection, "idx_chunks_filename")
         assert index_exists(connection, "idx_incidents_status")
-        assert index_exists(connection, "idx_documents_created_at")
-
+assert index_exists(connection, "idx_documents_created_at")
+        assert index_exists(connection, "idx_incidents_severity_time")
 
 def test_fresh_auth_database_reaches_latest_version(tmp_path):
     with connect(tmp_path / "fresh-users.db") as connection:
@@ -386,3 +386,8 @@ def test_migration_duration_logging(tmp_path, caplog):
         ), f"Expected duration log message not found in: {[r.message for r in caplog.records]}"
     finally:
         connection.close()
+def test_migration_013_adds_incident_severity_index(tmp_path):
+    with connect(tmp_path / "severity-idx-corpus.db") as connection:
+        migrate_corpus_database(connection)
+
+        assert index_exists(connection, "idx_incidents_severity_time")

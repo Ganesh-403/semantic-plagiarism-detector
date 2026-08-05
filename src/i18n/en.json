@@ -18,6 +18,7 @@
   "tab_drill": "🔬 Pair Drill-Down",
   "tab_users": "👥 User Management",
   "tab_settings": "⚙️ Settings",
+  "tab_audit_logs": "📜 Security Audit Logs",
   "download_csv": "⬇️ Download CSV",
   "download_excel": "📊 Export as Styled Excel (.xlsx)",
   "document_word_counts": "📊 Document Word Counts",
