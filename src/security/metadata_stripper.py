@@ -138,7 +138,8 @@ def inspect_pdf_fonts(pdf_bytes: bytes, max_font_bytes: int = 10_000_000) -> boo
         doc.close()
 
 
-def _strip_image_metadata(file_bytes: bytes) -> bytes:    """
+def _strip_image_metadata(file_bytes: bytes) -> bytes:
+    """
     Uses Pillow to read the image and save it without EXIF data.
     Includes safety checks to prevent decompression bombs or excessive memory usage
     by validating image dimensions before full decoding.
@@ -153,11 +154,19 @@ def _strip_image_metadata(file_bytes: bytes) -> bytes:    """
         ValueError: If the image dimensions exceed the 10,000px safety limit.
     """
     MAX_DIMENSION = 10000
+    MAX_DECOMPRESSED_MEMORY = 100 * 1024 * 1024
+    BYTES_PER_PIXEL = 4
 
     try:
         # Open image to inspect dimensions without fully decoding pixel data
         with Image.open(io.BytesIO(file_bytes)) as image:
             width, height = image.size
+
+            estimated_memory = width * height * BYTES_PER_PIXEL
+            if estimated_memory > MAX_DECOMPRESSED_MEMORY:
+                raise ValueError(
+                    "Decompressed image memory footprint exceeds 100 MB safety limit"
+                )
 
             # Safety check: prevent decompression bombs or excessive memory allocation
             if width > MAX_DIMENSION or height > MAX_DIMENSION:

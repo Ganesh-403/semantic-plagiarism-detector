@@ -138,6 +138,39 @@ def test_strip_image_metadata_decompression_bomb(monkeypatch):
     
     assert str(excinfo.value) == "Image dimensions exceed security safety limits."
 
+
+def test_rejects_image_with_excessive_memory_footprint(monkeypatch):
+    class MockImage:
+        size = (5120, 5121)  # 5120 * 5121 * 4 = 104,878,080 bytes > 100 MB
+        mode = "RGBA"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    def mock_open(*args, **kwargs):
+        return MockImage()
+
+    monkeypatch.setattr(Image, "open", mock_open)
+
+    with pytest.raises(
+        ValueError,
+        match="Decompressed image memory footprint exceeds 100 MB safety limit",
+    ):
+        strip_exif_metadata(b"fake image bytes", "test.jpg")
+
+
+def test_accepts_image_with_safe_memory_footprint():
+    img = Image.new("RGB", (100, 100), color="blue")
+    img_bytes = io.BytesIO()
+    img.save(img_bytes, format="JPEG")
+
+    result = strip_exif_metadata(img_bytes.getvalue(), "test.jpg")
+    assert isinstance(result, bytes)
+    assert len(result) > 0
+
 @patch("src.security.metadata_stripper.fitz.open")
 def test_inspect_pdf_fonts_exceeds_limit(mock_fitz_open):
     mock_page = MagicMock()
