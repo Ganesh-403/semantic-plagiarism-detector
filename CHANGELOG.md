@@ -5,6 +5,11 @@ All notable changes to the **Semantic Plagiarism Detection System** will be docu
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `get_documents_by_extension()` query helper to fetch non-deleted document records by file extension (`src/db/corpus_db.py`).
+
 ## [1.0.0] - 2026-07-21
 
 ### Added

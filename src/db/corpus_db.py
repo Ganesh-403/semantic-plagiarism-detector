@@ -700,6 +700,25 @@ def get_documents_by_class(class_section: str) -> list:
         return [r[0] for r in rows]
 
 
+def get_documents_by_extension(ext: str) -> list[dict]:
+    """Return all non-deleted document records matching a file extension.
+
+    Args:
+        ext: File extension to match (e.g. ``"pdf"`` or ``".pdf"``).
+
+    Returns:
+        A list of document row dictionaries, one per matching document.
+    """
+    extension = ext.lstrip(".")
+    with _connect() as conn:
+        cursor = conn.execute(
+            "SELECT * FROM documents WHERE filename LIKE '%.' || ? AND is_deleted = 0",
+            (extension,),
+        )
+        columns = [description[0] for description in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+
 def get_embedding_count() -> int:
     """Return the number of durable chunk embeddings in the corpus."""
     with _connect() as conn:

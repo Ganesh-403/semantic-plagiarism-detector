@@ -18,6 +18,7 @@ from src.db.corpus_db import (
     get_document_count_by_user,
     get_document_word_counts,
     get_documents_by_class,
+    get_documents_by_extension,
     get_total_document_count,
     get_deleted_documents_count,
     get_unique_class_sections,
@@ -661,6 +662,52 @@ def test_get_deleted_documents_count(mock_db):
     assert get_deleted_documents_count() == 2
     restore_document("doc1.pdf")
     assert get_deleted_documents_count() == 1
+# ---------------------------------------------------------------------------
+# Issue #1767 — get_documents_by_extension query helper
+# ---------------------------------------------------------------------------
+
+
+def test_get_documents_by_extension_returns_matching_records():
+    """Only non-deleted documents with the requested extension are returned."""
+    add_document("essay_a.pdf", "hash_pdf_a")
+    add_document("essay_b.pdf", "hash_pdf_b")
+    add_document("notes.txt", "hash_txt")
+
+    pdfs = get_documents_by_extension("pdf")
+
+    assert len(pdfs) == 2
+    filenames = {doc["filename"] for doc in pdfs}
+    assert filenames == {"essay_a.pdf", "essay_b.pdf"}
+    # Each record is a dict exposing the full document row.
+    assert all(isinstance(doc, dict) for doc in pdfs)
+    assert all(doc["is_deleted"] == 0 for doc in pdfs)
+
+
+def test_get_documents_by_extension_accepts_dot_prefix():
+    """A leading dot in the extension argument is tolerated."""
+    add_document("report.pdf", "hash_pdf_report")
+
+    pdfs = get_documents_by_extension(".pdf")
+
+    assert len(pdfs) == 1
+    assert pdfs[0]["filename"] == "report.pdf"
+
+
+def test_get_documents_by_extension_excludes_soft_deleted():
+    """Soft-deleted documents are excluded from the results."""
+    add_document("draft.pdf", "hash_pdf_draft")
+    soft_delete_document("draft.pdf")
+
+    pdfs = get_documents_by_extension("pdf")
+
+    assert pdfs == []
+
+
+def test_get_documents_by_extension_no_match_returns_empty():
+    """An extension with no matching documents returns an empty list."""
+    add_document("essay.docx", "hash_docx")
+
+    assert get_documents_by_extension("pdf") == []
 # ---------------------------------------------------------------------------
 # Issue #1359 — FTS5 Full-Text Search tests
 # ---------------------------------------------------------------------------
