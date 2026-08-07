@@ -295,6 +295,9 @@ def normalize_unicode_spaces(text: str) -> str:
     if not text:
         return text
 
+    # Replace non-breaking, thin, and other Unicode spaces with ASCII spaces
+    text = text.translate(UNICODE_SPACE_TRANSLATION)
+
     # Remove soft hyphens
     text = text.replace("\u00ad", "")
 

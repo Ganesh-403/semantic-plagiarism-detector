@@ -35,6 +35,7 @@ from .tag_manager import TagManager, sanitize_tag_name
 from .text_chunking import chunk_by_sentences, chunk_document, chunk_documents
 from .translator import translate_text
 from .webhook import send_plagiarism_alert
+from src.core.concurrency import with_sqlite_retry
 
 __all__ = [
     "with_sqlite_retry",
