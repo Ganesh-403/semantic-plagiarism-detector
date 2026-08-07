@@ -813,3 +813,22 @@ def test_client_host_fallback():
     response = _ip_middleware_client().get("/ip")
     assert response.status_code == 200
     assert response.json()["ip"] is not None
+
+
+# ── Standardized 404 Payload (#1790) ──────────────────────────────────────────
+
+
+def test_unknown_api_route_returns_standardized_404():
+    """Verify non-existent API routes return the standardized 404 payload."""
+    client = TestClient(app)
+
+    response = client.get("/api/v1/nonexistent-route")
+
+    assert response.status_code == 404
+    body = response.json()
+    assert body == {
+        "error": True,
+        "code": 404,
+        "message": "API endpoint or resource not found",
+    }
+
