@@ -11,6 +11,13 @@ from src.security.ssrf_protector import (
 )
 
 
+
+@pytest.fixture(autouse=True)
+def mock_requests_head():
+    with patch("src.security.ssrf_protector.requests.head") as mock_head:
+        mock_head.return_value.status_code = 200
+        yield mock_head
+
 @pytest.fixture(autouse=True)
 def clear_cache():
     """Ensure the DNS cache is cleared before every test."""

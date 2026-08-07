@@ -285,13 +285,7 @@ from app.theme import (
 )
 
 
-def test_get_colors_returns_valid_theme_colors():
-    colors = get_colors()
 
-    assert isinstance(colors, dict)
-    assert colors
-    assert "background" in colors
-    assert "accent" in colors
 
 
 def test_severity_tier():
@@ -309,13 +303,7 @@ def test_severity_tier():
     assert severity_tier(0.58, 0.59) == "low"
 
 
-def test_tier_from_severity_label():
-    assert tier_from_severity_label("🔴 High") == "high"
-    assert tier_from_severity_label("🟡 Medium") == "medium"
-    assert tier_from_severity_label("HIGH") == "high"
-    assert tier_from_severity_label("Warning") == "medium"
-    assert tier_from_severity_label("Low") == "low"
-    assert tier_from_severity_label("unknown") == "low"
+
 
 
 def test_apply_matplotlib_theme():

@@ -349,7 +349,6 @@ def test_eta_text_uses_default_rate():
     assert processing_eta_text(2 * BYTES_PER_MB) == (
         "Estimated processing time: about 4 seconds"
     )
- feat/average-processing-latency-1576
 
 
 def test_calculate_average_latency():
@@ -374,4 +373,3 @@ def test_calculate_mb_per_minute():
 
     # Test zero bytes processed
     assert calculate_mb_per_minute(0, 60.0) == 0.0
- main
