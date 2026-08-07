@@ -196,7 +196,8 @@ jobs:
               'Docs': { color: '0075ca', description: 'Documentation improvements' },
               'Security': { color: 'd93f0b', description: 'Security & Auth updates' },
               'AI': { color: '0e8a16', description: 'AI & NLP logic' },
-              'Performance': { color: 'fbca04', description: 'Performance optimizations' }
+              'Performance': { color: 'fbca04', description: 'Performance optimizations' },
+              'ECSoC26': { color: '7057ff', description: "ECSoC'26 issues" }
             };
 
             const ensureLabelsExist = async (labels) => {
@@ -230,7 +231,7 @@ jobs:
             const processIssue = async (issue) => {
               if (!issue || issue.pull_request) return;
               const text = `${issue.title}\n${issue.body || ''}`.toLowerCase();
-              const matchingLabels = [];
+              const matchingLabels = ['ECSoC26'];
               for (const rule of labelRules) {
                 const matched = rule.keywords.some(kw => new RegExp(`\\b${kw}\\b`, 'i').test(text));
                 if (matched) {
@@ -238,14 +239,17 @@ jobs:
                 }
               }
 
-              if (matchingLabels.length > 0) {
-                await ensureLabelsExist(matchingLabels);
-                console.log(`Auto-labeling issue #${issue.number} with: ${matchingLabels.join(', ')}`);
+              const existingLabelNames = (issue.labels || []).map(l => (typeof l === 'string' ? l : l.name));
+              const labelsToAdd = matchingLabels.filter(l => !existingLabelNames.includes(l));
+
+              if (labelsToAdd.length > 0) {
+                await ensureLabelsExist(labelsToAdd);
+                console.log(`Auto-labeling issue #${issue.number} with missing labels: ${labelsToAdd.join(', ')}`);
                 await github.rest.issues.addLabels({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: issue.number,
-                  labels: matchingLabels
+                  labels: labelsToAdd
                 });
               }
             };

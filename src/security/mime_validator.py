@@ -12,53 +12,53 @@ from xml.etree import ElementTree
 logger = logging.getLogger(__name__)
 
 # Strict mapping of file extension to allowed MIME types/signatures.
-ALLOWED_MIME_TYPES = {
-    "pdf": {"application/pdf"},
-    "docx": {
+ALLOWED_MIME_TYPES: dict[str, list[str]] = {
+    "pdf": ["application/pdf"],
+    "docx": [
         "application/vnd.openxmlformats-officedocument."
         "wordprocessingml.document",
         "application/zip",
         "application/x-zip-compressed",
         "application/octet-stream",
-    },
-    "xlsx": {
+    ],
+    "xlsx": [
         "application/vnd.openxmlformats-officedocument."
         "spreadsheetml.sheet",
         "application/zip",
         "application/x-zip-compressed",
         "application/octet-stream",
-    },
-    "doc": {
+    ],
+    "doc": [
         "application/msword",
         "application/vnd.ms-office",
         "application/octet-stream",
-    },
-    "zip": {
+    ],
+    "zip": [
         "application/zip",
         "application/x-zip-compressed",
         "application/octet-stream",
-    },
-    "txt": {"text/plain", "text/x-python", "text/markdown"},
-    "csv": {"text/csv", "text/plain", "application/csv"},
-    "md": {
+    ],
+    "txt": ["text/plain", "text/x-python", "text/markdown"],
+    "csv": ["text/csv", "text/plain", "application/csv"],
+    "md": [
         "text/markdown",
         "text/plain",
         "application/octet-stream",
-    },
-    "rtf": {"application/rtf", "text/rtf", "text/plain"},
-    "epub": {
+    ],
+    "rtf": ["application/rtf", "text/rtf", "text/plain"],
+    "epub": [
         "application/epub+zip",
         "application/zip",
         "application/octet-stream",
-    },
-    "odt": {
+    ],
+    "odt": [
         "application/vnd.oasis.opendocument.text",
         "application/zip",
         "application/octet-stream",
-    },
-    "png": {"image/png"},
-    "jpg": {"image/jpeg"},
-    "jpeg": {"image/jpeg"},
+    ],
+    "png": ["image/png"],
+    "jpg": ["image/jpeg"],
+    "jpeg": ["image/jpeg"],
 }
 
 ALLOWED_MAGIC_HEADERS = {

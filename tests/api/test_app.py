@@ -4,8 +4,9 @@ from starlette.middleware import Middleware
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient as StarletteTestClient
+from starlette.requests import Request
 
-from src.asgi_app import JSONContentTypeMiddleware
+from src.asgi_app import JSONContentTypeMiddleware, ClientIPLoggingMiddleware
 
 
 async def _json_echo(request):
@@ -568,7 +569,10 @@ def test_streaming_multipart_upload_streams_chunks_to_disk():
     from src.api.app import app
 
     client = TestClient(app)
-    content = b"This is a test paragraph for verifying streaming chunk reader upload functionality.\n\n" * 5
+    content = (
+        b"This is a test paragraph for verifying streaming chunk reader upload functionality.\n\n"
+        * 5
+    )
 
     files = {"file": ("stream_test.txt", content, "text/plain")}
     headers = {"Authorization": "Bearer test-write-token"}
@@ -682,9 +686,7 @@ def test_refresh_token_expired_returns_401(tmp_path):
         {"sub": "charlie", "type": "refresh"}, expires_in_seconds=-100
     )
 
-    res = client.post(
-        "/api/v1/auth/refresh", json={"refresh_token": expired_token}
-    )
+    res = client.post("/api/v1/auth/refresh", json={"refresh_token": expired_token})
     assert res.status_code == 401
     assert "expired" in res.json()["detail"].lower()
 
@@ -704,9 +706,7 @@ def test_refresh_token_revoked_returns_401(tmp_path):
     refresh_token = create_refresh_token(sub="dave")
     revoke_token(refresh_token, details="Revoked for testing")
 
-    res = client.post(
-        "/api/v1/auth/refresh", json={"refresh_token": refresh_token}
-    )
+    res = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
     assert res.status_code == 401
     assert "revoked" in res.json()["detail"].lower()
 
@@ -777,3 +777,39 @@ def test_hsts_security_header_options():
     finally:
         os.environ.pop("ENABLE_HSTS", None)
 
+
+# ── ClientIPLoggingMiddleware Tests ───────────────────────────────────────────
+
+
+def _ip_middleware_client():
+    async def _ip_echo(request: Request):
+        return JSONResponse({"ip": getattr(request.state, "client_ip", None)})
+
+    test_app = Starlette(
+        routes=[Route("/ip", _ip_echo, methods=["GET"])],
+        middleware=[Middleware(ClientIPLoggingMiddleware)],
+    )
+    return StarletteTestClient(test_app)
+
+
+def test_client_ip_from_forwarded_for():
+    response = _ip_middleware_client().get(
+        "/ip",
+        headers={"X-Forwarded-For": "203.0.113.8"},
+    )
+    assert response.status_code == 200
+    assert response.json()["ip"] == "203.0.113.8"
+
+
+def test_multiple_forwarded_addresses():
+    response = _ip_middleware_client().get(
+        "/ip",
+        headers={"X-Forwarded-For": "203.0.113.8, 10.0.0.1"},
+    )
+    assert response.json()["ip"] == "203.0.113.8"
+
+
+def test_client_host_fallback():
+    response = _ip_middleware_client().get("/ip")
+    assert response.status_code == 200
+    assert response.json()["ip"] is not None

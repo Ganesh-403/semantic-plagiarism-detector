@@ -9,11 +9,10 @@ import re
 import unicodedata
 from collections.abc import Collection, Mapping
 from pathlib import PurePath
-from typing import TypeVar
-
+from typing import IO, TypeVar
 
 DEFAULT_FILENAME = "document"
-MAX_FILENAME_LENGTH = 128
+MAX_FILENAME_LENGTH = 150
 
 _HTML_TAG_RE = re.compile(r"<[^>]*>")
 _CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
@@ -63,6 +62,23 @@ def _safe_extension(filename: str) -> str:
 def get_file_sha256_hash(file_bytes: bytes) -> str:
     """Return the SHA-256 hex digest for file bytes."""
     return hashlib.sha256(file_bytes).hexdigest()
+
+
+def compute_file_hash_stream(
+    file_stream: IO[bytes],
+    chunk_size: int = 65536,
+) -> str:
+    """Return the SHA-256 hex digest for a file-like object.
+
+    The stream is read incrementally in fixed-size chunks to avoid loading
+    the entire file into memory.
+    """
+    hasher = hashlib.sha256()
+
+    while chunk := file_stream.read(chunk_size):
+        hasher.update(chunk)
+
+    return hasher.hexdigest()
 
 
 def sanitize_filename(
@@ -260,8 +276,9 @@ def get_final_extension(filename: object) -> str:
     raw = html.unescape(str(filename or ""))
     raw = unicodedata.normalize("NFKC", raw)
     raw = _CONTROL_RE.sub("", raw)
+    raw = _HTML_TAG_RE.sub("", raw)
     basename = _basename(raw).strip()
-    _stem, extension = os.path.splitext(basename)
+    stem, extension = os.path.splitext(basename)
     return extension.casefold()
 
 
@@ -275,7 +292,8 @@ def get_file_extension_sanitized(filename: str) -> str:
     return extension.lower()
 
 
-def validate_document_extension(    filename: object,
+def validate_document_extension(
+    filename: object,
     *,
     allowed_extensions: Collection[str] = DEFAULT_ALLOWED_DOCUMENT_EXTENSIONS,
     require_extension: bool = True,
@@ -345,3 +363,4 @@ def sanitize_and_validate_filename(
         fallback=fallback,
         max_length=max_length,
     )
+

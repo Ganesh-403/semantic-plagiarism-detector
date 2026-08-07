@@ -425,6 +425,28 @@ def plot_similarity_heatmap_plotly(
     """Interactive Plotly heatmap featuring dynamic hover values and custom threshold bounds."""
     import plotly.graph_objects as go
 
+    if similarity_df.empty or len(similarity_df) == 0:
+        fig = go.Figure()
+        try:
+            safe_title = TitleSanitizer.sanitize(title)
+        except Exception:
+            safe_title = "Semantic Similarity Matrix"
+        fig.update_layout(
+            title=safe_title,
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        )
+        fig.add_annotation(
+            text="No document data available for heatmap visualization",
+            showarrow=False,
+            font=dict(size=14, color="#666666"),
+            bordercolor="#cccccc",
+            borderwidth=1,
+            borderpad=10,
+            bgcolor="#f8f9fa",
+        )
+        return fig
+
     if class_tag and class_tag != "All Classes":
         similarity_df = filter_heatmap_by_class_tag(
             similarity_df, class_tag=class_tag, doc_class_map=doc_class_map
@@ -444,7 +466,24 @@ def plot_similarity_heatmap_plotly(
         return go.Figure()
 
     # Issue #839: Handle empty or single document (< 2) input cleanly
-    if clean_df.empty or len(clean_df) < 2:
+    if clean_df.empty or len(clean_df) == 0:
+        fig = go.Figure()
+        fig.update_layout(
+            title=safe_title,
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        )
+        fig.add_annotation(
+            text="No document data available for heatmap visualization",
+            showarrow=False,
+            font=dict(size=14, color="#666666"),
+            bordercolor="#cccccc",
+            borderwidth=1,
+            borderpad=10,
+            bgcolor="#f8f9fa",
+        )
+        return fig
+    elif len(clean_df) < 2:
         fig = go.Figure()
         fig.update_layout(
             title=safe_title,
@@ -600,6 +639,37 @@ def plot_similarity_heatmap_plotly(
     )
 
     return fig
+
+
+def plot_document_similarity_heatmap(
+    similarity_df: pd.DataFrame,
+    title: str = "Semantic Similarity Matrix",
+    threshold: float = PLAGIARISM_THRESHOLD,
+    theme_colors: Optional[Dict[str, str]] = None,
+    colormap_name: str = DEFAULT_UI_COLORMAP,
+    colorscale: str = "Viridis",
+    show_annotations: bool = True,
+    mask_threshold: Optional[float] = None,
+    log_scale: bool = False,
+    class_tag: Optional[str] = None,
+    doc_class_map: Optional[dict] = None,
+    dim_diagonal: bool = False,
+):
+    """Wrapper function for plot_similarity_heatmap_plotly with empty state handling."""
+    return plot_similarity_heatmap_plotly(
+        similarity_df=similarity_df,
+        title=title,
+        threshold=threshold,
+        theme_colors=theme_colors,
+        colormap_name=colormap_name,
+        colorscale=colorscale,
+        show_annotations=show_annotations,
+        mask_threshold=mask_threshold,
+        log_scale=log_scale,
+        class_tag=class_tag,
+        doc_class_map=doc_class_map,
+        dim_diagonal=dim_diagonal,
+    )
 
 
 def plot_similarity_minimap(

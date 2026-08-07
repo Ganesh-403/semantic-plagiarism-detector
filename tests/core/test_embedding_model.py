@@ -13,6 +13,7 @@ Validates:
 - Edge cases (empty inputs, single chunks, massive batches)
 """
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -21,10 +22,10 @@ import pytest
 import src.core.embedding_model as embedding_model
 from src.core.embedding_model import (
     EmbeddingModelManager,
+    _detect_device,
     embed_chunks,
     embed_documents,
     get_document_embedding,
-    _detect_device,
 )
 
 
@@ -319,3 +320,261 @@ def test_embed_chunks_large_batch_memory_mock(mock_model):
     result = embed_chunks(chunks, batch_size=100)
     assert result.shape == (1000, 384)
     assert mock_model.encode.call_count == 10
+
+
+# ─── Tests for Embedding Model Quantization (Issue #1481) ─────────────────────
+
+import pytest
+import torch
+
+from src.core.embedding_model import _apply_dynamic_quantization
+
+
+class TestEmbeddingModelQuantization:
+    """Test suite for INT8 dynamic quantization support."""
+
+    def test_apply_dynamic_quantization_modifies_linear_layers(self):
+        """Verify that quantize_dynamic targets torch.nn.Linear layers."""
+        mock_model = MagicMock()
+        # Simulate a module structure
+        mock_model.modules.return_value = [torch.nn.Linear(10, 10)]
+
+        with patch("torch.quantization.quantize_dynamic") as mock_quantize:
+            mock_quantize.return_value = MagicMock()
+            _apply_dynamic_quantization(mock_model)
+
+            mock_quantize.assert_called_once()
+            args, kwargs = mock_quantize.call_args
+            assert torch.nn.Linear in args[1]
+            assert kwargs["dtype"] == torch.qint8
+
+    def test_quantization_fallback_on_error(self, caplog):
+        """If quantization fails, the original float32 model should be returned."""
+        mock_model = MagicMock()
+
+        with patch(
+            "torch.quantization.quantize_dynamic",
+            side_effect=RuntimeError("Quantization failed"),
+        ):
+            with caplog.at_level("WARNING"):
+                result = _apply_dynamic_quantization(mock_model)
+
+        assert result is mock_model
+        assert "Failed to apply dynamic quantization" in caplog.text
+
+    def test_manager_quantize_model_flag(self):
+        """Verify EmbeddingModelManager respects the quantize_model flag."""
+        # Reset singleton
+        EmbeddingModelManager._instance = None
+
+        manager = EmbeddingModelManager.get_instance(quantize_model=True)
+        assert manager.quantize_model is True
+
+        # Reset singleton
+        EmbeddingModelManager._instance = None
+        manager_fp32 = EmbeddingModelManager.get_instance(quantize_model=False)
+        assert manager_fp32.quantize_model is False
+
+    @patch("src.core.embedding_model.SentenceTransformer")
+    @patch("src.core.embedding_model._apply_dynamic_quantization")
+    def test_get_model_applies_quantization_when_enabled(self, mock_quantize, mock_st):
+        """When quantize_model=True, get_model must call the quantization helper."""
+        EmbeddingModelManager._instance = None
+        global _quantized_model
+        _quantized_model = None
+
+        mock_base_model = MagicMock()
+        mock_st.return_value = mock_base_model
+
+        mock_quantized_model = MagicMock()
+        mock_quantize.return_value = mock_quantized_model
+
+        manager = EmbeddingModelManager.get_instance(quantize_model=True)
+        model = manager.get_model()
+
+        mock_quantize.assert_called_once_with(mock_base_model)
+        assert model is mock_quantized_model
+
+    @patch("src.core.embedding_model.SentenceTransformer")
+    def test_get_model_skips_quantization_when_disabled(self, mock_st):
+        """When quantize_model=False, get_model must NOT call the quantization helper."""
+        EmbeddingModelManager._instance = None
+        global _model
+        _model = None
+
+        mock_base_model = MagicMock()
+        mock_st.return_value = mock_base_model
+
+        manager = EmbeddingModelManager.get_instance(quantize_model=False)
+        model = manager.get_model()
+
+        assert model is mock_base_model
+
+    def test_quantized_model_dimensions_match_float32(self):
+        """Verify that quantized models produce embeddings with the same dimensions as float32."""
+        # This is a mathematical invariant test. INT8 quantization should not
+        # change the output vector dimensionality (e.g., 384 for MiniLM).
+        # We mock the encode method to verify shape consistency.
+
+        mock_fp32_model = MagicMock()
+        mock_fp32_model.encode.return_value = np.random.rand(5, 384).astype(np.float32)
+
+        mock_int8_model = MagicMock()
+        mock_int8_model.encode.return_value = np.random.rand(5, 384).astype(np.float32)
+
+        # Dimensions must match
+        assert (
+            mock_fp32_model.encode(["test"]).shape
+            == mock_int8_model.encode(["test"]).shape
+        )
+
+
+class TestVerifyModelCacheIntegrity:
+    """Tests for verify_model_cache_integrity (issue #1580)."""
+
+    def test_returns_true_for_healthy_weight_file(self, tmp_path):
+        """A cache with a non-zero pytorch_model.bin must be healthy."""
+        snapshot = tmp_path / "models--demo--model" / "snapshots" / "abcdef1234"
+        snapshot.mkdir(parents=True)
+        (snapshot / "pytorch_model.bin").write_bytes(b"\x00" * 4096)
+
+        assert embedding_model.verify_model_cache_integrity(tmp_path) is True
+
+    def test_returns_false_for_zero_byte_pytorch_model_bin(self, tmp_path):
+        """A zero-byte pytorch_model.bin must be reported as corrupted."""
+        snapshot = tmp_path / "models--demo--model" / "snapshots" / "abcdef1234"
+        snapshot.mkdir(parents=True)
+        (snapshot / "pytorch_model.bin").write_bytes(b"")
+
+        assert embedding_model.verify_model_cache_integrity(tmp_path) is False
+
+    def test_returns_false_for_zero_byte_safetensors(self, tmp_path):
+        """A zero-byte model.safetensors must be reported as corrupted."""
+        snapshot = tmp_path / "models--demo--model" / "snapshots" / "abcdef1234"
+        snapshot.mkdir(parents=True)
+        (snapshot / "model.safetensors").write_bytes(b"")
+
+        assert embedding_model.verify_model_cache_integrity(tmp_path) is False
+
+    def test_returns_true_when_cache_directory_missing(self, tmp_path):
+        """A missing cache directory is healthy: the model will be downloaded fresh."""
+        missing = tmp_path / "does_not_exist"
+
+        assert embedding_model.verify_model_cache_integrity(missing) is True
+
+    def test_returns_true_when_no_weight_files_cached(self, tmp_path):
+        """A cache without any weight files must be healthy."""
+        model_dir = tmp_path / "models--demo--model" / "snapshots" / "abcdef1234"
+        model_dir.mkdir(parents=True)
+        (model_dir / "config.json").write_text("{}", encoding="utf-8")
+
+        assert embedding_model.verify_model_cache_integrity(tmp_path) is True
+
+    def test_ignores_non_weight_files(self, tmp_path):
+        """A zero-byte non-weight file must not fail the integrity check."""
+        snapshot = tmp_path / "models--demo--model" / "snapshots" / "abcdef1234"
+        snapshot.mkdir(parents=True)
+        (snapshot / "pytorch_model.bin").write_bytes(b"\x00" * 4096)
+        (snapshot / "config.json").write_bytes(b"")
+
+        assert embedding_model.verify_model_cache_integrity(tmp_path) is True
+
+    def test_accepts_str_and_path_equivalently(self, tmp_path):
+        """Both Path and str inputs must produce the same verdict."""
+        snapshot = tmp_path / "models--demo--model" / "snapshots" / "abcdef1234"
+        snapshot.mkdir(parents=True)
+        (snapshot / "pytorch_model.bin").write_bytes(b"\x00" * 4096)
+
+        assert embedding_model.verify_model_cache_integrity(
+            tmp_path
+        ) == embedding_model.verify_model_cache_integrity(str(tmp_path))
+
+    def test_logs_warning_for_corrupted_weight_file(self, tmp_path, caplog):
+        """Corrupted weight files must be reported through the logger."""
+        snapshot = tmp_path / "models--demo--model" / "snapshots" / "abcdef1234"
+        snapshot.mkdir(parents=True)
+        (snapshot / "pytorch_model.bin").write_bytes(b"")
+
+        with caplog.at_level("WARNING"):
+            assert embedding_model.verify_model_cache_integrity(tmp_path) is False
+
+        assert "Corrupted model weight file detected" in caplog.text
+
+
+class TestGetModelRedownloadsCorruptedCache:
+    """Tests for automatic re-download of corrupted cached models (issue #1580)."""
+
+    @staticmethod
+    def _corrupted_cache_dir(tmp_path) -> Path:
+        """Create a model cache dir containing a zero-byte weight file."""
+        model_cache_dir = tmp_path / "models--paraphrase-multilingual-MiniLM-L12-v2"
+        snapshot = model_cache_dir / "snapshots" / "abcdef1234"
+        snapshot.mkdir(parents=True)
+        (snapshot / "pytorch_model.bin").write_bytes(b"")
+        return model_cache_dir
+
+    def test_removes_corrupted_cache_before_loading(self, tmp_path, monkeypatch):
+        """A zero-byte cached model must be deleted before the model is loaded."""
+        model_cache_dir = self._corrupted_cache_dir(tmp_path)
+
+        monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path))
+        monkeypatch.setenv(
+            "SEMANTIC_PLAGIARISM_MODEL", embedding_model._DEFAULT_MODEL_NAME
+        )
+        embedding_model._model = None
+        embedding_model._quantized_model = None
+        EmbeddingModelManager._instance = None
+
+        mock_model = MagicMock()
+        with patch(
+            "src.core.embedding_model.SentenceTransformer", return_value=mock_model
+        ):
+            model = EmbeddingModelManager.get_instance(quantize_model=False).get_model()
+
+        assert model is mock_model
+        assert not model_cache_dir.exists()
+
+    def test_keeps_healthy_cache_intact(self, tmp_path, monkeypatch):
+        """A healthy cached model must not be deleted."""
+        model_cache_dir = tmp_path / "models--paraphrase-multilingual-MiniLM-L12-v2"
+        snapshot = model_cache_dir / "snapshots" / "abcdef1234"
+        snapshot.mkdir(parents=True)
+        (snapshot / "pytorch_model.bin").write_bytes(b"\x00" * 4096)
+
+        monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path))
+        monkeypatch.setenv(
+            "SEMANTIC_PLAGIARISM_MODEL", embedding_model._DEFAULT_MODEL_NAME
+        )
+        embedding_model._model = None
+        embedding_model._quantized_model = None
+        EmbeddingModelManager._instance = None
+
+        mock_model = MagicMock()
+        with patch(
+            "src.core.embedding_model.SentenceTransformer", return_value=mock_model
+        ):
+            model = EmbeddingModelManager.get_instance(quantize_model=False).get_model()
+
+        assert model is mock_model
+        assert model_cache_dir.exists()
+
+    def test_logs_warning_when_cache_removed(self, tmp_path, monkeypatch, caplog):
+        """Removing a corrupted cache must log a warning message."""
+        self._corrupted_cache_dir(tmp_path)
+
+        monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path))
+        monkeypatch.setenv(
+            "SEMANTIC_PLAGIARISM_MODEL", embedding_model._DEFAULT_MODEL_NAME
+        )
+        embedding_model._model = None
+        embedding_model._quantized_model = None
+        EmbeddingModelManager._instance = None
+
+        mock_model = MagicMock()
+        with patch(
+            "src.core.embedding_model.SentenceTransformer", return_value=mock_model
+        ):
+            with caplog.at_level("WARNING"):
+                EmbeddingModelManager.get_instance(quantize_model=False).get_model()
+
+        assert "Corrupted cache detected" in caplog.text

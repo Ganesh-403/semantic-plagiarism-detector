@@ -46,6 +46,15 @@ try:
 except ImportError:
     pass
 
+# Patch torch.__spec__ for Python 3.13 + PyTorch compatibility
+try:
+    import torch
+    if getattr(torch, "__spec__", None) is None:
+        import importlib.util
+        torch.__spec__ = importlib.util.spec_from_loader("torch", loader=None)
+except ImportError:
+    pass
+
 # ── Repository Root Path Bootstrap ────────────────────────────────────────────
 _REPO_ROOT = pathlib.Path(__file__).parent.parent.resolve()
 if str(_REPO_ROOT) not in sys.path:

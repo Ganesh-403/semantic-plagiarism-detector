@@ -14,14 +14,15 @@ import logging
 import os
 import re
 import sqlite3
-from datetime import datetime as dt, timezone
+from datetime import datetime as dt
+from datetime import timezone
 
 import bcrypt
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError, VerifyMismatchError
 
 from src.core.app_config import AUTH_DB_PATH
-from src.db.common import with_sqlite_retry
+from src.core.concurrency import with_sqlite_retry
 from src.db.migrations import migrate_auth_database, table_exists
 from src.errors import StaleDataException
 
@@ -458,9 +459,7 @@ def delete_user(username: str) -> None:
             conn.execute(
                 "DELETE FROM security_audit_log WHERE username = ?", (username,)
             )
-            conn.execute(
-                "DELETE FROM password_history WHERE username = ?", (username,)
-            )
+            conn.execute("DELETE FROM password_history WHERE username = ?", (username,))
 
             for table_name in ("user_sessions", "authorization_tokens"):
                 if table_exists(conn, table_name):
@@ -516,7 +515,9 @@ def update_password(
 
             for old_hash in recent_hashes:
                 if _verify_password_hash(new_password, old_hash):
-                    raise ValueError("New password cannot be one of your last 3 passwords")
+                    raise ValueError(
+                        "New password cannot be one of your last 3 passwords"
+                    )
 
             hashed = _hash_password(new_password)
             password_changed_at = dt.now(timezone.utc).isoformat()
@@ -685,9 +686,9 @@ def get_notification_preferences(username: str) -> dict:
     email_val = prefs.get("email_notifications", True)
     webhook_val = prefs.get("webhook_notifications", True)
 
-    if type(email_val) is not bool:
+    if not isinstance(email_val, bool):
         email_val = True
-    if type(webhook_val) is not bool:
+    if not isinstance(webhook_val, bool):
         webhook_val = True
 
     return {
@@ -703,9 +704,9 @@ def update_notification_preferences(
     webhook_notifications: bool = True,
 ) -> dict:
     """Update notification preferences for a user."""
-    if type(email_notifications) is not bool:
+    if not isinstance(email_notifications, bool):
         raise TypeError("email_notifications must be a boolean")
-    if type(webhook_notifications) is not bool:
+    if not isinstance(webhook_notifications, bool):
         raise TypeError("webhook_notifications must be a boolean")
 
     username = _validate_username(username)

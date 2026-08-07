@@ -14,12 +14,12 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Optional
 
 from src.core.app_config import CORPUS_DB_PATH, FALLBACK_DATA_DIR
+from src.core.concurrency import with_sqlite_retry
 from src.core.config import (
     normalize_score,
     normalize_severity_label,
     severity_from_score,
 )
-from src.db.common import with_sqlite_retry
 from src.db.migrations import migrate_corpus_database, table_exists
 from src.db.schemas import MatchResult
 
@@ -139,6 +139,7 @@ def _validate_incident(flag: Mapping[str, Any]) -> tuple[bool, str]:
 def _fetch_all_incidents(conn: sqlite3.Connection) -> list[MatchResult]:
     pass
 
+
 def _validate_pagination(limit: int, offset: int) -> tuple[int, int]:
     """Validate and normalize SQL pagination arguments."""
     if isinstance(limit, bool) or not isinstance(limit, int):
@@ -190,9 +191,7 @@ def _fetch_all_incidents(
             review_status=row["review_status"],
             date_flagged=row["date_flagged"],
             last_seen=row["last_seen"],
-            threshold_at_time_of_flag=row[
-                "threshold_at_time_of_flag"
-            ],
+            threshold_at_time_of_flag=row["threshold_at_time_of_flag"],
         )
         for row in rows
     ]
@@ -412,7 +411,7 @@ def get_incidents_by_severity(
             WHERE severity_rank = ?
             ORDER BY date_flagged DESC, incident_id ASC
             """,
-(norm_severity,),
+            (norm_severity,),
         ).fetchall()
         return [dict(row) for row in rows]
 
@@ -498,7 +497,8 @@ def get_incidents_by_assignment(
         return [dict(row) for row in rows]
 
 
-def get_all_incidents_above_threshold_for_export(    threshold: float,
+def get_all_incidents_above_threshold_for_export(
+    threshold: float,
     db_path: str | Path = DEFAULT_DB_PATH,
 ) -> list[MatchResult]:
     from src.db.schemas import MatchResult
@@ -966,7 +966,8 @@ def archive_old_incidents(
 
 
 @lru_cache(maxsize=128)
-def get_recent_incidents(    limit: int = 5,
+def get_recent_incidents(
+    limit: int = 5,
     db_path: str | Path | None = None,
 ) -> list[MatchResult]:
     """Fetch recent visible plagiarism incidents, cached for performance."""

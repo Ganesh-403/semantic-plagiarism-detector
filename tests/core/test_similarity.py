@@ -3,15 +3,16 @@ import pandas as pd
 import pytest
 
 from src.core.lexical_similarity import (STOPWORDS,  # noqa: E402
-                                         jaccard_similarity,
-                                         lexical_similarity_matrix,
-                                         remove_stopwords, tokenize)
+                                       jaccard_similarity,
+                                       lexical_similarity_matrix,
+                                       remove_stopwords, tokenize)
 from src.core.similarity import (
     calculate_paragraph_similarity_breakdown,
     clear_cross_encoder_cache,
     chunk_max_similarity,
     chunk_similarity_matrix,
     compute_hybrid_similarity,
+    cosine_distance_to_similarity,
     document_similarity_matrix,
     find_exact_matches,
     find_most_similar_chunks,
@@ -594,8 +595,6 @@ def test_find_exact_matches():
     assert find_exact_matches(text_a, text_c, case_sensitive=True) == ["HELLO WORLD", "This is a Test"]
 
 
-
-
 def test_manhattan_similarity_identical_vectors():
     vector = np.array([1.0, 2.0, 3.0])
 
@@ -871,3 +870,22 @@ def test_compute_hybrid_similarity_alpha_bounds():
         compute_hybrid_similarity(vector_sim, doc_a, doc_b, alpha=1.5)
 
 
+# ── Distance-based similarity helper tests ─────────────────────────────────────
+
+
+def test_cosine_distance_to_similarity():
+    """Verify that cosine distance is correctly converted to standardized similarity."""
+    assert cosine_distance_to_similarity(0.0) == 1.0
+    assert cosine_distance_to_similarity(0.2) == pytest.approx(0.8)
+    assert cosine_distance_to_similarity(1.0) == 0.0
+    # Values outside [0, 2] should be safely clamped to [0.0, 1.0]
+    assert cosine_distance_to_similarity(-0.5) == 1.0
+    assert cosine_distance_to_similarity(2.5) == 0.0
+
+def test_cosine_distance_to_similarity_array():
+    """Verify that cosine_distance_to_similarity handles numpy arrays correctly."""
+    distances = np.array([0.0, 0.5, 1.0, 2.0])
+    similarities = cosine_distance_to_similarity(distances)
+    
+    assert isinstance(similarities, np.ndarray)
+    assert np.allclose(similarities, [1.0, 0.5, 0.0, 0.0])

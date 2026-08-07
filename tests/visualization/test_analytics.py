@@ -243,3 +243,208 @@ def test_plot_analytics_charts_dark_mode_theme_colors():
         [0.5, 0.8, 0.9], theme_colors=dark_theme
     )
     assert fig4.layout.paper_bgcolor == "#0F172A"
+
+
+
+# ── Hierarchical Clustering Dendrogram (Issue #1367) ──────────────────────
+
+
+def _make_similarity_matrix(
+    n: int = 5, seed: int = 42
+) -> "pd.DataFrame":
+    """Build a synthetic symmetric similarity matrix for testing."""
+    import pandas as pd
+
+    rng = np.random.default_rng(seed)
+    mat = rng.random((n, n))
+    # Symmetrize and force diagonal = 1.
+    mat = (mat + mat.T) / 2.0
+    np.fill_diagonal(mat, 1.0)
+    np.clip(mat, 0.0, 1.0, out=mat)
+    names = [f"doc_{i}" for i in range(n)]
+    return pd.DataFrame(mat, index=names, columns=names)
+
+
+def test_plot_hierarchical_dendrogram_returns_figure():
+    """The function must return a plotly Figure object."""
+    from src.visualization.analytics import plot_hierarchical_dendrogram
+
+    sim_df = _make_similarity_matrix(n=5)
+    fig = plot_hierarchical_dendrogram(sim_df)
+    assert isinstance(fig, go.Figure)
+
+
+def test_plot_hierarchical_dendrogram_has_single_scatter_trace():
+    """The dendrogram is rendered as exactly one Scatter trace in lines mode."""
+    from src.visualization.analytics import plot_hierarchical_dendrogram
+
+    sim_df = _make_similarity_matrix(n=5)
+    fig = plot_hierarchical_dendrogram(sim_df)
+    assert len(fig.data) == 1
+    trace = fig.data[0]
+    assert isinstance(trace, go.Scatter)
+    assert trace.mode == "lines"
+
+
+def test_plot_hierarchical_dendrogram_wards_linkage():
+    """The merge tree must contain exactly n-1 merges for n documents."""
+    from src.visualization.analytics import plot_hierarchical_dendrogram
+
+    n = 6
+    sim_df = _make_similarity_matrix(n=n)
+    fig = plot_hierarchical_dendrogram(sim_df)
+
+    # Each Ward merge contributes 4 points + 1 None separator = 5 entries
+    # in the x/y arrays.  So len(x) should equal 5 * (n - 1).
+    trace = fig.data[0]
+    none_count = list(trace.x).count(None)
+    assert none_count == n - 1
+
+
+def test_plot_hierarchical_dendrogram_xaxis_shows_doc_names():
+    """Leaf x-tick labels must be the document names from the DataFrame."""
+    from src.visualization.analytics import plot_hierarchical_dendrogram
+
+    sim_df = _make_similarity_matrix(n=4)
+    fig = plot_hierarchical_dendrogram(sim_df)
+    ticktext = list(fig.layout.xaxis.ticktext)
+    assert ticktext == ["doc_0", "doc_1", "doc_2", "doc_3"]
+
+
+def test_plot_hierarchical_dendrogram_yaxis_is_inverted():
+    """The y-axis must be reversed so the tree grows downward (leaves at bottom)."""
+    from src.visualization.analytics import plot_hierarchical_dendrogram
+
+    sim_df = _make_similarity_matrix(n=5)
+    fig = plot_hierarchical_dendrogram(sim_df)
+    assert fig.layout.yaxis.autorange == "reversed"
+
+
+def test_plot_hierarchical_dendrogram_empty_input_returns_annotation_figure():
+    """An empty DataFrame must return a figure with an annotation, not raise."""
+    from src.visualization.analytics import plot_hierarchical_dendrogram
+
+    empty_df = pd.DataFrame()
+    fig = plot_hierarchical_dendrogram(empty_df)
+    assert isinstance(fig, go.Figure)
+    assert len(fig.layout.annotations) >= 1
+    assert (
+        "No similarity data available"
+        in fig.layout.annotations[0].text
+    )
+
+
+def test_plot_hierarchical_dendrogram_single_document_returns_annotation_figure():
+    """A 1×1 matrix must return an annotation figure, not raise."""
+    from src.visualization.analytics import plot_hierarchical_dendrogram
+
+    single_df = pd.DataFrame(
+        [[1.0]], index=["only_doc"], columns=["only_doc"]
+    )
+    fig = plot_hierarchical_dendrogram(single_df)
+    assert isinstance(fig, go.Figure)
+    assert len(fig.layout.annotations) >= 1
+    assert "At least two documents" in fig.layout.annotations[0].text
+
+
+def test_plot_hierarchical_dendrogram_identical_documents_merge_at_distance_zero():
+    """When all documents are identical, every merge distance is ~0."""
+    from src.visualization.analytics import plot_hierarchical_dendrogram
+
+    n = 4
+    # All-ones similarity matrix → distance 0 everywhere.
+    sim_df = pd.DataFrame(
+        np.ones((n, n)),
+        index=[f"d{i}" for i in range(n)],
+        columns=[f"d{i}" for i in range(n)],
+    )
+    fig = plot_hierarchical_dendrogram(sim_df)
+    trace = fig.data[0]
+    # Filter out None separators and assert every real y value is ~0.
+    ys = [y for y in trace.y if y is not None]
+    assert all(abs(float(y)) < 1e-9 for y in ys)
+
+
+def test_plot_hierarchical_dendrogram_hover_text_contains_doc_names():
+    """Hover tooltips must reference the document names so instructors can
+    identify which submissions belong to which cluster."""
+    from src.visualization.analytics import plot_hierarchical_dendrogram
+
+    sim_df = _make_similarity_matrix(n=4)
+    fig = plot_hierarchical_dendrogram(sim_df)
+    trace = fig.data[0]
+    # Concatenate all hovertext entries and check that each doc name appears.
+    all_text = " ".join(t or "" for t in trace.hovertext)
+    for name in sim_df.index:
+        assert name in all_text
+
+
+def test_plot_hierarchical_dendrogram_respects_theme_colors():
+    """Dark theme_colors must propagate to paper_bgcolor / plot_bgcolor."""
+    from src.visualization.analytics import plot_hierarchical_dendrogram
+
+    dark_theme = {
+        "background": "#0F172A",
+        "surface": "#1E293B",
+        "ink": "#F8FAFC",
+        "border": "#334155",
+    }
+    sim_df = _make_similarity_matrix(n=5)
+    fig = plot_hierarchical_dendrogram(sim_df, theme_colors=dark_theme)
+    assert fig.layout.paper_bgcolor == "#0F172A"
+    assert fig.layout.plot_bgcolor == "#1E293B"
+    assert fig.layout.font.color == "#F8FAFC"
+
+
+def test_plot_hierarchical_dendrogram_uses_wards_method():
+    """End-to-end sanity check: for a known dataset, verify the merge
+    sequence matches scipy's Ward linkage output exactly.
+
+    This guards against silent regressions where someone swaps the linkage
+    method (e.g. to 'single' or 'average') — which would still produce a
+    valid-looking dendrogram but with different cluster groupings.
+    """
+    from scipy.cluster.hierarchy import linkage
+    from scipy.spatial.distance import squareform
+
+    from src.visualization.analytics import plot_hierarchical_dendrogram
+
+    sim_df = _make_similarity_matrix(n=6, seed=7)
+    sim_values = np.clip(sim_df.to_numpy(dtype=float), 0.0, 1.0)
+    distance_matrix = 1.0 - sim_values
+    np.fill_diagonal(distance_matrix, 0.0)
+    condensed = squareform(distance_matrix, checks=False)
+    expected_linkage = linkage(condensed, method="ward")
+
+    # Reconstruct merge distances from the rendered figure's y values.
+    # Each merge contributes 4 real y values (drop, bridge, bridge, drop)
+    # plus one None separator.  The bridge y == merge distance.
+    fig = plot_hierarchical_dendrogram(sim_df)
+    ys = list(fig.data[0].y)
+
+    # Extract the bridge distances: the unique non-zero y values that
+    # appear exactly twice in a row (the horizontal bridge).
+    rendered_distances: list[float] = []
+    prev_y = None
+    for y in ys:
+        if y is None:
+            prev_y = None
+            continue
+        if prev_y is not None and abs(float(y) - float(prev_y)) < 1e-9:
+            # This is part of a horizontal bridge.
+            rendered_distances.append(float(y))
+        prev_y = y
+
+    # There should be exactly n-1 = 5 merges.
+    assert len(rendered_distances) == 5
+
+    # Compare against scipy's expected merge distances, sorted ascending.
+    expected_distances = sorted(float(row[2]) for row in expected_linkage)
+    rendered_sorted = sorted(rendered_distances)
+    for expected, rendered in zip(expected_distances, rendered_sorted):
+        assert abs(expected - rendered) < 1e-9, (
+            f"Ward merge distance mismatch: expected {expected}, "
+            f"got {rendered}"
+        )
+
+

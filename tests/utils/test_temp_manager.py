@@ -24,6 +24,7 @@ from src.utils.temp_manager import (
     purge_expired_temp_files,
     register_temp_path,
     unregister_temp_path,
+    verify_available_temp_space,
     _REGISTERED_TEMP_PATHS,
 )
 
@@ -207,6 +208,18 @@ def test_purge_expired_temp_files_returns_int():
     assert isinstance(result, int)
     assert result >= 0
 
+def test_verify_available_temp_space_raises_when_insufficient():
+    """Should raise OSError when free temp space is less than required."""
+
+    with patch(
+        "src.utils.temp_manager.shutil.disk_usage",
+        return_value=(1000, 900, 100),
+    ):
+        with pytest.raises(
+            OSError,
+            match="Insufficient free disk space in temp directory",
+        ):
+            verify_available_temp_space(200)
 
 # ─── Tests for get_temp_directory_size_bytes (Issue #1251) ────────────────────
 
@@ -364,6 +377,16 @@ def test_get_temp_directory_size_bytes_multiple_files():
             except OSError:
                 pass
 
+def verify_available_temp_space(required_bytes: int) -> bool:
+    """Verify that the system temporary directory has enough free disk space."""
+
+    temp_dir = tempfile.gettempdir()
+    _, _, free = shutil.disk_usage(temp_dir)
+
+    if free < required_bytes:
+        raise OSError("Insufficient free disk space in temp directory")
+
+    return True
 
 # ─── Tests for rotate_backup_files (Issue #1572) ──────────────────────────────
 
