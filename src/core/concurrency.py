@@ -4,6 +4,7 @@ import os
 import sqlite3
 import time
 from contextlib import contextmanager
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -100,24 +101,70 @@ def faiss_write_lock(lock_path: str = "corpus.index.lock", timeout: int = None):
     finally:
         lock.release()
 
-def with_sqlite_retry(max_retries=5, initial_delay=0.1, backoff_factor=2.0):
+def with_sqlite_retry(
+    fn: Callable | None = None,
+    *,
+    max_retries: int = 3,
+    delay: float = 0.1,
+    backoff: float = 2.0,
+) -> Callable:
     """
-    Decorator to retry SQLite operations when the database is locked or busy.
+    Decorator that retries SQLite operations when a sqlite3.OperationalError occurs
+    due to a locked or busy database ("database is locked" / "database is busy").
+
+    Applies exponential backoff on subsequent retry attempts. Usable both as a
+    bare decorator (``@with_sqlite_retry``) and with parameters
+    (``@with_sqlite_retry(max_retries=5)``).
+
+    Args:
+        fn: Function being decorated when used as ``@with_sqlite_retry``.
+        max_retries: Maximum number of retry attempts (default: 3).
+        delay: Initial delay in seconds before the first retry (default: 0.1).
+        backoff: Multiplier for exponential backoff (default: 2.0).
+
+    Returns:
+        Callable: Wrapped function with SQLite lock retry logic.
     """
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            delay = initial_delay
-            for attempt in range(max_retries):
-                try:
-                    return func(*args, **kwargs)
-                except sqlite3.OperationalError as e:
-                    if ("database is locked" in str(e) or "database is busy" in str(e)) and attempt < max_retries - 1:
-                        logger.warning(f"SQLite database is locked/busy. Retrying in {delay}s (Attempt {attempt + 1}/{max_retries})...")
-                        time.sleep(delay)
-                        delay *= backoff_factor
-                    else:
-                        raise
-            return func(*args, **kwargs)
-        return wrapper
+    if fn is not None and callable(fn):
+        return _make_sqlite_retry_wrapper(fn, max_retries=3, delay=0.1, backoff=2.0)
+
+    def decorator(func: Callable) -> Callable:
+        return _make_sqlite_retry_wrapper(
+            func,
+            max_retries=max_retries,
+            delay=delay,
+            backoff=backoff,
+        )
+
     return decorator
+
+
+def _make_sqlite_retry_wrapper(
+    func: Callable,
+    max_retries: int,
+    delay: float,
+    backoff: float,
+) -> Callable:
+    """Build a retry wrapper for the given function with exponential backoff."""
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        current_delay = delay
+        for attempt in range(max_retries + 1):
+            try:
+                return func(*args, **kwargs)
+            except sqlite3.OperationalError as exc:
+                err_msg = str(exc).lower()
+                is_locked_err = "locked" in err_msg or "busy" in err_msg
+                if is_locked_err and attempt < max_retries:
+                    func_name = getattr(func, "__name__", str(func))
+                    logger.warning(
+                        f"SQLite database locked/busy in '{func_name}' "
+                        f"(attempt {attempt + 1}/{max_retries}). Retrying in "
+                        f"{current_delay:.2f}s..."
+                    )
+                    time.sleep(current_delay)
+                    current_delay *= backoff
+                else:
+                    raise
+
+    return wrapper

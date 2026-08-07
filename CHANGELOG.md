@@ -5,6 +5,19 @@ All notable changes to the **Semantic Plagiarism Detection System** will be docu
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Quickstart example script demonstrating the core pipeline (`extract_text`, `chunk_text`, `embed_documents`, similarity scoring) with execution instructions (`examples/basic_plagiarism_check.py`).
+- Unit tests for the quickstart example (`tests/scripts/test_basic_plagiarism_check.py`).
+
+### Fixed
+- Restored `src` package importability by removing orphaned syntax from `src/core/document_parser.py`.
+- Re-pointed `with_sqlite_retry` imports from the removed `src.db.common` location to `src.core.concurrency` (`src/core/__init__.py`, `src/db/auth.py`, `src/db/corpus_db.py`, `src/db/incidents.py`).
+- Restored dual-mode (`bare`/parameterized) `with_sqlite_retry` decorator usage in `src/core/concurrency.py`.
+- Restored missing `clean_text(..., remove_stopwords=...)` parameter and removed duplicate `extract_text_from_zip` definition in `src/core/document_parser.py`.
+- Fixed `src/db/__init__.py` missing re-exports (`update_user_profile`, incident helpers).
+
 ## [1.0.0] - 2026-07-21
 
 ### Added
