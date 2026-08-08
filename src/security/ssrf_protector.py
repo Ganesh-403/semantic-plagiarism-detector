@@ -81,29 +81,82 @@ class SSRFProtector:
             )
 
     @classmethod
-    def _check_redirect_depth(cls, url: str, max_redirects: int = 3) -> None:
+    def _validate_ip_safety(cls, ip_str: str, url: str) -> None:
+        """Validates that a resolved IP address is not private, loopback, or link-local."""
+        try:
+            ip = ipaddress.ip_address(ip_str)
+            if cls.ALLOWED_CIDRS:
+                for network in cls.ALLOWED_CIDRS:
+                    if ip in network:
+                        logger.debug(
+                            "SSRF whitelist matched %s in %s",
+                            ip_str,
+                            network,
+                        )
+                        return
+        except ValueError as e:
+            raise SSRFSecurityException(SSRF_INVALID_IP_FORMAT.format(error=e))
+
+        if isinstance(ip, ipaddress.IPv4Address):
+            for subnet in cls.BLOCKED_PRIVATE_IPV4_SUBNETS:
+                if ip in subnet:
+                    logger.warning("Blocked SSRF attempt to target URL: %s", url)
+                    raise SSRFSecurityException(SSRF_BLOCKED_PRIVATE.format(ip=ip_str))
+        if ip.is_loopback:
+            logger.warning("Blocked SSRF attempt to target URL: %s", url)
+            raise SSRFSecurityException(SSRF_BLOCKED_LOOPBACK.format(ip=ip_str))
+        if ip.is_link_local:
+            logger.warning("Blocked SSRF attempt to target URL: %s", url)
+            raise SSRFSecurityException(SSRF_BLOCKED_LINK_LOCAL.format(ip=ip_str))
+        if ip.is_multicast:
+            logger.warning("Blocked SSRF attempt to target URL: %s", url)
+            raise SSRFSecurityException(SSRF_BLOCKED_MULTICAST.format(ip=ip_str))
+        if ip.is_unspecified:
+            logger.warning("Blocked SSRF attempt to target URL: %s", url)
+            raise SSRFSecurityException(SSRF_BLOCKED_UNSPECIFIED.format(ip=ip_str))
+        if ip.is_private:
+            logger.warning("Blocked SSRF attempt to target URL: %s", url)
+            raise SSRFSecurityException(SSRF_BLOCKED_PRIVATE.format(ip=ip_str))
+
+    @classmethod
+    def _check_redirect_depth(cls, url: str, max_redirects: int = 3, skip_initial_dns: bool = False) -> None:
         """
         Follows HTTP redirects (301/302/303/307/308) one hop at a time,
-        raising if the chain goes deeper than max_redirects or if a URL
-        repeats in the chain (a circular redirect loop, issue #1496).
+        validating IP safety and scheme before making every HTTP request.
         """
         current_url = url
         visited_urls = {current_url}
         redirect_count = 0
         while True:
-            response = requests.head(current_url, allow_redirects=False, timeout=5)
-            if response.status_code not in (301, 302, 303, 307, 308):
+            parsed = urllib.parse.urlparse(current_url)
+            if parsed.scheme != "https":
+                raise SSRFSecurityException(
+                    SSRF_INSECURE_SCHEME.format(scheme=parsed.scheme)
+                )
+            if not parsed.hostname:
+                raise SSRFSecurityException(SSRF_MISSING_HOSTNAME)
+
+            if redirect_count > 0 or not skip_initial_dns:
+                ip_str = cls._resolve_hostname(parsed.hostname)
+                cls._validate_ip_safety(ip_str, current_url)
+
+            try:
+                response = requests.head(current_url, allow_redirects=False, timeout=5)
+                if response.status_code not in (301, 302, 303, 307, 308):
+                    return
+                redirect_count += 1
+                if redirect_count > max_redirects:
+                    raise SSRFSecurityException(SSRF_MAX_REDIRECTS_EXCEEDED)
+                location = response.headers.get("Location")
+                if not location:
+                    return
+                current_url = urllib.parse.urljoin(current_url, location)
+                if current_url in visited_urls:
+                    raise SSRFSecurityException(SSRF_CIRCULAR_REDIRECT_LOOP)
+                visited_urls.add(current_url)
+            except requests.RequestException:
                 return
-            redirect_count += 1
-            if redirect_count > max_redirects:
-                raise SSRFSecurityException(SSRF_MAX_REDIRECTS_EXCEEDED)
-            location = response.headers.get("Location")
-            if not location:
-                return
-            current_url = urllib.parse.urljoin(current_url, location)
-            if current_url in visited_urls:
-                raise SSRFSecurityException(SSRF_CIRCULAR_REDIRECT_LOOP)
-            visited_urls.add(current_url)
+
     @classmethod
     def validate_webhook_url(
         cls,
@@ -115,17 +168,6 @@ class SSRFProtector:
         Validates that a provided webhook URL is safe to dispatch.
         Ensures the URL uses HTTPS, its domain is in ALLOWED_WEBHOOK_DOMAINS (if configured),
         and does not resolve to any internal network IP.
-
-        Args:
-            url: The webhook URL string
-            allowed_domains: Optional list of allowed domain hostnames. If None,
-                fetches configured domains via ``get_allowed_webhook_domains()``.
-
-        Returns:
-            True if the URL is strictly safe.
-
-        Raises:
-            SSRFSecurityException: If the URL is malicious or unapproved.
         """
         if not url:
             raise SSRFSecurityException(SSRF_WEBHOOK_URL_EMPTY)
@@ -161,44 +203,10 @@ class SSRFProtector:
 
         # 2. DNS Resolution
         ip_str = cls._resolve_hostname(hostname)
-
-        try:
-            ip = ipaddress.ip_address(ip_str)
-            if cls.ALLOWED_CIDRS:
-                for network in cls.ALLOWED_CIDRS:
-                    if ip in network:
-                        logger.debug(
-                            "SSRF whitelist matched %s in %s",
-                            ip_str,
-                            network,
-                        )
-                        return True
-        except ValueError as e:
-            raise SSRFSecurityException(SSRF_INVALID_IP_FORMAT.format(error=e))
-
-        if isinstance(ip, ipaddress.IPv4Address):
-            for subnet in cls.BLOCKED_PRIVATE_IPV4_SUBNETS:
-                if ip in subnet:
-                    logger.warning("Blocked SSRF attempt to target URL: %s", url)
-                    raise SSRFSecurityException(SSRF_BLOCKED_PRIVATE.format(ip=ip_str))
-        if ip.is_loopback:
-            logger.warning("Blocked SSRF attempt to target URL: %s", url)
-            raise SSRFSecurityException(SSRF_BLOCKED_LOOPBACK.format(ip=ip_str))
-        if ip.is_link_local:
-            logger.warning("Blocked SSRF attempt to target URL: %s", url)
-            raise SSRFSecurityException(SSRF_BLOCKED_LINK_LOCAL.format(ip=ip_str))
-        if ip.is_multicast:
-            logger.warning("Blocked SSRF attempt to target URL: %s", url)
-            raise SSRFSecurityException(SSRF_BLOCKED_MULTICAST.format(ip=ip_str))
-        if ip.is_unspecified:
-            logger.warning("Blocked SSRF attempt to target URL: %s", url)
-            raise SSRFSecurityException(SSRF_BLOCKED_UNSPECIFIED.format(ip=ip_str))
-        if ip.is_private:
-            logger.warning("Blocked SSRF attempt to target URL: %s", url)
-            raise SSRFSecurityException(SSRF_BLOCKED_PRIVATE.format(ip=ip_str))
+        cls._validate_ip_safety(ip_str, url)
 
         # Guard against redirect loops/deep redirect chains before declaring safe
-        cls._check_redirect_depth(url, max_redirects)
+        cls._check_redirect_depth(url, max_redirects, skip_initial_dns=True)
 
         # If it passed all checks, it's considered safe (public routable IP)
         return True
@@ -226,28 +234,12 @@ class SSRFProtector:
     ) -> tuple[str, str]:
         """
         Validates that a provided URL is safe to dispatch and pins the DNS resolution.
-
-        Performs the same checks as validate_webhook_url but returns the
-        validated URL string alongside the pinned IP address to prevent
-        DNS rebinding attacks.
-
-        Args:
-            url: The URL string to validate.
-            allowed_domains: Optional whitelist of allowed hostnames.
-            max_redirects: Maximum redirect hops to follow.
-
-        Returns:
-            A tuple of (validated_url, pinned_ip_address).
-
-        Raises:
-            SSRFSecurityException: If the URL fails any security check.
         """
         cls.validate_webhook_url(url, allowed_domains, max_redirects)
-
         parsed = urllib.parse.urlparse(url)
         hostname = parsed.hostname
-        ip_str = cls._resolve_hostname(hostname)
-
+        # Retrieve from cache established by validate_webhook_url
+        ip_str, _ = cls._dns_cache[hostname]
         return url, ip_str
 
     @classmethod

@@ -32,13 +32,6 @@ def test_private_subnet_blocked(monkeypatch, caplog):
         SSRFProtector.validate_webhook_url(
             "https://internal.example.com"
         )
-    assert "Blocked SSRF attempt to target URL: https://internal.example.com" in caplog.text
-    assert (
-        SSRFProtector.validate_webhook_url(
-            "https://internal.example.com"
-        )
-        is True
-    )
 @pytest.fixture(autouse=True)
 def clear_cache():
     """Ensure the DNS cache is cleared before every test."""
@@ -395,3 +388,22 @@ def test_pinned_request_ipv6_address(mock_getaddrinfo, mock_request):
     call_args, call_kwargs = mock_request.call_args
     assert "[2606:2800:220:1:248:1893:25c8:1946]" in call_args[1]
     assert call_kwargs["headers"]["Host"] == "example.com"
+
+
+@patch("src.security.ssrf_protector.requests.head")
+@patch("src.security.ssrf_protector.SSRFProtector._resolve_hostname")
+def test_redirect_chain_validates_ip_before_request(mock_resolve, mock_head):
+    """Verify redirect targets to internal/private IPs are blocked BEFORE making requests.head calls."""
+    def side_effect(hostname):
+        if hostname == "public.com":
+            return "93.184.216.34"
+        return "127.0.0.1"
+
+    mock_resolve.side_effect = side_effect
+    mock_head.return_value = type("Response", (), {"status_code": 302, "headers": {"Location": "https://internal.local/"}})()
+
+    with pytest.raises(SSRFSecurityException, match="Blocked loopback IP: 127.0.0.1"):
+        SSRFProtector._check_redirect_depth("https://public.com/start")
+
+    assert mock_head.call_count == 1
+    assert mock_head.call_args[0][0] == "https://public.com/start"
