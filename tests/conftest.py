@@ -46,6 +46,15 @@ try:
 except ImportError:
     pass
 
+# Patch torch.__spec__ for Python 3.13 + PyTorch compatibility
+try:
+    import torch
+    if getattr(torch, "__spec__", None) is None:
+        import importlib.util
+        torch.__spec__ = importlib.util.spec_from_loader("torch", loader=None)
+except ImportError:
+    pass
+
 # ── Repository Root Path Bootstrap ────────────────────────────────────────────
 _REPO_ROOT = pathlib.Path(__file__).parent.parent.resolve()
 if str(_REPO_ROOT) not in sys.path:
@@ -286,3 +295,12 @@ def sample_document_files(request):
         zip_buffer.seek(0)
         filename = "sample_test.docx"
         yield zip_buffer, filename
+
+import pytest
+@pytest.fixture(autouse=True)
+def clear_streamlit_singletons():
+    try:
+        from streamlit.delta_generator_singletons import _dg_singleton
+        _dg_singleton._instance = None
+    except ImportError:
+        pass

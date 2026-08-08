@@ -4,7 +4,6 @@ import sqlite3
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import pytest
 
 from src.db.migrations import migrate_corpus_database
 

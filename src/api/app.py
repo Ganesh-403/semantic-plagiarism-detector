@@ -11,6 +11,7 @@ import numpy as np
 
 START_TIME = time.time()
 total_scans = 0
+logger = logging.getLogger(__name__)
 from fastapi import (
     BackgroundTasks,
     Depends,
@@ -60,8 +61,9 @@ from src.core.similarity import (
 )
 from src.core.text_chunking import chunk_document
 from src.db.auth import get_user_role
-from src.db.corpus_db import _connect, clear_all_data, init_corpus_db
+from src.db.corpus_db import _connect, clear_all_data, init_corpus_db, get_document_by_hash
 from src.utils.file_streaming import stream_upload_file_to_disk
+from src.utils.hash_util import calculate_file_sha256
 from src.utils.redis_cache import CacheKeyPrefix, get_cache
 
 # ── API Initialization ────────────────────────────────────────────────────────
@@ -443,6 +445,7 @@ def get_service_status(request: Request):
     version, and the server timestamp in ISO 8601 UTC format so external clients
     can quickly confirm the service is online.
     """
+    logger.debug("Service status requested")
     return {
         "status": "online",
         "version": request.app.version,
@@ -645,6 +648,10 @@ async def scan_document(
         le=10,
         description="Number of top matching paragraph pairs to include per matched document",
     ),
+    reprocess: bool = Query(
+        default=False,
+        description="Bypass duplicate detection and process the file anyway",
+    ),
     _user: dict = Security(get_current_user, scopes=["write"]),
     _content_type: None = Depends(validate_content_type),
 ):
@@ -661,6 +668,23 @@ async def scan_document(
     temp_path = await stream_upload_file_to_disk(file)
 
     try:
+        if not reprocess:
+            file_hash = calculate_file_sha256(temp_path)
+            existing_doc = get_document_by_hash(file_hash)
+            if existing_doc:
+                if os.path.exists(temp_path):
+                    try:
+                        os.unlink(temp_path)
+                    except Exception:
+                        pass
+                return JSONResponse(
+                    status_code=status.HTTP_409_CONFLICT,
+                    content={
+                        "duplicate": True,
+                        "message": "This file has already been uploaded."
+                    }
+                )
+
         # Extract text from uploaded document streamed to disk
         extracted_text = extract_text(temp_path, filename)
         if not extracted_text.strip():
@@ -938,6 +962,10 @@ async def scan_document_async(
         le=10,
         description="Number of top matching paragraph pairs to include per matched document",
     ),
+    reprocess: bool = Query(
+        default=False,
+        description="Bypass duplicate detection and process the file anyway",
+    ),
     _user: dict = Security(get_current_user, scopes=["write"]),
     _content_type: None = Depends(validate_content_type),
 ):
@@ -952,6 +980,23 @@ async def scan_document_async(
 
     filename = file.filename
     temp_path = await stream_upload_file_to_disk(file)
+
+    if not reprocess:
+        file_hash = calculate_file_sha256(temp_path)
+        existing_doc = get_document_by_hash(file_hash)
+        if existing_doc:
+            if os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except Exception:
+                    pass
+            return JSONResponse(
+                status_code=status.HTTP_409_CONFLICT,
+                content={
+                    "duplicate": True,
+                    "message": "This file has already been uploaded."
+                }
+            )
 
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     status_url = f"/api/v1/scan/status/{job_id}"
@@ -1017,7 +1062,6 @@ def get_async_scan_status(
 
 # ── System Administration ──────────────────────────────────────────────────────
 
-logger = logging.getLogger(__name__)
 # Cast to str for consistency with callers that may pass it to faiss.*
 # or other C-extension APIs that require str paths.
 INDEX_PATH = str(FAISS_INDEX_PATH)

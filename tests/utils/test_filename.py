@@ -47,10 +47,6 @@ def test_get_file_extension_sanitized(filename, expected):
     assert get_file_extension_sanitized(filename) == expected
 
 
-def test_sanitized_filename_contains_no_html_or_path_separators():    result = sanitize_filename(
-        '<svg/onload=alert(1)>../../evil "file".pdf'
-    )
-
 def test_sanitized_filename_contains_no_html_or_path_separators():
     result = sanitize_filename('<svg/onload=alert(1)>../../evil "file".pdf')
 
@@ -125,7 +121,7 @@ def test_mapping_preserves_entries_after_sanitization_collision():
         ("no_extension", ""),
     ],
 )
-def test_get_file_extension_sanitized(filename, expected):
+def test_internal_safe_extension(filename, expected):
     """get_file_extension_sanitized returns lowercase, well-formed extensions."""
     assert _safe_extension(filename) == expected
 
@@ -234,3 +230,20 @@ def test_200_character_filename_is_truncated_safely():
 
     assert len(sanitized) <= 128
     assert sanitized.endswith(".pdf")
+
+from io import BytesIO
+
+from src.utils.filename import (
+    compute_file_hash_stream,
+    get_file_sha256_hash,
+)
+
+
+def test_compute_file_hash_stream_matches_byte_hash():
+    data = b"Hello World" * 1000
+    stream = BytesIO(data)
+
+    assert (
+        compute_file_hash_stream(stream)
+        == get_file_sha256_hash(data)
+    )

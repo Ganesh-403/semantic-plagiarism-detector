@@ -10,8 +10,10 @@ from src.db.incidents import (
     export_current_flags_csv,
     get_all_incidents,
     get_incident_by_id,
+    get_incidents_by_assignment,
     get_incidents_by_date_range,
     get_incidents_by_severity,
+    get_incidents_by_user,
     get_incidents_count_by_date,
     get_recent_incidents,
     incidents_to_csv,
@@ -19,7 +21,6 @@ from src.db.incidents import (
     purge_old_incidents,
     sync_flagged_incidents,
     update_review_status,
-    get_incidents_by_assignment,
 )
 
 @pytest.fixture(autouse=True)
@@ -669,4 +670,247 @@ def test_get_incidents_by_assignment_direct_table(tmp_path):
     res = get_incidents_by_assignment("Essay 1", db_path=db_file)
     assert len(res) == 2
     assert res[0]["details"] == "Incident B"
-    assert res[1]["details"] == "Incident A"
+    assert res[1]["details"] == "Incident A"
+
+
+
+# ── Issue #1765: get_incidents_by_user() ─────────────────────────────────────
+
+
+def test_get_incidents_by_user_returns_empty_for_empty_username(test_db):
+    """Empty / whitespace-only username should short-circuit to [] without
+    touching the database (prevents accidental owner='' matches)."""
+    assert get_incidents_by_user("") == []
+    assert get_incidents_by_user("   ") == []
+    assert get_incidents_by_user(None) == []  # type: ignore[arg-type]
+
+
+def test_get_incidents_by_user_returns_empty_when_no_incidents(test_db):
+    """A fresh database with no incidents should return an empty list."""
+    assert get_incidents_by_user("alice", db_path=test_db) == []
+
+
+def test_get_incidents_by_user_filters_by_owner(test_db):
+    """Canonical schema path: incidents are filtered via documents.owner."""
+    import sqlite3
+
+    # Seed documents with different owners.
+    with sqlite3.connect(test_db) as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO documents (filename, file_hash, upload_date, owner) "
+            "VALUES (?, ?, ?, ?)",
+            ("alice_doc1.pdf", "h1", "2026-01-01T00:00:00Z", "alice"),
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO documents (filename, file_hash, upload_date, owner) "
+            "VALUES (?, ?, ?, ?)",
+            ("alice_doc2.pdf", "h2", "2026-01-01T00:00:00Z", "alice"),
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO documents (filename, file_hash, upload_date, owner) "
+            "VALUES (?, ?, ?, ?)",
+            ("bob_doc1.pdf", "h3", "2026-01-01T00:00:00Z", "bob"),
+        )
+        conn.commit()
+
+    # Sync two incidents: one alice-vs-alice, one alice-vs-bob, one bob-vs-bob.
+    sync_flagged_incidents(
+        [{"doc_a": "alice_doc1.pdf", "doc_b": "alice_doc2.pdf", "similarity": 0.9}],
+        test_db,
+        now="2026-01-02T00:00:00Z",
+    )
+    sync_flagged_incidents(
+        [{"doc_a": "alice_doc1.pdf", "doc_b": "bob_doc1.pdf", "similarity": 0.8}],
+        test_db,
+        now="2026-01-03T00:00:00Z",
+    )
+    sync_flagged_incidents(
+        [{"doc_a": "bob_doc1.pdf", "doc_b": "bob_doc1.pdf", "similarity": 0.7}],  # skipped (same doc)
+        test_db,
+    )
+
+    # Alice should see both incidents that touch her documents.
+    alice_results = get_incidents_by_user("alice", db_path=test_db)
+    assert len(alice_results) == 2
+    # Newest first.
+    assert alice_results[0]["document_a"] == "alice_doc1.pdf"
+    assert alice_results[0]["document_b"] == "bob_doc1.pdf"
+    # owner columns should be present (added by the JOIN).
+    assert "owner_a" in alice_results[0]
+    assert "owner_b" in alice_results[0]
+
+    # Bob should see only the cross-incident.
+    bob_results = get_incidents_by_user("bob", db_path=test_db)
+    assert len(bob_results) == 1
+    assert bob_results[0]["document_a"] == "alice_doc1.pdf"
+    assert bob_results[0]["document_b"] == "bob_doc1.pdf"
+
+    # Unknown user → empty.
+    assert get_incidents_by_user("charlie", db_path=test_db) == []
+
+
+def test_get_incidents_by_user_orders_descending_by_date_flagged(test_db):
+    """Newest incidents must come first (ORDER BY date_flagged DESC)."""
+    import sqlite3
+
+    with sqlite3.connect(test_db) as conn:
+        for i in range(3):
+            conn.execute(
+                "INSERT OR REPLACE INTO documents (filename, file_hash, upload_date, owner) "
+                "VALUES (?, ?, ?, ?)",
+                (f"u{i}_a.pdf", f"hash_a_{i}", "2026-01-01T00:00:00Z", "u1"),
+            )
+            conn.execute(
+                "INSERT OR REPLACE INTO documents (filename, file_hash, upload_date, owner) "
+                "VALUES (?, ?, ?, ?)",
+                (f"u{i}_b.pdf", f"hash_b_{i}", "2026-01-01T00:00:00Z", "u1"),
+            )
+        conn.commit()
+
+    sync_flagged_incidents(
+        [{"doc_a": "u0_a.pdf", "doc_b": "u0_b.pdf", "similarity": 0.9}],
+        test_db,
+        now="2026-01-01T00:00:00Z",
+    )
+    sync_flagged_incidents(
+        [{"doc_a": "u1_a.pdf", "doc_b": "u1_b.pdf", "similarity": 0.9}],
+        test_db,
+        now="2026-06-01T00:00:00Z",
+    )
+    sync_flagged_incidents(
+        [{"doc_a": "u2_a.pdf", "doc_b": "u2_b.pdf", "similarity": 0.9}],
+        test_db,
+        now="2026-03-01T00:00:00Z",
+    )
+
+    results = get_incidents_by_user("u1", db_path=test_db)
+    assert len(results) == 3
+    dates = [r["date_flagged"] for r in results]
+    assert dates == sorted(dates, reverse=True)
+    assert results[0]["document_a"] == "u1_a.pdf"
+    assert results[-1]["document_a"] == "u0_a.pdf"
+
+
+def test_get_incidents_by_user_strips_whitespace_in_username(test_db):
+    """Leading/trailing whitespace in the username should be stripped."""
+    import sqlite3
+
+    with sqlite3.connect(test_db) as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO documents (filename, file_hash, upload_date, owner) "
+            "VALUES (?, ?, ?, ?)",
+            ("a.pdf", "h1", "2026-01-01T00:00:00Z", "alice"),
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO documents (filename, file_hash, upload_date, owner) "
+            "VALUES (?, ?, ?, ?)",
+            ("b.pdf", "h2", "2026-01-01T00:00:00Z", "alice"),
+        )
+        conn.commit()
+
+    sync_flagged_incidents(
+        [{"doc_a": "a.pdf", "doc_b": "b.pdf", "similarity": 0.9}],
+        test_db,
+    )
+
+    assert len(get_incidents_by_user("  alice  ", db_path=test_db)) == 1
+    assert len(get_incidents_by_user("\talice\n", db_path=test_db)) == 1
+
+
+def test_get_incidents_by_user_legacy_incidents_table(tmp_path):
+    """Legacy schema path: when a standalone `incidents` table with `owner`
+    and `timestamp` columns exists, the function should run the exact SQL
+    from the issue spec: SELECT * FROM incidents WHERE owner = ? ORDER BY
+    timestamp DESC.
+    """
+    import sqlite3
+
+    db_file = tmp_path / "legacy_incidents.db"
+    with sqlite3.connect(db_file) as conn:
+        conn.execute(
+            """
+            CREATE TABLE incidents (
+                id INTEGER PRIMARY KEY,
+                owner TEXT,
+                timestamp TEXT,
+                document_a TEXT,
+                document_b TEXT,
+                similarity_score REAL,
+                details TEXT
+            )
+            """
+        )
+        conn.execute(
+            "INSERT INTO incidents (owner, timestamp, document_a, document_b, similarity_score, details) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            ("alice", "2026-05-01T10:00:00Z", "a1.pdf", "a2.pdf", 0.85, "Incident A"),
+        )
+        conn.execute(
+            "INSERT INTO incidents (owner, timestamp, document_a, document_b, similarity_score, details) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            ("alice", "2026-05-02T10:00:00Z", "a3.pdf", "a4.pdf", 0.92, "Incident B"),
+        )
+        conn.execute(
+            "INSERT INTO incidents (owner, timestamp, document_a, document_b, similarity_score, details) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            ("bob",   "2026-05-03T10:00:00Z", "b1.pdf", "b2.pdf", 0.78, "Incident C"),
+        )
+        conn.commit()
+
+    # Alice should see her two incidents, newest first.
+    res = get_incidents_by_user("alice", db_path=db_file)
+    assert len(res) == 2
+    assert res[0]["timestamp"] == "2026-05-02T10:00:00Z"
+    assert res[0]["details"] == "Incident B"
+    assert res[1]["timestamp"] == "2026-05-01T10:00:00Z"
+    assert res[1]["details"] == "Incident A"
+
+    # Bob sees one.
+    bob_res = get_incidents_by_user("bob", db_path=db_file)
+    assert len(bob_res) == 1
+    assert bob_res[0]["details"] == "Incident C"
+
+    # Unknown user sees none.
+    assert get_incidents_by_user("charlie", db_path=db_file) == []
+
+
+def test_get_incidents_by_user_legacy_table_returns_all_columns(tmp_path):
+    """The legacy path uses SELECT *, so every column on the legacy table
+    should be present in the returned dicts."""
+    import sqlite3
+
+    db_file = tmp_path / "legacy_full.db"
+    with sqlite3.connect(db_file) as conn:
+        conn.execute(
+            """
+            CREATE TABLE incidents (
+                id INTEGER PRIMARY KEY,
+                owner TEXT,
+                timestamp TEXT,
+                document_a TEXT,
+                document_b TEXT,
+                similarity_score REAL,
+                severity_rank TEXT,
+                review_status TEXT,
+                details TEXT
+            )
+            """
+        )
+        conn.execute(
+            "INSERT INTO incidents (owner, timestamp, document_a, document_b, "
+            "similarity_score, severity_rank, review_status, details) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ("alice", "2026-05-01T10:00:00Z", "a.pdf", "b.pdf", 0.91, "High", "Pending", "flagged"),
+        )
+        conn.commit()
+
+    res = get_incidents_by_user("alice", db_path=db_file)
+    assert len(res) == 1
+    row = res[0]
+    # All columns from SELECT * must be present.
+    for col in ("id", "owner", "timestamp", "document_a", "document_b",
+                "similarity_score", "severity_rank", "review_status", "details"):
+        assert col in row, f"Missing column: {col}"
+    assert row["details"] == "flagged"
+    assert row["severity_rank"] == "High"
+

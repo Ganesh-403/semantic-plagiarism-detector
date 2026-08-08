@@ -5,7 +5,6 @@ import time
 import urllib.parse
 from typing import Dict
 
-import requests
 
 from src.errors import (
     SSRF_BLOCKED_LINK_LOCAL,
@@ -16,8 +15,7 @@ from src.errors import (
     SSRF_DNS_NO_ADDRESSES,
     SSRF_DNS_RESOLUTION_FAILED,
     SSRF_DOMAIN_NOT_ALLOWED,
-SSRF_CIRCULAR_REDIRECT_LOOP,
-    SSRF_MAX_REDIRECTS_EXCEEDED,    SSRF_WEBHOOK_URL_EMPTY,
+    SSRF_WEBHOOK_URL_EMPTY,
     SSRF_INSECURE_SCHEME,
     SSRF_INVALID_IP_FORMAT,
     SSRF_MISSING_HOSTNAME,
@@ -25,6 +23,47 @@ SSRF_CIRCULAR_REDIRECT_LOOP,
 
 
 logger = logging.getLogger(__name__)
+
+
+
+RESTRICTED_IPV4_CIDR_BLOCKS = (
+    "127.0.0.0/8",
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+)
+
+
+def is_ip_in_cidr_block(
+    ip_str: str,
+    cidr_block: str,
+) -> bool:
+    """Return whether an IP address belongs to a CIDR network.
+
+    Invalid addresses, malformed CIDR values, and IP-version mismatches return
+    ``False`` rather than leaking ``ipaddress`` parsing errors into callers.
+
+    Args:
+        ip_str: IPv4 or IPv6 address string.
+        cidr_block: IPv4 or IPv6 network in CIDR notation.
+
+    Returns:
+        ``True`` when the address is contained in the network; otherwise
+        ``False``.
+    """
+    try:
+        ip_address = ipaddress.ip_address(ip_str)
+        network = ipaddress.ip_network(
+            cidr_block,
+            strict=False,
+        )
+    except (TypeError, ValueError):
+        return False
+
+    if ip_address.version != network.version:
+        return False
+
+    return ip_address in network
 
 
 class SSRFSecurityException(Exception):
@@ -43,12 +82,7 @@ class SSRFProtector:
     # slow-DNS denial of service attacks. (Format: {hostname: (ip_str, timestamp)})
     _dns_cache: Dict[str, tuple[str, float]] = {}
     DNS_CACHE_TTL_SECONDS = 300  # 5 minutes
-    BLOCKED_PRIVATE_IPV4_SUBNETS = (
-        ipaddress.ip_network("10.0.0.0/8"),
-        ipaddress.ip_network("172.16.0.0/12"),
-        ipaddress.ip_network("192.168.0.0/16"),
-    )
-    ALLOWED_CIDRS: tuple[ipaddress._BaseNetwork, ...] = ()
+    RESTRICTED_IPV4_CIDR_BLOCKS = RESTRICTED_IPV4_CIDR_BLOCKS
 
     @classmethod
     def _resolve_hostname(cls, hostname: str) -> str:
@@ -81,35 +115,10 @@ class SSRFProtector:
             )
 
     @classmethod
-    def _check_redirect_depth(cls, url: str, max_redirects: int = 3) -> None:
-        """
-        Follows HTTP redirects (301/302/303/307/308) one hop at a time,
-        raising if the chain goes deeper than max_redirects or if a URL
-        repeats in the chain (a circular redirect loop, issue #1496).
-        """
-        current_url = url
-        visited_urls = {current_url}
-        redirect_count = 0
-        while True:
-            response = requests.head(current_url, allow_redirects=False, timeout=5)
-            if response.status_code not in (301, 302, 303, 307, 308):
-                return
-            redirect_count += 1
-            if redirect_count > max_redirects:
-                raise SSRFSecurityException(SSRF_MAX_REDIRECTS_EXCEEDED)
-            location = response.headers.get("Location")
-            if not location:
-                return
-            current_url = urllib.parse.urljoin(current_url, location)
-            if current_url in visited_urls:
-                raise SSRFSecurityException(SSRF_CIRCULAR_REDIRECT_LOOP)
-            visited_urls.add(current_url)
-    @classmethod
     def validate_webhook_url(
         cls,
         url: str,
         allowed_domains: list[str] | None = None,
-        max_redirects: int = 3,
     ) -> bool:
         """
         Validates that a provided webhook URL is safe to dispatch.
@@ -143,7 +152,6 @@ class SSRFProtector:
         # Domain whitelist validation
         if allowed_domains is None:
             from src.core.app_config import get_allowed_webhook_domains
-
             allowed_domains = get_allowed_webhook_domains()
 
         if allowed_domains:
@@ -164,136 +172,33 @@ class SSRFProtector:
 
         try:
             ip = ipaddress.ip_address(ip_str)
-            if cls.ALLOWED_CIDRS:
-                for network in cls.ALLOWED_CIDRS:
-                    if ip in network:
-                        logger.debug(
-                            "SSRF whitelist matched %s in %s",
-                            ip_str,
-                            network,
-                        )
-                        return True
         except ValueError as e:
             raise SSRFSecurityException(SSRF_INVALID_IP_FORMAT.format(error=e))
 
         if isinstance(ip, ipaddress.IPv4Address):
-            for subnet in cls.BLOCKED_PRIVATE_IPV4_SUBNETS:
-                if ip in subnet:
-                    logger.warning("Blocked SSRF attempt to target URL: %s", url)
-                    raise SSRFSecurityException(SSRF_BLOCKED_PRIVATE.format(ip=ip_str))
+            for cidr_block in cls.RESTRICTED_IPV4_CIDR_BLOCKS:
+                if is_ip_in_cidr_block(ip_str, cidr_block):
+                    if is_ip_in_cidr_block(
+                        ip_str,
+                        "127.0.0.0/8",
+                    ):
+                        raise SSRFSecurityException(
+                            SSRF_BLOCKED_LOOPBACK.format(ip=ip_str)
+                        )
+                    raise SSRFSecurityException(
+                        SSRF_BLOCKED_PRIVATE.format(ip=ip_str)
+                    )
         if ip.is_loopback:
-            logger.warning("Blocked SSRF attempt to target URL: %s", url)
             raise SSRFSecurityException(SSRF_BLOCKED_LOOPBACK.format(ip=ip_str))
         if ip.is_link_local:
-            logger.warning("Blocked SSRF attempt to target URL: %s", url)
             raise SSRFSecurityException(SSRF_BLOCKED_LINK_LOCAL.format(ip=ip_str))
         if ip.is_multicast:
-            logger.warning("Blocked SSRF attempt to target URL: %s", url)
             raise SSRFSecurityException(SSRF_BLOCKED_MULTICAST.format(ip=ip_str))
         if ip.is_unspecified:
-            logger.warning("Blocked SSRF attempt to target URL: %s", url)
             raise SSRFSecurityException(SSRF_BLOCKED_UNSPECIFIED.format(ip=ip_str))
         if ip.is_private:
-            logger.warning("Blocked SSRF attempt to target URL: %s", url)
             raise SSRFSecurityException(SSRF_BLOCKED_PRIVATE.format(ip=ip_str))
 
-        # Guard against redirect loops/deep redirect chains before declaring safe
-        cls._check_redirect_depth(url, max_redirects)
-
         # If it passed all checks, it's considered safe (public routable IP)
+        logger.debug(f"SSRF Check passed for {url} -> {ip_str}")
         return True
-
-    @classmethod
-    def configure_allowed_cidrs(
-        cls,
-        allowed_cidrs: list[str] | None = None,
-    ) -> None:
-        """
-        Configure CIDR ranges that are allowed even if they are private.
-        """
-        cls.ALLOWED_CIDRS = (
-            tuple(ipaddress.ip_network(cidr) for cidr in allowed_cidrs)
-            if allowed_cidrs
-            else ()
-        )
-
-    @classmethod
-    def validate_url_safety(
-        cls,
-        url: str,
-        allowed_domains: list[str] | None = None,
-        max_redirects: int = 3,
-    ) -> tuple[str, str]:
-        """
-        Validates that a provided URL is safe to dispatch and pins the DNS resolution.
-
-        Performs the same checks as validate_webhook_url but returns the
-        validated URL string alongside the pinned IP address to prevent
-        DNS rebinding attacks.
-
-        Args:
-            url: The URL string to validate.
-            allowed_domains: Optional whitelist of allowed hostnames.
-            max_redirects: Maximum redirect hops to follow.
-
-        Returns:
-            A tuple of (validated_url, pinned_ip_address).
-
-        Raises:
-            SSRFSecurityException: If the URL fails any security check.
-        """
-        cls.validate_webhook_url(url, allowed_domains, max_redirects)
-
-        parsed = urllib.parse.urlparse(url)
-        hostname = parsed.hostname
-        ip_str = cls._resolve_hostname(hostname)
-
-        return url, ip_str
-
-    @classmethod
-    def pinned_request(
-        cls,
-        method: str,
-        url: str,
-        pinned_ip: str,
-        **kwargs,
-    ) -> requests.Response:
-        """
-        Make an HTTP request directly to the pinned IP address with the
-        original Host header explicitly set.
-
-        This prevents DNS rebinding attacks where a malicious domain changes
-        its resolved IP between validation and the actual HTTP request.
-
-        Args:
-            method: HTTP method (GET, POST, etc.).
-            url: The original validated URL.
-            pinned_ip: The IP address returned by validate_url_safety().
-            **kwargs: Additional arguments passed to requests.request().
-
-        Returns:
-            requests.Response object.
-        """
-        parsed = urllib.parse.urlparse(url)
-        hostname = parsed.hostname
-        port = parsed.port or (443 if parsed.scheme == "https" else 80)
-
-        if ":" in pinned_ip:
-            netloc = f"[{pinned_ip}]:{port}"
-        else:
-            netloc = f"{pinned_ip}:{port}"
-
-        pinned_url = urllib.parse.urlunparse((
-            parsed.scheme,
-            netloc,
-            parsed.path,
-            parsed.params,
-            parsed.query,
-            parsed.fragment,
-        ))
-
-        headers = dict(kwargs.pop("headers", {}))
-        headers["Host"] = hostname
-
-        return requests.request(method, pinned_url, headers=headers, **kwargs)
-

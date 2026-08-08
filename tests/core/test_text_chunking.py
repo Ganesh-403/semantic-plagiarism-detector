@@ -34,6 +34,19 @@ def test_chunk_documents_passes_parameters():
     assert len(chunked["doc1.txt"]) > 0
 
 
+def test_min_words_filters_short_chunks():
+    # "42" and "Page 1" are ultra-short; only the long sentence should survive
+    text = "42\n\nPage 1\n\nThis is a sufficiently long sentence with many words in it."
+    chunks = chunk_text(text, chunk_size=500, chunk_overlap=0, min_words=5)
+    assert all(len(c.split()) >= 5 for c in chunks)
+    assert any("sufficiently" in c for c in chunks)
+
+
+def test_min_words_default_is_five():
+    # Verify default min_words=5 without explicit argument
+    text = "one two\n\nthree four five six seven eight"
+    chunks = chunk_text(text)
+    assert all(len(c.split()) >= 5 for c in chunks)
 def test_chunk_text_respects_max_chunks_limit():
     # Build text large enough to produce far more than 5 chunks at this chunk_size
     huge_text = "Word " * 5000
@@ -366,3 +379,13 @@ def test_chunk_text_raises_value_error_for_invalid_overlap():
             chunk_size=100,
             overlap_percentage=1.0,
         )
+
+
+def test_chunk_text_raises_value_error_for_non_positive_chunk_size():
+    """Verify chunk_text raises ValueError when chunk_size <= 0 (Issue #1579)."""
+    for invalid_size in [0, -1, -50]:
+        with pytest.raises(
+            ValueError, match="chunk_size must be a positive integer > 0"
+        ):
+            chunk_text("Sample text content for testing chunking.", chunk_size=invalid_size)
+            

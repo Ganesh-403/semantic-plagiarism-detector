@@ -1,0 +1,149 @@
+"""
+src/visualization/history_charts.py
+-----------------------------------
+Plotly chart generators for the Document Similarity History Dashboard.
+
+Provides functions to visualize historical scan trends, similarity distributions,
+and frequently flagged documents over time.
+"""
+
+from typing import List, Dict, Optional
+import pandas as pd
+import plotly.graph_objects as go
+import plotly.express as px
+
+
+def plot_similarity_trend_line(
+    history_data: List[Dict],
+    theme_colors: Optional[Dict] = None,
+) -> go.Figure:
+    """Generate a line chart showing average and max similarity trends over time.
+
+    Args:
+        history_data: List of scan history dictionaries from get_scan_history().
+        theme_colors: Optional theme color dictionary for dark/light mode support.
+
+    Returns:
+        Plotly Figure object with dual-line trend chart.
+    """
+    if not history_data:
+        fig = go.Figure()
+        fig.add_annotation(
+            text="No scan history data available yet.",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font=dict(size=16, color="#666666"),
+        )
+        fig.update_layout(
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+        )
+        return fig
+
+    df = pd.DataFrame(history_data)
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df = df.sort_values("timestamp")
+
+    bg_color = theme_colors.get("background", "#FFFFFF") if theme_colors else "#FFFFFF"
+    ink_color = theme_colors.get("ink", "#0F172A") if theme_colors else "#0F172A"
+    danger_color = theme_colors.get("danger", "#EF4444") if theme_colors else "#EF4444"
+    warning_color = (
+        theme_colors.get("warning", "#F59E0B") if theme_colors else "#F59E0B"
+    )
+
+    fig = go.Figure()
+
+    # Average similarity line
+    fig.add_trace(
+        go.Scatter(
+            x=df["timestamp"],
+            y=df["avg_similarity"],
+            mode="lines+markers",
+            name="Avg Similarity",
+            line=dict(color=warning_color, width=3),
+            marker=dict(size=8),
+        )
+    )
+
+    # Max similarity line
+    fig.add_trace(
+        go.Scatter(
+            x=df["timestamp"],
+            y=df["max_similarity"],
+            mode="lines+markers",
+            name="Max Similarity",
+            line=dict(color=danger_color, width=3),
+            marker=dict(size=8),
+        )
+    )
+
+    fig.update_layout(
+        title="Similarity Trends Over Time",
+        xaxis_title="Scan Date",
+        yaxis_title="Similarity Score",
+        yaxis=dict(range=[0, 1.0], tickformat=".0%"),
+        hovermode="x unified",
+        paper_bgcolor=bg_color,
+        plot_bgcolor=bg_color,
+        font=dict(color=ink_color),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
+
+    return fig
+
+
+def plot_flagged_documents_bar(
+    history_data: List[Dict],
+    theme_colors: Optional[Dict] = None,
+) -> go.Figure:
+    """Generate a bar chart showing the number of flagged documents per scan.
+
+    Args:
+        history_data: List of scan history dictionaries.
+        theme_colors: Optional theme color dictionary.
+
+    Returns:
+        Plotly Figure object with bar chart.
+    """
+    if not history_data:
+        fig = go.Figure()
+        fig.update_layout(
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+        )
+        return fig
+
+    df = pd.DataFrame(history_data)
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["date_str"] = df["timestamp"].dt.strftime("%Y-%m-%d %H:%M")
+
+    bg_color = theme_colors.get("background", "#FFFFFF") if theme_colors else "#FFFFFF"
+    ink_color = theme_colors.get("ink", "#0F172A") if theme_colors else "#0F172A"
+    primary_color = (
+        theme_colors.get("primary", "#3B82F6") if theme_colors else "#3B82F6"
+    )
+
+    fig = px.bar(
+        df,
+        x="date_str",
+        y="flagged_count",
+        title="Flagged Plagiarism Incidents per Scan",
+        labels={"date_str": "Scan Date", "flagged_count": "Flagged Pairs"},
+        color_discrete_sequence=[primary_color],
+    )
+
+    fig.update_layout(
+        paper_bgcolor=bg_color,
+        plot_bgcolor=bg_color,
+        font=dict(color=ink_color),
+        xaxis_tickangle=-45,
+    )
+
+    return fig
