@@ -60,8 +60,9 @@ from src.core.similarity import (
 )
 from src.core.text_chunking import chunk_document
 from src.db.auth import get_user_role
-from src.db.corpus_db import _connect, clear_all_data, init_corpus_db
+from src.db.corpus_db import _connect, clear_all_data, init_corpus_db, get_document_by_hash
 from src.utils.file_streaming import stream_upload_file_to_disk
+from src.utils.filename import compute_file_hash_stream
 from src.utils.redis_cache import CacheKeyPrefix, get_cache
 
 # ── API Initialization ────────────────────────────────────────────────────────
@@ -645,6 +646,10 @@ async def scan_document(
         le=10,
         description="Number of top matching paragraph pairs to include per matched document",
     ),
+    reprocess: bool = Query(
+        default=False,
+        description="Bypass duplicate check and reprocess the file",
+    ),
     _user: dict = Security(get_current_user, scopes=["write"]),
     _content_type: None = Depends(validate_content_type),
 ):
@@ -659,6 +664,21 @@ async def scan_document(
 
     filename = file.filename
     temp_path = await stream_upload_file_to_disk(file)
+
+    with open(temp_path, "rb") as f:
+        file_hash = compute_file_hash_stream(f)
+
+    if not reprocess:
+        existing_doc = get_document_by_hash(file_hash)
+        if existing_doc:
+            return JSONResponse(
+                status_code=status.HTTP_409_CONFLICT,
+                content={
+                    "duplicate": True,
+                    "existing_document_id": existing_doc,
+                    "message": "This file has already been uploaded."
+                }
+            )
 
     try:
         # Extract text from uploaded document streamed to disk
@@ -938,6 +958,10 @@ async def scan_document_async(
         le=10,
         description="Number of top matching paragraph pairs to include per matched document",
     ),
+    reprocess: bool = Query(
+        default=False,
+        description="Bypass duplicate check and reprocess the file",
+    ),
     _user: dict = Security(get_current_user, scopes=["write"]),
     _content_type: None = Depends(validate_content_type),
 ):
@@ -952,6 +976,21 @@ async def scan_document_async(
 
     filename = file.filename
     temp_path = await stream_upload_file_to_disk(file)
+
+    with open(temp_path, "rb") as f:
+        file_hash = compute_file_hash_stream(f)
+
+    if not reprocess:
+        existing_doc = get_document_by_hash(file_hash)
+        if existing_doc:
+            return JSONResponse(
+                status_code=status.HTTP_409_CONFLICT,
+                content={
+                    "duplicate": True,
+                    "existing_document_id": existing_doc,
+                    "message": "This file has already been uploaded."
+                }
+            )
 
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     status_url = f"/api/v1/scan/status/{job_id}"

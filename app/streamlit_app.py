@@ -47,6 +47,7 @@ from src.utils.filename import (
     sanitize_filename,
     unique_filename,
     validate_document_extension,
+    compute_file_hash_stream,
 )
 
 
@@ -2061,8 +2062,8 @@ if user_role == "admin":
                 )
                 continue
 
-            file_bytes = uploaded_file.read()
-            file_hash = hashlib.sha256(file_bytes).hexdigest()
+            file_hash = compute_file_hash_stream(uploaded_file)
+            uploaded_file.seek(0)
             existing_doc = get_document_by_hash(file_hash)
 
             if existing_doc:
@@ -2076,6 +2077,7 @@ if user_role == "admin":
                 if action == "Skip":
                     continue
 
+            file_bytes = uploaded_file.read()
             file_bytes_dict[safe_name] = strip_exif_metadata(
                 file_bytes, safe_name
             )

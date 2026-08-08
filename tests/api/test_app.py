@@ -813,3 +813,57 @@ def test_client_host_fallback():
     response = _ip_middleware_client().get("/ip")
     assert response.status_code == 200
     assert response.json()["ip"] is not None
+
+def test_scan_document_duplicate_detected(tmp_path):
+    from src.db.corpus_db import configure_corpus_db_path, init_corpus_db, add_document
+    from src.core.app_config import configure_test_paths
+    from fastapi.testclient import TestClient
+    from src.api.app import app
+    from src.utils.filename import get_file_sha256_hash
+
+    db_file = tmp_path / "test_dup_corpus.db"
+    index_file = tmp_path / "test_dup_corpus.index"
+    configure_test_paths(db_path=db_file, index_path=index_file)
+    init_corpus_db()
+
+    content = b"This is a test document to check duplicate upload behavior."
+    file_hash = get_file_sha256_hash(content)
+
+    # Insert it directly into the database to mock an existing document
+    add_document(
+        filename="existing_doc.txt",
+        file_hash=file_hash,
+        upload_date="2026-08-01T12:00:00",
+        class_section=None,
+        student_name=None,
+        assignment_title=None,
+        pdf_author=None,
+        pdf_creation_date=None,
+        pdf_title=None,
+        tags="",
+        detected_language="en",
+        owner="admin"
+    )
+
+    client = TestClient(app)
+    
+    # 1. Test duplicate is blocked by default
+    res = client.post(
+        "/api/v1/scan",
+        headers={"Authorization": "Bearer test-write-token"},
+        files={"file": ("test.txt", content, "text/plain")}
+    )
+    assert res.status_code == 409
+    data = res.json()
+    assert data["duplicate"] is True
+    assert data["existing_document_id"] == "existing_doc.txt"
+    assert "already been uploaded" in data["message"]
+
+    # 2. Test reprocess=true bypasses the check
+    res2 = client.post(
+        "/api/v1/scan?reprocess=true",
+        headers={"Authorization": "Bearer test-write-token"},
+        files={"file": ("test.txt", content, "text/plain")}
+    )
+    assert res2.status_code == 200
+
