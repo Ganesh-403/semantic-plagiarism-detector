@@ -889,3 +889,14 @@ def test_cosine_distance_to_similarity_array():
     
     assert isinstance(similarities, np.ndarray)
     assert np.allclose(similarities, [1.0, 0.5, 0.0, 0.0])
+
+def test_compute_similarity_matrix_min_threshold():
+    from src.core.similarity import compute_similarity_matrix
+    embeddings = {
+        "doc1": np.array([1.0, 0.0]),
+        "doc2": np.array([0.9, 0.1]),
+        "doc3": np.array([0.0, 1.0])
+    }
+    df = compute_similarity_matrix(embeddings, min_threshold=0.5)
+    assert df.loc["doc1", "doc3"] == 0.0
+    assert df.loc["doc1", "doc1"] == 1.0

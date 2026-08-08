@@ -96,6 +96,8 @@ def cosine_distance_to_similarity(distance: float) -> float:
     Returns:
         A float similarity score strictly bounded in [0.0, 1.0].
     """
+    if isinstance(distance, np.ndarray):
+        return np.clip(1.0 - distance, 0.0, 1.0)
     return float(max(0.0, min(1.0, 1.0 - distance)))
 
 
@@ -161,6 +163,7 @@ def document_similarity_matrix(
     doc_embeddings: Union[Dict[str, np.ndarray], np.ndarray, List[np.ndarray]],
     batch_size: Optional[int] = None,
     min_percentile: Optional[float] = None,
+    min_threshold: float = 0.0,
 ) -> Union[pd.DataFrame, np.ndarray]:
     """
     Build an N×N cosine similarity matrix between all document pairs.
@@ -177,6 +180,8 @@ def document_similarity_matrix(
         if stacked.ndim == 1 or stacked.size == 0:
             return np.array([[]])
         sim = np.clip(cosine_similarity(stacked), 0.0, 1.0)
+        if min_threshold > 0.0:
+            sim = np.where(sim < min_threshold, 0.0, sim)
         return _apply_min_percentile_filter(sim, min_percentile)
     doc_names = list(doc_embeddings.keys())
     n = len(doc_names)
@@ -209,6 +214,8 @@ def document_similarity_matrix(
                 sim = cosine_similarity(stacked[start:end], stacked)
                 matrix[start:end] = np.clip(sim, 0.0, 1.0)
 
+    if min_threshold > 0.0:
+        matrix = np.where(matrix < min_threshold, 0.0, matrix)
     df = pd.DataFrame(matrix, index=doc_names, columns=doc_names)
     return _apply_min_percentile_filter(df, min_percentile)
 
@@ -216,13 +223,14 @@ def compute_similarity_matrix(
     embeddings: Union[Dict[str, np.ndarray], np.ndarray, List[np.ndarray]],
     batch_size: Optional[int] = None,
     min_percentile: Optional[float] = None,
+    min_threshold: float = 0.0,
 ) -> Union[pd.DataFrame, np.ndarray]:
     """
     Direct alias/wrapper for document_similarity_matrix to maintain backwards compatibility
     with app/streamlit_app.py and external modules.
     """
     return document_similarity_matrix(
-        embeddings, batch_size=batch_size, min_percentile=min_percentile
+        embeddings, batch_size=batch_size, min_percentile=min_percentile, min_threshold=min_threshold
     )
 
 # ── Hybrid similarity (lexical + semantic) ─────────────────────────────────────
