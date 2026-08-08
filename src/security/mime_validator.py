@@ -6,7 +6,10 @@ import io
 import logging
 import zipfile
 from typing import Optional
-from xml.etree import ElementTree
+try:
+    import defusedxml.ElementTree as ElementTree
+except ImportError:
+    from xml.etree import ElementTree
 
 
 logger = logging.getLogger(__name__)
@@ -197,7 +200,15 @@ def _validate_ooxml_archive(
                 )
                 return False
 
-            root = ElementTree.fromstring(content_types_xml)
+            try:
+                root = ElementTree.fromstring(content_types_xml)
+            except Exception as err:
+                logger.warning(
+                    "[mime_validator] Invalid or dangerous XML in [Content_Types].xml for '%s': %s",
+                    filename,
+                    err,
+                )
+                return False
             declared_content_types = {
                 element.attrib.get("ContentType", "")
                 for element in root.iter()

@@ -245,3 +245,26 @@ def test_validate_mime_type_magic_fallback():
             b"MZ\x90\x00\x03\x00\x00\x00",
             "malicious.pdf",
         ) is False
+
+
+def test_ooxml_xxe_entity_expansion_safely_handled():
+    """Verify that malicious XML entity expansion in [Content_Types].xml is safely handled (Issue #1709)."""
+    malicious_xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<!DOCTYPE Types [\n'
+        '  <!ENTITY lol "lol">\n'
+        '  <!ELEMENT Types (#PCDATA)>\n'
+        '  <!ENTITY lol1 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">\n'
+        ']>\n'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n'
+        '  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>\n'
+        '</Types>'
+    )
+    docx_bytes = build_zip({
+        "[Content_Types].xml": malicious_xml,
+        "_rels/.rels": "<Relationships/>",
+        "word/document.xml": "<w:document/>",
+    })
+    # Defusedxml blocks entity expansion / DTD entity resolution gracefully
+    result = validate_mime_type(docx_bytes, "malicious_bomb.docx")
+    assert result is False
