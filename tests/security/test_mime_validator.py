@@ -268,3 +268,55 @@ def test_ooxml_xxe_entity_expansion_safely_handled():
     # Defusedxml blocks entity expansion / DTD entity resolution gracefully
     result = validate_mime_type(docx_bytes, "malicious_bomb.docx")
     assert result is False
+
+def test_validate_mime_type_accepts_valid_legacy_doc_header(monkeypatch):
+    """A .doc file with the complete OLE signature is accepted."""
+    valid_doc = (
+        b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+        b"\x00" * 64
+    )
+    monkeypatch.setattr(
+        "src.security.mime_validator._check_magic_bytes",
+        lambda *_args: None,
+    )
+
+    assert validate_mime_type(valid_doc, "legacy.doc") is True
+
+
+def test_validate_mime_type_rejects_invalid_legacy_doc_header(monkeypatch):
+    """A renamed payload without OLE bytes must be rejected."""
+    monkeypatch.setattr(
+        "src.security.mime_validator._check_magic_bytes",
+        lambda *_args: True,
+    )
+
+    assert validate_mime_type(
+        b"not-an-ole-compound-document",
+        "malicious.doc",
+    ) is False
+
+
+def test_validate_mime_type_rejects_truncated_legacy_doc_header(monkeypatch):
+    """The old four-byte prefix alone is insufficient."""
+    monkeypatch.setattr(
+        "src.security.mime_validator._check_magic_bytes",
+        lambda *_args: None,
+    )
+
+    assert validate_mime_type(
+        b"\xd0\xcf\x11\xe0",
+        "truncated.doc",
+    ) is False
+
+
+def test_validate_mime_type_legacy_doc_extension_is_case_insensitive(monkeypatch):
+    valid_doc = (
+        b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+        b"\x00" * 16
+    )
+    monkeypatch.setattr(
+        "src.security.mime_validator._check_magic_bytes",
+        lambda *_args: None,
+    )
+
+    assert validate_mime_type(valid_doc, "REPORT.DOC") is True

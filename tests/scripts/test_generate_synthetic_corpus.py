@@ -199,7 +199,7 @@ def test_generate_corpus_plagiarized_has_source(tmp_path):
         output_dir=tmp_path,
     )
 
-    filenames = {m["filename"] for m in manifest}
+
 
     for entry in manifest:
         assert entry["type"] == "plagiarized"

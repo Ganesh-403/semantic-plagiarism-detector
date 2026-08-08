@@ -1,18 +1,3 @@
-"""
-src/core/ai_detector.py
------------------------
-AI content detection module using transformer models.
-
-Provides probability scoring for AI-generated text using pre-trained
-transformer classifiers, with supplemental perplexity analysis for
-explicit perplexity ratings that complement the probability scores.
-
-Recent Additions (Issue #1154):
-- Added `calculate_text_perplexity` helper function that provides explicit
-  perplexity ratings. Lower perplexity scores indicate potential AI-generated
-  text, as AI models tend to produce more predictable, lower-perplexity text.
-"""
-
 # pylint: disable=streamlit-global-mutation
 
 import logging
@@ -192,6 +177,31 @@ def calculate_text_perplexity(text: str) -> float:
             err,
         )
         return float(_DEFAULT_PERPLEXITY_SCORE)
+
+
+def normalize_perplexity(raw_score: float, scale_factor: float = 100.0) -> float:
+    """
+    Normalize a raw perplexity score to a float between 0.0 and 1.0.
+
+    Perplexity values typically range from 1 to infinity. This function maps
+    the raw perplexity score using a monotonic scaling function to a normalized
+    value between 0.0 and 1.0.
+
+    Args:
+        raw_score: Raw perplexity score float.
+        scale_factor: Scaling factor determining the midpoint/sensitivity of normalization.
+
+    Returns:
+        Normalized score as a float between 0.0 and 1.0.
+    """
+    if raw_score is None or not isinstance(raw_score, (int, float)):
+        return 0.0
+    
+    if raw_score <= 0.0:
+        return 0.0
+
+    normalized = float(raw_score / (raw_score + scale_factor))
+    return float(np.clip(normalized, 0.0, 1.0))
 
 
 def detect_ai_probability_batch(
@@ -607,3 +617,4 @@ def categorize_ai_probability(score: float) -> str:
         return "Moderate Probability"
     else:
         return "Low Probability"
+    

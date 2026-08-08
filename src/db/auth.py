@@ -14,14 +14,15 @@ import logging
 import os
 import re
 import sqlite3
-from datetime import datetime as dt, timezone
+from datetime import datetime as dt
+from datetime import timezone
 
 import bcrypt
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError, VerifyMismatchError
 
 from src.core.app_config import AUTH_DB_PATH
-from src.db.common import with_sqlite_retry
+from src.core.concurrency import with_sqlite_retry
 from src.db.migrations import migrate_auth_database, table_exists
 from src.errors import StaleDataException
 
@@ -30,6 +31,8 @@ logger = logging.getLogger(__name__)
 _DB_PATH = os.path.abspath(str(AUTH_DB_PATH))
 
 VALID_ROLES = {"admin", "teacher"}
+
+SQLITE_TIMEOUT: float = 15.0
 
 PASSWORD_COMPLEXITY_REGEX = re.compile(
     r"^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_\-#^()+=\[\]{}|:<>,./~\\])[A-Za-z\d@$!%*?&_\-#^()+=\[\]{}|:<>,./~\\]{8,}$"
@@ -45,7 +48,8 @@ def configure_db_path(db_path: str | os.PathLike) -> None:
 
 
 def _connect() -> sqlite3.Connection:
-    return sqlite3.connect(_DB_PATH, timeout=15.0, check_same_thread=False)
+    """Establish a connection to the SQLite database with configured timeout."""
+    return sqlite3.connect(_DB_PATH, timeout=SQLITE_TIMEOUT, check_same_thread=False)
 
 
 def log_security_event(
@@ -177,9 +181,44 @@ def get_distinct_audit_event_types() -> list[str]:
         return []
 
 
+def get_recent_audit_events(limit: int = 20) -> list[dict]:
+    """Fetch the N most recent security audit events across all accounts."""
+    if limit < 0:
+        raise ValueError("Limit must be a non-negative integer.")
+
+    try:
+        with _connect() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM security_audit_log ORDER BY timestamp DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+            return [dict(row) for row in rows]
+    except sqlite3.Error as e:
+        logger.error(f"Failed to query recent security audit events: {e}")
+        return []
+
+
 def _hash_password(password: str) -> str:
     """Return an Argon2 hash for the given password."""
     return _ph.hash(password)
+
+
+def set_password_change_required(username: str, required: bool) -> None:
+    """Set or clear the must_change_password flag for a user account.
+
+    When *required* is True the user will be forced to change their password
+    on their next successful login.
+    """
+    username = _validate_username(username)
+    with _connect() as conn:
+        result = conn.execute(
+            "UPDATE users SET must_change_password = ? WHERE username = ?",
+            (1 if required else 0, username),
+        )
+        conn.commit()
+    if result.rowcount == 0:
+        raise ValueError(f"User '{username}' not found.")
 
 
 def _verify_password_hash(password: str, stored_hash: str) -> bool:
@@ -281,27 +320,43 @@ def init_db() -> None:
         pass
 
 
-def verify_user(username: str, password: str) -> bool:
-    """Return True if username exists, account is active, and password matches."""
+def verify_user(
+    username: str,
+    password: str,
+    return_details: bool = False,
+) -> bool | dict:
+    """Authenticate a user and return auth status.
+
+    If return_details is True, returns a dict
+    ``{"authenticated": bool, "must_change_password": bool}``.
+    Otherwise returns a boolean (True on success, False on failure).
+    """
     try:
         username = _validate_username(username)
         password = _validate_password(password)
     except ValueError:
+        if return_details:
+            return {"authenticated": False, "must_change_password": False}
         return False
 
     with _connect() as conn:
         row = conn.execute(
-            "SELECT password, is_active FROM users WHERE username = ?",
+            "SELECT password, is_active, must_change_password FROM users WHERE username = ?",
             (username,),
         ).fetchone()
 
     if not row:
+        if return_details:
+            return {"authenticated": False, "must_change_password": False}
         return False
 
-    stored_hash, is_active = row
+    stored_hash, is_active, must_change_password = row
     if not is_active:
+        if return_details:
+            return {"authenticated": False, "must_change_password": False}
         return False
 
+    authenticated = False
     if stored_hash.startswith("$argon2"):
         try:
             _ph.verify(stored_hash, password)
@@ -314,11 +369,11 @@ def verify_user(username: str, password: str) -> bool:
                     )
                     conn_rehash.commit()
             _record_login_timestamp(username)
-            return True
+            authenticated = True
         except (VerifyMismatchError, VerificationError):
-            return False
+            authenticated = False
 
-    if stored_hash.startswith(("$2a$", "$2b$", "$2y$")):
+    elif stored_hash.startswith(("$2a$", "$2b$", "$2y$")):
         try:
             if bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8")):
                 hashed = _hash_password(password)
@@ -329,11 +384,16 @@ def verify_user(username: str, password: str) -> bool:
                     )
                     conn_migrate.commit()
                 _record_login_timestamp(username)
-                return True
+                authenticated = True
         except ValueError:
-            return False
+            authenticated = False
 
-    return False
+    if return_details:
+        return {
+            "authenticated": authenticated,
+            "must_change_password": bool(must_change_password) if authenticated else False,
+        }
+    return authenticated
 
 
 authenticate_user = verify_user
@@ -440,9 +500,7 @@ def delete_user(username: str) -> None:
             conn.execute(
                 "DELETE FROM security_audit_log WHERE username = ?", (username,)
             )
-            conn.execute(
-                "DELETE FROM password_history WHERE username = ?", (username,)
-            )
+            conn.execute("DELETE FROM password_history WHERE username = ?", (username,))
 
             for table_name in ("user_sessions", "authorization_tokens"):
                 if table_exists(conn, table_name):
@@ -498,7 +556,9 @@ def update_password(
 
             for old_hash in recent_hashes:
                 if _verify_password_hash(new_password, old_hash):
-                    raise ValueError("New password cannot be one of your last 3 passwords")
+                    raise ValueError(
+                        "New password cannot be one of your last 3 passwords"
+                    )
 
             hashed = _hash_password(new_password)
             password_changed_at = dt.now(timezone.utc).isoformat()
@@ -667,9 +727,9 @@ def get_notification_preferences(username: str) -> dict:
     email_val = prefs.get("email_notifications", True)
     webhook_val = prefs.get("webhook_notifications", True)
 
-    if type(email_val) is not bool:
+    if not isinstance(email_val, bool):
         email_val = True
-    if type(webhook_val) is not bool:
+    if not isinstance(webhook_val, bool):
         webhook_val = True
 
     return {
@@ -685,9 +745,9 @@ def update_notification_preferences(
     webhook_notifications: bool = True,
 ) -> dict:
     """Update notification preferences for a user."""
-    if type(email_notifications) is not bool:
+    if not isinstance(email_notifications, bool):
         raise TypeError("email_notifications must be a boolean")
-    if type(webhook_notifications) is not bool:
+    if not isinstance(webhook_notifications, bool):
         raise TypeError("webhook_notifications must be a boolean")
 
     username = _validate_username(username)

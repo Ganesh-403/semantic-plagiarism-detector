@@ -1,4 +1,8 @@
-from .analytics import plot_high_severity_trends, plot_most_plagiarized_documents
+from .analytics import (
+    plot_high_severity_trends,
+    plot_hierarchical_dendrogram,
+    plot_most_plagiarized_documents,
+)
 from .heatmap import (
     filter_heatmap_by_class_tag,
     plot_chunk_similarity_comparison,
@@ -6,6 +10,7 @@ from .heatmap import (
     plot_differential_heatmap_matplotlib,
     plot_similarity_heatmap,
     plot_similarity_heatmap_plotly,
+    plot_document_similarity_heatmap,
 )
 from .network_graph import (
     build_network_data,
@@ -24,6 +29,7 @@ __all__ = [
     "filter_heatmap_by_class_tag",
     "plot_similarity_heatmap",
     "plot_similarity_heatmap_plotly",
+    "plot_document_similarity_heatmap",
     "plot_differential_heatmap",
     "plot_differential_heatmap_matplotlib",
     "plot_chunk_similarity_comparison",
@@ -38,4 +44,5 @@ __all__ = [
     "plot_plagiarism_network_graph",
     "plot_high_severity_trends",
     "plot_most_plagiarized_documents",
+    "plot_hierarchical_dendrogram",
 ]

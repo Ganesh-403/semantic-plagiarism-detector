@@ -10,7 +10,7 @@ import logging
 import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from src.core.app_config import CORPUS_DB_PATH, FALLBACK_CORPUS_DB_PATH
 
@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 DB_PATH = str(CORPUS_DB_PATH)
 
 # In-memory counters for lookup hits and misses
-_cache_hits = 0
-_cache_misses = 0
+cache_hits = 0
+cache_misses = 0
 
 
 def _init_db() -> None:
@@ -111,12 +111,12 @@ def get_cached_translation(
             (text_hash,),
         )
         row = cursor.fetchone()
-        global _cache_hits, _cache_misses
+        global cache_hits, cache_misses
         if row:
-            _cache_hits += 1
+            cache_hits += 1
             return row[0]
         else:
-            _cache_misses += 1
+            cache_misses += 1
             return None
 
 
@@ -259,12 +259,11 @@ def get_translation_cache_stats() -> dict:
         return {"total_entries": 0, "oldest_entry_days": 0}
 
 
-def get_translation_cache_hit_rate() -> float:
-    """Returns the translation cache hit rate (hits / (hits + misses)).
-
-    If there have been no cache lookups, returns 0.0.
+def get_translation_cache_hit_ratio() -> float:
     """
-    total = _cache_hits + _cache_misses
+    Computes the translation cache hit ratio.
+    """
+    total = cache_hits + cache_misses
     if total == 0:
         return 0.0
     return _cache_hits / total
@@ -275,3 +274,20 @@ def reset_translation_cache_counters() -> None:
     global _cache_hits, _cache_misses
     _cache_hits = 0
     _cache_misses = 0
+
+
+def get_cache_performance_summary() -> dict[str, Any]:
+    """Retrieves cache lookup telemetry, including total requests, hits, misses, and hit ratio percentage.
+
+    Returns:
+        dict[str, Any]: A dictionary summary of cache performance statistics.
+    """
+    total = _cache_hits + _cache_misses
+    ratio = (float(_cache_hits) / total * 100.0) if total > 0 else 0.0
+    return {
+        "total_requests": total,
+        "hits": _cache_hits,
+        "misses": _cache_misses,
+        "hit_ratio_percentage": ratio,
+    }
+
