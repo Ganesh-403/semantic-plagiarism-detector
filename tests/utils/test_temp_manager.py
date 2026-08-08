@@ -377,16 +377,6 @@ def test_get_temp_directory_size_bytes_multiple_files():
             except OSError:
                 pass
 
-def verify_available_temp_space(required_bytes: int) -> bool:
-    """Verify that the system temporary directory has enough free disk space."""
-
-    temp_dir = tempfile.gettempdir()
-    _, _, free = shutil.disk_usage(temp_dir)
-
-    if free < required_bytes:
-        raise OSError("Insufficient free disk space in temp directory")
-
-    return True
 
 # ─── Tests for rotate_backup_files (Issue #1572) ──────────────────────────────
 

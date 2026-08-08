@@ -127,9 +127,35 @@ def calculate_processing_throughput(total_bytes: int, elapsed_seconds: float) ->
     if elapsed_seconds <= 0:
         return 0.0
 
-    total_kb = total_bytes / BYTES_PE # type: ignore 
+    total_kb = total_bytes / 1024 
     throughput = total_kb / elapsed_seconds
     return round(throughput, 2)
+
+
+def calculate_mb_per_minute(total_bytes: int, elapsed_seconds: float) -> float:
+    """
+    Calculate throughput in Megabytes (MB) per minute.
+
+    Args:
+        total_bytes: The total number of bytes processed.
+        elapsed_seconds: The total time elapsed in seconds.
+
+    Returns:
+        float: The throughput in MB/min. Returns 0.0 if elapsed_seconds <= 0.
+    """
+    if elapsed_seconds <= 0:
+        return 0.0
+
+    total_mb = total_bytes / (1024 * 1024)
+    minutes = elapsed_seconds / 60.0
+    return round(total_mb / minutes, 2)
+
+
+def calculate_average_latency(latencies: list[float]) -> float:
+    """Calculate the average latency from a list of latencies."""
+    if not latencies:
+        return 0.0
+    return round(sum(latencies) / len(latencies), 3)
 
 
 def calculate_page_throughput(total_pages: int, elapsed_seconds: float) -> float:

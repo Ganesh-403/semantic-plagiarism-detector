@@ -232,7 +232,7 @@ def benchmark_document_embedding(
     logger.info(f"Benchmarking document embedding for {num_docs} documents...")
 
     start_time = time.perf_counter()
-    doc_embeddings = embed_documents(corpus, batch_size=batch_size)
+    embed_documents(corpus, batch_size=batch_size)
     end_time = time.perf_counter()
 
     total_time_seconds = end_time - start_time

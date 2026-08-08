@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import functools
 import hashlib
+import logging
 import re
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 
@@ -24,6 +25,8 @@ import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+
+logger = logging.getLogger(__name__)
 
 # ── Stop-word handling (issue #222) ───────────────────────────────────────────
 

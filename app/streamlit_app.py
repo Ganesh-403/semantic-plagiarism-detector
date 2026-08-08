@@ -7,7 +7,6 @@ import functools
 from pathlib import Path
 import sys
 import time
-import hashlib
 from datetime import datetime, timezone
 
 import numpy as np
@@ -2218,6 +2217,7 @@ st.divider()
     tab_users,
     tab_settings,
     tab_history,
+    tab_audit,
 ) = st.tabs(
     [
         get_text("tab_warnings", lang=lang_code),
@@ -2228,6 +2228,7 @@ st.divider()
         get_text("tab_analytics", lang=lang_code),
         get_text("tab_users", lang=lang_code),
         get_text("tab_settings", lang=lang_code),
+        get_text("tab_audit_logs", lang=lang_code),
         "📊 History",
     ],
     key="main_tabs",

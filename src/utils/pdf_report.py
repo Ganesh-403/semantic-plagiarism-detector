@@ -12,7 +12,7 @@ import os
 
 from datetime import datetime
 from io import BytesIO
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from reportlab.lib import colors
 from src.core.app_config import get_pdf_footer_text

@@ -815,7 +815,7 @@ def test_client_host_fallback():
     assert response.json()["ip"] is not None
 
 def test_scan_document_duplicate_detected(tmp_path):
-    from src.db.corpus_db import configure_corpus_db_path, init_corpus_db, add_document
+    from src.db.corpus_db import init_corpus_db, add_document
     from src.core.app_config import configure_test_paths
     from fastapi.testclient import TestClient
     from src.api.app import app

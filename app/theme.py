@@ -14,14 +14,21 @@ Provides:
 # -*- coding: utf-8 -*-
 
 from app.css_constants import (
-    BADGE,
-    EMPTY_STATE,
-    EMPTY_ICON,
-    EMPTY_TITLE,
-    EMPTY_DESC,
-    SIDEBAR_USER_BADGE,
-    AVATAR,
-    SIM_PILL,
+    CLASS_AVATAR,
+    CLASS_BADGE,
+    CLASS_EMPTY_DESC,
+    CLASS_EMPTY_ICON,
+    CLASS_EMPTY_STATE,
+    CLASS_EMPTY_TITLE,
+    CLASS_PIPELINE_ACTIVE,
+    CLASS_PIPELINE_ARROW,
+    CLASS_PIPELINE_DONE,
+    CLASS_PIPELINE_ETA,
+    CLASS_PIPELINE_STEP,
+    CLASS_PIPELINE_STEPS,
+    CLASS_SIDEBAR_USER_BADGE,
+    CLASS_SIM_PILL,
+    CLASS_WELCOME_BANNER,
 )
 
 """
@@ -41,6 +48,8 @@ Recent Additions (Issue #572):
 import re
 import secrets
 import streamlit as st
+from typing import Any
+from src.core.config import DEFAULT_THRESHOLDS, normalize_severity_label, severity_key
 
 
 # ── CSP Nonce Generation (Issue #644) ──────────────────────────────────────────
@@ -126,82 +135,6 @@ def sanitize_theme_colors(colors: dict) -> dict:
         fallback = fallback_map.get(k, "#000000")
         sanitized[k] = sanitize_hex_color(str(v), fallback=fallback)
     return sanitized
-
-
-try:
-    from app.css_constants import (
-        CLASS_AVATAR,
-        CLASS_BADGE,
-        CLASS_EMPTY_DESC,
-        CLASS_EMPTY_ICON,
-        CLASS_EMPTY_STATE,
-        CLASS_EMPTY_TITLE,
-        CLASS_PIPELINE_ACTIVE,
-        CLASS_PIPELINE_ARROW,
-        CLASS_PIPELINE_DONE,
-        CLASS_PIPELINE_ETA,
-        CLASS_PIPELINE_STEP,
-        CLASS_PIPELINE_STEPS,
-        CLASS_SIDEBAR_USER_BADGE,
-        CLASS_SIM_PILL,
-        CLASS_WELCOME_BANNER,
-    )
-except ImportError:
-    from css_constants import (
-        CLASS_AVATAR,
-        CLASS_BADGE,
-        CLASS_EMPTY_DESC,
-        CLASS_EMPTY_ICON,
-        CLASS_EMPTY_STATE,
-        CLASS_EMPTY_TITLE,
-        CLASS_PIPELINE_ACTIVE,
-        CLASS_PIPELINE_ARROW,
-        CLASS_PIPELINE_DONE,
-        CLASS_PIPELINE_ETA,
-        CLASS_PIPELINE_STEP,
-        CLASS_PIPELINE_STEPS,
-        CLASS_SIDEBAR_USER_BADGE,
-        CLASS_SIM_PILL,
-        CLASS_WELCOME_BANNER,
-    )
-from src.core.config import DEFAULT_THRESHOLDS, normalize_severity_label, severity_key
-
-# ── CSS Class Constants ────────────────────────────────────────────────────────
-try:
-    from app.css_constants import (
-        CLASS_AVATAR,
-        CLASS_BADGE,
-        CLASS_EMPTY_DESC,
-        CLASS_EMPTY_ICON,
-        CLASS_EMPTY_STATE,
-        CLASS_EMPTY_TITLE,
-        CLASS_PIPELINE_ACTIVE,
-        CLASS_PIPELINE_ARROW,
-        CLASS_PIPELINE_DONE,
-        CLASS_PIPELINE_ETA,
-        CLASS_PIPELINE_STEP,
-        CLASS_PIPELINE_STEPS,
-        CLASS_SIDEBAR_USER_BADGE,
-        CLASS_SIM_PILL,
-        CLASS_WELCOME_BANNER,
-    )
-except ImportError:
-    # Fallbacks for isolated testing
-    CLASS_AVATAR = "avatar-circle"
-    CLASS_BADGE = "severity-badge"
-    CLASS_EMPTY_DESC = "empty-desc"
-    CLASS_EMPTY_ICON = "empty-icon"
-    CLASS_EMPTY_STATE = "empty-state"
-    CLASS_EMPTY_TITLE = "empty-title"
-    CLASS_PIPELINE_ACTIVE = "pipeline-active"
-    CLASS_PIPELINE_ARROW = "pipeline-arrow"
-    CLASS_PIPELINE_DONE = "pipeline-done"
-    CLASS_PIPELINE_ETA = "pipeline-eta"
-    CLASS_PIPELINE_STEP = "pipeline-step"
-    CLASS_PIPELINE_STEPS = "pipeline-steps"
-    CLASS_SIDEBAR_USER_BADGE = "sidebar-user-badge"
-    CLASS_SIM_PILL = "sim-pill"
-    CLASS_WELCOME_BANNER = "welcome-banner"
 
 
 # ── Theme Definitions ──────────────────────────────────────────────────────────
@@ -727,14 +660,14 @@ def inject_css() -> None:
         }}
 
         .{CLASS_WELCOME_BANNER} {{
-    background-color: var(--secondary-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 12px 16px;
-    margin-bottom: 16px;
-    color: var(--text-color);
-    font-size: 0.95rem;
-}}
+            background-color: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            color: var(--text-color);
+            font-size: 0.95rem;
+        }}
 
         [data-testid="stExpander"],
         [data-testid="stForm"] {{
@@ -862,7 +795,7 @@ def inject_css() -> None:
 
         /* ── Back to Top Button ─────────────────────────────────────── */
 
-.sr-only {{
+        .sr-only {{
             position: absolute;
             width: 1px;
             height: 1px;
@@ -1219,31 +1152,8 @@ def inject_css() -> None:
     st.markdown(hotkey_js, unsafe_allow_html=True)
     st.markdown(back_to_top_html(), unsafe_allow_html=True)
 
+
 # ── Severity Helpers ───────────────────────────────────────────────────────────
-try:
-    from src.core.config import (
-        DEFAULT_THRESHOLDS,
-        normalize_severity_label,
-        severity_key,
-    )
-except ImportError:
-    # Fallbacks for testing
-    class DefaultThresholds:
-        plagiarism = 0.59
-
-    DEFAULT_THRESHOLDS = DefaultThresholds()
-
-    def normalize_severity_label(label: str) -> str:
-        return label.lower()
-
-    def severity_key(score: float) -> str:
-        if score >= 0.90:
-            return "high"
-        if score >= 0.59:
-            return "medium"
-        return "low"
-
-
 def severity_tier(
     score: float, threshold: float = DEFAULT_THRESHOLDS.plagiarism
 ) -> str:
@@ -1276,17 +1186,6 @@ def tier_color(tier: str) -> str:
     return colors["neutral_soft"]
 
 
-def empty_state_html(icon: str, title: str, description: str) -> str:
-    """Return styled empty-state HTML block."""
-    return (
-        f'<div class="{CLASS_EMPTY_STATE}">'
-        f'<div class="{CLASS_EMPTY_ICON}">{icon}</div>'
-        f'<div class="{CLASS_EMPTY_TITLE}">{title}</div>'
-        f'<div class="{CLASS_EMPTY_DESC}">{description}</div>'
-        f"</div>"
-    )
-
-
 def badge_html(tier: str, label: str = None) -> str:
     """Generates standard HTML badge chip for severity."""
     colors = get_colors()
@@ -1304,10 +1203,6 @@ def badge_html(tier: str, label: str = None) -> str:
         default_label = "🟢 Low"
 
     display_label = label if label is not None else default_label
-
-    return f'<span class="{BADGE}" style="background-color: {bg_color}; color: {text_color}; border: 1px solid {text_color};">{display_label}</span>'
-    return f'<span class="{CLASS_BADGE}" style="background-color: {bg_color}; color: {text_color}; border: 1px solid {text_color};">{display_label}</span>'
-    return f'<span class="{CLASS_BADGE}" style="color: {text_color}; background-color: {bg_color};">{display_label}</span>'
 
     tooltip_map = {
         "high": "Similarity >= 80%",
@@ -1346,21 +1241,12 @@ def format_similarity_html(
         bg = colors["success"]
         text = "#FFFFFF"
 
-    return (
-        f'<span class="{SIM_PILL}" style="background:{bg};">'
-        f'<span class="{CLASS_SIM_PILL}" style="background:{bg};">'
-        f"Similarity: {score * 100:.1f}%</span>"
-    )
     return f'<span class="{CLASS_SIM_PILL}" style="background-color: {bg}; color: {text};">Similarity: {score * 100:.1f}%</span>'
 
 
 def empty_state_html(icon: str, title: str, description: str) -> str:
     """Return styled empty-state HTML block."""
     return (
-        f'<div class="{EMPTY_STATE}">'
-        f'<div class="{EMPTY_ICON}">{icon}</div>'
-        f'<div class="{EMPTY_TITLE}">{title}</div>'
-        f'<div class="{EMPTY_DESC}">{description}</div>'
         f'<div class="{CLASS_EMPTY_STATE}">'
         f'<div class="{CLASS_EMPTY_ICON}">{icon}</div>'
         f'<div class="{CLASS_EMPTY_TITLE}">{title}</div>'
@@ -1373,9 +1259,6 @@ def sidebar_user_badge_html(username: str, role: str) -> str:
     """Return the sidebar user badge with avatar circle."""
     initial = username[0].upper() if username else "?"
     return (
-        f'<div class="{SIDEBAR_USER_BADGE}">'
-        f'<div class="{AVATAR}">{initial}</div>'
-        f"<div><strong>{username}</strong><br>"
         f'<div class="{CLASS_SIDEBAR_USER_BADGE}">'
         f'<div class="{CLASS_AVATAR}">{initial}</div>'
         f"<div>"
@@ -1438,8 +1321,6 @@ def back_to_top_html(scroll_threshold: int = 250) -> str:
     """
     nonce = get_csp_nonce()
     return f"""
-    <button id="back-to-top-btn"            type="button"
-            aria-label="Back to top"
 title="Back to top">
         ⬆️ Top
     </button>
@@ -1486,32 +1367,6 @@ scrollContainer.addEventListener('scroll', function () {{
     </script>
     """
 
-
-def version_check_widget_html(
-    local_version: str,
-    latest_tag: str,
-    repo_url: str = "https://github.com/Ganesh-403/semantic-plagiarism-detector/releases/latest",
-) -> str:
-    """Return an HTML snippet that renders an update-available notification banner.
-
-    The banner is intentionally lightweight — pure HTML/CSS with no external
-    dependencies — so it renders reliably inside ``st.markdown(...,
-    unsafe_allow_html=True)``.
-
-    Parameters
-    ----------
-    local_version:
-        The version string of the currently running application.
-    latest_tag:
-        The newer tag string returned by the GitHub API (e.g. ``"v1.2.0"``).
-    repo_url:
-        Link target for the "View release" call-to-action.
-
-    Returns
-    -------
-    str
-        A self-contained HTML string ready for ``st.markdown``.
-    """
 
 
 def version_check_widget_html(

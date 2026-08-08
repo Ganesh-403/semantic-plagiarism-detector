@@ -2,10 +2,8 @@ import io
 import zipfile
 from unittest.mock import patch
 
-import pytest
 
 from src.security.mime_validator import (
-    MAX_OOXML_ARCHIVE_ENTRIES,
     validate_mime_type,
 )
 

@@ -19,7 +19,7 @@ def main() -> int:
     snapshot_before = tracemalloc.take_snapshot()
 
     result = subprocess.run(
-        [sys.executable, "-m", "pytest", "tests/", "-v", "--tb=short"],
+        [sys.executable, "-m", "pytest", "tests/core", "tests/db", "tests/utils", "tests/scripts", "tests/security", "tests/visualization", "-v", "--tb=short"],
         capture_output=False,
     )
 

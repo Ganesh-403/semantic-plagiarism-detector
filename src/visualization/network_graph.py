@@ -9,9 +9,9 @@ import csv
 import io
 from typing import Optional
 
-import networkx as nx
 import numpy as np
 import pandas as pd
+import networkx as nx
 import plotly.graph_objects as go
 
 
@@ -303,7 +303,7 @@ def build_network_data(
 
     # ── Plagiarism Cluster Detection (Issue #1675) ───────────────────────────────
     # Use connected components to identify collusion rings
-    import networkx as nx
+
     connected_components = list(nx.connected_components(G))
     cluster_map = {}
     for cluster_id, component in enumerate(connected_components):

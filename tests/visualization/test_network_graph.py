@@ -12,7 +12,18 @@ import pandas as pd
 import plotly.graph_objects as go
 import pytest
 
-from src.visualization.network_graph import export_network_adjacency_csv, export_network_centrality_csv
+from src.visualization.network_graph import (
+    export_network_adjacency_csv,
+    export_network_centrality_csv,
+    build_network_data,
+    plot_similarity_network,
+    render_network_plotly,
+    plot_plagiarism_network_graph,
+    calculate_force_directed_layout,
+    export_network_to_gexf_bytes,
+    export_graph_to_csv,
+    export_network_to_csv_bytes,
+)
 
 
 def test_export_network_adjacency_csv():

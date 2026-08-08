@@ -863,9 +863,8 @@ class TestNormalizeExtendedPunctuation:
 # ─── Tests for Unicode NFC Normalizer (Issue #1482) ───────────────────────────
 
 import unicodedata
-import pytest
-from src.core.document_parser import normalize_unicode_nfc, extract_text
-from unittest.mock import patch, MagicMock
+from src.core.document_parser import normalize_unicode_nfc
+from unittest.mock import patch
 
 
 class TestNormalizeUnicodeNFC:

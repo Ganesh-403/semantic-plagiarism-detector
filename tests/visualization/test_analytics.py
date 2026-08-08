@@ -7,6 +7,7 @@ Unit tests for the analytics visualization functions.
 import numpy as np
 import plotly.graph_objects as go
 import pytest
+import pandas as pd
 
 from src.visualization.analytics import (
     plot_severity_donut_chart,
@@ -175,10 +176,8 @@ def test_plot_similarity_boxplot_fallback_keys():
     assert len(fig.data) == 1
     assert list(fig.data[0].y) == [0.9, 0.5]
 
-from src.visualization.analytics import plot_similarity_histogram
 
 
-from src.visualization.analytics import plot_similarity_histogram
 
 
 def test_plot_similarity_histogram_returns_figure():
@@ -253,7 +252,7 @@ def test_plot_analytics_charts_dark_mode_theme_colors():
 
 def _make_similarity_matrix(
     n: int = 5, seed: int = 42
-) -> "pd.DataFrame":
+) -> pd.DataFrame:
     """Build a synthetic symmetric similarity matrix for testing."""
     import pandas as pd
 

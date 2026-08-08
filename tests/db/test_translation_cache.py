@@ -13,12 +13,12 @@ import pytest
 
 from src.db import translation_cache
 from src.db.translation_cache import (
-    DB_PATH,
+    get_translation_cache_hit_ratio,
     cache_translation,
     get_cached_translation,
-    get_translation_cache_hit_rate,
     reset_translation_cache_counters,
     get_cache_performance_summary,
+    DB_PATH,
 )
 
 
