@@ -9,6 +9,7 @@ delta exceeds 10MB across test runs.
 import subprocess
 import sys
 import tracemalloc
+import os
 
 
 MEMORY_DELTA_LIMIT_MB = 10.0
@@ -18,9 +19,13 @@ def main() -> int:
     tracemalloc.start()
     snapshot_before = tracemalloc.take_snapshot()
 
+    env = os.environ.copy()
+    env["MEMCHECK_RUNNING"] = "1"
+    
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "tests/core", "tests/db", "tests/utils", "tests/scripts", "tests/security", "tests/visualization", "-v", "--tb=short"],
         capture_output=False,
+        env=env
     )
 
     if result.returncode != 0:

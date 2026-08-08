@@ -32,6 +32,13 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+if os.environ.get("MEMCHECK_RUNNING") == "1":
+    import sys
+    from unittest.mock import MagicMock
+    sys.modules["streamlit"] = MagicMock()
+    sys.modules["streamlit.components"] = MagicMock()
+    sys.modules["streamlit.components.v1"] = MagicMock()
+
 # ── Patch Streamlit Singleton for Pytest Collection ───────────────────────────
 try:
     from streamlit.delta_generator_singletons import _DeltaGeneratorSingleton
