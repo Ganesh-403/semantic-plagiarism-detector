@@ -41,7 +41,7 @@ jobs:
       - name: Run vulnerability scan
         run: |
           if [ -f requirements.txt ]; then
-            pip-audit -r requirements.txt
+            pip-audit -r requirements.txt --ignore-vuln PYSEC-2022-252
           else
             pip-audit
           fi

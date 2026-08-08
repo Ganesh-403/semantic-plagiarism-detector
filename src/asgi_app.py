@@ -18,7 +18,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-
 DEFAULT_MAX_REQUEST_BYTES = 52_428_800
 JSON_API_PREFIX = "/api/"
 NON_JSON_API_PATHS = frozenset(
@@ -27,6 +26,26 @@ NON_JSON_API_PATHS = frozenset(
         "/api/v1/scan",
     }
 )
+
+
+class ClientIPLoggingMiddleware(BaseHTTPMiddleware):
+    """Attach the originating client IP to request.state."""
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        forwarded_for = request.headers.get("x-forwarded-for")
+
+        if forwarded_for:
+            # Take the first IP if multiple proxies are present.
+            client_ip = forwarded_for.split(",")[0].strip()
+        elif request.client:
+            client_ip = request.client.host
+        else:
+            client_ip = None
+
+        request.state.client_ip = client_ip
+
+        response = await call_next(request)
+        return response
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -159,8 +178,7 @@ class JSONContentTypeMiddleware(BaseHTTPMiddleware):
                 status_code=415,
                 content={
                     "detail": (
-                        "Unsupported Media Type: Request must be "
-                        "application/json"
+                        "Unsupported Media Type: Request must be " "application/json"
                     )
                 },
             )
@@ -231,6 +249,9 @@ class TokenBucketRateLimiter(BaseHTTPMiddleware):
         self._buckets: dict[str, tuple[float, float]] = {}
 
     def _get_client_ip(self, request: Request) -> str:
+        client_ip = getattr(request.state, "client_ip", None)
+        if client_ip:
+            return client_ip
         forwarded = request.headers.get("x-forwarded-for")
         if forwarded:
             return forwarded.split(",")[0].strip()
@@ -272,6 +293,7 @@ class TokenBucketRateLimiter(BaseHTTPMiddleware):
 app = st.App(
     "app/streamlit_app.py",
     middleware=[
+        Middleware(ClientIPLoggingMiddleware),
         Middleware(RequestIDMiddleware),
         Middleware(SecurityHeadersMiddleware),
         Middleware(ContentLengthLimitMiddleware),
@@ -279,4 +301,3 @@ app = st.App(
         Middleware(TokenBucketRateLimiter),
     ],
 )
-

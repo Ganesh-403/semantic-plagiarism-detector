@@ -138,7 +138,8 @@ def inspect_pdf_fonts(pdf_bytes: bytes, max_font_bytes: int = 10_000_000) -> boo
         doc.close()
 
 
-def _strip_image_metadata(file_bytes: bytes) -> bytes:    """
+def _strip_image_metadata(file_bytes: bytes) -> bytes:
+    """
     Uses Pillow to read the image and save it without EXIF data.
     Includes safety checks to prevent decompression bombs or excessive memory usage
     by validating image dimensions before full decoding.

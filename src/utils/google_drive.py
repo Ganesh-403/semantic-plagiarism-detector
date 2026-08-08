@@ -12,14 +12,34 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 import requests
 
+import logging
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
 from src.utils.filename import unique_filename
 
+logger = logging.getLogger(__name__)
+
 # Supported extensions for the plagiarism detection pipeline
 SUPPORTED_EXTENSIONS = (".pdf", ".docx", ".doc", ".txt")
+
+
+def validate_service_account_key(key_dict: dict) -> bool:
+    """
+    Validate that the service account JSON key dictionary contains required fields.
+    """
+    if not isinstance(key_dict, dict):
+        logger.warning("Invalid key type: expected a dictionary.")
+        return False
+
+    required_keys = ["type", "project_id", "private_key", "client_email"]
+    for key in required_keys:
+        if key not in key_dict or not key_dict[key]:
+            logger.warning(f"Google Drive service account key is missing or empty for required field: {key}")
+            return False
+
+    return True
 
 
 def get_supported_file_extensions() -> List[str]:

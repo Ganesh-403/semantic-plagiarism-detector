@@ -1,9 +1,3 @@
-"""
-tests/visualization/test_heatmap.py
------------------------------------
-Unit tests for plot_similarity_heatmap edge cases.
-"""
-
 import io
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -17,6 +11,7 @@ from src.visualization.heatmap import (
     plot_differential_heatmap_matplotlib,
     plot_similarity_heatmap,
     plot_similarity_heatmap_plotly,
+    plot_document_similarity_heatmap,
 )
 
 
@@ -589,6 +584,17 @@ def test_plot_similarity_heatmap_plotly_custom_colorscale(
     fig_default = plot_similarity_heatmap_plotly(multi_doc_df, title="Default Colorscale")
     heatmap_default = next(trace for trace in fig_default.data if trace.type == "heatmap")
     assert heatmap_default.colorscale != heatmap.colorscale
+
+
+def test_plot_document_similarity_heatmap_empty():
+    """Verify plot_document_similarity_heatmap returns empty Plotly figure with centered annotation on empty input."""
+    df = pd.DataFrame()
+    fig = plot_document_similarity_heatmap(df, title="Empty Heatmap Test")
+
+    assert hasattr(fig, "layout")
+    assert fig.layout.title.text == "Empty Heatmap Test"
+    assert len(fig.layout.annotations) == 1
+    assert fig.layout.annotations[0].text == "No document data available for heatmap visualization"
 
 
 def test_plot_similarity_heatmap_responsive_tick_fontsize(multi_doc_df: pd.DataFrame) -> None:

@@ -90,6 +90,9 @@ WARNING_CARD_MEDIUM = "warning-card-medium"
 WARNING_CARD_LOW = "warning-card-low"
 """Low severity warning card accent border."""
 
+HIGH_SEVERITY_ROW = "high-severity-row"
+"""High severity plagiarism row accent border."""
+
 # ── Login container classes ────────────────────────────────────────────────────
 
 LOGIN_CONTAINER = "login-container"
@@ -206,3 +209,4 @@ CLASS_SKELETON_TEXT_SHORT = "skeleton-text-short"
 CLASS_SKELETON_CHART = "skeleton-chart"
 CLASS_SKELETON_TABLE = "skeleton-table"
 CLASS_CLEAR_ALL_CONTAINER = "clear-all-container"
+CLASS_HIGH_SEVERITY_ROW = "high-severity-row"

@@ -18,8 +18,12 @@ def get_export_timestamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _json_default_serializer(obj: Any) -> Any:
+def json_serializer_fallback(obj: Any) -> Any:
     """Custom JSON serializer for NumPy data types, pandas Timestamps, and datetime objects.
+
+    Passed as the ``default=`` callback to :func:`json.dumps` so that
+    otherwise non-serializable objects (e.g. ``numpy.int64``, ``numpy.float64``,
+    ``datetime``) don't raise an unhandled ``TypeError`` when exporting.
 
     Args:
         obj: Object instance to serialize.
@@ -120,9 +124,9 @@ def export_similarity_matrix_to_json(
             },
             "pairs": pairs,
         }
-        return json.dumps(output_data, indent=indent, ensure_ascii=False, default=_json_default_serializer)
+        return json.dumps(output_data, indent=indent, ensure_ascii=False, default=json_serializer_fallback)
 
-    return json.dumps(pairs, indent=indent, ensure_ascii=False, default=_json_default_serializer)
+    return json.dumps(pairs, indent=indent, ensure_ascii=False, default=json_serializer_fallback)
 
 
 def export_to_json(
@@ -158,7 +162,7 @@ def export_to_json(
             processed_data,
             indent=indent,
             ensure_ascii=False,
-            default=_json_default_serializer,
+            default=json_serializer_fallback,
         )
 
     root_metadata: Dict[str, Any] = {
@@ -186,7 +190,7 @@ def export_to_json(
         payload,
         indent=indent,
         ensure_ascii=False,
-        default=_json_default_serializer,
+        default=json_serializer_fallback,
     )
 
 

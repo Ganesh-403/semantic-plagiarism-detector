@@ -7,7 +7,9 @@ semantic space.
 
 from __future__ import annotations
 
+import hashlib
 import logging
+from threading import RLock
 from dataclasses import asdict, dataclass
 from typing import Callable, Iterable
 
@@ -23,6 +25,83 @@ DetectorFactory.seed = 0
 
 ENGLISH_CODES = {"en"}
 MIN_DETECTION_CHARACTERS = 20
+
+
+
+class TranslationMemoryCache:
+    """Thread-safe in-memory cache for translated sentences.
+
+    Cache keys are SHA-256 hashes of the source language, target language,
+    and exact source sentence. Including both language codes prevents a
+    translation produced for one language pair from being reused for another.
+    """
+
+    def __init__(self) -> None:
+        self._translations: dict[str, str] = {}
+        self._lock = RLock()
+
+    @staticmethod
+    def _build_key(
+        sentence: str,
+        source_lang: str,
+        target_lang: str,
+    ) -> str:
+        """Return a deterministic SHA-256 key for a translation request."""
+        payload = (
+            f"{_normalise_language_code(source_lang)}\0"
+            f"{_normalise_language_code(target_lang)}\0"
+            f"{sentence}"
+        )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def get(
+        self,
+        sentence: str,
+        *,
+        source_lang: str,
+        target_lang: str,
+    ) -> str | None:
+        """Return a cached translation or ``None`` when absent."""
+        key = self._build_key(
+            sentence,
+            source_lang,
+            target_lang,
+        )
+        with self._lock:
+            return self._translations.get(key)
+
+    def set(
+        self,
+        sentence: str,
+        translation: str,
+        *,
+        source_lang: str,
+        target_lang: str,
+    ) -> None:
+        """Store a successful non-empty translation."""
+        normalized_translation = str(translation or "").strip()
+        if not normalized_translation:
+            return
+
+        key = self._build_key(
+            sentence,
+            source_lang,
+            target_lang,
+        )
+        with self._lock:
+            self._translations[key] = normalized_translation
+
+    def clear(self) -> None:
+        """Remove every cached translation."""
+        with self._lock:
+            self._translations.clear()
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._translations)
+
+
+TRANSLATION_MEMORY_CACHE = TranslationMemoryCache()
 
 
 @dataclass(frozen=True)
@@ -66,12 +145,6 @@ def detect_language(text: str, min_confidence: float = 0.8) -> tuple[str, bool]:
         detected_lang = _normalise_language_code(top_lang.lang)
         confidence = top_lang.prob
 
-        if confidence < 0.7:
-            logger.warning(
-                "Low language detection confidence (%.2f) for input text snippet",
-                confidence,
-            )
-
         if confidence < min_confidence:
             logger.warning(
                 "Low-confidence language detection (%.4f < %.2f) for text: %s. Defaulting to 'en'.",
@@ -87,98 +160,21 @@ def detect_language(text: str, min_confidence: float = 0.8) -> tuple[str, bool]:
         return "en", False
 
 
-def translate_to_english(
-    text: str,
-    *,
-    detector: Callable[[str], str | tuple[str, bool]] | None = None,
-    translator: Callable[..., str] | None = None,
-) -> dict[str, str | float]:
-    """Translates source text into English and returns confidence alongside metadata.
-
-    Returns:
-        dict: {
-            "translated_text": str,
-            "source_language": str,
-            "confidence": float
-        }
-    """
-    original_text = str(text or "")
-    if not original_text.strip():
-        return {
-            "translated_text": original_text,
-            "source_language": "en",
-            "confidence": 1.0,
-        }
-
-    detector_fn = detector or detect_language
-    translator_fn = translator or translate_text
-
-    source_lang = "en"
-    confidence = 1.0
-
-    try:
-        cleaned = " ".join(original_text.split())
-        if len(cleaned) >= MIN_DETECTION_CHARACTERS and any(c.isalpha() for c in cleaned):
-            langs = detect_langs(cleaned)
-            if langs:
-                top_lang = langs[0]
-                source_lang = _normalise_language_code(top_lang.lang)
-                confidence = float(top_lang.prob)
-    except Exception:
-        res = detector_fn(original_text)
-        if isinstance(res, tuple):
-            source_lang, _ = res
-        else:
-            source_lang = res
-        source_lang = _normalise_language_code(source_lang)
-
-    # If text is already in English, return confidence = 1.0
-    if source_lang in ENGLISH_CODES or source_lang == "unknown":
-        return {
-            "translated_text": original_text,
-            "source_language": "en" if source_lang in ENGLISH_CODES else source_lang,
-            "confidence": 1.0,
-        }
-
-    # Perform translation for non-English source text
-    try:
-        translated_text = translator_fn(
-            original_text,
-            target_lang="en",
-            source_lang=source_lang,
-        )
-    except TypeError:
-        try:
-            translated_text = translator_fn(original_text, target_lang="en")
-        except Exception:
-            translated_text = original_text
-            confidence = 0.0
-    except Exception:
-        translated_text = original_text
-        confidence = 0.0
-
-    translated_text_str = str(translated_text or "").strip()
-    if not translated_text_str or translated_text_str.lower().startswith("(translation error"):
-        return {
-            "translated_text": original_text,
-            "source_language": source_lang,
-            "confidence": 0.0,
-        }
-
-    return {
-        "translated_text": translated_text_str,
-        "source_language": source_lang,
-        "confidence": round(confidence, 4),
-    }
-
-
 def prepare_text_for_embedding(
     text: str,
     *,
     detector: Callable[[str], str | tuple[str, bool]] | None = None,
     translator: Callable[..., str] | None = None,
+    translation_cache: TranslationMemoryCache | None = None,
 ) -> dict[str, object]:
-    """Prepare one source paragraph for English-aligned embedding."""
+    """Prepare one source paragraph for English-aligned embedding.
+
+    Parameters are injectable to make behaviour deterministic in tests and to
+    avoid network translation calls during unit tests.
+
+    The returned ``original_text`` always matches the input.  When translation
+    fails, ``embedding_text`` safely falls back to the original text.
+    """
     original_text = str(text or "")
     if not original_text.strip():
         return PreparedText(
@@ -190,6 +186,11 @@ def prepare_text_for_embedding(
 
     detector_fn = detector or detect_language
     translator_fn = translator or translate_text
+    cache = (
+        translation_cache
+        if translation_cache is not None
+        else TRANSLATION_MEMORY_CACHE
+    )
 
     try:
         res = detector_fn(original_text)
@@ -209,19 +210,35 @@ def prepare_text_for_embedding(
             translated=False,
         ).to_dict()
 
-    try:
-        translated_text = translator_fn(
-            original_text,
-            target_lang="en",
-            source_lang=language,
-        )
-    except TypeError:
+    target_language = "en"
+    cached_translation = cache.get(
+        original_text,
+        source_lang=language,
+        target_lang=target_language,
+    )
+
+    if cached_translation is not None:
+        translated_text = cached_translation
+    else:
         try:
-            translated_text = translator_fn(original_text, target_lang="en")
+            translated_text = translator_fn(
+                original_text,
+                target_lang=target_language,
+                source_lang=language,
+            )
+        except TypeError:
+            # Backward compatibility with the repository's previous
+            # translator signature:
+            # translate_text(text, target_lang="en").
+            try:
+                translated_text = translator_fn(
+                    original_text,
+                    target_lang=target_language,
+                )
+            except Exception:
+                translated_text = ""
         except Exception:
             translated_text = ""
-    except Exception:
-        translated_text = ""
 
     translated_text = str(translated_text or "").strip()
     translation_failed = not translated_text or translated_text.lower().startswith(
@@ -237,6 +254,14 @@ def prepare_text_for_embedding(
             translation_failed=True,
         ).to_dict()
 
+    if cached_translation is None:
+        cache.set(
+            original_text,
+            translated_text,
+            source_lang=language,
+            target_lang=target_language,
+        )
+
     return PreparedText(
         original_text=original_text,
         embedding_text=translated_text,
@@ -248,7 +273,12 @@ def prepare_text_for_embedding(
 def prepare_chunks_for_embedding(
     chunks: Iterable[str],
 ) -> tuple[list[str], list[dict[str, object]]]:
-    """Prepare a sequence of chunks while preserving original display text."""
+    """Prepare a sequence of chunks while preserving original display text.
+
+    Returns:
+        ``(embedding_chunks, metadata)`` where ``embedding_chunks`` contains
+        English-aligned text and ``metadata`` records language/translation state.
+    """
     embedding_chunks: list[str] = []
     metadata: list[dict[str, object]] = []
 

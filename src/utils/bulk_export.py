@@ -150,7 +150,9 @@ def normalize_csv_headers(headers: list[str]) -> list[str]:
     return normalized
 
 
-def export_incidents_csv_stream(incidents_list: List[Dict]) -> bytes:
+def export_incidents_csv_stream(
+    incidents_list: List[Dict], delimiter: str = ","
+) -> bytes:
     """Stream a list of incident dicts into a CSV-formatted byte stream
     encoded with **utf-8-sig** (UTF-8 with BOM) for Excel compatibility.
 
@@ -169,6 +171,11 @@ def export_incidents_csv_stream(incidents_list: List[Dict]) -> bytes:
     incidents_list:
         A list of incident dictionaries, as returned by
         :func:`~src.db.incidents.get_all_incidents`.
+    delimiter:
+        Single-character field delimiter passed through to
+        :class:`csv.DictWriter`. Defaults to ``","``. Use ``";"`` or
+        ``"\\t"`` for locales (e.g. many European Excel configurations)
+        that expect semicolon- or tab-delimited CSV files.
 
     Returns
     -------
@@ -181,6 +188,9 @@ def export_incidents_csv_stream(incidents_list: List[Dict]) -> bytes:
     --------
     >>> csv_bytes = export_incidents_csv_stream(incidents)
     >>> assert csv_bytes.startswith(b"\\xef\\xbb\\xbf")  # UTF-8 BOM
+
+    >>> csv_bytes = export_incidents_csv_stream(incidents, delimiter=";")
+    >>> assert b";" in csv_bytes
     """
     output = io.StringIO()
     writer = csv.DictWriter(
@@ -188,6 +198,7 @@ def export_incidents_csv_stream(incidents_list: List[Dict]) -> bytes:
         fieldnames=_CSV_HEADERS,
         extrasaction="ignore",
         lineterminator="\r\n",
+        delimiter=delimiter,
     )
     writer.writeheader()
 
@@ -217,12 +228,25 @@ def export_incidents_csv_stream(incidents_list: List[Dict]) -> bytes:
 def stream_incidents_csv_chunks(
     query_func: Callable,
     batch_size: int = 1000,
+    delimiter: str = ",",
 ) -> Generator[str, None, None]:
     """
     Stream incidents in chunks to a CSV-formatted string generator.
 
     This avoids loading all incidents into memory at once by fetching them in batches.
     The first yielded string includes the CSV headers.
+
+    Parameters
+    ----------
+    query_func:
+        Callable accepting ``limit`` and ``offset`` keyword arguments that
+        returns a batch of incident dicts.
+    batch_size:
+        Number of incidents to fetch per batch.
+    delimiter:
+        Single-character field delimiter passed through to
+        :class:`csv.DictWriter`. Defaults to ``","``. Use ``";"`` or
+        ``"\\t"`` for locales that expect semicolon- or tab-delimited CSV.
     """
     # Yield the header first
     output = io.StringIO()
@@ -231,6 +255,7 @@ def stream_incidents_csv_chunks(
         fieldnames=_CSV_HEADERS,
         extrasaction="ignore",
         lineterminator="\r\n",
+        delimiter=delimiter,
     )
     writer.writeheader()
     yield output.getvalue()
@@ -247,6 +272,7 @@ def stream_incidents_csv_chunks(
             fieldnames=_CSV_HEADERS,
             extrasaction="ignore",
             lineterminator="\r\n",
+            delimiter=delimiter,
         )
 
         for incident in batch:
@@ -419,11 +445,16 @@ def generate_bulk_reports_zip(
     return memory_file.getvalue()
 
 
-def create_batch_incident_zip_archive(incidents: list[dict]) -> bytes:
+def create_batch_incident_zip_archive(
+    incidents: list[dict], delimiter: str = ","
+) -> bytes:
     """Generate in-memory ZIP byte buffer containing incidents_summary.csv, metadata.json, and PDF reports.
 
     Args:
         incidents: A list of incident dictionaries.
+        delimiter: Field delimiter used for ``incidents_summary.csv``.
+            Defaults to ``","``; use ``";"`` or ``"\\t"`` for locales that
+            expect semicolon- or tab-delimited CSV.
 
     Returns:
         bytes: The in-memory ZIP file content.
@@ -433,7 +464,7 @@ def create_batch_incident_zip_archive(incidents: list[dict]) -> bytes:
     with zipfile.ZipFile(memory_file, "w", zipfile.ZIP_DEFLATED) as zf:
         # 1. Generate and write incidents_summary.csv
         try:
-            csv_bytes = export_incidents_csv_stream(incidents)
+            csv_bytes = export_incidents_csv_stream(incidents, delimiter=delimiter)
             zf.writestr("incidents_summary.csv", csv_bytes)
         except Exception as exc:
             logger.error(
