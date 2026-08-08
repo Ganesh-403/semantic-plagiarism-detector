@@ -32,6 +32,18 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+# ── Patch Streamlit Singleton for Pytest Collection ───────────────────────────
+try:
+    from streamlit.delta_generator_singletons import _DeltaGeneratorSingleton
+    _DeltaGeneratorSingleton._instance = None
+    _orig_init = _DeltaGeneratorSingleton.__init__
+    def _patched_init(self, *args, **kwargs):
+        _DeltaGeneratorSingleton._instance = None
+        _orig_init(self, *args, **kwargs)
+    _DeltaGeneratorSingleton.__init__ = _patched_init
+except Exception:
+    pass
+
 # ── Redis Test Database Isolation ─────────────────────────────────────────────
 # Use a separate Redis database (1 instead of 0) during tests so that running
 # the test suite does not flush the active development session cache.
