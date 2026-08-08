@@ -225,6 +225,26 @@ def get_temp_directory_size_bytes() -> int:
 
     return total_size
 
+def verify_available_temp_space(required_bytes: int) -> bool:
+    """
+    Verify that the system temporary directory has enough free disk space.
+
+    Args:
+        required_bytes: Minimum number of free bytes required.
+
+    Returns:
+        True if sufficient free space is available.
+
+    Raises:
+        OSError: If the temporary directory does not have enough free space.
+    """
+    temp_dir = tempfile.gettempdir()
+    _, _, free = shutil.disk_usage(temp_dir)
+
+    if free < required_bytes:
+        raise OSError("Insufficient free disk space in temp directory")
+
+    return True
 
 def rotate_backup_files(backup_dir: Path, keep_count: int = 5) -> int:
     """Enforce retention policies on backup directories by keeping only the N most recent files.

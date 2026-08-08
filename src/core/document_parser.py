@@ -1,40 +1,47 @@
 """Document text extraction with OCR fallback for scanned PDF pages."""
 
 from __future__ import annotations
-import defusedxml
+
 import io
 import logging
 import os
 import re
-import zipfile
 import shutil
 import subprocess
-import xml.etree.ElementTree
 import tempfile
+import xml.etree.ElementTree
+import zipfile
 from collections import Counter
 from pathlib import Path
 from typing import BinaryIO, Dict, List, Optional, Union
 
+import defusedxml
+
 try:
     import defusedxml.lxml
+
     defusedxml.lxml.monkey_patch()
 except (AttributeError, ImportError):
     pass
 from urllib.parse import urlparse
 
 import docx
-
 import pdfplumber
 from langdetect import LangDetectException, detect
+
 try:
     from striprtf.striprtf import rtf_to_text
 except ImportError:
+
     def rtf_to_text(rtf_text: str) -> str:
         return rtf_text
 
+
 logger = logging.getLogger(__name__)
-from src.core.translator import translate_text
 import string
+import unicodedata
+
+from src.core.translator import translate_text
 
 # OCR dependencies are imported lazily so TXT/DOCX and normal text PDFs still
 # work even when Tesseract is not installed on the machine.
@@ -56,25 +63,137 @@ DEFAULT_OCR_LANGUAGE = "eng"
 MAX_BATCH_SIZE = 50
 
 # File extensions supported by the extraction pipeline, exposed for UI display
-ALLOWED_EXTENSIONS = {".pdf", ".docx", ".csv", ".epub", ".html", ".md", ".markdown", ".mdown", ".rtf", ".txt"}
+ALLOWED_EXTENSIONS = {
+    ".pdf",
+    ".docx",
+    ".csv",
+    ".epub",
+    ".html",
+    ".md",
+    ".markdown",
+    ".mdown",
+    ".rtf",
+    ".txt",
+}
 ZERO_WIDTH_CHARS_PATTERN = re.compile(r"[\u200B\u200C\u200D\uFEFF\u2060\u200E\u200F]")
 
 # Standard English stopwords for lexical analysis noise reduction
-ENGLISH_STOPWORDS = frozenset({
-    "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
-    "of", "with", "by", "is", "are", "was", "were", "be", "been", "being",
-    "over",
-    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
-    "should", "can", "could", "may", "might", "must", "i", "me", "my",
-    "myself", "we", "our", "ours", "ourselves", "you", "your", "yours",
-    "yourself", "yourselves", "he", "him", "his", "himself", "she", "her",
-    "hers", "herself", "it", "its", "itself", "they", "them", "their",
-    "theirs", "themselves", "what", "which", "who", "whom", "this", "that",
-    "these", "those", "am", "as", "if", "then", "than", "too", "very", "s",
-    "t", "just", "don", "now", "d", "ll", "m", "o", "re", "ve", "y", "ain",
-    "aren", "couldn", "didn", "doesn", "hadn", "hasn", "haven", "isn", "ma",
-    "mightn", "mustn", "needn", "shan", "shouldn", "wasn", "weren", "won", "wouldn"
-})
+ENGLISH_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "and",
+        "or",
+        "but",
+        "in",
+        "on",
+        "at",
+        "to",
+        "for",
+        "of",
+        "with",
+        "by",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "over",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "can",
+        "could",
+        "may",
+        "might",
+        "must",
+        "i",
+        "me",
+        "my",
+        "myself",
+        "we",
+        "our",
+        "ours",
+        "ourselves",
+        "you",
+        "your",
+        "yours",
+        "yourself",
+        "yourselves",
+        "he",
+        "him",
+        "his",
+        "himself",
+        "she",
+        "her",
+        "hers",
+        "herself",
+        "it",
+        "its",
+        "itself",
+        "they",
+        "them",
+        "their",
+        "theirs",
+        "themselves",
+        "what",
+        "which",
+        "who",
+        "whom",
+        "this",
+        "that",
+        "these",
+        "those",
+        "am",
+        "as",
+        "if",
+        "then",
+        "than",
+        "too",
+        "very",
+        "s",
+        "t",
+        "just",
+        "don",
+        "now",
+        "d",
+        "ll",
+        "m",
+        "o",
+        "re",
+        "ve",
+        "y",
+        "ain",
+        "aren",
+        "couldn",
+        "didn",
+        "doesn",
+        "hadn",
+        "hasn",
+        "haven",
+        "isn",
+        "ma",
+        "mightn",
+        "mustn",
+        "needn",
+        "shan",
+        "shouldn",
+        "wasn",
+        "weren",
+        "won",
+        "wouldn",
+    }
+)
 
 
 def load_custom_stopwords(file_path: Optional[str] = None) -> frozenset:
@@ -111,7 +230,7 @@ def get_stopwords() -> frozenset:
 
 def sanitize_zero_width_characters(text: str, filename: Optional[str] = None) -> str:
     """
-    Strips zero-width unicode characters (e.g. \u200B) often used to bypass plagiarism checkers.
+    Strips zero-width unicode characters (e.g. \u200b) often used to bypass plagiarism checkers.
     Logs a security warning if any zero-width characters are found.
     """
     if not text:
@@ -127,59 +246,120 @@ def sanitize_zero_width_characters(text: str, filename: Optional[str] = None) ->
         return ZERO_WIDTH_CHARS_PATTERN.sub("", text)
     return text
 
-UNICODE_SPACE_TRANSLATION = str.maketrans({
-    "\u00A0": " ",   # Non-breaking space
-    "\u2000": " ",
-    "\u2001": " ",
-    "\u2002": " ",
-    "\u2003": " ",
-    "\u2004": " ",
-    "\u2005": " ",
-    "\u2006": " ",
-    "\u2007": " ",
-    "\u2008": " ",
-    "\u2009": " ",   # Thin space
-    "\u200A": " ",
-    "\u202F": " ",
-    "\u205F": " ",
-    "\u3000": " ",   # Ideographic space
-})
 
-FULLWIDTH_TRANSLATION = str.maketrans({
-    "，": ",",
-    "。": ".",
-    "：": ":",
-    "；": ";",
-    "！": "!",
-    "？": "?",
-    "（": "(",
-    "）": ")",
-    "【": "[",
-    "】": "]",
-    "［": "[",
-    "］": "]",
-    "｛": "{",
-    "｝": "}",
-})
+UNICODE_SPACE_TRANSLATION = str.maketrans(
+    {
+        "\u00a0": " ",  # Non-breaking space
+        "\u2000": " ",
+        "\u2001": " ",
+        "\u2002": " ",
+        "\u2003": " ",
+        "\u2004": " ",
+        "\u2005": " ",
+        "\u2006": " ",
+        "\u2007": " ",
+        "\u2008": " ",
+        "\u2009": " ",  # Thin space
+        "\u200a": " ",
+        "\u202f": " ",
+        "\u205f": " ",
+        "\u3000": " ",  # Ideographic space
+    }
+)
+
+FULLWIDTH_TRANSLATION = str.maketrans(
+    {
+        "，": ",",
+        "。": ".",
+        "：": ":",
+        "；": ";",
+        "！": "!",
+        "？": "?",
+        "（": "(",
+        "）": ")",
+        "【": "[",
+        "】": "]",
+        "［": "[",
+        "］": "]",
+        "｛": "{",
+        "｝": "}",
+    }
+)
 
 
 def normalize_unicode_spaces(text: str) -> str:
+    """Normalize special Unicode whitespace, zero-width characters, and full-width punctuation.
+    
+    Documents extracted from PDFs, DOCX files, or web sources often contain
+    non-standard Unicode characters that break string matching, lexical
+    similarity calculations, and tokenization. This function acts as a
+    comprehensive fallback normalizer to ensure consistent text representation
+    across different operating systems and extraction libraries.
+    
+    Handled conversions:
+    - Non-breaking spaces (\u00A0) -> standard space
+    - Thin spaces (\u2009), hair spaces (\u200A) -> standard space
+    - Zero-width spaces (\u200B), zero-width joiners/non-joiners -> empty string
+    - Soft hyphens (\u00AD) -> empty string
+    - Byte Order Mark / Zero-width no-break space (\uFEFF) -> empty string
+    - Full-width punctuation and alphanumerics -> half-width (via NFKC normalization)
+    
+    Args:
+        text: The input text string to normalize.
+        
+    Returns:
+        The normalized text string with standard spaces and half-width characters.
+        Returns an empty string if the input is None, empty, or not a string.
+        
+    Examples:
+        >>> normalize_unicode_spaces("Hello\u00A0World")
+        'Hello World'
+        >>> normalize_unicode_spaces("soft\u00ADhyphen")
+        'softhyphen'
+        >>> normalize_unicode_spaces("Ｆｕｌｌ－ｗｉｄｔｈ")
+        'Full-width'
     """
-    Normalize Unicode spacing and punctuation so visually identical
-    documents compare consistently.
-    """
-    if not text:
-        return text
+    # Validate input type and handle empty/None gracefully
+    if not text or not isinstance(text, str):
+        return ""
+        
+    # Step 1: Apply NFKC normalization to convert full-width characters to half-width
+    # and compose compatibility characters. This handles Asian full-width punctuation
+    # and ensures mathematical symbols are standardized.
+    text = unicodedata.normalize("NFKC", text)
+    
+    # Step 2: Map specific problematic Unicode characters to standard equivalents
+    # using str.translate for O(1) performance per character lookup.
+    # This is significantly faster than chained .replace() calls.
+    unicode_mapping = {
+        0x00A0: " ",    # Non-breaking space (common in PDFs and web scrapes)
+        0x2009: " ",    # Thin space
+        0x200A: " ",    # Hair space
+        0x202F: " ",    # Narrow no-break space
+        0x205F: " ",    # Medium mathematical space
+        0x3000: " ",    # Ideographic space (full-width space used in CJK text)
+        0x00AD: "",     # Soft hyphen (invisible but breaks regex word boundaries)
+        0x200B: "",     # Zero-width space
+        0x200C: "",     # Zero-width non-joiner
+        0x200D: "",     # Zero-width joiner
+        0xFEFF: "",     # Zero-width no-break space / Byte Order Mark (BOM)
+        0x2060: "",     # Word joiner
+        0x2028: "\n",   # Line separator -> standard newline
+        0x2029: "\n\n", # Paragraph separator -> double newline
+    }
+    
+    text = text.translate(unicode_mapping)
+    
+    # Step 3: Collapse multiple consecutive standard spaces into a single space
+    # to prevent artificial inflation of lexical distance metrics and ensure
+    # consistent tokenization in downstream embedding models.
+    text = re.sub(r" {2,}", " ", text)
+    
+    # Step 4: Strip leading/trailing whitespace that may have been introduced
+    # by the normalization process.
+    return text.strip()
 
-    text = text.translate(UNICODE_SPACE_TRANSLATION)
 
-    # Remove soft hyphens
-    text = text.replace("\u00AD", "")
-
-    # Normalize full-width punctuation
-    text = text.translate(FULLWIDTH_TRANSLATION)
-
-    return text
 def check_batch_rate_limit(file_count: int, session_id: Optional[str] = None) -> None:
     """
     Validates batch file collection size against session rate limits.
@@ -190,9 +370,7 @@ def check_batch_rate_limit(file_count: int, session_id: Optional[str] = None) ->
     if file_count > MAX_BATCH_SIZE:
         from src.errors import PARSER_BATCH_LIMIT_EXCEEDED
 
-        raise ValueError(
-            PARSER_BATCH_LIMIT_EXCEEDED.format(limit=MAX_BATCH_SIZE)
-        )
+        raise ValueError(PARSER_BATCH_LIMIT_EXCEEDED.format(limit=MAX_BATCH_SIZE))
 
 
 # Tesseract language packs intentionally exposed by the administrator UI.
@@ -203,10 +381,6 @@ from src.core.app_config import SUPPORTED_OCR_LANGUAGES
 
 class CorruptedArchiveError(ValueError):
     """Raised when an uploaded zip file or inner archived document is corrupted."""
-
-
-class CorruptedArchiveError(ValueError):
-    """Raised when an uploaded ZIP file or inner archived document is corrupted."""
 
 
 def validate_ocr_dpi(value: int) -> int:
@@ -291,18 +465,15 @@ def strip_bibliography(text: str) -> str:
         sliced_text = text[: match.start()].rstrip()
         if hasattr(text, "word_headings"):
             words_in_sliced = len(sliced_text.split())
-            return ParsedDocxText(sliced_text, word_headings=text.word_headings[:words_in_sliced])
+            return ParsedDocxText(
+                sliced_text, word_headings=text.word_headings[:words_in_sliced]
+            )
         return sliced_text
     return text
 
 
 def clean_text(raw_text: str, remove_stopwords: bool = False) -> str:
-    """Normalize whitespace and remove unwanted Unicode characters.
-
-    Args:
-        raw_text: The text to clean.
-        remove_stopwords: When True, filters out English stopwords.
-    """
+    """Normalize whitespace and remove unwanted Unicode characters."""
     text = raw_text
 
     text = text.translate(
@@ -330,7 +501,8 @@ def clean_text(raw_text: str, remove_stopwords: bool = False) -> str:
         words = text.split()
         stopwords = get_stopwords()
         filtered_words = [
-            word for word in words
+            word
+            for word in words
             if word.lower().strip(string.punctuation) not in stopwords
         ]
         text = " ".join(filtered_words)
@@ -582,22 +754,11 @@ def _ocr_pdf_page(
                 (pixmap.width, pixmap.height),
                 pixmap.samples,
             )
-            try:
-                return pytesseract.image_to_string(
-                    image,
-                    lang=language,
-                    config="--oem 3 --psm 3",
-                ).strip()
-            except (MemoryError, Exception) as exc:
-                if isinstance(exc, MemoryError):
-                    logger.warning(
-                        f"[document_parser] OCR page {page_index} failed due to memory exhaustion: {exc}"
-                    )
-                else:
-                    logger.warning(
-                        f"[document_parser] OCR page {page_index} failed: {exc}"
-                    )
-                return f"[OCR extraction failed for page {page_index}]"
+            return pytesseract.image_to_string(
+                image,
+                lang=language,
+                config="--oem 3 --psm 3",
+            ).strip()
     except pytesseract.TesseractNotFoundError as exc:
         from src.errors import OCR_TESSERACT_NOT_FOUND
 
@@ -711,15 +872,55 @@ def _extract_single_file_helper(
     return extract_text(data, name, ocr_language=ocr_language, ocr_dpi=ocr_dpi)
 
 
+def _resolve_process_pool_workers(
+    max_workers: int | None,
+    file_count: int,
+) -> int:
+    """Return a safe process-pool size for bulk extraction.
+
+    The requested worker limit is capped by both the available CPU count and
+    the number of files, preventing unnecessary processes and excessive memory
+    pressure on shared systems.
+    """
+    if isinstance(max_workers, bool) or (
+        max_workers is not None and not isinstance(max_workers, int)
+    ):
+        raise TypeError("max_workers must be an integer or None.")
+
+    if max_workers is not None and max_workers < 1:
+        raise ValueError("max_workers must be at least 1.")
+
+    available_cpus = os.cpu_count() or 1
+    requested_workers = available_cpus if max_workers is None else max_workers
+
+    return max(
+        1,
+        min(
+            requested_workers,
+            available_cpus,
+            max(file_count, 1),
+        ),
+    )
+
+
 def extract_texts_parallel(
     files_dict: Dict[str, bytes],
     *,
     ocr_language: str = DEFAULT_OCR_LANGUAGE,
     ocr_dpi: int = DEFAULT_OCR_DPI,
     session_id: Optional[str] = None,
+    max_workers: int | None = None,
 ) -> tuple[Dict[str, str], Dict[str, Exception]]:
     """
-    Extract text from multiple files in parallel using ProcessPoolExecutor.
+    Extract text from multiple files using a bounded process pool.
+
+    Args:
+        files_dict: Mapping of filename to raw file bytes.
+        ocr_language: Validated OCR language code.
+        ocr_dpi: Validated OCR rendering resolution.
+        session_id: Optional rate-limit session identifier.
+        max_workers: Requested process limit. ``None`` uses the available CPU
+            count. The final pool is capped by CPU count and file count.
 
     Returns:
         tuple of (results_dict, errors_dict)
@@ -737,7 +938,12 @@ def extract_texts_parallel(
     if not files_dict:
         return results, errors
 
-    if len(files_dict) == 1 or not _should_use_parallel():
+    worker_count = _resolve_process_pool_workers(
+        max_workers,
+        len(files_dict),
+    )
+
+    if worker_count == 1 or not _should_use_parallel():
         for name, data in files_dict.items():
             try:
                 results[name] = _extract_single_file_helper(
@@ -758,7 +964,9 @@ def extract_texts_parallel(
     try:
         from concurrent.futures import ProcessPoolExecutor
 
-        with ProcessPoolExecutor() as executor:
+        with ProcessPoolExecutor(
+            max_workers=worker_count,
+        ) as executor:
             futures = {
                 executor.submit(
                     _extract_single_file_helper,
@@ -837,52 +1045,39 @@ def count_pdf_images(pdf_bytes: bytes) -> int:
 
 
 def extract_pdf_metadata(file: PDFInput) -> Dict[str, str]:
-    """Extract PDF metadata (Author, Title, Creation Date, Creator, Producer) using PyMuPDF.
+    """Extract PDF metadata (Author, Creation Date, Title) using PyMuPDF.
 
     Returns:
-        Dictionary with keys 'author', 'title', 'creation_date', 'creator', 'producer'.
+        Dictionary with keys 'author', 'creation_date', 'title'.
         Values are None if metadata is not available.
     """
     pdf_bytes = _read_pdf_bytes(file)
-
-    metadata = {
-        "author": None,
-        "title": None,
-        "creation_date": None,
-        "creator": None,
-        "producer": None,
-    }
+    metadata = {"author": None, "creation_date": None, "title": None}
 
     try:
         import fitz  # PyMuPDF
 
         with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
-            doc_metadata = doc.metadata or {}
-
+            doc_metadata = doc.metadata
             metadata["author"] = doc_metadata.get("author")
-            metadata["title"] = doc_metadata.get("title")
             metadata["creation_date"] = doc_metadata.get("creationDate")
-            metadata["creator"] = doc_metadata.get("creator")
-            metadata["producer"] = doc_metadata.get("producer")
-
+            metadata["title"] = doc_metadata.get("title")
     except (ValueError, RuntimeError, OSError, TypeError) as exc:
         print(f"[document_parser] Error extracting PDF metadata: {exc}")
-
     except Exception as exc:
         logger.error(f"[document_parser] Error extracting PDF metadata: {exc}")
 
     image_count = count_pdf_images(pdf_bytes)
-
     if image_count:
         logger.info(
             "[document_parser] PDF contains %d embedded image(s): %s",
             image_count,
             metadata.get("title") or "unknown",
         )
-
     metadata["image_count"] = image_count
 
     return metadata
+
 
 def extract_text_from_pdf(
     file: PDFInput,
@@ -1081,54 +1276,6 @@ def extract_text_from_rtf(file: PDFInput) -> str:
     return text.strip()
 
 
-def extract_text_from_zip(
-    file: PDFInput,
-    *,
-    ocr_language: str = DEFAULT_OCR_LANGUAGE,
-    ocr_dpi: int = DEFAULT_OCR_DPI,
-) -> str:
-    """Extract and aggregate text from all valid documents inside a ZIP archive.
-
-    Catches zipfile.BadZipFile and reports corrupted zip files or damaged inner entries.
-    """
-    raw_data = _read_pdf_bytes(file)
-    zip_stream = io.BytesIO(raw_data)
-
-    if not zipfile.is_zipfile(zip_stream):
-        raise CorruptedArchiveError("Uploaded ZIP file is corrupted or not a valid ZIP archive.")
-
-    zip_stream.seek(0)
-    extracted_texts: List[str] = []
-    corrupted_files: List[str] = []
-
-    try:
-        with zipfile.ZipFile(zip_stream, "r") as archive:
-            for member_name in archive.namelist():
-                # Skip directories and macOS metadata files
-                if member_name.endswith("/") or member_name.startswith("__MACOSX"):
-                    continue
-
-                try:
-                    file_bytes = archive.read(member_name)
-                    parsed = extract_text(file_bytes, member_name, ocr_language=ocr_language, ocr_dpi=ocr_dpi)
-                    if parsed:
-                        extracted_texts.append(parsed)
-                except Exception as exc:
-                    corrupted_files.append(f"{member_name} ({exc})")
-
-            if corrupted_files:
-                bad_list = ", ".join(corrupted_files)
-                print(f"[document_parser] Warning: Corrupted inner files in zip: {bad_list}")
-
-            if not extracted_texts and corrupted_files:
-                raise CorruptedArchiveError(f"ZIP archive contains corrupted files: {', '.join(corrupted_files)}")
-
-    except zipfile.BadZipFile as exc:
-        raise CorruptedArchiveError(f"Uploaded ZIP submission is corrupted: {exc}") from exc
-
-    return "\n\n".join(extracted_texts).strip()
-
-
 def extract_text_from_doc(file: PDFInput) -> str:
     """Extract plain text from a legacy Word Document (.doc) using antiword."""
     if not shutil.which("antiword"):
@@ -1318,7 +1465,7 @@ def extract_text_from_epub(file: PDFInput) -> str:
     """Extract plain text from an EPUB file."""
     try:
         from bs4 import BeautifulSoup
-        from ebooklib import epub # type: ignore
+        from ebooklib import epub  # type: ignore
 
         epub_file = io.BytesIO(file) if isinstance(file, bytes) else file
 
@@ -1367,7 +1514,9 @@ def extract_text_from_zip(
     zip_stream = io.BytesIO(raw_data)
 
     if not zipfile.is_zipfile(zip_stream):
-        raise CorruptedArchiveError("Uploaded ZIP file is corrupted or not a valid ZIP archive.")
+        raise CorruptedArchiveError(
+            "Uploaded ZIP file is corrupted or not a valid ZIP archive."
+        )
 
     zip_stream.seek(0)
     extracted_texts: List[str] = []
@@ -1382,7 +1531,12 @@ def extract_text_from_zip(
 
                 try:
                     file_bytes = archive.read(member_name)
-                    parsed = extract_text(file_bytes, member_name, ocr_language=ocr_language, ocr_dpi=ocr_dpi)
+                    parsed = extract_text(
+                        file_bytes,
+                        member_name,
+                        ocr_language=ocr_language,
+                        ocr_dpi=ocr_dpi,
+                    )
                     if parsed:
                         extracted_texts.append(parsed)
                 except Exception as exc:
@@ -1390,15 +1544,23 @@ def extract_text_from_zip(
 
             if corrupted_files:
                 bad_list = ", ".join(corrupted_files)
-                print(f"[document_parser] Warning: Corrupted inner files in zip: {bad_list}")
+                print(
+                    f"[document_parser] Warning: Corrupted inner files in zip: {bad_list}"
+                )
 
             if not extracted_texts and corrupted_files:
-                raise CorruptedArchiveError(f"ZIP archive contains corrupted files: {', '.join(corrupted_files)}")
+                raise CorruptedArchiveError(
+                    f"ZIP archive contains corrupted files: {', '.join(corrupted_files)}"
+                )
 
     except zipfile.BadZipFile as exc:
-        raise CorruptedArchiveError(f"Uploaded ZIP submission is corrupted: {exc}") from exc
+        raise CorruptedArchiveError(
+            f"Uploaded ZIP submission is corrupted: {exc}"
+        ) from exc
 
     return "\n\n".join(extracted_texts).strip()
+
+
 def extract_text_from_odt(file: PDFInput) -> str:
     """Extract plain text from an ODT (OpenDocument Text) file.
     ODT files are ZIP archives containing content.xml with ODF XML.
@@ -1420,12 +1582,19 @@ def extract_text_from_odt(file: PDFInput) -> str:
         if body is not None:
             office_text = body.find("office:text", ns)
             if office_text is not None:
-                for p in office_text.iter("{urn:oasis:names:tc:opendocument:xmlns:text:1.0}p"):
+                for p in office_text.iter(
+                    "{urn:oasis:names:tc:opendocument:xmlns:text:1.0}p"
+                ):
                     text_parts.append("".join(p.itertext()))
 
         return "\n\n".join(text_parts).strip()
 
-    except (KeyError, ValueError, zipfile.BadZipFile, xml.etree.ElementTree.ParseError) as exc:
+    except (
+        KeyError,
+        ValueError,
+        zipfile.BadZipFile,
+        xml.etree.ElementTree.ParseError,
+    ) as exc:
         print(f"[document_parser] Error reading ODT: {exc}")
     except Exception as exc:
         logger.error(f"[document_parser] Error reading ODT: {exc}")
@@ -1441,6 +1610,7 @@ def extract_text_from_image(
         from PIL import Image
     except ImportError as exc:
         from src.errors import OCR_DEPENDENCIES_MISSING
+
         raise OCRDependencyError(OCR_DEPENDENCIES_MISSING) from exc
 
     _configure_tesseract(pytesseract)
@@ -1460,12 +1630,16 @@ def extract_text_from_image(
                     f"[document_parser] OCR image extraction failed due to memory exhaustion: {exc}"
                 )
             else:
-                logger.warning(
-                    f"[document_parser] OCR image extraction failed: {exc}"
-                )
+                logger.warning(f"[document_parser] OCR image extraction failed: {exc}")
             return "[OCR extraction failed for the file]"
+        return pytesseract.image_to_string(
+            image,
+            lang=ocr_language,
+            config="--oem 3 --psm 3",
+        ).strip()
     except pytesseract.TesseractNotFoundError as exc:
         from src.errors import OCR_TESSERACT_NOT_FOUND
+
         raise OCRDependencyError(OCR_TESSERACT_NOT_FOUND) from exc
     except Exception as exc:
         logger.error(f"[document_parser] Error reading image: {exc}")
@@ -1475,18 +1649,30 @@ def extract_text_from_image(
 _DATE_PATTERNS = [
     re.compile(r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b"),
     re.compile(r"\b\d{4}-\d{2}-\d{2}\b"),
-    re.compile(r"\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\b", re.IGNORECASE),
-    re.compile(r"\b\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?),?\s+\d{4}\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?),?\s+\d{4}\b",
+        re.IGNORECASE,
+    ),
 ]
 
 _ORG_PATTERNS = [
-    re.compile(r"\b(?:University|College|Institute|Department|Corp|Corporation|Inc|Incorporated|Ltd|Limited|LLC|Society|Foundation|Academy|School)\b(?:\s+[A-Z][a-zA-Z]+)*"),
-    re.compile(r"\b(?:[A-Z][a-zA-Z]+\s+)+(?:University|College|Institute|Department|Corp|Corporation|Inc|Incorporated|Ltd|Limited|LLC|Society|Foundation|Academy|School)\b"),
+    re.compile(
+        r"\b(?:University|College|Institute|Department|Corp|Corporation|Inc|Incorporated|Ltd|Limited|LLC|Society|Foundation|Academy|School)\b(?:\s+[A-Z][a-zA-Z]+)*"
+    ),
+    re.compile(
+        r"\b(?:[A-Z][a-zA-Z]+\s+)+(?:University|College|Institute|Department|Corp|Corporation|Inc|Incorporated|Ltd|Limited|LLC|Society|Foundation|Academy|School)\b"
+    ),
     re.compile(r"\bDepartment\s+of\s+[A-Z][a-zA-Z\s]+\b"),
 ]
 
 _PERSON_PATTERNS = [
-    re.compile(r"\b(?:Mr|Mrs|Ms|Dr|Prof|Professor|Sir|Lady)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b"),
+    re.compile(
+        r"\b(?:Mr|Mrs|Ms|Dr|Prof|Professor|Sir|Lady)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b"
+    ),
 ]
 
 
@@ -1513,7 +1699,13 @@ def mask_named_entities_in_text(text: str) -> str:
             chunks = nltk.ne_chunk(pos_tags)
             entities = []
             for chunk in chunks:
-                if hasattr(chunk, "label") and chunk.label() in ("PERSON", "ORGANIZATION", "ORGANISATION", "GPE", "DATE"):
+                if hasattr(chunk, "label") and chunk.label() in (
+                    "PERSON",
+                    "ORGANIZATION",
+                    "ORGANISATION",
+                    "GPE",
+                    "DATE",
+                ):
                     entity_str = " ".join(c[0] for c in chunk)
                     entities.append(entity_str)
             for ent in sorted(entities, key=len, reverse=True):
@@ -1538,16 +1730,44 @@ def normalize_extended_punctuation(text: str) -> str:
     """Replace curly quotes, em-dashes, and ellipsis with standard ASCII."""
     if not text:
         return text
-    
-    translation_table = str.maketrans({
-        "“": '"',
-        "”": '"',
-        "‘": "'",
-        "’": "'",
-        "—": "-",
-        "…": "..."
-    })
+
+    translation_table = str.maketrans(
+        {"“": '"', "”": '"', "‘": "'", "’": "'", "—": "-", "…": "..."}
+    )
     return text.translate(translation_table)
+
+
+def normalize_unicode_nfc(text: str) -> str:
+    """Convert input text to Unicode NFC canonical composition form.
+
+    Different operating systems and text extraction libraries may produce
+    text in different Unicode normalization forms. For example, the character
+    'é' can be represented as a single code point (NFC) or as 'e' followed
+    by a combining acute accent (NFD). This causes string matching failures
+    and inconsistent behavior in lexical similarity calculations.
+
+    This function ensures all text is converted to NFC (Normalization Form C),
+    which composes characters wherever possible. This is the standard form
+    recommended for most text processing and storage tasks.
+
+    Args:
+        text: The input text string to normalize.
+
+    Returns:
+        The NFC-normalized text string. Returns an empty string if input is None.
+
+    Examples:
+        >>> normalize_unicode_nfc("cafe\\u0301")  # NFD form
+        'café'
+        >>> normalize_unicode_nfc("café")        # NFC form
+        'café'
+    """
+    if not text or not isinstance(text, str):
+        return ""
+
+    # unicodedata.normalize('NFC', text) composes characters
+    # e.g., 'e' + '´' -> 'é'
+    return unicodedata.normalize("NFC", text)
 
 
 def extract_text(
@@ -1556,8 +1776,6 @@ def extract_text(
     *,
     ocr_language: str = DEFAULT_OCR_LANGUAGE,
     ocr_dpi: int = DEFAULT_OCR_DPI,
-    clean_whitespace: bool = True,
-    mask_named_entities: bool = False,
 ) -> str:
     """Route extraction according to a filename extension."""
     ocr_language, ocr_dpi = normalize_ocr_settings(
@@ -1568,6 +1786,7 @@ def extract_text(
     # Validate file type magic bytes first to prevent malicious file uploads
     file_bytes = _read_pdf_bytes(file)
     from src.security.mime_validator import validate_mime_type
+
     if not validate_mime_type(file_bytes, filename):
         logger.warning(
             f"[document_parser] Security warning: Rejected file '{filename}' "
@@ -1586,8 +1805,6 @@ def extract_text(
         raw = extract_text_from_doc(file)
     elif extension in ("md", "markdown", "mdown"):
         raw = extract_text_from_md(file)
-    elif extension == "zip":
-        raw = extract_text_from_zip(file, ocr_language=ocr_language, ocr_dpi=ocr_dpi)
 
     elif extension in ("zip", "7z", "tar", "gz"):
         raw = extract_text_from_zip(file, ocr_language=ocr_language, ocr_dpi=ocr_dpi)
@@ -1606,25 +1823,17 @@ def extract_text(
 
     raw = strip_bibliography(raw)
     raw = normalize_unicode_spaces(raw)
+
+    # Apply NFC normalization to ensure consistent string matching across OSes (Issue #1482)
+    raw = normalize_unicode_nfc(raw)
+
     raw = sanitize_zero_width_characters(raw, filename=filename)
-
-    if clean_whitespace and raw:
-        lines = [line.rstrip() for line in raw.splitlines()]
-        cleaned_text = "\n".join(lines)
-        raw = re.sub(r"\n{3,}", "\n\n", cleaned_text)
-
-    if mask_named_entities and raw:
-        raw = mask_named_entities_in_text(raw)
-
-    raw = normalize_extended_punctuation(raw)
-
     lang_code = detect_text_language(raw)
 
     logger.info(
         f"[document_parser] Detected language for document '{filename}': {lang_code}"
     )
     return raw
-
 
 
 ALLOWED_EXTENSIONS = {
@@ -1645,7 +1854,9 @@ def get_supported_file_extensions() -> list[str]:
     return sorted(ALLOWED_EXTENSIONS)
 
 
-def extract_texts_from_pdfs(files: list, session_id: Optional[str] = None) -> Dict[str, str]:
+def extract_texts_from_pdfs(
+    files: list, session_id: Optional[str] = None
+) -> Dict[str, str]:
     """Legacy compatibility wrapper."""
     return extract_texts(files, session_id=session_id)
 
@@ -1659,7 +1870,9 @@ def _extract_text_from_file_path(file_path: Path) -> tuple[str, str]:
         extracted = extract_text(content_bytes, filename)
         return filename, extracted
     except Exception as exc:
-        logger.error(f"[document_parser] Error extracting text from path {file_path}: {exc}")
+        logger.error(
+            f"[document_parser] Error extracting text from path {file_path}: {exc}"
+        )
         return filename, ""
 
 
@@ -1712,7 +1925,11 @@ def parallel_extract_texts(
     return results
 
 
-def extract_texts(files: list, session_id: Optional[str] = None) -> Dict[str, str]:
+def extract_texts(
+    files: list,
+    session_id: Optional[str] = None,
+    max_workers: int | None = None,
+) -> Dict[str, str]:
     """Extract text from multiple uploaded files."""
     check_batch_rate_limit(len(files) if files else 0, session_id=session_id)
 
@@ -1733,7 +1950,11 @@ def extract_texts(files: list, session_id: Optional[str] = None) -> Dict[str, st
             logger.error(f"[document_parser] Error reading file data for {name}: {exc}")
             files_dict[name] = b""
 
-    raw_texts, errors = extract_texts_parallel(files_dict, session_id=session_id)
+    raw_texts, errors = extract_texts_parallel(
+        files_dict,
+        session_id=session_id,
+        max_workers=max_workers,
+    )
     if errors:
         raise next(iter(errors.values()))
 

@@ -176,14 +176,6 @@ EXPORT_GENERATION_IO_FAILED = (
 )
 
 
-class OCRFileBatchError(Exception):
-    """Exception raised when OCR extraction fails on one or more files in a batch."""
-
-    def __init__(self, failed_files: list[str], failure_details: list[str]):
-        self.failed_files = failed_files
-        self.failure_details = failure_details
-        super().__init__(f"OCR failed for files: {failed_files}")
-
 
 class StaleDataException(Exception):
     """Raised when an update fails because the version has changed (optimistic locking)."""

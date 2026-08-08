@@ -245,3 +245,56 @@ def test_optimize_faiss_index_converts_above_threshold(caplog, monkeypatch):
     assert manager["index"].ntotal == 10
     assert isinstance(manager["index"], (faiss.IndexIVFFlat, faiss.IndexIDMap))
 
+
+def test_get_faiss_index_memory_bytes_none_or_uninitialized():
+    """Verify get_faiss_index_memory_bytes returns 0 for None or empty index."""
+    from src.core.faiss_index import get_faiss_index_memory_bytes
+
+    assert get_faiss_index_memory_bytes(None) == 0
+    assert get_faiss_index_memory_bytes(faiss.IndexFlatIP(384)) == 0
+
+
+def test_get_faiss_index_memory_bytes_with_vectors():
+    """Verify get_faiss_index_memory_bytes returns byte size for populated index."""
+    from src.core.faiss_index import get_faiss_index_memory_bytes
+
+    dim = 384
+    index = faiss.IndexFlatIP(dim)
+    vecs = _unit_vecs(100, dim=dim)
+    index.add(vecs)
+
+    mem_bytes = get_faiss_index_memory_bytes(index)
+    assert isinstance(mem_bytes, int)
+    assert mem_bytes > 0
+
+    # Wrapped in dict
+    assert get_faiss_index_memory_bytes({"index": index}) == mem_bytes
+
+    # Wrapped in object attribute
+    class IndexManager:
+        def __init__(self, idx):
+            self.index = idx
+
+    assert get_faiss_index_memory_bytes(IndexManager(index)) == mem_bytes
+
+
+def test_format_faiss_memory_badge_formatting():
+    """Verify format_faiss_memory_badge text output for uninitialized and populated index."""
+    from src.core.faiss_index import format_faiss_memory_badge
+
+    # Uninitialized / None fallback
+    assert format_faiss_memory_badge(None) == "FAISS Memory: 0 MB"
+    assert format_faiss_memory_badge(faiss.IndexFlatIP(384)) == "FAISS Memory: 0 MB"
+
+    # Populated index
+    dim = 384
+    index = faiss.IndexFlatIP(dim)
+    vecs = _unit_vecs(1000, dim=dim)
+    index.add(vecs)
+
+    badge = format_faiss_memory_badge(index)
+    assert badge.startswith("FAISS Memory:")
+    assert "MB" in badge
+    assert "(1,000 vectors)" in badge
+
+

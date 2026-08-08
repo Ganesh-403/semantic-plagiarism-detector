@@ -6,7 +6,7 @@ import sqlite3
 
 from .common import column_exists, run_migrations
 
-AUTH_SCHEMA_VERSION = 13
+AUTH_SCHEMA_VERSION = 14
 
 
 def migration_001_create_users(
@@ -212,6 +212,19 @@ def migration_013_create_password_history_table(
     )
 
 
+def migration_014_add_must_change_password(
+    connection: sqlite3.Connection,
+) -> None:
+    """Add must_change_password flag to force password reset on next login."""
+    if not column_exists(connection, "users", "must_change_password"):
+        connection.execute(
+            """
+            ALTER TABLE users
+            ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0
+            """
+        )
+
+
 AUTH_MIGRATIONS = {
     1: migration_001_create_users,
     2: migration_002_add_onboarding_state,
@@ -226,6 +239,7 @@ AUTH_MIGRATIONS = {
     11: migration_011_add_version_column,
     12: migration_012_create_revoked_tokens_table,
     13: migration_013_create_password_history_table,
+    14: migration_014_add_must_change_password,
 }
 
 
