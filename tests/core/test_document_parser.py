@@ -836,3 +836,19 @@ class TestNormalizeExtendedPunctuation:
 
         result = extract_text(str(file_path), "punct.txt")
         assert result == '"Hello"-world...'
+
+
+class TestExtractTextFromUrlSSRF:
+    """Unit tests for extract_text_from_url SSRF protections (Issue #1710)."""
+
+    def test_extract_text_from_url_invalid_scheme(self):
+        from src.core.document_parser import extract_text_from_url
+        with pytest.raises(ValueError, match="Invalid URL"):
+            extract_text_from_url("ftp://example.com/file.txt")
+
+    @patch("src.security.ssrf_protector.socket.getaddrinfo")
+    def test_extract_text_from_url_blocks_private_ip(self, mock_getaddrinfo):
+        from src.core.document_parser import extract_text_from_url
+        mock_getaddrinfo.return_value = [(2, 1, 6, "", ("10.0.0.1", 443))]
+        with pytest.raises(ValueError, match="URL security validation failed"):
+            extract_text_from_url("https://internal.corp.local/document")

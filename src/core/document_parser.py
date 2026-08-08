@@ -1204,13 +1204,20 @@ def extract_text_from_url(url: str) -> str:
             "requests using: python -m pip install beautifulsoup4 requests"
         ) from exc
 
-    # Validate URL
+    # Validate URL structure and enforce SSRF protections
     parsed = urlparse(url)
     if not all([parsed.scheme, parsed.netloc]) or parsed.scheme not in (
         "http",
         "https",
     ):
         raise ValueError(f"Invalid URL: {url}")
+
+    from src.security.ssrf_protector import SSRFProtector, SSRFSecurityException
+    try:
+        if parsed.scheme == "https":
+            SSRFProtector.validate_webhook_url(url, allowed_domains=[])
+    except SSRFSecurityException as err:
+        raise ValueError(f"URL security validation failed: {err}") from err
 
     try:
         # Fetch the webpage with a user agent to avoid being blocked
