@@ -6,6 +6,10 @@ import time
 import uuid
 from datetime import datetime, timezone
 
+from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer
 import psutil
 import numpy as np
 
@@ -50,6 +54,7 @@ from src.api.schemas import (
     TokenResponse,
 )
 from sklearn.metrics.pairwise import cosine_similarity
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.core.app_config import FAISS_INDEX_PATH, HEALTHZ_DB_PATHS
 from src.core.document_parser import extract_text
@@ -140,6 +145,20 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
+
+@app.exception_handler(404)
+async def not_found_handler(request, exc: StarletteHTTPException):
+    """Custom exception handler for HTTP 404 errors."""
+    return JSONResponse(
+        status_code=404,
+        content={
+            "error": True,
+            "code": 404,
+            "message": "API endpoint or resource not found",
+        },
+    )
+
+# ── Bearer Token Authentication ────────────────────────────────────────────────
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """

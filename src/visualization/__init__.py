@@ -2,6 +2,7 @@ from .analytics import (
     plot_high_severity_trends,
     plot_hierarchical_dendrogram,
     plot_most_plagiarized_documents,
+    plot_similarity_percentiles,
 )
 from .heatmap import (
     filter_heatmap_by_class_tag,
@@ -45,4 +46,5 @@ __all__ = [
     "plot_high_severity_trends",
     "plot_most_plagiarized_documents",
     "plot_hierarchical_dendrogram",
+    "plot_similarity_percentiles",
 ]
