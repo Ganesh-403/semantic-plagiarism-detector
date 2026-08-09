@@ -4,7 +4,7 @@ from __future__ import annotations
 def normalize_encoding(text: str) -> str:
     """Replace common mojibake with the intended characters."""
     replacements = {
-        "\ufffd": "",  # replacement character
+        "\ufffd": "",
         "Ã©": "é",
         "Ã¡": "á",
         "Ã¼": "ü",
