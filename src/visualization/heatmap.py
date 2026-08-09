@@ -32,6 +32,7 @@ import seaborn as sns
 import streamlit as st
 from matplotlib.figure import Figure
 from matplotlib.ticker import PercentFormatter
+import plotly.graph_objects as go
 
 # Enforce non-interactive backend for standard plot generation to prevent thread-safety
 # issues in web environments like Streamlit.
@@ -428,12 +429,8 @@ def plot_similarity_heatmap_plotly(
     dim_diagonal: bool = False,
     zmin: float = 0.0,
     zmax: float = 1.0,
-):    """Interactive Plotly heatmap featuring dynamic hover values and custom threshold bounds."""
     font_scale: float = 1.0,
-):
-    """Interactive Plotly heatmap featuring dynamic hover values and custom threshold bounds."""
-
-):
+) -> go.Figure:
     """Interactive Plotly heatmap featuring dynamic hover values and custom threshold bounds."""
     import plotly.graph_objects as go
 
@@ -1460,7 +1457,6 @@ def plot_multi_heatmap_grid(
                     )
 
         # Per-panel axis styling
-        axis_idx = panel_idx + 1
         tick_sz = int(max(7, 10 - n // 3) * scale)
         fig.update_xaxes(
             tickangle=-30,

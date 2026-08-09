@@ -69,6 +69,11 @@ __all__ = [
     "get_unique_class_sections",
     "get_documents_by_class",
     "get_incidents_by_assignment",
+    "get_user_last_login",
+    "get_deleted_documents_count",
+    "get_total_document_count",
+    "get_recent_incidents",
+    "log_incident",
 ]
 
 

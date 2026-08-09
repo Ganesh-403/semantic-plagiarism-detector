@@ -2,9 +2,7 @@
 Unit tests verifying package initialization and symbol exports of src.core (Issue #1711).
 """
 
-import sys
 import unittest
-from typing import Callable
 
 
 class TestCoreImports(unittest.TestCase):

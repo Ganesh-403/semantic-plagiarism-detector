@@ -664,6 +664,7 @@ def build_visualization_lazily(is_enabled, build_fn):
     return None
 
 
+
 # ── Issue #1383: Cosine vs Lexical Similarity Comparison Table ─────────────────
 SEMANTIC_HIGH_THRESHOLD = 0.80  # vector (cosine) score considered "high"
 LEXICAL_LOW_THRESHOLD = 0.30    # lexical (jaccard) score considered "low"
@@ -964,6 +965,7 @@ def logout_dialog():
             clear_session(SESSION_ID)
             st.rerun()
 
+
 @st.dialog("⚠️ Confirm Bulk Clear")
 def clear_all_dialog():
     st.markdown(
@@ -1014,6 +1016,7 @@ def clear_all_dialog():
 
             st.success("✅ All documents, chunks, and incidents have been cleared.")
             st.rerun()
+
 
 
 # ── Corpus Overview Header & Quick Actions (#1242) ───────────────────────────
@@ -2330,6 +2333,7 @@ st.divider()
         get_text("tab_settings", lang=lang_code),
         get_text("tab_audit_logs", lang=lang_code),
         "📊 History",
+        get_text("tab_audit_logs", lang=lang_code),
     ],
     key="main_tabs",
 )

@@ -386,21 +386,3 @@ def processing_eta_text(
     seconds = estimate_processing_seconds(total_bytes, seconds_per_mb=seconds_per_mb)
     duration = format_processing_duration(seconds)
     return f"Estimated processing time: about {duration}"
-def calculate_mb_per_minute(total_bytes: int, elapsed_seconds: float) -> float:
-    """
-    Calculate document processing throughput in megabytes per minute (MB/min).
-    
-    Args:
-        total_bytes (int): Total size processed in bytes.
-        elapsed_seconds (float): Time elapsed in seconds.
-        
-    Returns:
-        float: Throughput in MB/min rounded to 2 decimal places. Returns 0.0 if elapsed_seconds <= 0.
-    >"""
-    if elapsed_seconds <= 0 or total_bytes <= 0:
-        return 0.0
-    
-    megabytes = total_bytes / (1024 * 1024)
-    minutes = elapsed_seconds / 60.0
-    
-    return round(megabytes / minutes, 2)

@@ -378,6 +378,7 @@ def test_get_temp_directory_size_bytes_multiple_files():
                 pass
 
 
+
 # ─── Tests for rotate_backup_files (Issue #1572) ──────────────────────────────
 
 import time

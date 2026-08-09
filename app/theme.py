@@ -1176,7 +1176,6 @@ def inject_css() -> None:
 
 
 # ── Severity Helpers ───────────────────────────────────────────────────────────
-from typing import Any
 try:
     from src.core.config import (
         DEFAULT_THRESHOLDS,

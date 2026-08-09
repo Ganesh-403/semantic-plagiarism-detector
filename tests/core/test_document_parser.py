@@ -20,7 +20,7 @@ from src.core.document_parser import (
     strip_bibliography,
     normalize_unicode_spaces,
     normalize_extended_punctuation,
-    parallel_extract_texts,
+    normalize_unicode_nfc,
     mask_named_entities_in_text,
 )
 
@@ -869,8 +869,7 @@ class TestNormalizeExtendedPunctuation:
 # ─── Tests for Unicode NFC Normalizer (Issue #1482) ───────────────────────────
 
 import unicodedata
-
-from src.core.document_parser import normalize_unicode_nfc
+import pytest
 from unittest.mock import patch
 
 

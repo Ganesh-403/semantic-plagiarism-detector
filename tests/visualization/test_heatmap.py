@@ -581,7 +581,7 @@ def test_plot_similarity_heatmap_plotly_custom_colorscale(
     heatmap = next(trace for trace in fig.data if trace.type == "heatmap")
     assert heatmap.colorscale is not None
 
-fig_default = plot_similarity_heatmap_plotly(multi_doc_df, title="Default Colorscale")
+    fig_default = plot_similarity_heatmap_plotly(multi_doc_df, title="Default Colorscale")
     heatmap_default = next(trace for trace in fig_default.data if trace.type == "heatmap")
     assert heatmap_default.colorscale != heatmap.colorscale
 
@@ -775,7 +775,7 @@ def test_plot_multi_heatmap_grid_four_panels_wraps_to_two_rows():
 def test_plot_multi_heatmap_grid_no_annotations_large_matrix(two_panel_matrices: dict):
     """Annotation layer is omitted (show_annotations=False) when explicitly disabled."""
     fig_no_ann = plot_multi_heatmap_grid(two_panel_matrices, show_annotations=False)
-    fig_with_ann = plot_multi_heatmap_grid(two_panel_matrices, show_annotations=True)
+    plot_multi_heatmap_grid(two_panel_matrices, show_annotations=True)
     # Fewer non-subplot-title annotations when annotations disabled
     no_ann_count = sum(
         1 for a in fig_no_ann.layout.annotations

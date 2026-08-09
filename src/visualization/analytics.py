@@ -83,8 +83,6 @@ def plot_similarity_boxplot_by_group(
         fig.update_xaxes(showgrid=show_grid)
         fig.update_yaxes(showgrid=show_grid)
 
-_apply_theme_colors(fig, theme_colors, theme_override)        return fig
-
         _apply_theme_colors(fig, theme_colors)
         return fig
 
@@ -115,12 +113,7 @@ _apply_theme_colors(fig, theme_colors, theme_override)        return fig
     fig.update_xaxes(showgrid=show_grid)
     fig.update_yaxes(showgrid=show_grid, range=[0.0, 1.0])
 
-_apply_theme_colors(fig, theme_colors)
-
-    return fig
-
-
-_apply_theme_colors(fig, theme_colors, theme_override)
+    _apply_theme_colors(fig, theme_colors)
     return fig
 
 def _apply_theme_colors(
@@ -198,10 +191,6 @@ def calculate_severity_ratios(incidents: list[dict[str, Any]]) -> dict[str, floa
         for label, count in counts.items()
     }    
 
-    _apply_theme_colors(fig, theme_colors)
-
-    return fig
-    
 def _annotation_color(theme_colors: dict[str, str] | None) -> str:
     """Pick a readable annotation color for the given theme.
 
@@ -280,7 +269,8 @@ def plot_high_severity_trends(
     show_grid: bool = True,
     theme_colors: dict[str, str] | None = None,
     theme_override: str | None = None,
-) -> go.Figure:    """Create an interactive line chart showing High severity plagiarism incidents over time."""
+) -> go.Figure:
+    """Create an interactive line chart showing High severity plagiarism incidents over time."""
     if not trend_data:
         fig = go.Figure()
         fig.add_annotation(
