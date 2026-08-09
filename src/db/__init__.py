@@ -7,9 +7,11 @@ from .auth import (
     get_all_users,
     get_recent_audit_events,
     get_user_active_status,
+    get_user_last_login,
     get_user_role,
     init_db,
     is_user_active,
+    set_password_change_required,
     set_user_active_status,
     update_password,
     update_user_profile,
@@ -28,10 +30,12 @@ from .corpus_db import (
     get_document_by_hash,
     get_document_chunks_count,
     get_documents_by_class,
+    get_total_document_count,
     get_unique_class_sections,
     init_corpus_db,
 )
 from .incidents import get_incidents_by_assignment, get_recent_incidents, log_incident
+
 
 __all__ = [
     "get_read_connection",
@@ -49,6 +53,9 @@ __all__ = [
     "get_user_active_status",
     "set_user_active_status",
     "is_user_active",
+    "update_user_profile",
+    "set_password_change_required",
+    "get_recent_audit_events",
     "init_corpus_db",
     "add_document",
     "get_document_by_hash",
@@ -61,11 +68,6 @@ __all__ = [
     "get_document_chunks_count",
     "get_unique_class_sections",
     "get_documents_by_class",
-    "get_total_document_count",
-    "get_deleted_documents_count",
-    "get_recent_incidents",
-    "get_recent_audit_events",
-    "log_incident",
     "get_incidents_by_assignment",
 ]
 

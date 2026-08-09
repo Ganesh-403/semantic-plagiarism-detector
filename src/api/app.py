@@ -11,6 +11,7 @@ import numpy as np
 
 START_TIME = time.time()
 total_scans = 0
+logger = logging.getLogger(__name__)
 from fastapi import (
     BackgroundTasks,
     Depends,
@@ -62,7 +63,7 @@ from src.core.text_chunking import chunk_document
 from src.db.auth import get_user_role
 from src.db.corpus_db import _connect, clear_all_data, init_corpus_db, get_document_by_hash
 from src.utils.file_streaming import stream_upload_file_to_disk
-from src.utils.filename import compute_file_hash_stream
+from src.utils.hash_util import calculate_file_sha256
 from src.utils.redis_cache import CacheKeyPrefix, get_cache
 
 # ── API Initialization ────────────────────────────────────────────────────────
@@ -444,6 +445,7 @@ def get_service_status(request: Request):
     version, and the server timestamp in ISO 8601 UTC format so external clients
     can quickly confirm the service is online.
     """
+    logger.debug("Service status requested")
     return {
         "status": "online",
         "version": request.app.version,
@@ -648,7 +650,7 @@ async def scan_document(
     ),
     reprocess: bool = Query(
         default=False,
-        description="Bypass duplicate check and reprocess the file",
+        description="Bypass duplicate detection and process the file anyway",
     ),
     _user: dict = Security(get_current_user, scopes=["write"]),
     _content_type: None = Depends(validate_content_type),
@@ -665,22 +667,25 @@ async def scan_document(
     filename = file.filename
     temp_path = await stream_upload_file_to_disk(file)
 
-    with open(temp_path, "rb") as f:
-        file_hash = compute_file_hash_stream(f)
-
-    if not reprocess:
-        existing_doc = get_document_by_hash(file_hash)
-        if existing_doc:
-            return JSONResponse(
-                status_code=status.HTTP_409_CONFLICT,
-                content={
-                    "duplicate": True,
-                    "existing_document_id": existing_doc,
-                    "message": "This file has already been uploaded."
-                }
-            )
-
     try:
+        if not reprocess:
+            file_hash = calculate_file_sha256(temp_path)
+            existing_doc = get_document_by_hash(file_hash)
+            if existing_doc:
+                if os.path.exists(temp_path):
+                    try:
+                        os.unlink(temp_path)
+                    except Exception:
+                        pass
+                return JSONResponse(
+                    status_code=status.HTTP_409_CONFLICT,
+                    content={
+                        "duplicate": True,
+                        "existing_document_id": existing_doc,
+                        "message": "This file has already been uploaded."
+                    }
+                )
+
         # Extract text from uploaded document streamed to disk
         extracted_text = extract_text(temp_path, filename)
         if not extracted_text.strip():
@@ -960,7 +965,7 @@ async def scan_document_async(
     ),
     reprocess: bool = Query(
         default=False,
-        description="Bypass duplicate check and reprocess the file",
+        description="Bypass duplicate detection and process the file anyway",
     ),
     _user: dict = Security(get_current_user, scopes=["write"]),
     _content_type: None = Depends(validate_content_type),
@@ -977,12 +982,15 @@ async def scan_document_async(
     filename = file.filename
     temp_path = await stream_upload_file_to_disk(file)
 
-    with open(temp_path, "rb") as f:
-        file_hash = compute_file_hash_stream(f)
-
     if not reprocess:
+        file_hash = calculate_file_sha256(temp_path)
         existing_doc = get_document_by_hash(file_hash)
         if existing_doc:
+            if os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except Exception:
+                    pass
             return JSONResponse(
                 status_code=status.HTTP_409_CONFLICT,
                 content={
@@ -1056,7 +1064,6 @@ def get_async_scan_status(
 
 # ── System Administration ──────────────────────────────────────────────────────
 
-logger = logging.getLogger(__name__)
 # Cast to str for consistency with callers that may pass it to faiss.*
 # or other C-extension APIs that require str paths.
 INDEX_PATH = str(FAISS_INDEX_PATH)

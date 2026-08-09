@@ -581,10 +581,26 @@ def test_plot_similarity_heatmap_plotly_custom_colorscale(
     heatmap = next(trace for trace in fig.data if trace.type == "heatmap")
     assert heatmap.colorscale is not None
 
-    fig_default = plot_similarity_heatmap_plotly(multi_doc_df, title="Default Colorscale")
+fig_default = plot_similarity_heatmap_plotly(multi_doc_df, title="Default Colorscale")
     heatmap_default = next(trace for trace in fig_default.data if trace.type == "heatmap")
     assert heatmap_default.colorscale != heatmap.colorscale
 
+
+def test_plot_similarity_heatmap_plotly_custom_zmin_zmax(
+    multi_doc_df: pd.DataFrame,
+) -> None:
+    """Verify Issue #1598: custom zmin/zmax bounds are passed to go.Heatmap."""
+    fig = plot_similarity_heatmap_plotly(
+        multi_doc_df, title="Custom Range", zmin=0.2, zmax=0.8
+    )
+    heatmap = next(trace for trace in fig.data if trace.type == "heatmap")
+    assert heatmap.zmin == 0.2
+    assert heatmap.zmax == 0.8
+
+    fig_default = plot_similarity_heatmap_plotly(multi_doc_df, title="Default Range")
+    heatmap_default = next(trace for trace in fig_default.data if trace.type == "heatmap")
+    assert heatmap_default.zmin == 0.0
+    assert heatmap_default.zmax == 1.0
 
 def test_plot_document_similarity_heatmap_empty():
     """Verify plot_document_similarity_heatmap returns empty Plotly figure with centered annotation on empty input."""
@@ -606,3 +622,177 @@ def test_plot_similarity_heatmap_responsive_tick_fontsize(multi_doc_df: pd.DataF
     expected_fontsize = max(6, 12 - len(multi_doc_df) // 10)
     assert xticklabels[0].get_fontsize() == expected_fontsize
     plt.close(fig)
+
+
+# ==============================================================================
+# Issue #1504 – plot_multi_heatmap_grid
+# ==============================================================================
+
+
+from src.visualization.heatmap import plot_multi_heatmap_grid  # noqa: E402
+
+
+@pytest.fixture
+def two_panel_matrices() -> dict:
+    """Two minimal 3×3 similarity matrices labelled Spring and Fall."""
+    docs = ["doc1", "doc2", "doc3"]
+    spring = pd.DataFrame(
+        [
+            [1.00, 0.85, 0.42],
+            [0.85, 1.00, 0.38],
+            [0.42, 0.38, 1.00],
+        ],
+        columns=docs,
+        index=docs,
+    )
+    fall = pd.DataFrame(
+        [
+            [1.00, 0.30, 0.20],
+            [0.30, 1.00, 0.25],
+            [0.20, 0.25, 1.00],
+        ],
+        columns=docs,
+        index=docs,
+    )
+    return {"Spring 2024": spring, "Fall 2024": fall}
+
+
+def test_plot_multi_heatmap_grid_empty_dict():
+    """Returns a valid Figure with an informative annotation when no matrices supplied."""
+    import plotly.graph_objects as go
+
+    fig = plot_multi_heatmap_grid({})
+    assert isinstance(fig, go.Figure)
+    assert len(fig.layout.annotations) >= 1
+    annotation_texts = [a.text for a in fig.layout.annotations]
+    assert any("No similarity matrices" in t for t in annotation_texts)
+
+
+def test_plot_multi_heatmap_grid_returns_figure(two_panel_matrices: dict):
+    """Returns a go.Figure for a valid two-panel matrix dict."""
+    import plotly.graph_objects as go
+
+    fig = plot_multi_heatmap_grid(two_panel_matrices)
+    assert isinstance(fig, go.Figure)
+
+
+def test_plot_multi_heatmap_grid_has_two_heatmap_traces(two_panel_matrices: dict):
+    """Figure must contain exactly one Heatmap trace per valid matrix."""
+    fig = plot_multi_heatmap_grid(two_panel_matrices)
+    heatmap_traces = [t for t in fig.data if t.type == "heatmap"]
+    assert len(heatmap_traces) == 2
+
+
+def test_plot_multi_heatmap_grid_shared_colorbar(two_panel_matrices: dict):
+    """With shared_colorbar=True only the last heatmap trace has showscale=True."""
+    fig = plot_multi_heatmap_grid(two_panel_matrices, shared_colorbar=True)
+    heatmap_traces = [t for t in fig.data if t.type == "heatmap"]
+    scales = [t.showscale for t in heatmap_traces]
+    # At most one panel shows the scale (the last one); others are False
+    assert scales[-1] is True
+    # All preceding panels should be False
+    for s in scales[:-1]:
+        assert s is False
+
+
+def test_plot_multi_heatmap_grid_independent_colorbars(two_panel_matrices: dict):
+    """With shared_colorbar=False every heatmap trace has showscale=True."""
+    fig = plot_multi_heatmap_grid(two_panel_matrices, shared_colorbar=False)
+    heatmap_traces = [t for t in fig.data if t.type == "heatmap"]
+    for trace in heatmap_traces:
+        assert trace.showscale is True
+
+
+def test_plot_multi_heatmap_grid_zmin_zmax(two_panel_matrices: dict):
+    """All heatmap traces share zmin=0 and zmax=1 for consistent colour mapping."""
+    fig = plot_multi_heatmap_grid(two_panel_matrices)
+    heatmap_traces = [t for t in fig.data if t.type == "heatmap"]
+    for trace in heatmap_traces:
+        assert trace.zmin == 0.0
+        assert trace.zmax == 1.0
+
+
+def test_plot_multi_heatmap_grid_invalid_panel_placeholder():
+    """An empty DataFrame produces a grey placeholder trace, not an error."""
+    import plotly.graph_objects as go
+
+    matrices = {
+        "Valid": pd.DataFrame(
+            [[1.0, 0.5], [0.5, 1.0]], columns=["A", "B"], index=["A", "B"]
+        ),
+        "Empty": pd.DataFrame(),
+    }
+    fig = plot_multi_heatmap_grid(matrices)
+    assert isinstance(fig, go.Figure)
+    # Should still produce 2 traces (one real, one placeholder)
+    assert len(fig.data) == 2
+
+
+def test_plot_multi_heatmap_grid_single_doc_panel_placeholder():
+    """A single-document DataFrame (< 2 docs) produces a placeholder, not an error."""
+    import plotly.graph_objects as go
+
+    matrices = {
+        "Good": pd.DataFrame(
+            [[1.0, 0.7], [0.7, 1.0]], columns=["A", "B"], index=["A", "B"]
+        ),
+        "Too Small": pd.DataFrame([[1.0]], columns=["X"], index=["X"]),
+    }
+    fig = plot_multi_heatmap_grid(matrices)
+    assert isinstance(fig, go.Figure)
+    assert len(fig.data) == 2
+
+
+def test_plot_multi_heatmap_grid_colorscale_propagated(two_panel_matrices: dict):
+    """The supplied colorscale is applied to all valid heatmap traces."""
+    fig = plot_multi_heatmap_grid(two_panel_matrices, colorscale="Cividis")
+    heatmap_traces = [t for t in fig.data if t.type == "heatmap" and t.zmin == 0.0]
+    for trace in heatmap_traces:
+        # Plotly normalises colorscale names; just check it was set (not None/empty)
+        assert trace.colorscale is not None
+
+
+def test_plot_multi_heatmap_grid_threshold_shapes(two_panel_matrices: dict):
+    """Flagged pairs (similarity >= threshold) generate red border shapes."""
+    # Threshold 0.0 forces every off-diagonal pair to be flagged
+    fig = plot_multi_heatmap_grid(two_panel_matrices, threshold=0.0)
+    rect_shapes = [s for s in fig.layout.shapes if s.type == "rect"]
+    # 3×3 matrices → 3*(3-1) = 6 off-diagonal pairs × 2 panels = 12 shapes
+    assert len(rect_shapes) >= 12
+
+
+def test_plot_multi_heatmap_grid_four_panels_wraps_to_two_rows():
+    """4 panels → 2 columns × 2 rows (up to 3 cols per row)."""
+    docs = ["A", "B"]
+    single = pd.DataFrame([[1.0, 0.5], [0.5, 1.0]], columns=docs, index=docs)
+    matrices = {f"Panel {i}": single.copy() for i in range(4)}
+    fig = plot_multi_heatmap_grid(matrices)
+    # Make_subplots with 2 rows × 2 cols gives 4 x-axes (x, x2, x3, x4)
+    heatmap_traces = [t for t in fig.data if t.type == "heatmap"]
+    assert len(heatmap_traces) == 4
+
+
+def test_plot_multi_heatmap_grid_no_annotations_large_matrix(two_panel_matrices: dict):
+    """Annotation layer is omitted (show_annotations=False) when explicitly disabled."""
+    fig_no_ann = plot_multi_heatmap_grid(two_panel_matrices, show_annotations=False)
+    fig_with_ann = plot_multi_heatmap_grid(two_panel_matrices, show_annotations=True)
+    # Fewer non-subplot-title annotations when annotations disabled
+    no_ann_count = sum(
+        1 for a in fig_no_ann.layout.annotations
+        if a.text and a.text[0].isdigit()  # cell value annotations are numeric
+    )
+    assert no_ann_count == 0
+
+
+def test_plot_multi_heatmap_grid_layout_title(two_panel_matrices: dict):
+    """Global layout title is set to the multi-assignment grid title."""
+    fig = plot_multi_heatmap_grid(two_panel_matrices)
+    assert "Multi-Assignment" in fig.layout.title.text
+
+
+def test_plot_multi_heatmap_grid_custom_theme_colors(two_panel_matrices: dict):
+    """Theme colors are applied to paper_bgcolor and font color."""
+    theme = {"background": "#1e293b", "ink": "#f1f5f9", "surface": "#334155"}
+    fig = plot_multi_heatmap_grid(two_panel_matrices, theme_colors=theme)
+    assert fig.layout.paper_bgcolor == "#1e293b"
+

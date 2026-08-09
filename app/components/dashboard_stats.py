@@ -557,8 +557,8 @@ def render_dashboard_stats() -> None:
 
     # 2. Load active theme colors from theme utility
     try:
-        from app.theme import get_colors
-        theme_colors = get_colors()
+        from app.theme import get_chart_colors
+        theme_colors = get_chart_colors()
     except Exception:
         theme_colors = {
             "background": "#FFFFFF",

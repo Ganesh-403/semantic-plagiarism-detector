@@ -304,3 +304,12 @@ def test_get_common_translation_pairs():
     assert len(pairs) >= 5
     assert ("es", "en") in pairs
     assert ("fr", "en") in pairs
+
+def test_get_language_display_name():
+    from src.core.translator import get_language_display_name
+
+    assert get_language_display_name("de") == "German"
+    assert get_language_display_name("en") == "English"
+    assert get_language_display_name("xyz") == "XYZ"
+    assert get_language_display_name("") == ""
+    assert get_language_display_name(None) == ""

@@ -248,6 +248,7 @@ def test_api_v1_status_returns_online_payload():
     response = _status_client.get("/api/v1/status")
 
     assert response.status_code == 200
+    assert "application/json" in response.headers["content-type"]
     data = response.json()
     assert data["status"] == "online"
     assert data["version"] == "1.0.0"

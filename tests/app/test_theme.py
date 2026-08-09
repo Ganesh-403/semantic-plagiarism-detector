@@ -14,7 +14,7 @@ from app.theme import (
 )
 from unittest.mock import patch
 
-from app.theme import get_colors, inject_css, sanitize_hex_color
+from app.theme import get_colors, inject_css, sanitize_hex_color, get_chart_colors
 
 
 def test_get_colors_returns_valid_theme_colors():
@@ -54,6 +54,30 @@ def test_themes_have_expected_keys():
 def test_default_colors():
     """Verify default COLORS matches Light theme."""
     assert COLORS == THEMES["Light"]
+
+
+def test_get_chart_colors_matches_active_theme_when_override_disabled():
+    """Without the 'Force Dark Mode Charts' override, chart colors follow the app theme."""
+    mock_state: dict = {"force_dark_charts": False}
+    with patch("app.theme.st.session_state", mock_state):
+        with patch("app.theme.get_colors", return_value=THEMES["Light"]):
+            assert get_chart_colors() == THEMES["Light"]
+
+
+def test_get_chart_colors_forces_dark_when_override_enabled():
+    """With 'Force Dark Mode Charts' enabled, chart colors are Dark regardless of app theme."""
+    mock_state: dict = {"force_dark_charts": True}
+    with patch("app.theme.st.session_state", mock_state):
+        with patch("app.theme.get_colors", return_value=THEMES["Light"]):
+            assert get_chart_colors() == THEMES["Dark"]
+
+
+def test_get_chart_colors_defaults_to_active_theme_when_key_absent():
+    """If the override key was never set (widget not yet rendered), fall back to get_colors()."""
+    mock_state: dict = {}
+    with patch("app.theme.st.session_state", mock_state):
+        with patch("app.theme.get_colors", return_value=THEMES["Dark"]):
+            assert get_chart_colors() == THEMES["Dark"]
 
 
 def test_severity_tier_high():
@@ -127,7 +151,7 @@ def test_inject_css_generates_css_without_errors():
     with patch("app.theme.st.markdown") as mock_markdown:
         inject_css()
 
-    assert mock_markdown.call_count == 2
+    assert mock_markdown.call_count == 3
 
     css = mock_markdown.call_args_list[0].args[0]
 
@@ -357,7 +381,7 @@ def test_inject_css_includes_csp_nonce():
         with patch("app.theme.st.markdown") as mock_md:
             inject_css()
 
-        assert mock_md.call_count == 2
+        assert mock_md.call_count == 3
         style_html = mock_md.call_args_list[0].args[0]
         script_html = mock_md.call_args_list[1].args[0]
 
@@ -391,6 +415,17 @@ def test_inject_css_contains_accent_border_left():
 
     style_html = mock_md.call_args_list[0].args[0]
     assert "border-left: 4px solid #4f46e5" in style_html
+
+
+def test_inject_css_contains_high_severity_row_styling():
+    """inject_css() must output CSS rules for .high-severity-row (Issue #1569)."""
+    with patch("app.theme.st.markdown") as mock_md:
+        inject_css()
+
+    style_html = mock_md.call_args_list[0].args[0]
+    assert ".high-severity-row" in style_html
+    assert "border-left: 4px solid #ef4444" in style_html
+    assert "background-color: rgba(239, 68, 68, 0.05)" in style_html
 
 
 def test_active_tab_border_style_default():

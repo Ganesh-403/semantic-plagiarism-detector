@@ -578,3 +578,92 @@ class TestGetModelRedownloadsCorruptedCache:
                 EmbeddingModelManager.get_instance(quantize_model=False).get_model()
 
         assert "Corrupted cache detected" in caplog.text
+
+
+class TestModelCacheFolderConfig:
+    """Tests for the configurable model cache folder (issue #1759)."""
+
+    @staticmethod
+    def _reset_global_state(monkeypatch):
+        """Reset cached module models and the manager singleton before each test."""
+        monkeypatch.setattr(embedding_model, "_model", None)
+        monkeypatch.setattr(embedding_model, "_quantized_model", None)
+        monkeypatch.setattr(EmbeddingModelManager, "_instance", None)
+
+    def test_get_cache_dir_reads_hf_hub_cache(self, monkeypatch):
+        """_get_cache_dir() must return the HF_HUB_CACHE env var when set."""
+        monkeypatch.setenv("HF_HUB_CACHE", "C:/custom/hf_cache")
+        monkeypatch.delenv("TRANSFORMERS_CACHE", raising=False)
+
+        assert embedding_model._get_cache_dir() == "C:/custom/hf_cache"
+
+    def test_get_cache_dir_falls_back_to_transformers_cache(self, monkeypatch):
+        """When HF_HUB_CACHE is unset, TRANSFORMERS_CACHE must be used instead."""
+        monkeypatch.delenv("HF_HUB_CACHE", raising=False)
+        monkeypatch.setenv("TRANSFORMERS_CACHE", "C:/custom/transformers_cache")
+
+        assert embedding_model._get_cache_dir() == "C:/custom/transformers_cache"
+
+    def test_get_cache_dir_defaults_to_none(self, monkeypatch):
+        """When neither cache env var is set, _get_cache_dir() must be None."""
+        monkeypatch.delenv("HF_HUB_CACHE", raising=False)
+        monkeypatch.delenv("TRANSFORMERS_CACHE", raising=False)
+
+        assert embedding_model._get_cache_dir() is None
+
+    def test_get_model_passes_cache_folder_to_loader(self, monkeypatch):
+        """SentenceTransformer must receive cache_folder=<HF_HUB_CACHE>."""
+        cache_dir = "C:/custom/hf_cache"
+        monkeypatch.setenv("HF_HUB_CACHE", cache_dir)
+        monkeypatch.setenv(
+            "SEMANTIC_PLAGIARISM_MODEL", embedding_model._DEFAULT_MODEL_NAME
+        )
+        sentence_transformer = MagicMock(return_value=MagicMock())
+        monkeypatch.setattr(
+            embedding_model, "SentenceTransformer", sentence_transformer
+        )
+        self._reset_global_state(monkeypatch)
+
+        EmbeddingModelManager.get_instance(quantize_model=False).get_model()
+
+        sentence_transformer.assert_called_once_with(
+            embedding_model._DEFAULT_MODEL_NAME, cache_folder=cache_dir
+        )
+
+    def test_get_model_logs_configured_cache_target(self, monkeypatch, caplog):
+        """The configured cache location must be logged on model load."""
+        import logging
+
+        cache_dir = "C:/custom/hf_cache"
+        monkeypatch.setenv("HF_HUB_CACHE", cache_dir)
+        monkeypatch.setenv(
+            "SEMANTIC_PLAGIARISM_MODEL", embedding_model._DEFAULT_MODEL_NAME
+        )
+        monkeypatch.setattr(
+            embedding_model, "SentenceTransformer", MagicMock(return_value=MagicMock())
+        )
+        self._reset_global_state(monkeypatch)
+
+        with caplog.at_level(logging.INFO):
+            EmbeddingModelManager.get_instance(quantize_model=False).get_model()
+
+        assert f"Model cache target: {cache_dir}" in caplog.text
+
+    def test_get_model_logs_default_cache_target(self, monkeypatch, caplog):
+        """The default cache location must be logged when no cache dir is set."""
+        import logging
+
+        monkeypatch.delenv("HF_HUB_CACHE", raising=False)
+        monkeypatch.delenv("TRANSFORMERS_CACHE", raising=False)
+        monkeypatch.setenv(
+            "SEMANTIC_PLAGIARISM_MODEL", embedding_model._DEFAULT_MODEL_NAME
+        )
+        monkeypatch.setattr(
+            embedding_model, "SentenceTransformer", MagicMock(return_value=MagicMock())
+        )
+        self._reset_global_state(monkeypatch)
+
+        with caplog.at_level(logging.INFO):
+            EmbeddingModelManager.get_instance(quantize_model=False).get_model()
+
+        assert "Model cache target: default (~/.cache/huggingface)" in caplog.text

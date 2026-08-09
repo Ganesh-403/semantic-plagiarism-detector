@@ -1,4 +1,4 @@
-from src.core.translator import translate_text
+from src.core.translator import translate_text, get_language_display_name
 
 
 def test_none_is_preserved():
@@ -13,6 +13,11 @@ def test_invalid_language_returns_compatible_error_message():
     result = translate_text("Hello", target_lang="invalid_lang")
     assert isinstance(result, str)
     assert "Translation Error" in result
+
+def test_get_language_display_name():
+    assert get_language_display_name("es") == "Spanish (Español)"
+    assert get_language_display_name("en") == "English"
+    assert get_language_display_name("INVALID") == "INVALID"
 
 
 def test_translate_text_basic():

@@ -9,6 +9,7 @@ import re
 import unicodedata
 from collections.abc import Collection, Mapping
 from pathlib import PurePath
+from typing import TypeVar
 from typing import IO, TypeVar
 
 DEFAULT_FILENAME = "document"
@@ -280,7 +281,6 @@ def get_final_extension(filename: object) -> str:
     basename = _basename(raw).strip()
     stem, extension = os.path.splitext(basename)
     return extension.casefold()
-
 
 def get_file_extension_sanitized(filename: str) -> str:
     """Return the lower-case file extension, starting with a dot.

@@ -10,12 +10,13 @@ import pytest
 import pandas as pd
 
 from src.visualization.analytics import (
+    calculate_severity_ratios,
     plot_severity_donut_chart,
     plot_similarity_boxplot,
+    plot_similarity_boxplot_by_group,
     plot_similarity_histogram,
     plot_similarity_percentiles,
 )
-
 
 def test_plot_similarity_percentiles_calculation():
     """Verify the 25th, 50th, 75th, and 90th percentiles are plotted correctly."""
@@ -31,7 +32,32 @@ def test_plot_similarity_percentiles_returns_figure():
     """Test that the function returns a Plotly Figure."""
     fig = plot_similarity_percentiles([0.4, 0.6, 0.8])
     assert isinstance(fig, go.Figure)
+def test_plot_similarity_boxplot_by_group_returns_figure():
+    """Test that the function returns a Plotly Figure with one box per group."""
+    scores_dict = {
+        "Essay 1": [0.1, 0.4, 0.6, 0.9],
+        "Essay 2": [0.2, 0.3, 0.5],
+    }
+    fig = plot_similarity_boxplot_by_group(scores_dict)
 
+    assert isinstance(fig, go.Figure)
+    box_names = [trace.name for trace in fig.data]
+    assert box_names == ["Essay 1", "Essay 2"]
+    assert list(fig.data[0].y) == scores_dict["Essay 1"]
+
+
+def test_plot_similarity_boxplot_by_group_empty_dict():
+    """An empty scores_dict should return a figure with a message, not error."""
+    fig = plot_similarity_boxplot_by_group({})
+
+
+def test_plot_similarity_boxplot_by_group_empty_dict():
+    """An empty scores_dict should return a figure with a message, not error."""
+    fig = plot_similarity_boxplot_by_group({})
+
+    assert isinstance(fig, go.Figure)
+    assert len(fig.data) == 0
+    assert fig.layout.annotations[0].text == "No similarity scores available to plot"
 
 def test_plot_similarity_percentiles_empty_scores():
     """Test that an empty score list returns an empty chart with a message."""
@@ -449,3 +475,65 @@ def test_plot_hierarchical_dendrogram_uses_wards_method():
         )
 
 
+def test_plot_charts_default_to_light_template_without_theme_colors():
+    """Without theme_colors the layout must keep the Plotly defaults."""
+    fig = plot_similarity_percentiles([0.4, 0.6, 0.8])
+
+    assert fig.layout.paper_bgcolor is None
+    assert fig.layout.font.color is None
+
+
+def test_theme_override_forces_light_template():
+    """theme_override='light' should force the plotly_white template."""
+    fig = plot_similarity_percentiles([0.4, 0.6, 0.8], theme_override="light")
+
+    assert fig.layout.template.layout.paper_bgcolor == "white"
+
+
+def test_theme_override_forces_dark_template():
+    """theme_override='dark' should force the plotly_dark template."""
+    fig = plot_similarity_percentiles([0.4, 0.6, 0.8], theme_override="dark")
+
+    assert fig.layout.template.layout.paper_bgcolor == "rgb(17,17,17)"
+
+
+def test_theme_override_none_leaves_default_template():
+    """Without theme_override, the default Plotly template should apply."""
+    fig = plot_similarity_percentiles([0.4, 0.6, 0.8])
+
+    assert fig.layout.template.layout.paper_bgcolor not in (
+        "white",
+        "rgb(17,17,17)",
+    )
+
+def test_calculate_severity_ratios_percentage_breakdown():
+    """Test the exact percentage breakdown across High, Medium, and Low."""
+    incidents = [
+        {"similarity_score": 0.9},   # High
+        {"similarity_score": 0.85},  # High
+        {"similarity_score": 0.6},   # Medium
+        {"similarity_score": 0.3},   # Low
+    ]
+    ratios = calculate_severity_ratios(incidents)
+
+    assert ratios == {"High": 50.0, "Medium": 25.0, "Low": 25.0}
+
+
+def test_calculate_severity_ratios_ignores_invalid_scores():
+    """Incidents with missing or non-numeric scores should be skipped."""
+    incidents = [
+        {"similarity_score": 0.9},
+        {"similarity_score": None},
+        {"assignment_title": "no score field"},
+        {"similarity_score": "not-a-number"},
+    ]
+    ratios = calculate_severity_ratios(incidents)
+
+    assert ratios == {"High": 100.0, "Medium": 0.0, "Low": 0.0}
+
+
+def test_calculate_severity_ratios_empty_incidents():
+    """An empty incident list should return all-zero percentages, not error."""
+    ratios = calculate_severity_ratios([])
+
+    assert ratios == {"High": 0.0, "Medium": 0.0, "Low": 0.0}

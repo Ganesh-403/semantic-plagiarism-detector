@@ -1,16 +1,5 @@
 from __future__ import annotations
 
-"""
-app/theme.py
-------------
-Theme management and CSS utility functions for the Semantic Plagiarism Detector.
-
-Provides:
-- Light and Dark theme color definitions
-- CSS class name constants for consistent styling
-- HTML generation helpers for UI components
-- Dynamic theme injection for Streamlit
-"""
 # -*- coding: utf-8 -*-
 
 from app.css_constants import (
@@ -47,6 +36,7 @@ Recent Additions (Issue #572):
 
 import re
 import secrets
+from datetime import datetime, timezone
 import streamlit as st
 from typing import Any
 from src.core.config import DEFAULT_THRESHOLDS, normalize_severity_label, severity_key
@@ -255,6 +245,26 @@ def get_colors() -> dict:
         return THEMES["Light"]
 
 
+def get_chart_colors() -> dict:
+    """Return the color palette Plotly chart builders should use.
+
+    Normally mirrors the app's active Light/Dark theme (via get_colors()).
+    If the user has enabled "Force Dark Mode Charts" in Settings, this
+    returns the Dark palette regardless of the app's overall theme, so
+    charts can be forced dark independently of the Streamlit UI theme.
+
+    Note: "force_dark_charts" must match SessionKeys.FORCE_DARK_CHARTS
+    (app/session_keys.py) — not imported directly here to avoid a
+    circular import between app.theme and app.session_keys.
+    """
+    try:
+        if st.session_state.get("force_dark_charts", False):
+            return THEMES["Dark"]
+    except Exception:
+        pass
+    return get_colors()
+
+
 def inject_css() -> None:
     """
     Inject CSS for the currently selected Light or Dark theme.
@@ -264,14 +274,13 @@ def inject_css() -> None:
     """
     colors = sanitize_theme_colors(get_colors())
 
-    css = f"""
-    <style>
+    main_css = f"""
         @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
 
         :root {{
             --primary-bg: {colors["background"]};
             --secondary-bg: {colors["surface"]};
-            --text-color: var(--text-color);
+            --text-color: {colors["ink"]};
             --secondary-text-color: {colors["muted"]};
             --border-color: {colors["border"]};
             --accent-color: {colors["accent"]};
@@ -568,6 +577,13 @@ def inject_css() -> None:
 
         .warning-card-low {{
             border-left: 4px solid var(--success) !important;
+        }}
+
+        /* ── High severity row accent border (Issue #1569) ───────────── */
+
+        .high-severity-row {{
+            border-left: 4px solid #ef4444 !important;
+            background-color: rgba(239, 68, 68, 0.05) !important;
         }}
 
         /* ── Warning list container animation (#369) ─────────────────
@@ -1081,9 +1097,15 @@ def inject_css() -> None:
         border-radius: 8px;
         margin-bottom: 1.5rem;
     }}
+
+    /* High Severity Row Styling (Issue #1569) */
+    .high-severity-row {{
+        border-left: 4px solid #ef4444 !important;
+        background-color: rgba(239, 68, 68, 0.05) !important;
+    }}
     """
 
-    css = base_css + file_uploader_css + sidebar_active_tab_css
+    css = main_css + base_css + file_uploader_css + sidebar_active_tab_css
 
     if st.session_state.get("privacy_mode", False):
         css += """
@@ -1154,6 +1176,29 @@ def inject_css() -> None:
 
 
 # ── Severity Helpers ───────────────────────────────────────────────────────────
+from typing import Any
+try:
+    from src.core.config import (
+        DEFAULT_THRESHOLDS,
+        normalize_severity_label,
+        severity_key,
+    )
+except ImportError:
+    # Fallbacks for testing
+    class DefaultThresholds:
+        plagiarism = 0.59
+
+    DEFAULT_THRESHOLDS = DefaultThresholds()
+
+    def normalize_severity_label(label: str) -> str:
+        return label.lower()
+
+    def severity_key(score: float) -> str:
+        if score >= 0.90:
+            return "high"
+        if score >= 0.59:
+            return "medium"
+        return "low"
 def severity_tier(
     score: float, threshold: float = DEFAULT_THRESHOLDS.plagiarism
 ) -> str:
@@ -1253,8 +1298,6 @@ def empty_state_html(icon: str, title: str, description: str) -> str:
         f'<div class="{CLASS_EMPTY_DESC}">{description}</div>'
         f"</div>"
     )
-
-
 def sidebar_user_badge_html(username: str, role: str) -> str:
     """Return the sidebar user badge with avatar circle."""
     initial = username[0].upper() if username else "?"
@@ -1329,7 +1372,7 @@ title="Back to top">
         if (window.__backToTopInitialized) return;
         window.__backToTopInitialized = true;
 
-var SCROLL_THRESHOLD = {scroll_threshold};
+        var SCROLL_THRESHOLD = {scroll_threshold};
         /* Streamlit >= 1.28 scrolls inside the parent of
            [data-testid="block-container"], not the window. */
         var scrollContainer =
@@ -1348,7 +1391,7 @@ var SCROLL_THRESHOLD = {scroll_threshold};
 
         /* Re-query the button every scroll tick so the .visible class
            is always applied to the live element, not a detached one. */
-scrollContainer.addEventListener('scroll', function () {{
+        scrollContainer.addEventListener('scroll', function () {{
             var btn = document.getElementById('back-to-top-btn');
             var status = document.getElementById('back-to-top-status');
             if (!btn) return;
@@ -1368,44 +1411,6 @@ scrollContainer.addEventListener('scroll', function () {{
     """
 
 
-
-def version_check_widget_html(
-    local_version: str,
-    latest_tag: str,
-    repo_url: str = "https://github.com/Ganesh-403/semantic-plagiarism-detector/releases/latest",
-) -> str:
-    """Return an HTML snippet that renders an update-available notification banner."""
-    colors = get_colors()
-    warning_color = colors["warning"]
-    warning_soft = colors["warning_soft"]
-    ink = colors["ink"]
-
-    return f"""
-<div id="spd-update-banner" style="
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 16px;
-    margin-top: 8px;
-    background: {warning_soft};
-    border: 1px solid {warning_color};
-    border-radius: 8px;
-    font-family: 'Inter', sans-serif;
-    font-size: 0.85rem;
-    color: {ink};
-">
-    <span style="font-size: 1.1rem;">🔔</span>
-    <span>
-        <strong>Update available:</strong>
-        v{local_version} &rarr; <strong>{latest_tag}</strong>.
-        &nbsp;
-        <a href="{repo_url}" target="_blank" rel="noopener noreferrer"
-           style="color: {warning_color}; font-weight: 600; text-decoration: underline;">
-            View release &rarr;
-        </a>
-    </span>
-</div>
-"""
 
 
 def active_tab_border_style(color: str = "#4f46e5", width: int = 4) -> str:
@@ -1734,3 +1739,17 @@ def render_sidebar_navigation_menu(
         html_items.append(f'<li data-tab-id="{tab_id}">{badge}</li>')
 
     return f'<ul class="sidebar-nav-menu" style="list-style: none; padding: 0; margin: 0;">{"".join(html_items)}</ul>'
+
+
+def render_timezone_footer() -> str:
+    """Render current UTC server time and timezone label caption in the dashboard sidebar footer.
+
+    Returns:
+        Formatted server timezone caption string.
+    """
+    now_utc = datetime.now(timezone.utc)
+    time_str = now_utc.strftime("%H:%M")
+    caption_text = f"Server Time: {time_str} UTC"
+    st.sidebar.caption(f"🕒 {caption_text}")
+    return caption_text
+

@@ -617,4 +617,16 @@ def categorize_ai_probability(score: float) -> str:
         return "Moderate Probability"
     else:
         return "Low Probability"
+
+def categorize_perplexity_score(score: float) -> str:
+    """
+    Categorize perplexity score into predictable tiers.
+    """
+    if score < 30:
+        return "Highly Predictable"
+    elif score < 70:
+        return "Moderate"
+    else:
+        return "Unpredictable"
+
     

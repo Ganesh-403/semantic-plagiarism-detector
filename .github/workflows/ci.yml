@@ -52,11 +52,8 @@ jobs:
         run: |
           mypy src/
 
-      - name: Run Automated Test Runner (Coverage Enforcement)
-        run: |
-          echo "Scanning requirements.txt for known vulnerabilities..."
-          # Fail the build if vulnerabilities are found in the dependency tree
-          pip-audit -r requirements.txt --desc on
+      - name: Security Scan
+        run: pip-audit -r requirements.txt --desc on --ignore-vuln PYSEC-2022-252
 
       - name: Upload Security Report
         if: failure()

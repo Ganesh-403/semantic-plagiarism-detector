@@ -396,6 +396,23 @@ def format_language_display(code: str, include_native: bool = True) -> str:
     return name
 
 
+def get_language_display_name(code: str) -> str:
+    """
+    Map ISO-639-1 code to full language name (e.g. 'de' -> 'German').
+    Return uppercase code string if language is unmapped.
+
+    Args:
+        code: ISO-639-1 language code.
+
+    Returns:
+        Full language name or uppercase code.
+    """
+    if not code or not isinstance(code, str):
+        return ""
+    normalized = code.strip().lower()
+    return LANGUAGE_NAME_MAP.get(normalized, code.strip().upper())
+
+
 def get_common_translation_pairs() -> list[tuple[str, str]]:
     """Return a list of primary cross-lingual translation language code pairs.
 

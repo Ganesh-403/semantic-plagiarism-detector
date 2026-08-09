@@ -113,6 +113,18 @@ def test_mapping_preserves_entries_after_sanitization_collision():
     }
 
 
+@pytest.mark.parametrize(
+    ("filename", "expected"),
+    [
+        (".PDF", ".pdf"),
+        (".DocX", ".docx"),
+        ("file.txt", ".txt"),
+        ("no_extension", ""),
+    ],
+)
+def test_internal_safe_extension(filename, expected):
+    """get_file_extension_sanitized returns lowercase, well-formed extensions."""
+    assert _safe_extension(filename) == expected
 
 def test_get_file_extension_sanitized_handles_empty_filename():
     assert _safe_extension("") == ""

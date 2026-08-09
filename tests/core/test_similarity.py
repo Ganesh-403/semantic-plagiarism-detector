@@ -105,6 +105,19 @@ def test_document_similarity_matrix_rejects_invalid_percentile(dummy_embeddings)
         document_similarity_matrix(dummy_embeddings, min_percentile=150.0)
 
 
+def test_document_similarity_matrix_min_threshold_filters_low_scores(dummy_embeddings):
+    # Calculate regular matrix to find a threshold to test with
+    regular_df = document_similarity_matrix(dummy_embeddings)
+    min_val = min(regular_df.loc["doc_A", "doc_C"], regular_df.loc["doc_B", "doc_C"])
+    threshold = min_val + 0.1
+    
+    df = document_similarity_matrix(dummy_embeddings, min_threshold=threshold)
+    assert isinstance(df, pd.DataFrame)
+    assert df.loc["doc_A", "doc_C"] == 0.0
+    assert df.loc["doc_C", "doc_A"] == 0.0
+    assert df.loc["doc_A", "doc_B"] > 0.0
+
+
 def test_chunk_similarity_matrix(dummy_embeddings):
     df = chunk_similarity_matrix(dummy_embeddings)
 

@@ -204,7 +204,7 @@ def chunk_text(
     if not chunks:
         chunks = _character_fallback_chunking(text, chunk_size, chunk_overlap)
 
-    return chunks
+    return [c for c in chunks if len(c.split()) >= min_words]
 
 
 # Alias for backward compatibility with src/core/__init__.py

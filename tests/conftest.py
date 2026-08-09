@@ -314,3 +314,12 @@ def sample_document_files(request):
         zip_buffer.seek(0)
         filename = "sample_test.docx"
         yield zip_buffer, filename
+
+import pytest
+@pytest.fixture(autouse=True)
+def clear_streamlit_singletons():
+    try:
+        from streamlit.delta_generator_singletons import _dg_singleton
+        _dg_singleton._instance = None
+    except ImportError:
+        pass
