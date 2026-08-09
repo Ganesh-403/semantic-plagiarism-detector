@@ -5,18 +5,21 @@ Unit tests for the analytics visualization functions.
 """
 
 import numpy as np
-import plotly.graph_objects as go
 import pandas as pd
+import plotly.graph_objects as go
 import pytest
 
 from src.visualization.analytics import (
+    aggregate_incidents_by_month,
     calculate_severity_ratios,
+    plot_monthly_incident_trends,
     plot_severity_donut_chart,
     plot_similarity_boxplot,
     plot_similarity_boxplot_by_group,
     plot_similarity_histogram,
     plot_similarity_percentiles,
 )
+
 
 def test_plot_similarity_percentiles_calculation():
     """Verify the 25th, 50th, 75th, and 90th percentiles are plotted correctly."""
@@ -32,6 +35,8 @@ def test_plot_similarity_percentiles_returns_figure():
     """Test that the function returns a Plotly Figure."""
     fig = plot_similarity_percentiles([0.4, 0.6, 0.8])
     assert isinstance(fig, go.Figure)
+
+
 def test_plot_similarity_boxplot_by_group_returns_figure():
     """Test that the function returns a Plotly Figure with one box per group."""
     scores_dict = {
@@ -50,14 +55,10 @@ def test_plot_similarity_boxplot_by_group_empty_dict():
     """An empty scores_dict should return a figure with a message, not error."""
     fig = plot_similarity_boxplot_by_group({})
 
-
-def test_plot_similarity_boxplot_by_group_empty_dict():
-    """An empty scores_dict should return a figure with a message, not error."""
-    fig = plot_similarity_boxplot_by_group({})
-
     assert isinstance(fig, go.Figure)
     assert len(fig.data) == 0
     assert fig.layout.annotations[0].text == "No similarity scores available to plot"
+
 
 def test_plot_similarity_percentiles_empty_scores():
     """Test that an empty score list returns an empty chart with a message."""
@@ -203,9 +204,6 @@ def test_plot_similarity_boxplot_fallback_keys():
     assert list(fig.data[0].y) == [0.9, 0.5]
 
 
-
-
-
 def test_plot_similarity_histogram_returns_figure():
     scores = [0.1, 0.2, 0.35, 0.5, 0.55, 0.9]
     fig = plot_similarity_histogram(scores, n_bins=10)
@@ -260,25 +258,18 @@ def test_plot_analytics_charts_dark_mode_theme_colors():
     assert fig2.layout.paper_bgcolor == "#0F172A"
     assert fig2.layout.plot_bgcolor == "#1E293B"
 
-    fig3 = plot_severity_donut_chart(
-        [{"severity": "High"}], theme_colors=dark_theme
-    )
+    fig3 = plot_severity_donut_chart([{"severity": "High"}], theme_colors=dark_theme)
     assert fig3.layout.paper_bgcolor == "#0F172A"
     assert fig3.layout.plot_bgcolor == "#1E293B"
 
-    fig4 = plot_similarity_percentiles(
-        [0.5, 0.8, 0.9], theme_colors=dark_theme
-    )
+    fig4 = plot_similarity_percentiles([0.5, 0.8, 0.9], theme_colors=dark_theme)
     assert fig4.layout.paper_bgcolor == "#0F172A"
-
 
 
 # ── Hierarchical Clustering Dendrogram (Issue #1367) ──────────────────────
 
 
-def _make_similarity_matrix(
-    n: int = 5, seed: int = 42
-) -> "pd.DataFrame":
+def _make_similarity_matrix(n: int = 5, seed: int = 42) -> "pd.DataFrame":
     """Build a synthetic symmetric similarity matrix for testing."""
     import pandas as pd
 
@@ -355,19 +346,14 @@ def test_plot_hierarchical_dendrogram_empty_input_returns_annotation_figure():
     fig = plot_hierarchical_dendrogram(empty_df)
     assert isinstance(fig, go.Figure)
     assert len(fig.layout.annotations) >= 1
-    assert (
-        "No similarity data available"
-        in fig.layout.annotations[0].text
-    )
+    assert "No similarity data available" in fig.layout.annotations[0].text
 
 
 def test_plot_hierarchical_dendrogram_single_document_returns_annotation_figure():
     """A 1×1 matrix must return an annotation figure, not raise."""
     from src.visualization.analytics import plot_hierarchical_dendrogram
 
-    single_df = pd.DataFrame(
-        [[1.0]], index=["only_doc"], columns=["only_doc"]
-    )
+    single_df = pd.DataFrame([[1.0]], index=["only_doc"], columns=["only_doc"])
     fig = plot_hierarchical_dendrogram(single_df)
     assert isinstance(fig, go.Figure)
     assert len(fig.layout.annotations) >= 1
@@ -470,8 +456,7 @@ def test_plot_hierarchical_dendrogram_uses_wards_method():
     rendered_sorted = sorted(rendered_distances)
     for expected, rendered in zip(expected_distances, rendered_sorted):
         assert abs(expected - rendered) < 1e-9, (
-            f"Ward merge distance mismatch: expected {expected}, "
-            f"got {rendered}"
+            f"Ward merge distance mismatch: expected {expected}, " f"got {rendered}"
         )
 
 
@@ -506,13 +491,14 @@ def test_theme_override_none_leaves_default_template():
         "rgb(17,17,17)",
     )
 
+
 def test_calculate_severity_ratios_percentage_breakdown():
     """Test the exact percentage breakdown across High, Medium, and Low."""
     incidents = [
-        {"similarity_score": 0.9},   # High
+        {"similarity_score": 0.9},  # High
         {"similarity_score": 0.85},  # High
-        {"similarity_score": 0.6},   # Medium
-        {"similarity_score": 0.3},   # Low
+        {"similarity_score": 0.6},  # Medium
+        {"similarity_score": 0.3},  # Low
     ]
     ratios = calculate_severity_ratios(incidents)
 
@@ -537,3 +523,110 @@ def test_calculate_severity_ratios_empty_incidents():
     ratios = calculate_severity_ratios([])
 
     assert ratios == {"High": 0.0, "Medium": 0.0, "Low": 0.0}
+
+
+# ── Monthly Incident Trend Bar Chart (Issue #1792) ──────────────────────────
+
+
+def test_aggregate_incidents_by_month_counts_by_month():
+    """Incidents sharing a month (YYYY-MM) must be aggregated into one row."""
+    incidents = [
+        {"date": "2026-03-01"},
+        {"date": "2026-03-15"},
+        {"date": "2026-04-02"},
+    ]
+    df = aggregate_incidents_by_month(incidents)
+
+    assert list(df["month"]) == ["2026-03", "2026-04"]
+    assert list(df["incident_count"]) == [2, 1]
+
+
+def test_aggregate_incidents_by_month_sorts_chronologically():
+    """Aggregated months must be returned in ascending YYYY-MM order."""
+    incidents = [
+        {"date": "2026-11-10"},
+        {"date": "2026-02-05"},
+        {"date": "2026-11-20"},
+        {"date": "2026-01-01"},
+    ]
+    df = aggregate_incidents_by_month(incidents)
+
+    assert list(df["month"]) == ["2026-01", "2026-02", "2026-11"]
+    assert list(df["incident_count"]) == [1, 1, 2]
+
+
+def test_aggregate_incidents_by_month_skips_invalid_dates():
+    """Records without a parseable date must be skipped, not crash."""
+    incidents = [
+        {"date": "2026-03-01"},
+        {"date": None},
+        {"date": "not-a-date"},
+        {},
+    ]
+    df = aggregate_incidents_by_month(incidents)
+
+    assert list(df["month"]) == ["2026-03"]
+    assert list(df["incident_count"]) == [1]
+
+
+def test_aggregate_incidents_by_month_empty_input():
+    """Empty input must return an empty DataFrame with expected columns."""
+    df = aggregate_incidents_by_month([])
+
+    assert df.empty
+    assert list(df.columns) == ["month", "incident_count"]
+
+
+def test_aggregate_incidents_by_month_falls_back_to_timestamp_key():
+    """When the date key is missing, timestamp/created_at must be tried."""
+    incidents = [
+        {"date": "2026-03-01"},
+        {"timestamp": "2026-04-15T10:30:00"},
+        {"created_at": "2026-05-02"},
+    ]
+    df = aggregate_incidents_by_month(incidents)
+
+    assert list(df["month"]) == ["2026-03", "2026-04", "2026-05"]
+    assert list(df["incident_count"]) == [1, 1, 1]
+
+
+def test_plot_monthly_incident_trends_returns_figure():
+    """The function must return a Plotly Figure with a vertical bar trace."""
+    incidents = [
+        {"date": "2026-03-01"},
+        {"date": "2026-03-15"},
+        {"date": "2026-04-02"},
+    ]
+    fig = plot_monthly_incident_trends(incidents)
+
+    assert isinstance(fig, go.Figure)
+    bar_trace = fig.data[0]
+    assert bar_trace.orientation == "v"
+    assert list(bar_trace.x) == ["2026-03", "2026-04"]
+    assert list(bar_trace.y) == [2, 1]
+
+
+def test_plot_monthly_incident_trends_empty_input():
+    """Empty incidents must return a chart with an explanatory annotation."""
+    fig = plot_monthly_incident_trends([])
+
+    assert isinstance(fig, go.Figure)
+    assert len(fig.data) == 0
+    assert len(fig.layout.annotations) == 1
+    assert fig.layout.annotations[0].text == "No plagiarism incidents recorded"
+
+
+def test_plot_monthly_incident_trends_theme_colors():
+    """theme_colors must propagate to the figure layout."""
+    dark_theme = {
+        "background": "#0F172A",
+        "surface": "#1E293B",
+        "ink": "#F8FAFC",
+        "border": "#334155",
+    }
+    incidents = [{"date": "2026-03-01"}, {"date": "2026-04-02"}]
+    fig = plot_monthly_incident_trends(incidents, theme_colors=dark_theme)
+
+    assert fig.layout.paper_bgcolor == "#0F172A"
+    assert fig.layout.plot_bgcolor == "#1E293B"
+    assert fig.layout.font.color == "#F8FAFC"

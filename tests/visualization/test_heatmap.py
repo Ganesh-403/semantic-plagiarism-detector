@@ -1,4 +1,5 @@
 import io
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import pytest
@@ -9,9 +10,9 @@ from src.visualization.heatmap import (
     filter_heatmap_by_class_tag,
     plot_differential_heatmap,
     plot_differential_heatmap_matplotlib,
+    plot_document_similarity_heatmap,
     plot_similarity_heatmap,
     plot_similarity_heatmap_plotly,
-    plot_document_similarity_heatmap,
 )
 
 
@@ -119,7 +120,9 @@ def test_plot_similarity_heatmap_multi(multi_doc_df: pd.DataFrame) -> None:
     plt.close(fig)
 
 
-def test_plot_similarity_heatmap_colorbar_scale_range(multi_doc_df: pd.DataFrame) -> None:
+def test_plot_similarity_heatmap_colorbar_scale_range(
+    multi_doc_df: pd.DataFrame,
+) -> None:
     """Verify that the heatmap colorbar scale range defaults strictly to [0.0, 1.0]."""
     fig = plot_similarity_heatmap(multi_doc_df)
     cbar = fig.axes[0].collections[0].colorbar
@@ -128,8 +131,6 @@ def test_plot_similarity_heatmap_colorbar_scale_range(multi_doc_df: pd.DataFrame
     cbar.get_clim = lambda: cbar.mappable.get_clim()
     assert cbar.get_clim() == (0.0, 1.0)
     plt.close(fig)
-
-
 
 
 def test_plot_similarity_heatmap_no_annotation(multi_doc_df: pd.DataFrame) -> None:
@@ -571,6 +572,8 @@ def test_plot_differential_heatmap_matplotlib():
     fig = plot_differential_heatmap_matplotlib(matrix_a, matrix_b)
     assert isinstance(fig, Figure)
     plt.close(fig)
+
+
 def test_plot_similarity_heatmap_plotly_custom_colorscale(
     multi_doc_df: pd.DataFrame,
 ) -> None:
@@ -581,8 +584,12 @@ def test_plot_similarity_heatmap_plotly_custom_colorscale(
     heatmap = next(trace for trace in fig.data if trace.type == "heatmap")
     assert heatmap.colorscale is not None
 
-fig_default = plot_similarity_heatmap_plotly(multi_doc_df, title="Default Colorscale")
-    heatmap_default = next(trace for trace in fig_default.data if trace.type == "heatmap")
+    fig_default = plot_similarity_heatmap_plotly(
+        multi_doc_df, title="Default Colorscale"
+    )
+    heatmap_default = next(
+        trace for trace in fig_default.data if trace.type == "heatmap"
+    )
     assert heatmap_default.colorscale != heatmap.colorscale
 
 
@@ -598,9 +605,12 @@ def test_plot_similarity_heatmap_plotly_custom_zmin_zmax(
     assert heatmap.zmax == 0.8
 
     fig_default = plot_similarity_heatmap_plotly(multi_doc_df, title="Default Range")
-    heatmap_default = next(trace for trace in fig_default.data if trace.type == "heatmap")
+    heatmap_default = next(
+        trace for trace in fig_default.data if trace.type == "heatmap"
+    )
     assert heatmap_default.zmin == 0.0
     assert heatmap_default.zmax == 1.0
+
 
 def test_plot_document_similarity_heatmap_empty():
     """Verify plot_document_similarity_heatmap returns empty Plotly figure with centered annotation on empty input."""
@@ -610,10 +620,15 @@ def test_plot_document_similarity_heatmap_empty():
     assert hasattr(fig, "layout")
     assert fig.layout.title.text == "Empty Heatmap Test"
     assert len(fig.layout.annotations) == 1
-    assert fig.layout.annotations[0].text == "No document data available for heatmap visualization"
+    assert (
+        fig.layout.annotations[0].text
+        == "No document data available for heatmap visualization"
+    )
 
 
-def test_plot_similarity_heatmap_responsive_tick_fontsize(multi_doc_df: pd.DataFrame) -> None:
+def test_plot_similarity_heatmap_responsive_tick_fontsize(
+    multi_doc_df: pd.DataFrame,
+) -> None:
     """Verify responsive font sizing calculation max(6, 12 - N // 10) on tick labels (#1617)."""
     fig = plot_similarity_heatmap(multi_doc_df)
     ax = fig.axes[0]
@@ -775,10 +790,10 @@ def test_plot_multi_heatmap_grid_four_panels_wraps_to_two_rows():
 def test_plot_multi_heatmap_grid_no_annotations_large_matrix(two_panel_matrices: dict):
     """Annotation layer is omitted (show_annotations=False) when explicitly disabled."""
     fig_no_ann = plot_multi_heatmap_grid(two_panel_matrices, show_annotations=False)
-    fig_with_ann = plot_multi_heatmap_grid(two_panel_matrices, show_annotations=True)
     # Fewer non-subplot-title annotations when annotations disabled
     no_ann_count = sum(
-        1 for a in fig_no_ann.layout.annotations
+        1
+        for a in fig_no_ann.layout.annotations
         if a.text and a.text[0].isdigit()  # cell value annotations are numeric
     )
     assert no_ann_count == 0
@@ -795,4 +810,3 @@ def test_plot_multi_heatmap_grid_custom_theme_colors(two_panel_matrices: dict):
     theme = {"background": "#1e293b", "ink": "#f1f5f9", "surface": "#334155"}
     fig = plot_multi_heatmap_grid(two_panel_matrices, theme_colors=theme)
     assert fig.layout.paper_bgcolor == "#1e293b"
-

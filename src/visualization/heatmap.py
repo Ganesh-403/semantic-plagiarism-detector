@@ -47,10 +47,10 @@ except ImportError:
 # ── Colormap Mappings & Constants ──────────────────────────────────────────────
 try:
     from app.theme import (
-        UI_COLORMAP_OPTIONS,
+        DEFAULT_UI_COLORMAP,
         MATPLOTLIB_CMAP_MAPPING,
         PLOTLY_CMAP_MAPPING,
-        DEFAULT_UI_COLORMAP,
+        UI_COLORMAP_OPTIONS,
         apply_matplotlib_theme,
     )
 except ImportError:
@@ -379,9 +379,7 @@ def plot_similarity_heatmap(
 
         safe_labels = [TitleSanitizer.sanitize(str(lbl)) for lbl in clean_df.columns]
         tick_fontsize = max(6, 12 - n // 10)
-        ax.set_xticklabels(
-            safe_labels, rotation=30, ha="right", fontsize=tick_fontsize
-        )
+        ax.set_xticklabels(safe_labels, rotation=30, ha="right", fontsize=tick_fontsize)
         ax.set_yticklabels(safe_labels, rotation=0, fontsize=tick_fontsize)
 
         red_patch = mpatches.Patch(
@@ -428,11 +426,7 @@ def plot_similarity_heatmap_plotly(
     dim_diagonal: bool = False,
     zmin: float = 0.0,
     zmax: float = 1.0,
-):    """Interactive Plotly heatmap featuring dynamic hover values and custom threshold bounds."""
     font_scale: float = 1.0,
-):
-    """Interactive Plotly heatmap featuring dynamic hover values and custom threshold bounds."""
-
 ):
     """Interactive Plotly heatmap featuring dynamic hover values and custom threshold bounds."""
     import plotly.graph_objects as go
@@ -624,7 +618,9 @@ def plot_similarity_heatmap_plotly(
     fig.update_layout(
         title=dict(
             text=safe_title,
-            font=dict(size=int(18 * scale), family=DEFAULT_FONT_FAMILY, color=ink_color),
+            font=dict(
+                size=int(18 * scale), family=DEFAULT_FONT_FAMILY, color=ink_color
+            ),
         ),
         height=max(500, n * cell_px + 150),
         autosize=True,
@@ -637,7 +633,10 @@ def plot_similarity_heatmap_plotly(
             tickfont=dict(size=int(10 * scale)),
         ),
         yaxis=dict(
-            autorange="reversed", title="Document ID", color=ink_color, fixedrange=False,
+            autorange="reversed",
+            title="Document ID",
+            color=ink_color,
+            fixedrange=False,
             tickfont=dict(size=int(10 * scale)),
         ),
         annotations=annotations,
@@ -719,6 +718,7 @@ def plot_similarity_minimap(
 
     return fig
 
+
 # ── Differential / Delta Heatmap Visualization (#1369) ─────────────────────────
 
 
@@ -767,8 +767,12 @@ def plot_differential_heatmap(
     import plotly.graph_objects as go
 
     if class_tag and class_tag != "All Classes":
-        matrix_a = filter_heatmap_by_class_tag(matrix_a, class_tag=class_tag, doc_class_map=doc_class_map)
-        matrix_b = filter_heatmap_by_class_tag(matrix_b, class_tag=class_tag, doc_class_map=doc_class_map)
+        matrix_a = filter_heatmap_by_class_tag(
+            matrix_a, class_tag=class_tag, doc_class_map=doc_class_map
+        )
+        matrix_b = filter_heatmap_by_class_tag(
+            matrix_b, class_tag=class_tag, doc_class_map=doc_class_map
+        )
 
     try:
         safe_title = TitleSanitizer.sanitize(title)
@@ -833,7 +837,9 @@ def plot_differential_heatmap(
     delta_matrix = delta_df.values
 
     # Determine symmetric color scale bounds around 0
-    max_abs_delta = float(np.max(np.abs(delta_matrix))) if delta_matrix.size > 0 else 1.0
+    max_abs_delta = (
+        float(np.max(np.abs(delta_matrix))) if delta_matrix.size > 0 else 1.0
+    )
     if max_abs_delta < 1e-4:
         max_abs_delta = 1.0
 
@@ -1278,7 +1284,9 @@ def plot_multi_heatmap_grid(
         fig.update_layout(
             title=dict(
                 text="Multi-Matrix Heatmap Grid",
-                font=dict(size=int(18 * scale), family=DEFAULT_FONT_FAMILY, color=ink_color),
+                font=dict(
+                    size=int(18 * scale), family=DEFAULT_FONT_FAMILY, color=ink_color
+                ),
             ),
             paper_bgcolor=bg_color,
             plot_bgcolor=bg_color,
@@ -1422,16 +1430,20 @@ def plot_multi_heatmap_grid(
                 zmin=0.0,
                 zmax=1.0,
                 showscale=show_cb,
-                colorbar=dict(
-                    title=dict(
-                        text="Cosine<br>Similarity",
-                        font=dict(size=int(11 * scale)),
-                    ),
-                    thickness=12,
-                    tickformat=".0%",
-                    len=0.8,
-                    x=1.02,
-                ) if show_cb else None,
+                colorbar=(
+                    dict(
+                        title=dict(
+                            text="Cosine<br>Similarity",
+                            font=dict(size=int(11 * scale)),
+                        ),
+                        thickness=12,
+                        tickformat=".0%",
+                        len=0.8,
+                        x=1.02,
+                    )
+                    if show_cb
+                    else None
+                ),
                 xgap=2,
                 ygap=2,
             ),
@@ -1460,7 +1472,6 @@ def plot_multi_heatmap_grid(
                     )
 
         # Per-panel axis styling
-        axis_idx = panel_idx + 1
         tick_sz = int(max(7, 10 - n // 3) * scale)
         fig.update_xaxes(
             tickangle=-30,
@@ -1482,10 +1493,14 @@ def plot_multi_heatmap_grid(
     shape_items = [s for s in all_shapes if s.get("type") in ("rect", "line", "circle")]
     annotation_items = [a for a in all_shapes if "text" in a]
 
-    panel_height = max(350, 80 * max(
-        (len(cleaned[lbl].columns) if cleaned[lbl] is not None else 2)
-        for lbl in labels
-    ))
+    panel_height = max(
+        350,
+        80
+        * max(
+            (len(cleaned[lbl].columns) if cleaned[lbl] is not None else 2)
+            for lbl in labels
+        ),
+    )
     total_height = n_rows * panel_height + 100
 
     fig.update_layout(
@@ -1503,9 +1518,7 @@ def plot_multi_heatmap_grid(
         plot_bgcolor=bg_color,
         font=dict(color=ink_color, family=DEFAULT_FONT_FAMILY),
         shapes=shape_items,
-        annotations=(
-            list(fig.layout.annotations) + annotation_items
-        ),
+        annotations=(list(fig.layout.annotations) + annotation_items),
         margin=dict(l=60, r=80, t=80, b=60),
         hoverlabel=dict(
             bgcolor=_get_theme_color(theme_colors, "surface", "white"),
@@ -1515,4 +1528,3 @@ def plot_multi_heatmap_grid(
     )
 
     return fig
-
