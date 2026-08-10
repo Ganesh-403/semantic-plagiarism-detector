@@ -228,26 +228,6 @@ def migration_014_add_must_change_password(
         )
 
 
-AUTH_MIGRATIONS = {
-    1: migration_001_create_users,
-    2: migration_002_add_onboarding_state,
-    3: migration_003_add_two_factor_fields,
-    4: migration_004_add_role_index,
-    5: migration_005_add_preferences,
-    6: migration_006_add_active_flag,
-    7: migration_007_add_theme_preference,
-    8: migration_008_create_security_audit_log,
-    9: migration_009_add_last_login_at,
-    10: migration_010_add_password_changed_at,
-    11: migration_011_add_version_column,
-    12: migration_012_create_revoked_tokens_table,
-
-    13: migration_013_add_user_status
-
-    14: migration_013_create_password_history_table,
-    15: migration_014_add_must_change_password,
-
-}
 def migration_013_add_user_status(
     connection: sqlite3.Connection,
 ) -> None:
@@ -269,6 +249,25 @@ def migration_013_add_user_status(
         END
         """
     )
+
+
+AUTH_MIGRATIONS = {
+    1: migration_001_create_users,
+    2: migration_002_add_onboarding_state,
+    3: migration_003_add_two_factor_fields,
+    4: migration_004_add_role_index,
+    5: migration_005_add_preferences,
+    6: migration_006_add_active_flag,
+    7: migration_007_add_theme_preference,
+    8: migration_008_create_security_audit_log,
+    9: migration_009_add_last_login_at,
+    10: migration_010_add_password_changed_at,
+    11: migration_011_add_version_column,
+    12: migration_012_create_revoked_tokens_table,
+    13: migration_013_add_user_status,
+    14: migration_013_create_password_history_table,
+    15: migration_014_add_must_change_password,
+}
 
 
 def migrate_auth_database(

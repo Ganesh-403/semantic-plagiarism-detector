@@ -1966,17 +1966,3 @@ def extract_texts(
         results[name] = raw_texts.get(name, "")
 
     return results
-
-+--- a/src/core/document_parser.py
-+@@ -20,6 +20,7 @@
-+ import re
-+ 
-+ class DocumentParser:
-++    def strip_digits(self, text):
-++        return re.sub(r'\d+', '', text)
-+ 
-+     def parse_document(self, content):
-+         # Example parsing logic
-+-        parsed_content = content.strip()
-++        parsed_content = self.strip_digits(content).strip()
-+         return parsed_content

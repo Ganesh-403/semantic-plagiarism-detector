@@ -415,28 +415,7 @@ def plot_similarity_heatmap(
         fig.tight_layout()
         return fig
 
-@pytest.mark.parametrize(
-    ("colormap", "expected"),
-    [
-        ("Blues", "Blues"),
-        ("Plasma", "Plasma"),
-        ("RdYlGn", "RdYlGn"),
-    ],
-)
-def test_plot_similarity_heatmap_plotly_colormap_presets(
-    multi_doc_df: pd.DataFrame,
-    colormap: str,
-    expected: str,
-) -> None:
-    """Verify supported colormap presets configure the Plotly heatmap."""
-    fig = plot_similarity_heatmap_plotly(
-        multi_doc_df,
-        colormap_name=colormap,
-    )
 
-    heatmap = next(trace for trace in fig.data if trace.type == "heatmap")
-
-    assert heatmap.colorscale == expected
 # ── Interactive Visualization (Plotly) ─────────────────────────────────────────
 def plot_similarity_heatmap_plotly(
     similarity_df: pd.DataFrame,
@@ -445,8 +424,6 @@ def plot_similarity_heatmap_plotly(
     theme_colors: Optional[Dict[str, str]] = None,
     colormap_name: str = DEFAULT_UI_COLORMAP,
 
-    colorscale: Optional[str] = None,
-    show_annotations: bool = True,    mask_threshold: Optional[float] = None,
     colorscale: str = "Viridis",
     show_annotations: bool = True,
     mask_threshold: Optional[float] = None,
@@ -1538,24 +1515,3 @@ def plot_multi_heatmap_grid(
     )
 
     return fig
-
-
-+--- a/src/visualization/heatmap.py
-+@@ -30,7 +30,7 @@
-+     """
-+     ax = sns.heatmap(data, cmap='viridis')
-+     plt.title(title)
-+-    plt.xlabel(xlabel)
-++    plt.xlabel(xlabel, rotation=axis_label_angle)
-+     plt.ylabel(ylabel)
-+     plt.show()
-+
-+--- a/src/visualization/heatmap.py
-+@@ -45,7 +45,7 @@
-+     """
-+     ax = sns.heatmap(data, cmap='viridis', **kwargs)
-+     plt.title(title)
-+-    plt.xlabel(xlabel)
-++    plt.xlabel(xlabel, rotation=axis_label_angle)
-+     plt.ylabel(ylabel)
-+     plt.show()

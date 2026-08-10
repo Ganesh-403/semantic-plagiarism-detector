@@ -351,18 +351,6 @@ def verify_user(
         return False
 
     with _connect() as conn:
-
-       row = conn.execute(
-    "SELECT password, status FROM users WHERE username = ?",
-    (username,),
-).fetchone()
-
-if not row:
-    return False
-
-stored_hash, status = row
-if status == "suspended":
-    return False
         row = conn.execute(
             "SELECT password, is_active, must_change_password FROM users WHERE username = ?",
             (username,),
@@ -885,20 +873,17 @@ def set_user_active_status(username: str, is_active: bool) -> None:
             if username == "admin" and not is_active:
                 raise ValueError("The admin account cannot be suspended.")
             conn.execute(
-                conn.execute(
-    """
-    UPDATE users
-    SET is_active = ?,
-        status = ?
-    WHERE username = ?
-    """,
-    (
-        1 if is_active else 0,
-        "active" if is_active else "suspended",
-        username,
-    ),
-)" WHERE username = ?",
-                (1 if is_active else 0, username),
+                """
+                UPDATE users
+                SET is_active = ?,
+                    status = ?
+                WHERE username = ?
+                """,
+                (
+                    1 if is_active else 0,
+                    "active" if is_active else "suspended",
+                    username,
+                ),
             )
             conn.commit()
     except sqlite3.Error as e:
