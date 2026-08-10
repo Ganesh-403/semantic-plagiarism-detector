@@ -11,16 +11,6 @@ from xml.etree import ElementTree
 logger = logging.getLogger(__name__)
 
 # Strict mapping of file extension to allowed MIME types/signatures.
-ALLOWED_MIME_TYPES = {
-    "pdf": {"application/pdf"},
-    "docx": {
-        "application/vnd.openxmlformats-officedocument." "wordprocessingml.document",
-        "application/zip",
-        "application/x-zip-compressed",
-        "application/octet-stream",
-    },
-    "xlsx": {
-        "application/vnd.openxmlformats-officedocument." "spreadsheetml.sheet",
 ALLOWED_MIME_TYPES: dict[str, list[str]] = {
     "pdf": ["application/pdf"],
     "docx": [

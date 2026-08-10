@@ -241,6 +241,8 @@ UI_COLORMAP_OPTIONS = [
     "Viridis",
     "Cividis",
     "Plasma",
+    "Blues",
+    "RdYlGn",
     "Coolwarm",
     "YlOrRd",
 ]
@@ -249,6 +251,8 @@ MATPLOTLIB_CMAP_MAPPING: dict[str, str] = {
     "Viridis": "viridis",
     "Cividis": "cividis",
     "Plasma": "plasma",
+    "Blues": "Blues",
+    "RdYlGn": "RdYlGn",
     "Coolwarm": "coolwarm",
     "YlOrRd": "YlOrRd",
     "Legacy Red/Green": "RdYlGn_r",
@@ -258,6 +262,8 @@ PLOTLY_CMAP_MAPPING = {
     "Viridis": "Viridis",
     "Cividis": "Cividis",
     "Plasma": "Plasma",
+    "Blues": "Blues",
+    "RdYlGn": "RdYlGn",
     "Coolwarm": "RdBu_r",
     "YlOrRd": "YlOrRd",
     "Legacy Red/Green": "RdYlGn_r",
@@ -311,6 +317,26 @@ def get_colors() -> dict:
         return st.session_state.theme_colors
     except Exception:
         return THEMES["Light"]
+
+
+def get_chart_colors() -> dict:
+    """Return the color palette Plotly chart builders should use.
+
+    Normally mirrors the app's active Light/Dark theme (via get_colors()).
+    If the user has enabled "Force Dark Mode Charts" in Settings, this
+    returns the Dark palette regardless of the app's overall theme, so
+    charts can be forced dark independently of the Streamlit UI theme.
+
+    Note: "force_dark_charts" must match SessionKeys.FORCE_DARK_CHARTS
+    (app/session_keys.py) — not imported directly here to avoid a
+    circular import between app.theme and app.session_keys.
+    """
+    try:
+        if st.session_state.get("force_dark_charts", False):
+            return THEMES["Dark"]
+    except Exception:
+        pass
+    return get_colors()
 
 
 def inject_css() -> None:
@@ -1831,4 +1857,20 @@ def render_timezone_footer() -> str:
     caption_text = f"Server Time: {time_str} UTC"
     st.sidebar.caption(f"🕒 {caption_text}")
     return caption_text
+
+
+def render_session_status_banner() -> None:
+    """Render caption banner in dashboard footer displaying active session runtime."""
+    import time
+    from app.session_keys import SessionKeys
+
+    if SessionKeys.SESSION_START_TIME not in st.session_state:
+        st.session_state[SessionKeys.SESSION_START_TIME] = time.time()
+
+    start_time = st.session_state[SessionKeys.SESSION_START_TIME]
+    elapsed_seconds = time.time() - start_time
+    elapsed_minutes = int(elapsed_seconds // 60)
+
+    st.caption(f"Active Session: {elapsed_minutes} mins")
+
 

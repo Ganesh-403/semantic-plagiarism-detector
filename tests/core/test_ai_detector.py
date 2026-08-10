@@ -628,3 +628,9 @@ def test_normalize_perplexity_bounds():
     assert 0.0 <= normalize_perplexity(1e6) <= 1.0
     assert 0.0 <= normalize_perplexity(0.0) <= 1.0
     
+def test_categorize_perplexity_score():
+    from src.core.ai_detector import categorize_perplexity_score
+    assert categorize_perplexity_score(25.0) == "Highly Predictable"
+    assert categorize_perplexity_score(50.0) == "Moderate"
+    assert categorize_perplexity_score(85.0) == "Unpredictable"
+    

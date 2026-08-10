@@ -37,3 +37,5 @@ class SessionKeys:
     OCR_DPI_SLIDER = "ocr_dpi_slider"
     CLASS_FILTER_SELECTBOX = "class_filter_selectbox"
     AUDIT_LOG_PAGE = "audit_log_page"
+    FORCE_DARK_CHARTS = "force_dark_charts"
+    SESSION_START_TIME = "session_start_time"

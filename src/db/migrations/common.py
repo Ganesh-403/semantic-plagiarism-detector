@@ -171,15 +171,15 @@ def run_migrations(
     target_version: int,
 ) -> int:
     """Apply every missing migration sequentially and atomically."""
-    target = int(target_version)
-    current = get_user_version(connection)
+    new_ver = int(target_version)
+    old_ver = get_user_version(connection)
 
-    if current > target:
+    if old_ver > new_ver:
         raise RuntimeError(
-            f"Database schema version {current} is newer than supported version {target}."
+            f"Database schema version {old_ver} is newer than supported version {new_ver}."
         )
 
-    expected_versions = set(range(1, target + 1))
+    expected_versions = set(range(1, new_ver + 1))
     missing_definitions = sorted(expected_versions.difference(migrations))
     if missing_definitions:
         raise RuntimeError(
@@ -187,11 +187,11 @@ def run_migrations(
             + ", ".join(map(str, missing_definitions))
         )
 
-    if current == target:
-        return current
+    if old_ver == new_ver:
+        return old_ver
 
     with migration_transaction(connection):
-        for version in range(current + 1, target + 1):
+        for version in range(old_ver + 1, new_ver + 1):
             migration_fn = migrations[version]
             migration_name = getattr(migration_fn, "__name__", f"v{version}")
             start_time = time.perf_counter()
@@ -202,15 +202,15 @@ def run_migrations(
                 migration_name,
                 elapsed_sec,
             )
-        set_user_version(connection, target)
+        set_user_version(connection, new_ver)
 
     logger.info(
         "Database migration from version %d to %d completed successfully.",
-        current,
-        target,
+        old_ver,
+        new_ver,
     )
 
-    return target
+    return new_ver
 
 
 def delete_all_if_table_exists(

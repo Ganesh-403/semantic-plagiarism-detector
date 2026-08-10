@@ -1,12 +1,15 @@
 import io
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 from PIL import Image
+
 from src.security.metadata_stripper import (
+    inspect_pdf_fonts,
     strip_exif_metadata,
     strip_pdf_javascript,
-    inspect_pdf_fonts,
 )
+
 
 def test_strip_pdf_javascript_removes_open_action():
     from pypdf import PdfReader, PdfWriter
@@ -93,8 +96,9 @@ def test_strip_image_metadata_dimension_safety_limit_height():
 
 
 def test_strip_image_metadata_dimension_exactly_at_limit():
-    # Create a dummy image exactly at the 10,000px limit (should pass)
-    img = Image.new("RGB", (10000, 10000), color="green")
+    # Create a dummy image exactly at the 10,000px limit (should pass).
+    # L (grayscale) mode keeps the decompressed footprint under the 100 MB limit.
+    img = Image.new("L", (10000, 10000), color=128)
     img_bytes = io.BytesIO()
     img.save(img_bytes, format="PNG")
 
@@ -102,6 +106,56 @@ def test_strip_image_metadata_dimension_exactly_at_limit():
     result = strip_exif_metadata(img_bytes.getvalue(), "test.png")
     assert isinstance(result, bytes)
     assert len(result) > 0
+
+
+def test_strip_image_metadata_decompressed_memory_exceeds_limit(monkeypatch):
+    # 10000 x 10000 RGB pixels -> 10000 * 10000 * 3 = 300 MB, which exceeds
+    # the 100 MB decompressed memory safety limit.
+    class FakeImage:
+        size = (10000, 10000)
+        mode = "RGB"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(Image, "open", MagicMock(return_value=FakeImage()))
+
+    with pytest.raises(ValueError) as excinfo:
+        strip_exif_metadata(b"fake image bytes", "test.png")
+
+    assert "Decompressed image memory footprint exceeds 100 MB safety limit" in str(
+        excinfo.value
+    )
+
+
+def test_strip_image_metadata_decompressed_memory_within_limit(monkeypatch):
+    # 4000 x 3000 RGB pixels -> 4000 * 3000 * 3 = 36 MB, within the 100 MB limit.
+    class FakeImage:
+        size = (4000, 3000)
+        mode = "RGB"
+        format = "PNG"
+
+        def getdata(self):
+            return []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    fake_new_image = MagicMock()
+    monkeypatch.setattr(Image, "open", MagicMock(return_value=FakeImage()))
+    monkeypatch.setattr(Image, "new", MagicMock(return_value=fake_new_image))
+
+    # Should not raise the decompressed memory error; the sanitized image is saved.
+    strip_exif_metadata(b"fake image bytes", "test.png")
+
+    fake_new_image.putdata.assert_called_once_with([])
+    fake_new_image.save.assert_called_once()
 
 
 def test_strip_palette_image_preserves_colors():
@@ -129,14 +183,15 @@ def test_strip_image_metadata_decompression_bomb(monkeypatch):
     # Mock Image.open to raise DecompressionBombError
     def mock_open(*args, **kwargs):
         raise Image.DecompressionBombError("Image size exceeds limit")
-    
+
     monkeypatch.setattr(Image, "open", mock_open)
-    
+
     img_bytes = b"fake image bytes"
     with pytest.raises(ValueError) as excinfo:
         strip_exif_metadata(img_bytes, "test.jpg")
-    
+
     assert str(excinfo.value) == "Image dimensions exceed security safety limits."
+
 
 @patch("src.security.metadata_stripper.fitz.open")
 def test_inspect_pdf_fonts_exceeds_limit(mock_fitz_open):
