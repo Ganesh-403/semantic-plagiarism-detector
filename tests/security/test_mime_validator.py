@@ -184,6 +184,13 @@ def test_truncated_zip_is_rejected():
     ) is False
 
 
+def test_weak_pk_signature_without_full_magic_bytes_is_rejected():
+    assert validate_mime_type(
+        b"PK\x05\x06" + b"\x00" * 18,
+        "empty.docx",
+    ) is False
+
+
 def test_too_many_archive_members_are_rejected(monkeypatch):
     monkeypatch.setattr(
         "src.security.mime_validator."

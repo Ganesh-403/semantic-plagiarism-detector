@@ -14,7 +14,7 @@ from app.theme import (
 )
 from unittest.mock import patch
 
-from app.theme import get_colors, inject_css, sanitize_hex_color
+from app.theme import get_colors, inject_css, sanitize_hex_color, get_chart_colors
 
 
 def test_get_colors_returns_valid_theme_colors():
@@ -54,6 +54,30 @@ def test_themes_have_expected_keys():
 def test_default_colors():
     """Verify default COLORS matches Light theme."""
     assert COLORS == THEMES["Light"]
+
+
+def test_get_chart_colors_matches_active_theme_when_override_disabled():
+    """Without the 'Force Dark Mode Charts' override, chart colors follow the app theme."""
+    mock_state: dict = {"force_dark_charts": False}
+    with patch("app.theme.st.session_state", mock_state):
+        with patch("app.theme.get_colors", return_value=THEMES["Light"]):
+            assert get_chart_colors() == THEMES["Light"]
+
+
+def test_get_chart_colors_forces_dark_when_override_enabled():
+    """With 'Force Dark Mode Charts' enabled, chart colors are Dark regardless of app theme."""
+    mock_state: dict = {"force_dark_charts": True}
+    with patch("app.theme.st.session_state", mock_state):
+        with patch("app.theme.get_colors", return_value=THEMES["Light"]):
+            assert get_chart_colors() == THEMES["Dark"]
+
+
+def test_get_chart_colors_defaults_to_active_theme_when_key_absent():
+    """If the override key was never set (widget not yet rendered), fall back to get_colors()."""
+    mock_state: dict = {}
+    with patch("app.theme.st.session_state", mock_state):
+        with patch("app.theme.get_colors", return_value=THEMES["Dark"]):
+            assert get_chart_colors() == THEMES["Dark"]
 
 
 def test_severity_tier_high():
@@ -555,3 +579,24 @@ def test_css_variables_injected():
     assert "background-color: var(--secondary-bg)" in css
     assert "border: 1px solid var(--border-color)" in css
     assert "var(--accent-color)" in css
+
+
+def test_render_session_status_banner():
+    """Verify that render_session_status_banner sets session start time and displays banner."""
+    from app.theme import render_session_status_banner
+    import time
+
+    mock_state = {}
+
+    with patch("app.theme.st.session_state", mock_state), patch("app.theme.st.caption") as mock_caption:
+        # First call: should initialize session_start_time and render 0 mins
+        render_session_status_banner()
+        assert "session_start_time" in mock_state
+        mock_caption.assert_called_once_with("Active Session: 0 mins")
+
+    # Second test: with established session start time in the past
+    mock_state_past = {"session_start_time": time.time() - 45.2 * 60}
+    with patch("app.theme.st.session_state", mock_state_past), patch("app.theme.st.caption") as mock_caption_past:
+        render_session_status_banner()
+        mock_caption_past.assert_called_once_with("Active Session: 45 mins")
+

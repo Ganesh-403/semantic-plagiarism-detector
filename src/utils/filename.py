@@ -10,7 +10,7 @@ import unicodedata
 from collections.abc import Collection, Mapping
 from pathlib import PurePath
 from typing import TypeVar
-from typing import IO, TypeVar
+from typing import IO
 
 DEFAULT_FILENAME = "document"
 MAX_FILENAME_LENGTH = 150

@@ -202,3 +202,62 @@ class SSRFProtector:
         # If it passed all checks, it's considered safe (public routable IP)
         logger.debug(f"SSRF Check passed for {url} -> {ip_str}")
         return True
+
++--- a/src/security/ssrf_protector.py
++@@ -20,6 +20,14 @@
++ import socket
++ from urllib.parse import urlparse
++ 
+++# CIDR Subnet Block Filter Configuration
+++CIDR_SUBNET_FILTER = [
+++    '127.0.0.0/8',  # Loopback addresses
+++    '10.0.0.0/8',   # Private network
+++    '172.16.0.0/12',# Private network
+++    '192.168.0.0/16'  # Private network
+++]
+++
++ 
++ class SSRFProtector:
++     def __init__(self):
++@@ -45,7 +53,15 @@ class SSRFProtector:
++         if not self.is_valid_url(url):
++             return False
++         
++-        parsed_url = urlparse(url)
+++        try:
+++            parsed_url = urlparse(url)
+++            ip_address = socket.gethostbyname(parsed_url.hostname)
+++        except (socket.gaierror, socket.herror):
+++            return False  # Invalid hostname
++ 
+++        if not self.is_valid_ip(ip_address):
+++            return False
+++
++         return True
++ 
++     def is_valid_url(self, url):
++@@ -54,6 +70,22 @@ class SSRFProtector:
++         try:
++             result = urlparse(url)
++             return all([result.scheme, result.netloc])
+++        except ValueError:
+++            return False  # Invalid URL format
+++
+++    def is_valid_ip(self, ip_address):
+++        try:
+++            socket.inet_aton(ip_address)
+++        except socket.error:
+++            return False  # Invalid IP address
+++
+++        for subnet in CIDR_SUBNET_FILTER:
+++            if self.is_ip_in_subnet(ip_address, subnet):
+++                return True
+++
+++        return False
+++
+++    def is_ip_in_subnet(self, ip_address, subnet):
+++        ip_parts = [int(part) for part in ip_address.split('.')]
+++        subnet_parts = [int(part) for part in subnet.split('/')[0].split('.')]
+++        mask_length = int(subnet.split('/')[1])
++ 
++         return True

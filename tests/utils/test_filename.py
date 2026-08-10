@@ -235,7 +235,6 @@ from io import BytesIO
 
 from src.utils.filename import (
     compute_file_hash_stream,
-    get_file_sha256_hash,
 )
 
 

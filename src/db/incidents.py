@@ -353,20 +353,43 @@ def get_total_incidents_count(
 
 
 def get_incident_by_id(
-    incident_id: str | int,
+    incident_id: int,
     db_path: str | Path | None = None,
 ) -> dict[str, Any] | None:
-    if db_path is None:
-        db_path = DEFAULT_DB_PATH
-    """Fetch a single plagiarism incident record by its incident_id primary key.
+    """Fetch a single plagiarism incident record by its ``incident_id`` primary key.
+
+    Issue #1772: Instructors need a helper to fetch a single incident record
+    by its integer primary key without having to query by document names.
+
+    The function accepts both integer and string representations of the
+    incident_id (string IDs are common in the legacy ``INC-xxx`` format;
+    integer IDs are used by the canonical ``plagiarism_incidents`` table).
+    The query matches against both forms so callers don't need to know
+    which format is stored.
 
     Args:
-        incident_id: Integer or string primary key of the incident.
-        db_path: Path to the SQLite corpus database.
+        incident_id: Integer (or string) primary key of the incident.
+            Strings are accepted for backward compatibility with the
+            legacy ``INC-xxx`` ID format, but the canonical type is
+            ``int``.
+        db_path: Path to the SQLite corpus database. Defaults to
+            :data:`DEFAULT_DB_PATH` when ``None``.
 
     Returns:
-        Dictionary containing incident record columns, or None if not found.
+        Dictionary containing the incident record columns
+        (``incident_id``, ``document_a``, ``document_b``,
+        ``similarity_score``, ``severity_rank``, ``review_status``,
+        ``date_flagged``, ``last_seen``, ``threshold_at_time_of_flag``),
+        or ``None`` if no matching incident is found or if the incident's
+        documents have been soft-deleted.
+
+    Note:
+        Incidents linked to soft-deleted documents (``is_deleted = 1``)
+        are excluded from the result, consistent with
+        :func:`get_all_incidents`.
     """
+    if db_path is None:
+        db_path = DEFAULT_DB_PATH
     init_incident_db(db_path)
     with closing(_get_connection(db_path)) as conn:
         conn.row_factory = sqlite3.Row

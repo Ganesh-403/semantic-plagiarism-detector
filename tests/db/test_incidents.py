@@ -914,3 +914,219 @@ def test_get_incidents_by_user_legacy_table_returns_all_columns(tmp_path):
     assert row["details"] == "flagged"
     assert row["severity_rank"] == "High"
 
+
+
+# ── Issue #1772: Additional comprehensive tests for get_incident_by_id ──────
+
+
+def test_get_incident_by_id_returns_none_for_nonexistent_integer(test_db):
+    """A nonexistent integer ID should return None, not raise."""
+    result = get_incident_by_id(99999, test_db)
+    assert result is None
+
+
+def test_get_incident_by_id_returns_none_for_zero(test_db):
+    """ID 0 (never auto-assigned) should return None."""
+    result = get_incident_by_id(0, test_db)
+    assert result is None
+
+
+def test_get_incident_by_id_returns_none_for_negative(test_db):
+    """Negative IDs should return None without raising."""
+    result = get_incident_by_id(-1, test_db)
+    assert result is None
+
+
+def test_get_incident_by_id_returns_all_expected_columns(test_db):
+    """The returned dict should contain all 9 canonical incident columns."""
+    import sqlite3
+
+    with sqlite3.connect(test_db) as conn:
+        conn.execute(
+            """
+            INSERT INTO plagiarism_incidents (
+                incident_id, document_a, document_b, similarity_score,
+                severity_rank, review_status, date_flagged, last_seen,
+                threshold_at_time_of_flag
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                2001,
+                "col_a.pdf",
+                "col_b.pdf",
+                0.92,
+                "High",
+                "Pending",
+                "2026-08-01T10:00:00Z",
+                "2026-08-01T10:00:00Z",
+                0.59,
+            ),
+        )
+        conn.commit()
+
+    result = get_incident_by_id(2001, test_db)
+    assert result is not None
+
+    expected_keys = {
+        "incident_id",
+        "document_a",
+        "document_b",
+        "similarity_score",
+        "severity_rank",
+        "review_status",
+        "date_flagged",
+        "last_seen",
+        "threshold_at_time_of_flag",
+    }
+    assert expected_keys == set(result.keys())
+    assert result["similarity_score"] == 0.92
+    assert result["severity_rank"] == "High"
+    assert result["threshold_at_time_of_flag"] == 0.59
+
+
+def test_get_incident_by_id_string_integer_equivalence(test_db):
+    """Passing int 3001 and str '3001' should return the same record."""
+    import sqlite3
+
+    with sqlite3.connect(test_db) as conn:
+        conn.execute(
+            """
+            INSERT INTO plagiarism_incidents (
+                incident_id, document_a, document_b, similarity_score,
+                severity_rank, review_status, date_flagged, last_seen,
+                threshold_at_time_of_flag
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                3001,
+                "equiv_a.pdf",
+                "equiv_b.pdf",
+                0.81,
+                "High",
+                "Pending",
+                "2026-08-02T00:00:00Z",
+                "2026-08-02T00:00:00Z",
+                0.50,
+            ),
+        )
+        conn.commit()
+
+    by_int = get_incident_by_id(3001, test_db)
+    by_str = get_incident_by_id("3001", test_db)
+
+    assert by_int is not None
+    assert by_str is not None
+    assert by_int["document_a"] == by_str["document_a"]
+    assert by_int["document_b"] == by_str["document_b"]
+
+
+def test_get_incident_by_id_excludes_soft_deleted_documents(test_db):
+    """If either document is soft-deleted, the incident should not be returned."""
+    import sqlite3
+
+    with sqlite3.connect(test_db) as conn:
+        conn.execute(
+            "INSERT INTO documents (filename, file_hash, upload_date, is_deleted) "
+            "VALUES (?, ?, ?, 1)",
+            ("deleted_doc.pdf", "hash_del", "2026-08-03T00:00:00Z"),
+        )
+        conn.execute(
+            "INSERT INTO documents (filename, file_hash, upload_date, is_deleted) "
+            "VALUES (?, ?, ?, 0)",
+            ("alive_doc.pdf", "hash_alive", "2026-08-03T00:00:00Z"),
+        )
+        conn.execute(
+            """
+            INSERT INTO plagiarism_incidents (
+                incident_id, document_a, document_b, similarity_score,
+                severity_rank, review_status, date_flagged, last_seen,
+                threshold_at_time_of_flag
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                4001,
+                "deleted_doc.pdf",
+                "alive_doc.pdf",
+                0.85,
+                "High",
+                "Pending",
+                "2026-08-03T00:00:00Z",
+                "2026-08-03T00:00:00Z",
+                0.50,
+            ),
+        )
+        conn.commit()
+
+    result = get_incident_by_id(4001, test_db)
+    assert result is None
+
+
+def test_get_incident_by_id_uses_default_db_path_when_none(test_db, monkeypatch):
+    """When db_path is None, the function should use DEFAULT_DB_PATH."""
+    import src.db.incidents as incidents_mod
+
+    monkeypatch.setattr(incidents_mod, "DEFAULT_DB_PATH", test_db)
+
+    import sqlite3
+
+    with sqlite3.connect(test_db) as conn:
+        conn.execute(
+            """
+            INSERT INTO plagiarism_incidents (
+                incident_id, document_a, document_b, similarity_score,
+                severity_rank, review_status, date_flagged, last_seen,
+                threshold_at_time_of_flag
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                5001,
+                "default_a.pdf",
+                "default_b.pdf",
+                0.77,
+                "Medium",
+                "Pending",
+                "2026-08-04T00:00:00Z",
+                "2026-08-04T00:00:00Z",
+                0.50,
+            ),
+        )
+        conn.commit()
+
+    result = get_incident_by_id(5001, None)
+    assert result is not None
+    assert result["document_a"] == "default_a.pdf"
+
+
+def test_get_incident_by_id_returns_dict_type(test_db):
+    """The return type should be dict or None, never a sqlite3.Row."""
+    import sqlite3
+
+    with sqlite3.connect(test_db) as conn:
+        conn.execute(
+            """
+            INSERT INTO plagiarism_incidents (
+                incident_id, document_a, document_b, similarity_score,
+                severity_rank, review_status, date_flagged, last_seen,
+                threshold_at_time_of_flag
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                6001,
+                "type_a.pdf",
+                "type_b.pdf",
+                0.65,
+                "Medium",
+                "Pending",
+                "2026-08-05T00:00:00Z",
+                "2026-08-05T00:00:00Z",
+                0.50,
+            ),
+        )
+        conn.commit()
+
+    result = get_incident_by_id(6001, test_db)
+    assert result is not None
+    assert isinstance(result, dict)
+    assert not isinstance(result, sqlite3.Row)
+
+

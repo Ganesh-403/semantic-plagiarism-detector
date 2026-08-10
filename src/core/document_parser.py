@@ -1769,6 +1769,7 @@ def extract_text(
     *,
     ocr_language: str = DEFAULT_OCR_LANGUAGE,
     ocr_dpi: int = DEFAULT_OCR_DPI,
+    to_lowercase: bool = False,
 ) -> str:
     """Route extraction according to a filename extension."""
     ocr_language, ocr_dpi = normalize_ocr_settings(
@@ -1816,6 +1817,7 @@ def extract_text(
 
     raw = strip_bibliography(raw)
     raw = normalize_unicode_spaces(raw)
+    raw = normalize_extended_punctuation(raw)
 
     # Apply NFC normalization to ensure consistent string matching across OSes (Issue #1482)
     raw = normalize_unicode_nfc(raw)
@@ -1823,9 +1825,14 @@ def extract_text(
     raw = sanitize_zero_width_characters(raw, filename=filename)
     lang_code = detect_text_language(raw)
 
+    if to_lowercase:
+        raw = raw.lower()
+
     logger.info(
         f"[document_parser] Detected language for document '{filename}': {lang_code}"
     )
+    if to_lowercase:
+        raw = raw.lower()
     return raw
 
 
@@ -1870,14 +1877,14 @@ def _extract_text_from_file_path(file_path: Path) -> tuple[str, str]:
 
 
 def parallel_extract_texts(
-    file_paths: list[Path], max_workers: int = 4
+    file_paths: list[Path], max_workers: int | None = None
 ) -> dict[str, str]:
     """
     Extract text from multiple file paths concurrently using a ProcessPoolExecutor.
 
     Args:
         file_paths: List of file Path objects to extract text from.
-        max_workers: Maximum process workers to spawn (default: 4).
+        max_workers: Maximum process workers to spawn (default: min(max_workers, os.cpu_count())).
 
     Returns:
         dict[str, str]: Mapping of filename to extracted text string.
@@ -1896,9 +1903,12 @@ def parallel_extract_texts(
 
     from concurrent.futures import ProcessPoolExecutor, as_completed
 
+    cpu_count = os.cpu_count() or 1
+    safe_max_workers = min(max_workers, cpu_count) if max_workers is not None else cpu_count
+
     results = {}
     try:
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        with ProcessPoolExecutor(max_workers=safe_max_workers) as executor:
             future_to_path = {
                 executor.submit(_extract_text_from_file_path, path): path
                 for path in paths
@@ -1956,3 +1966,17 @@ def extract_texts(
         results[name] = raw_texts.get(name, "")
 
     return results
+
++--- a/src/core/document_parser.py
++@@ -20,6 +20,7 @@
++ import re
++ 
++ class DocumentParser:
+++    def strip_digits(self, text):
+++        return re.sub(r'\d+', '', text)
++ 
++     def parse_document(self, content):
++         # Example parsing logic
++-        parsed_content = content.strip()
+++        parsed_content = self.strip_digits(content).strip()
++         return parsed_content
