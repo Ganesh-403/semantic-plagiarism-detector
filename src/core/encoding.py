@@ -1,4 +1,7 @@
-"""Encoding fallback for document parsing."""
+"""Encoding fallback utilities for document parsing."""
+
+This module provides helpers for normalizing common encoding issues
+such as mojibake and replacement characters.
 from __future__ import annotations
 
 def normalize_encoding(text: str) -> str:
