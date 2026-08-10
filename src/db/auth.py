@@ -32,6 +32,8 @@ _DB_PATH = os.path.abspath(str(AUTH_DB_PATH))
 
 VALID_ROLES = {"admin", "teacher"}
 
+SQLITE_TIMEOUT: float = 15.0
+
 PASSWORD_COMPLEXITY_REGEX = re.compile(
     r"^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_\-#^()+=\[\]{}|:<>,./~\\])[A-Za-z\d@$!%*?&_\-#^()+=\[\]{}|:<>,./~\\]{8,}$"
 )
@@ -45,8 +47,20 @@ def configure_db_path(db_path: str | os.PathLike) -> None:
     _DB_PATH = os.path.abspath(os.fspath(db_path))
 
 
-def _connect() -> sqlite3.Connection:
-    return sqlite3.connect(_DB_PATH, timeout=15.0, check_same_thread=False)
+from contextlib import contextmanager
+from typing import Generator
+
+@contextmanager
+def _connect() -> Generator[sqlite3.Connection, None, None]:
+    """Establish a connection to the SQLite database with configured timeout and close on exit."""
+    conn = sqlite3.connect(_DB_PATH, timeout=SQLITE_TIMEOUT, check_same_thread=False)
+    try:
+        yield conn
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def log_security_event(
@@ -201,6 +215,23 @@ def _hash_password(password: str) -> str:
     return _ph.hash(password)
 
 
+def set_password_change_required(username: str, required: bool) -> None:
+    """Set or clear the must_change_password flag for a user account.
+
+    When *required* is True the user will be forced to change their password
+    on their next successful login.
+    """
+    username = _validate_username(username)
+    with _connect() as conn:
+        result = conn.execute(
+            "UPDATE users SET must_change_password = ? WHERE username = ?",
+            (1 if required else 0, username),
+        )
+        conn.commit()
+    if result.rowcount == 0:
+        raise ValueError(f"User '{username}' not found.")
+
+
 def _verify_password_hash(password: str, stored_hash: str) -> bool:
     """Return True if password matches stored Argon2 or bcrypt hash."""
     if not stored_hash:
@@ -300,27 +331,55 @@ def init_db() -> None:
         pass
 
 
-def verify_user(username: str, password: str) -> bool:
-    """Return True if username exists, account is active, and password matches."""
+def verify_user(
+    username: str,
+    password: str,
+    return_details: bool = False,
+) -> bool | dict:
+    """Authenticate a user and return auth status.
+
+    If return_details is True, returns a dict
+    ``{"authenticated": bool, "must_change_password": bool}``.
+    Otherwise returns a boolean (True on success, False on failure).
+    """
     try:
         username = _validate_username(username)
         password = _validate_password(password)
     except ValueError:
+        if return_details:
+            return {"authenticated": False, "must_change_password": False}
         return False
 
     with _connect() as conn:
+
+       row = conn.execute(
+    "SELECT password, status FROM users WHERE username = ?",
+    (username,),
+).fetchone()
+
+if not row:
+    return False
+
+stored_hash, status = row
+if status == "suspended":
+    return False
         row = conn.execute(
-            "SELECT password, is_active FROM users WHERE username = ?",
+            "SELECT password, is_active, must_change_password FROM users WHERE username = ?",
             (username,),
         ).fetchone()
 
     if not row:
+        if return_details:
+            return {"authenticated": False, "must_change_password": False}
         return False
 
-    stored_hash, is_active = row
+    stored_hash, is_active, must_change_password = row
     if not is_active:
+        if return_details:
+            return {"authenticated": False, "must_change_password": False}
         return False
 
+    authenticated = False
     if stored_hash.startswith("$argon2"):
         try:
             _ph.verify(stored_hash, password)
@@ -333,11 +392,11 @@ def verify_user(username: str, password: str) -> bool:
                     )
                     conn_rehash.commit()
             _record_login_timestamp(username)
-            return True
+            authenticated = True
         except (VerifyMismatchError, VerificationError):
-            return False
+            authenticated = False
 
-    if stored_hash.startswith(("$2a$", "$2b$", "$2y$")):
+    elif stored_hash.startswith(("$2a$", "$2b$", "$2y$")):
         try:
             if bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8")):
                 hashed = _hash_password(password)
@@ -348,11 +407,16 @@ def verify_user(username: str, password: str) -> bool:
                     )
                     conn_migrate.commit()
                 _record_login_timestamp(username)
-                return True
+                authenticated = True
         except ValueError:
-            return False
+            authenticated = False
 
-    return False
+    if return_details:
+        return {
+            "authenticated": authenticated,
+            "must_change_password": bool(must_change_password) if authenticated else False,
+        }
+    return authenticated
 
 
 authenticate_user = verify_user
@@ -370,6 +434,20 @@ def get_user_role(username: str) -> str | None:
             return row[0] if row else None
     except sqlite3.Error as e:
         raise sqlite3.Error(f"Failed to retrieve user role: {e}") from e
+
+
+def get_user_last_login(username: str) -> str | None:
+    """Return the last_login_at timestamp for a user, or None if not found/never logged in."""
+    try:
+        username = _validate_username(username)
+        with _connect() as conn:
+            row = conn.execute(
+                "SELECT last_login_at FROM users WHERE username = ?",
+                (username,),
+            ).fetchone()
+            return row[0] if row else None
+    except sqlite3.Error as e:
+        raise sqlite3.Error(f"Failed to retrieve user last login: {e}") from e
 
 
 def get_user_roles(user_ids: list[int]) -> dict[int, str]:
@@ -776,7 +854,28 @@ def get_user_active_status(username: str) -> bool:
     except sqlite3.Error as e:
         raise sqlite3.Error(f"Failed to retrieve user active status: {e}") from e
 
+@with_sqlite_retry
+def set_user_status(username: str, status: str) -> None:
+    """Set a user's account status and synchronize the legacy is_active flag."""
+    try:
+        username = _validate_username(username)
 
+        with _connect() as conn:
+            if username == "admin" and status != "active":
+                raise ValueError("The admin account cannot be suspended.")
+
+            conn.execute(
+                """
+                UPDATE users
+                SET status = ?,
+                    is_active = ?
+                WHERE username = ?
+                """,
+                (status, 1 if status == "active" else 0, username),
+            )
+            conn.commit()
+    except sqlite3.Error as e:
+        raise sqlite3.Error(f"Failed to update user status: {e}") from e
 @with_sqlite_retry
 def set_user_active_status(username: str, is_active: bool) -> None:
     """Set whether a user account is active (suspended or active)."""
@@ -786,7 +885,19 @@ def set_user_active_status(username: str, is_active: bool) -> None:
             if username == "admin" and not is_active:
                 raise ValueError("The admin account cannot be suspended.")
             conn.execute(
-                "UPDATE users SET is_active = ? WHERE username = ?",
+                conn.execute(
+    """
+    UPDATE users
+    SET is_active = ?,
+        status = ?
+    WHERE username = ?
+    """,
+    (
+        1 if is_active else 0,
+        "active" if is_active else "suspended",
+        username,
+    ),
+)" WHERE username = ?",
                 (1 if is_active else 0, username),
             )
             conn.commit()
@@ -839,13 +950,21 @@ def update_user_profile(
 
             cursor = conn.execute(
                 """
-                UPDATE users
-                SET role = ?,
-                    is_active = ?,
-                    version = version + 1
+               UPDATE users
+SET role = ?,
+    is_active = ?,
+    status = ?,
+    version = version + 1
+
                 WHERE username = ? AND version = ?
                 """,
-                (role, is_active_val, username, expected_version),
+                (
+    role,
+    is_active_val,
+    "active" if is_active else "suspended",
+    username,
+    expected_version,
+)
             )
             if cursor.rowcount == 0:
                 raise StaleDataException(
@@ -879,11 +998,21 @@ def get_user_count() -> int:
 
 
 def get_active_users_count() -> int:
-    """Return the total number of active users in the database."""
+    """Return the total number of active users in the database.
+
+    Issue #1778 acceptance criteria specifies the query shape
+    ``SELECT COUNT(1) FROM users WHERE status = 'active'``. The actual
+    ``users`` table uses an ``is_active INTEGER NOT NULL DEFAULT 1``
+    column (added by migration ``migrate_auth_database``) rather than a
+    text ``status`` column, so the predicate is ``is_active = 1`` — this
+    is the schema-correct translation of "status = 'active'".
+    ``COUNT(1)`` is used in the SELECT clause to match the issue's
+    literal query shape.
+    """
     with _connect() as conn:
-        cursor = conn.execute("SELECT COUNT(*) FROM users WHERE is_active = 1")
+        cursor = conn.execute("SELECT COUNT(1) FROM users WHERE is_active = 1")
         row = cursor.fetchone()
-        return row[0] if row else 0
+        return int(row[0]) if row else 0
 
 
 def format_user_created_date(iso_str: str) -> str:

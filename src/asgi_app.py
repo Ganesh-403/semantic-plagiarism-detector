@@ -71,7 +71,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 class ContentLengthLimitMiddleware(BaseHTTPMiddleware):
-    """Reject declared request bodies larger than the configured cap."""
+    """Reject declared HTTP request bodies exceeding MAX_REQUEST_BYTES (default 50MB)."""
 
     async def dispatch(self, request, call_next):
         max_bytes_str = os.environ.get(

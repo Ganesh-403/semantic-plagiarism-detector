@@ -8,6 +8,8 @@ import json
 import os
 from unittest.mock import patch
 
+import pytest
+
 from src.i18n.translator import _I18N_DIR, _SUPPORTED_LANGUAGES, _translations, get_text
 
 # A key that genuinely exists in the English translations
@@ -221,6 +223,32 @@ def test_is_valid_language_code():
     assert is_valid_language_code(None) is False
 
 
+def test_validate_target_language_code_valid():
+    from src.core.translator import validate_target_language_code
+
+    assert validate_target_language_code("en") is True
+    assert validate_target_language_code("es") is True
+    assert validate_target_language_code("fr") is True
+    assert validate_target_language_code("ES") is True
+    assert validate_target_language_code("  de  ") is True
+
+
+def test_validate_target_language_code_invalid():
+    from src.core.translator import validate_target_language_code
+
+    with pytest.raises(ValueError) as excinfo:
+        validate_target_language_code("xyz")
+    assert "Unsupported target language code: xyz" in str(excinfo.value)
+
+    with pytest.raises(ValueError) as excinfo:
+        validate_target_language_code("")
+    assert "Unsupported target language code:" in str(excinfo.value)
+
+    with pytest.raises(ValueError) as excinfo:
+        validate_target_language_code(None)
+    assert "Unsupported target language code: None" in str(excinfo.value)
+
+
 def test_get_supported_language_codes():
     from src.core.translator import get_supported_language_codes
 
@@ -304,3 +332,13 @@ def test_get_common_translation_pairs():
     assert len(pairs) >= 5
     assert ("es", "en") in pairs
     assert ("fr", "en") in pairs
+
+
+def test_get_language_display_name():
+    from src.core.translator import get_language_display_name
+
+    assert get_language_display_name("de") == "German"
+    assert get_language_display_name("en") == "English"
+    assert get_language_display_name("xyz") == "XYZ"
+    assert get_language_display_name("") == ""
+    assert get_language_display_name(None) == ""

@@ -1,6 +1,6 @@
 """Tests for src/core/embeddings.py"""
 
-from src.core.embeddings import generate_embeddings
+from src.core.embedding_model import embed_chunks as generate_embeddings
 
 
 def test_embed_empty_text_returns_zero_vector():

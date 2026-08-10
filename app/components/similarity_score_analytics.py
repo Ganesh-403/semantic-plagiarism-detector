@@ -249,8 +249,8 @@ def _render_histogram(
 ) -> None:
     """Render an interactive Plotly histogram."""
     try:
-        from app.theme import get_colors
-        colors = get_colors()
+        from app.theme import get_chart_colors
+        colors = get_chart_colors()
     except Exception:
         colors = {}
 
@@ -304,8 +304,8 @@ def _render_histogram(
 def _render_boxplot(scores: pd.Series) -> None:
     """Render an interactive Plotly box plot."""
     try:
-        from app.theme import get_colors
-        colors = get_colors()
+        from app.theme import get_chart_colors
+        colors = get_chart_colors()
     except Exception:
         colors = {}
 

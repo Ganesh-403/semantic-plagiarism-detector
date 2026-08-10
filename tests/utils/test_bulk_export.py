@@ -2,7 +2,11 @@ import io
 import json
 import zipfile
 
-from src.utils.bulk_export import export_incidents_csv_stream, generate_bulk_reports_zip
+from src.utils.bulk_export import (
+    export_incidents_csv_stream,
+    export_incidents_csv,
+    generate_bulk_reports_zip,
+)
 
 
 def test_generate_bulk_reports_zip():
@@ -483,4 +487,144 @@ def test_stream_incidents_csv_chunks_escaping():
     data = chunks[1]
     assert '"comma, in name.pdf"' in data
     assert 'quote"" in name.pdf' in data
+
+
+# ---------------------------------------------------------------------------
+# Tests for the `delimiter` parameter (European Excel compatibility)
+# ---------------------------------------------------------------------------
+
+
+def test_export_incidents_csv_stream_default_delimiter_is_comma():
+    """Without an explicit delimiter, output must remain comma-separated
+    (backward compatibility with existing callers)."""
+    csv_bytes = export_incidents_csv_stream(_SAMPLE_INCIDENTS)
+    text = csv_bytes.decode("utf-8-sig")
+    first_line = text.splitlines()[0]
+
+    assert "," in first_line
+    assert ";" not in first_line
+
+
+def test_export_incidents_csv_stream_semicolon_delimiter():
+    """delimiter=';' must produce semicolon-delimited CSV, parseable back
+    into the original field values."""
+    import csv as _csv
+    import io as _io
+
+    csv_bytes = export_incidents_csv_stream(_SAMPLE_INCIDENTS, delimiter=";")
+    text = csv_bytes.decode("utf-8-sig")
+    first_line = text.splitlines()[0]
+
+    # Header row uses semicolons, not commas, as the field separator
+    assert first_line == "Incident ID;Doc A;Doc B;Similarity;Severity;Status;Date"
+
+    reader = _csv.DictReader(_io.StringIO(text), delimiter=";")
+    rows = list(reader)
+
+    assert len(rows) == 2
+    assert rows[0]["Incident ID"] == "INC-001"
+    assert rows[0]["Doc A"] == "alice.pdf"
+    assert rows[0]["Similarity"] == "95.00%"
+    assert rows[1]["Incident ID"] == "INC-002"
+
+
+def test_export_incidents_csv_stream_tab_delimiter():
+    """delimiter='\\t' must produce tab-delimited CSV."""
+    import csv as _csv
+    import io as _io
+
+    csv_bytes = export_incidents_csv_stream(_SAMPLE_INCIDENTS, delimiter="\t")
+    text = csv_bytes.decode("utf-8-sig")
+    first_line = text.splitlines()[0]
+
+    assert "\t" in first_line
+    assert "," not in first_line
+
+    reader = _csv.DictReader(_io.StringIO(text), delimiter="\t")
+    rows = list(reader)
+    assert rows[0]["Doc A"] == "alice.pdf"
+
+
+def test_stream_incidents_csv_chunks_semicolon_delimiter():
+    """stream_incidents_csv_chunks must honor delimiter=';' across both
+    the header chunk and the data chunks."""
+    def mock_query(limit, offset):
+        if offset > 0:
+            return []
+        return [{
+            "incident_id": "INC-1",
+            "document_a": "alice.pdf",
+            "document_b": "bob.pdf",
+            "similarity_score": 0.5,
+        }]
+
+    chunks = list(stream_incidents_csv_chunks(mock_query, delimiter=";"))
+
+    assert len(chunks) == 2
+    header, data = chunks
+    assert header.startswith("Incident ID;Doc A;Doc B")
+    assert "INC-1;alice.pdf;bob.pdf" in data
+
+
+def test_create_batch_incident_zip_archive_semicolon_delimiter():
+    """create_batch_incident_zip_archive must forward delimiter into the
+    incidents_summary.csv it writes."""
+    from src.utils.bulk_export import create_batch_incident_zip_archive
+
+    incidents = [
+        {
+            "incident_id": "INC-1",
+            "document_a": "alice.pdf",
+            "document_b": "bob.pdf",
+            "similarity_score": 0.5,
+        }
+    ]
+
+    zip_bytes = create_batch_incident_zip_archive(incidents, delimiter=";")
+
+    with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+        csv_text = zf.read("incidents_summary.csv").decode("utf-8-sig")
+
+    assert "Incident ID;Doc A;Doc B" in csv_text
+
+
+def test_export_incidents_csv_delimiter_validation():
+    """Verify that export_incidents_csv validates delimiter and falls back to comma if invalid (#1735)."""
+    # 1. Test valid 1-character delimiter
+    csv_bytes = export_incidents_csv(_SAMPLE_INCIDENTS, delimiter=";")
+    first_line = csv_bytes.decode("utf-8-sig").splitlines()[0]
+    assert ";" in first_line
+    assert "," not in first_line
+
+    # 2. Test multi-character delimiter (invalid) -> should fall back to ","
+    csv_bytes_multi = export_incidents_csv(_SAMPLE_INCIDENTS, delimiter=";;")
+    first_line_multi = csv_bytes_multi.decode("utf-8-sig").splitlines()[0]
+    assert "," in first_line_multi
+    assert ";" not in first_line_multi
+
+    # 3. Test non-string delimiter (invalid) -> should fall back to ","
+    csv_bytes_none = export_incidents_csv(_SAMPLE_INCIDENTS, delimiter=None)
+    first_line_none = csv_bytes_none.decode("utf-8-sig").splitlines()[0]
+    assert "," in first_line_none
+
+
+def test_export_incidents_csv_quoting_style():
+    """Verify that export_incidents_csv respects custom quoting styles (#1739)."""
+    import csv
+
+    # Test QUOTE_ALL: all fields should be quoted
+    csv_bytes_all = export_incidents_csv(_SAMPLE_INCIDENTS, quoting_style=csv.QUOTE_ALL)
+    text_all = csv_bytes_all.decode("utf-8-sig")
+    first_line_all = text_all.splitlines()[0]
+    # Header fields must be quoted
+    assert '"Incident ID","Doc A","Doc B","Similarity","Severity","Status","Date"' in first_line_all
+
+    # Test QUOTE_MINIMAL: default minimal quoting (normal string without special characters is unquoted)
+    csv_bytes_min = export_incidents_csv(_SAMPLE_INCIDENTS, quoting_style=csv.QUOTE_MINIMAL)
+    text_min = csv_bytes_min.decode("utf-8-sig")
+    first_line_min = text_min.splitlines()[0]
+    # Header fields must not be quoted
+    assert "Incident ID,Doc A,Doc B,Similarity,Severity,Status,Date" in first_line_min
+
+
 

@@ -84,12 +84,12 @@ def strip_pdf_javascript(pdf_bytes: bytes) -> bytes:
         javascript_detected = False
 
         if catalog:
-           catalog = catalog.get_object()
+            catalog = catalog.get_object()
 
         for key in ["/JS", "/JavaScript", "/OpenAction"]:
-           if key in catalog:
-              javascript_detected = True
-              del catalog[key]
+            if key in catalog:
+                javascript_detected = True
+                del catalog[key]
 
         if javascript_detected:
             logger.warning("Embedded PDF JavaScript actions detected and removed")
@@ -130,19 +130,48 @@ def inspect_pdf_fonts(pdf_bytes: bytes, max_font_bytes: int = 10_000_000) -> boo
                 font_data = doc.extract_font(xref)
                 font_buffer = font_data[-1] if font_data else b""
                 if len(font_buffer) > max_font_bytes:
-                    raise ValueError(
-                        "Embedded PDF font stream exceeds safety limit"
-                    )
+                    raise ValueError("Embedded PDF font stream exceeds safety limit")
         return True
     finally:
         doc.close()
+
+
+_MODE_BYTES_PER_PIXEL = {
+    "1": 1,  # Pillow stores bitmap mode as 1 byte/pixel internally
+    "L": 1,
+    "P": 1,
+    "RGB": 3,
+    "RGBA": 4,
+    "CMYK": 4,
+    "YCbCr": 3,
+    "LAB": 3,
+    "HSV": 3,
+    "I": 4,
+    "F": 4,
+    "I;16": 2,
+    "I;16L": 2,
+    "I;16B": 2,
+    "BGR;15": 2,
+    "BGR;16": 2,
+    "BGR;24": 3,
+    "BGR;32": 4,
+}
+
+
+def _estimate_decompressed_memory_bytes(width: int, height: int, mode: str) -> int:
+    """
+    Estimates the decompressed in-memory footprint of an image as
+    width * height * bytes_per_pixel based on its header dimensions and mode.
+    """
+    bytes_per_pixel = _MODE_BYTES_PER_PIXEL.get(mode, 4)  # conservative default
+    return width * height * bytes_per_pixel
 
 
 def _strip_image_metadata(file_bytes: bytes) -> bytes:
     """
     Uses Pillow to read the image and save it without EXIF data.
     Includes safety checks to prevent decompression bombs or excessive memory usage
-    by validating image dimensions before full decoding.
+    by validating image dimensions and decompressed memory footprint before full decoding.
 
     Args:
         file_bytes (bytes): The raw byte content of the image file.
@@ -151,9 +180,11 @@ def _strip_image_metadata(file_bytes: bytes) -> bytes:
         bytes: The sanitized image bytes without EXIF metadata.
 
     Raises:
-        ValueError: If the image dimensions exceed the 10,000px safety limit.
+        ValueError: If the image dimensions exceed the 10,000px safety limit or if the
+            estimated decompressed memory footprint exceeds the 100 MB safety limit.
     """
     MAX_DIMENSION = 10000
+    MAX_DECOMPRESSED_BYTES = 100 * 1024 * 1024  # 100 MB safety limit
 
     try:
         # Open image to inspect dimensions without fully decoding pixel data
@@ -163,6 +194,16 @@ def _strip_image_metadata(file_bytes: bytes) -> bytes:
             # Safety check: prevent decompression bombs or excessive memory allocation
             if width > MAX_DIMENSION or height > MAX_DIMENSION:
                 raise ValueError("Image dimensions exceed 10,000px safety limit")
+
+            # Safety check: reject images whose decompressed pixel data would consume
+            # more than 100 MB of memory before loading them into memory.
+            if (
+                _estimate_decompressed_memory_bytes(width, height, image.mode)
+                > MAX_DECOMPRESSED_BYTES
+            ):
+                raise ValueError(
+                    "Decompressed image memory footprint exceeds 100 MB safety limit"
+                )
 
             # Save format defaults to JPEG if original was JPEG, PNG for PNG, etc.
             # Capture it before any mode conversion (convert() drops the format).

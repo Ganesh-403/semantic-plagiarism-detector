@@ -65,8 +65,6 @@ from .db import (
     update_password,
     update_user_profile,
     verify_user,
-    get_recent_incidents,
-    log_incident,
     get_deleted_documents_count,
     get_incidents_by_assignment,
 )
@@ -144,8 +142,6 @@ __all__ = [
     "set_user_active_status",
     "is_user_active",
     "update_user_profile",
-    "get_recent_incidents",
-    "log_incident",
     "get_deleted_documents_count",
     "get_incidents_by_assignment",
     "init_corpus_db",

@@ -67,6 +67,35 @@ def cleanup_registered_temp_paths() -> None:
 atexit.register(cleanup_registered_temp_paths)
 
 
+def cleanup_temp_files(retention_hours: float = 1.0) -> None:
+    """
+    Cleans up registered temporary files and directories that are older than the specified retention hours.
+
+    Args:
+        retention_hours: The number of hours to retain files. Files/directories older than this
+                         (based on modification time st_mtime) will be deleted. Defaults to 1.0.
+    """
+    now = time.time()
+    retention_seconds = retention_hours * 3600.0
+
+    for path in list(_REGISTERED_TEMP_PATHS):
+        try:
+            if os.path.exists(path) or os.path.islink(path):
+                mtime = os.path.getmtime(path)
+                if now - mtime > retention_seconds:
+                    if os.path.isdir(path) and not os.path.islink(path):
+                        shutil.rmtree(path, ignore_errors=True)
+                    else:
+                        os.remove(path)
+                    if path in _REGISTERED_TEMP_PATHS:
+                        _REGISTERED_TEMP_PATHS.remove(path)
+            else:
+                if path in _REGISTERED_TEMP_PATHS:
+                    _REGISTERED_TEMP_PATHS.remove(path)
+        except OSError as exc:
+            logger.warning("Failed to clean up temp path %s: %s", path, exc)
+
+
 def create_managed_temp_file(
     suffix: Optional[str] = None, prefix: Optional[str] = None
 ) -> str:

@@ -100,24 +100,48 @@ def faiss_write_lock(lock_path: str = "corpus.index.lock", timeout: int = None):
     finally:
         lock.release()
 
-def with_sqlite_retry(max_retries=5, initial_delay=0.1, backoff_factor=2.0):
+def with_sqlite_retry(func=None, max_retries=5, initial_delay=0.1, backoff_factor=2.0):
     """
     Decorator to retry SQLite operations when the database is locked or busy.
+    Supports both @with_sqlite_retry and @with_sqlite_retry(max_retries=5).
     """
-    def decorator(func):
-        @functools.wraps(func)
+    if callable(func):
+        user_func = func
+        _max_retries = 5
+        _initial_delay = 0.1
+        _backoff_factor = 2.0
+
+        @functools.wraps(user_func)
+        def wrapper(*args, **kwargs):
+            delay = _initial_delay
+            for attempt in range(_max_retries):
+                try:
+                    return user_func(*args, **kwargs)
+                except sqlite3.OperationalError as e:
+                    if ("database is locked" in str(e) or "database is busy" in str(e)) and attempt < _max_retries - 1:
+                        logger.warning(f"SQLite database is locked/busy. Retrying in {delay}s (Attempt {attempt + 1}/{_max_retries})...")
+                        time.sleep(delay)
+                        delay *= _backoff_factor
+                    else:
+                        raise
+            return user_func(*args, **kwargs)
+        return wrapper
+
+    def decorator(user_func):
+        @functools.wraps(user_func)
         def wrapper(*args, **kwargs):
             delay = initial_delay
-            for attempt in range(max_retries):
+            _max_retries = max_retries if isinstance(max_retries, int) else 5
+            for attempt in range(_max_retries):
                 try:
-                    return func(*args, **kwargs)
+                    return user_func(*args, **kwargs)
                 except sqlite3.OperationalError as e:
-                    if ("database is locked" in str(e) or "database is busy" in str(e)) and attempt < max_retries - 1:
-                        logger.warning(f"SQLite database is locked/busy. Retrying in {delay}s (Attempt {attempt + 1}/{max_retries})...")
+                    if ("database is locked" in str(e) or "database is busy" in str(e)) and attempt < _max_retries - 1:
+                        logger.warning(f"SQLite database is locked/busy. Retrying in {delay}s (Attempt {attempt + 1}/{_max_retries})...")
                         time.sleep(delay)
                         delay *= backoff_factor
                     else:
                         raise
-            return func(*args, **kwargs)
+            return user_func(*args, **kwargs)
         return wrapper
     return decorator

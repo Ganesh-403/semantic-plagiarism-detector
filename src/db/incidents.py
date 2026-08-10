@@ -21,6 +21,7 @@ from src.core.config import (
     severity_from_score,
 )
 from src.db.migrations import migrate_corpus_database, table_exists
+from src.db.migrations.common import column_exists
 from src.db.schemas import MatchResult
 
 # Seed the incidents default DB path from the centralized app_config.
@@ -352,20 +353,43 @@ def get_total_incidents_count(
 
 
 def get_incident_by_id(
-    incident_id: str | int,
+    incident_id: int,
     db_path: str | Path | None = None,
 ) -> dict[str, Any] | None:
-    if db_path is None:
-        db_path = DEFAULT_DB_PATH
-    """Fetch a single plagiarism incident record by its incident_id primary key.
+    """Fetch a single plagiarism incident record by its ``incident_id`` primary key.
+
+    Issue #1772: Instructors need a helper to fetch a single incident record
+    by its integer primary key without having to query by document names.
+
+    The function accepts both integer and string representations of the
+    incident_id (string IDs are common in the legacy ``INC-xxx`` format;
+    integer IDs are used by the canonical ``plagiarism_incidents`` table).
+    The query matches against both forms so callers don't need to know
+    which format is stored.
 
     Args:
-        incident_id: Integer or string primary key of the incident.
-        db_path: Path to the SQLite corpus database.
+        incident_id: Integer (or string) primary key of the incident.
+            Strings are accepted for backward compatibility with the
+            legacy ``INC-xxx`` ID format, but the canonical type is
+            ``int``.
+        db_path: Path to the SQLite corpus database. Defaults to
+            :data:`DEFAULT_DB_PATH` when ``None``.
 
     Returns:
-        Dictionary containing incident record columns, or None if not found.
+        Dictionary containing the incident record columns
+        (``incident_id``, ``document_a``, ``document_b``,
+        ``similarity_score``, ``severity_rank``, ``review_status``,
+        ``date_flagged``, ``last_seen``, ``threshold_at_time_of_flag``),
+        or ``None`` if no matching incident is found or if the incident's
+        documents have been soft-deleted.
+
+    Note:
+        Incidents linked to soft-deleted documents (``is_deleted = 1``)
+        are excluded from the result, consistent with
+        :func:`get_all_incidents`.
     """
+    if db_path is None:
+        db_path = DEFAULT_DB_PATH
     init_incident_db(db_path)
     with closing(_get_connection(db_path)) as conn:
         conn.row_factory = sqlite3.Row
@@ -493,6 +517,117 @@ def get_incidents_by_assignment(
             ORDER BY i.date_flagged DESC, i.incident_id ASC
             """,
             (assignment_title, assignment_title),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+        rows = conn.execute(
+            """
+            SELECT DISTINCT i.incident_id, i.document_a, i.document_b,
+                            i.similarity_score, i.severity_rank,
+                            i.review_status, i.date_flagged, i.last_seen,
+                            i.threshold_at_time_of_flag
+            FROM plagiarism_incidents i
+            LEFT JOIN documents da ON i.document_a = da.filename
+            LEFT JOIN documents db ON i.document_b = db.filename
+            WHERE da.assignment_title = ? OR db.assignment_title = ?
+            ORDER BY i.date_flagged DESC, i.incident_id ASC
+            """,
+            (assignment_title, assignment_title),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_incidents_by_user(
+    username: str,
+    db_path: str | Path | None = None,
+) -> list[dict[str, Any]]:
+    """Return all plagiarism incidents associated with *username* (issue #1765).
+
+    Instructors need a single helper to pull every incident record linked
+    to a specific user/student. The function supports two schemas:
+
+    1. **Legacy ``incidents`` table** — if a table named ``incidents``
+       exists in the database AND that table has both ``owner`` and
+       ``timestamp`` columns, the function executes the literal query
+       from the issue spec::
+
+           SELECT * FROM incidents WHERE owner = ? ORDER BY timestamp DESC
+
+       This preserves backward compatibility with older deployments
+       that stored incidents with an explicit ``owner`` column.
+
+    2. **Canonical ``plagiarism_incidents`` + ``documents`` schema** —
+       the production schema stores incident rows in
+       ``plagiarism_incidents`` (no ``owner`` column) and the uploader
+       in ``documents.owner`` (added by migration #10). When the legacy
+       ``incidents`` table is absent, the function JOINs
+       ``plagiarism_incidents`` against ``documents`` on either side of
+       the document pair (since either document may belong to the user)
+       and returns the same canonical column set as the other
+       ``get_incidents_by_*`` helpers, ordered by ``date_flagged``
+       descending so the most recent flags appear first.
+
+    Args:
+        username: The owner / student username to filter on. Empty or
+            whitespace-only strings return an empty list without hitting
+            the database (avoids accidentally returning rows whose
+            ``owner`` is NULL/empty via ``owner = ''`` semantics).
+        db_path: Path to the SQLite corpus database. Defaults to
+            :data:`DEFAULT_DB_PATH` when ``None``.
+
+    Returns:
+        A list of incident dicts ordered newest-first. Each dict's
+        columns depend on the schema path taken (see above). Returns
+        ``[]`` when no rows match or when *username* is falsy.
+    """
+    if not username or not str(username).strip():
+        return []
+
+    if db_path is None:
+        db_path = DEFAULT_DB_PATH
+
+    init_incident_db(db_path)
+    target_user = str(username).strip()
+
+    with closing(_get_connection(db_path)) as conn:
+        conn.row_factory = sqlite3.Row
+
+        # ── Path 1: legacy `incidents` table with `owner` + `timestamp` ──
+        # Mirrors the dual-path strategy used by get_incidents_by_assignment
+        # so older deployments (and tests that pre-populate the legacy
+        # table) keep working with the exact SQL from the issue spec.
+        if table_exists(conn, "incidents") \
+                and column_exists(conn, "incidents", "owner") \
+                and column_exists(conn, "incidents", "timestamp"):
+            rows = conn.execute(
+                """
+                SELECT * FROM incidents
+                WHERE owner = ?
+                ORDER BY timestamp DESC
+                """,
+                (target_user,),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+        # ── Path 2: canonical plagiarism_incidents + documents(owner) ──
+        # Either side of the document pair may belong to the target user,
+        # so we match against both da.owner and db.owner. The DISTINCT
+        # guard prevents duplicate rows when both documents belong to the
+        # same user.
+        rows = conn.execute(
+            """
+            SELECT DISTINCT pi.incident_id, pi.document_a, pi.document_b,
+                            pi.similarity_score, pi.severity_rank,
+                            pi.review_status, pi.date_flagged, pi.last_seen,
+                            pi.threshold_at_time_of_flag,
+                            da.owner AS owner_a, db.owner AS owner_b
+            FROM plagiarism_incidents pi
+            LEFT JOIN documents da ON pi.document_a = da.filename
+            LEFT JOIN documents db ON pi.document_b = db.filename
+            WHERE da.owner = ? OR db.owner = ?
+            ORDER BY pi.date_flagged DESC, pi.incident_id ASC
+            """,
+            (target_user, target_user),
         ).fetchall()
         return [dict(row) for row in rows]
 

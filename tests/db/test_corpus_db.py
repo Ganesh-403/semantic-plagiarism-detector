@@ -854,6 +854,26 @@ def test_corpus_soft_delete_lifecycle():
     assert get_deleted_documents_count() == 0
 
 
+
+def test_get_deleted_documents_count_explicit():
+    """Verify that get_deleted_documents_count correctly counts only soft-deleted documents."""
+    # zero deleted documents returns 0
+    assert get_deleted_documents_count() == 0
+
+    # Insert test documents
+    add_document("doc_active.pdf", "hash_active")
+    add_document("doc_del1.pdf", "hash_del1")
+    add_document("doc_del2.pdf", "hash_del2")
+
+    # Soft delete some documents
+    soft_delete_document("doc_del1.pdf")
+    soft_delete_document("doc_del2.pdf")
+
+    # Verify count is correct and is an integer
+    count = get_deleted_documents_count()
+    assert count == 2
+    assert isinstance(count, int)
+
 def test_soft_delete_and_restore_document():
     """Verify document soft-deletion and subsequent restoration flow (#1284)."""
     filename = "delete_restore_test.pdf"
