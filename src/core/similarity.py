@@ -29,6 +29,14 @@ from src.core.config import (
     severity_from_score,
 )
 
+# ── Distance / similarity conversion ──────────────────────────────────────────
+
+
+def cosine_distance_to_similarity(distance: float) -> float:
+    """Convert a cosine distance (1 - similarity) back to a similarity score."""
+    return max(0.0, min(1.0, 1.0 - distance))
+
+
 # ── Validation helpers ─────────────────────────────────────────────────────────
 
 

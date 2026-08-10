@@ -241,6 +241,8 @@ UI_COLORMAP_OPTIONS = [
     "Viridis",
     "Cividis",
     "Plasma",
+    "Blues",
+    "RdYlGn",
     "Coolwarm",
     "YlOrRd",
 ]
@@ -249,6 +251,8 @@ MATPLOTLIB_CMAP_MAPPING: dict[str, str] = {
     "Viridis": "viridis",
     "Cividis": "cividis",
     "Plasma": "plasma",
+    "Blues": "Blues",
+    "RdYlGn": "RdYlGn",
     "Coolwarm": "coolwarm",
     "YlOrRd": "YlOrRd",
     "Legacy Red/Green": "RdYlGn_r",
@@ -258,6 +262,8 @@ PLOTLY_CMAP_MAPPING = {
     "Viridis": "Viridis",
     "Cividis": "Cividis",
     "Plasma": "Plasma",
+    "Blues": "Blues",
+    "RdYlGn": "RdYlGn",
     "Coolwarm": "RdBu_r",
     "YlOrRd": "YlOrRd",
     "Legacy Red/Green": "RdYlGn_r",
@@ -1851,4 +1857,20 @@ def render_timezone_footer() -> str:
     caption_text = f"Server Time: {time_str} UTC"
     st.sidebar.caption(f"🕒 {caption_text}")
     return caption_text
+
+
+def render_session_status_banner() -> None:
+    """Render caption banner in dashboard footer displaying active session runtime."""
+    import time
+    from app.session_keys import SessionKeys
+
+    if SessionKeys.SESSION_START_TIME not in st.session_state:
+        st.session_state[SessionKeys.SESSION_START_TIME] = time.time()
+
+    start_time = st.session_state[SessionKeys.SESSION_START_TIME]
+    elapsed_seconds = time.time() - start_time
+    elapsed_minutes = int(elapsed_seconds // 60)
+
+    st.caption(f"Active Session: {elapsed_minutes} mins")
+
 

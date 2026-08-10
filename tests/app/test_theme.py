@@ -579,3 +579,24 @@ def test_css_variables_injected():
     assert "background-color: var(--secondary-bg)" in css
     assert "border: 1px solid var(--border-color)" in css
     assert "var(--accent-color)" in css
+
+
+def test_render_session_status_banner():
+    """Verify that render_session_status_banner sets session start time and displays banner."""
+    from app.theme import render_session_status_banner
+    import time
+
+    mock_state = {}
+
+    with patch("app.theme.st.session_state", mock_state), patch("app.theme.st.caption") as mock_caption:
+        # First call: should initialize session_start_time and render 0 mins
+        render_session_status_banner()
+        assert "session_start_time" in mock_state
+        mock_caption.assert_called_once_with("Active Session: 0 mins")
+
+    # Second test: with established session start time in the past
+    mock_state_past = {"session_start_time": time.time() - 45.2 * 60}
+    with patch("app.theme.st.session_state", mock_state_past), patch("app.theme.st.caption") as mock_caption_past:
+        render_session_status_banner()
+        mock_caption_past.assert_called_once_with("Active Session: 45 mins")
+

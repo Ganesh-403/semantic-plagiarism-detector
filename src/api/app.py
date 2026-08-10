@@ -6,6 +6,9 @@ import time
 import uuid
 from datetime import datetime, timezone
 
+from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import psutil
 import numpy as np
 
@@ -14,13 +17,6 @@ total_scans = 0
 logger = logging.getLogger(__name__)
 from fastapi import (
     BackgroundTasks,
-    Depends,
-    FastAPI,
-    File,
-    HTTPException,
-    Query,
-    UploadFile,
-    status,
     Request,
     Security,
 )
@@ -30,8 +26,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse, JSONResponse
+from fastapi.responses import PlainTextResponse
 
 from src.api.middleware import verify_bearer_token, get_current_user
 from src.api.schemas import (
@@ -50,6 +45,7 @@ from src.api.schemas import (
     TokenResponse,
 )
 from sklearn.metrics.pairwise import cosine_similarity
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.core.app_config import FAISS_INDEX_PATH, HEALTHZ_DB_PATHS
 from src.core.document_parser import extract_text
@@ -140,6 +136,20 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
+
+@app.exception_handler(404)
+async def not_found_handler(request, exc: StarletteHTTPException):
+    """Custom exception handler for HTTP 404 errors."""
+    return JSONResponse(
+        status_code=404,
+        content={
+            "error": True,
+            "code": 404,
+            "message": "API endpoint or resource not found",
+        },
+    )
+
+# ── Bearer Token Authentication ────────────────────────────────────────────────
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """

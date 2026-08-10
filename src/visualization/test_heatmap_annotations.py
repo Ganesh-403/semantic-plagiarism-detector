@@ -17,7 +17,6 @@ Covers:
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from src.visualization.heatmap import plot_similarity_heatmap_plotly
 

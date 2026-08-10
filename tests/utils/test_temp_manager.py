@@ -18,6 +18,7 @@ from unittest.mock import patch
 
 from src.utils.temp_manager import (
     cleanup_registered_temp_paths,
+    cleanup_temp_files,
     create_managed_temp_file,
     create_managed_temp_dir,
     get_temp_directory_size_bytes,
@@ -555,3 +556,53 @@ class TestRotateBackupFiles:
         assert deleted == 1
         assert file_a.exists()  # Newest kept
         assert not file_b.exists()  # Oldest deleted
+
+
+def test_cleanup_temp_files_retention(tmp_path):
+    """Verify that cleanup_temp_files only deletes files/dirs older than retention_hours."""
+    import time
+
+    # 1. Create a "new" file and register it
+    new_file = tmp_path / "new_temp_file.txt"
+    new_file.write_text("fresh content")
+    register_temp_path(str(new_file))
+
+    # 2. Create an "old" file and register it
+    old_file = tmp_path / "old_temp_file.txt"
+    old_file.write_text("stale content")
+    register_temp_path(str(old_file))
+    # Modify mtime to be 2 hours ago
+    old_mtime = time.time() - (2 * 3600)
+    os.utime(old_file, (old_mtime, old_mtime))
+
+    # 3. Create a "new" directory and register it
+    new_dir = tmp_path / "new_temp_dir"
+    new_dir.mkdir()
+    register_temp_path(str(new_dir))
+
+    # 4. Create an "old" directory and register it
+    old_dir = tmp_path / "old_temp_dir"
+    old_dir.mkdir()
+    register_temp_path(str(old_dir))
+    # Modify mtime to be 2 hours ago
+    os.utime(old_dir, (old_mtime, old_mtime))
+
+    # Run cleanup with 1.0 hour retention
+    cleanup_temp_files(retention_hours=1.0)
+
+    # Assertions
+    # New file/dir should still exist and remain registered
+    assert new_file.exists()
+    assert str(new_file) in _REGISTERED_TEMP_PATHS
+    assert new_dir.exists()
+    assert str(new_dir) in _REGISTERED_TEMP_PATHS
+
+    # Old file/dir should be deleted and unregistered
+    assert not old_file.exists()
+    assert str(old_file) not in _REGISTERED_TEMP_PATHS
+    assert not old_dir.exists()
+    assert str(old_dir) not in _REGISTERED_TEMP_PATHS
+
+    # Cleanup remaining new items to prevent test leakage
+    cleanup_registered_temp_paths()
+

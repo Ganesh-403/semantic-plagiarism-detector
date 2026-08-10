@@ -63,7 +63,17 @@ def test_verify_user():
     add_user(user, "SecurePass123!")
     assert verify_user(user, "SecurePass123!") is True
     assert verify_user(user, "WrongPass123!") is False
+def test_verify_user_rejects_suspended_user():
+    user = f"user_{uuid.uuid4().hex[:8]}"
+    add_user(user, "SecurePass123!")
 
+    assert verify_user(user, "SecurePass123!") is True
+
+    set_user_status(user, "suspended")
+
+    assert verify_user(user, "SecurePass123!") is False
+
+    delete_user(user)
 
 def test_get_user_role():
     user = f"user_{uuid.uuid4().hex[:8]}"
@@ -217,7 +227,33 @@ def test_2fa_flow():
 
     delete_user(username)
 
+def test_set_user_status():
+    user = f"user_{uuid.uuid4().hex[:8]}"
+    add_user(user, "SecurePass123!")
 
+    set_user_status(user, "suspended")
+
+    with sqlite3.connect(src.db.auth._DB_PATH) as conn:
+        status, is_active = conn.execute(
+            "SELECT status, is_active FROM users WHERE username = ?",
+            (user,),
+        ).fetchone()
+
+    assert status == "suspended"
+    assert is_active == 0
+
+    set_user_status(user, "active")
+
+    with sqlite3.connect(src.db.auth._DB_PATH) as conn:
+        status, is_active = conn.execute(
+            "SELECT status, is_active FROM users WHERE username = ?",
+            (user,),
+        ).fetchone()
+
+    assert status == "active"
+    assert is_active == 1
+
+    delete_user(user)
 def test_suspend_account():
     username = f"user_{uuid.uuid4().hex[:8]}"
     add_user(username, "password123!")

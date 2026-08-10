@@ -628,6 +628,8 @@ if SessionKeys.PDF_PASSWORDS not in st.session_state:
     st.session_state[SessionKeys.PDF_PASSWORDS] = {}
 if SessionKeys.LANG not in st.session_state:
     st.session_state[SessionKeys.LANG] = "en"
+if SessionKeys.SESSION_START_TIME not in st.session_state:
+    st.session_state[SessionKeys.SESSION_START_TIME] = time.time()
 
 if SessionKeys.MODEL_LOAD_TIME not in st.session_state:
     from src.core.embedding_model import EmbeddingModelManager
@@ -662,6 +664,57 @@ def build_visualization_lazily(is_enabled, build_fn):
     if is_enabled:
         return build_fn()
     return None
+
+@st.dialog("⚠️ Confirm Bulk Clear")
+def clear_all_dialog():
+    st.markdown(
+        "**WARNING:** This action is destructive and cannot be undone. "
+        "This will permanently delete all student documents, paragraph chunks, "
+        "and plagiarism incidents from the database, and reset the FAISS index."
+    )
+    st.write("Are you absolutely sure you want to proceed?")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Cancel", use_container_width=True, key="cancel_clear_all"):
+            st.rerun()
+    with col2:
+        if st.button(
+            "Clear All",
+            type="primary",
+            use_container_width=True,
+            key="confirm_clear_all",
+        ):
+            clear_all_data()
+            if os.path.exists(_INDEX_PATH):
+                try:
+                    os.remove(_INDEX_PATH)
+                except OSError as e:
+                    print(f"Error removing FAISS index: {e}")
+                except Exception as e:
+                    logger.error(f"Error removing FAISS index: {e}")
+
+            try:
+                from src.utils.redis_cache import get_cache
+
+                cache = get_cache()
+                if cache.is_available():
+                    cache.delete("faiss:index:corpus_index")
+                    cache.clear_pattern("analysis:*")
+            except (ImportError, RuntimeError, ConnectionError) as e:
+                print(f"Error invalidating cache: {e}")
+            except Exception as e:
+                logger.error(f"Error invalidating cache: {e}")
+
+            if "analysis_results" in st.session_state:
+                st.session_state.analysis_results = None
+            if "analysis_file_signature" in st.session_state:
+                st.session_state.analysis_file_signature = None
+            if "processed_pipeline_signature" in st.session_state:
+                st.session_state.processed_pipeline_signature = None
+
+            st.success("✅ All documents, chunks, and incidents have been cleared.")
+            st.rerun()
 
 
 
@@ -744,6 +797,7 @@ def render_cosine_vs_lexical_comparison_table(
     comp_df = pd.DataFrame(rows)
     if not comp_df.empty:
         st.dataframe(comp_df, use_container_width=True)
+
     return comp_df
 
 from datetime import date, timedelta
@@ -963,58 +1017,6 @@ def logout_dialog():
                 if key in st.session_state:
                     del st.session_state[key]
             clear_session(SESSION_ID)
-            st.rerun()
-
-
-@st.dialog("⚠️ Confirm Bulk Clear")
-def clear_all_dialog():
-    st.markdown(
-        "**WARNING:** This action is destructive and cannot be undone. "
-        "This will permanently delete all student documents, paragraph chunks, "
-        "and plagiarism incidents from the database, and reset the FAISS index."
-    )
-    st.write("Are you absolutely sure you want to proceed?")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Cancel", use_container_width=True, key="cancel_clear_all"):
-            st.rerun()
-    with col2:
-        if st.button(
-            "Clear All",
-            type="primary",
-            use_container_width=True,
-            key="confirm_clear_all",
-        ):
-            clear_all_data()
-            if os.path.exists(_INDEX_PATH):
-                try:
-                    os.remove(_INDEX_PATH)
-                except OSError as e:
-                    print(f"Error removing FAISS index: {e}")
-                except Exception as e:
-                    logger.error(f"Error removing FAISS index: {e}")
-
-            try:
-                from src.utils.redis_cache import get_cache
-
-                cache = get_cache()
-                if cache.is_available():
-                    cache.delete("faiss:index:corpus_index")
-                    cache.clear_pattern("analysis:*")
-            except (ImportError, RuntimeError, ConnectionError) as e:
-                print(f"Error invalidating cache: {e}")
-            except Exception as e:
-                logger.error(f"Error invalidating cache: {e}")
-
-            if "analysis_results" in st.session_state:
-                st.session_state.analysis_results = None
-            if "analysis_file_signature" in st.session_state:
-                st.session_state.analysis_file_signature = None
-            if "processed_pipeline_signature" in st.session_state:
-                st.session_state.processed_pipeline_signature = None
-
-            st.success("✅ All documents, chunks, and incidents have been cleared.")
             st.rerun()
 
 
@@ -2315,6 +2317,7 @@ st.divider()
     tab_matrix,
     tab_heatmap,
     tab_drill,
+    tab_compare,
     tab_analytics,
     tab_users,
     tab_settings,
@@ -2327,6 +2330,7 @@ st.divider()
         get_text("tab_matrix", lang=lang_code),
         get_text("tab_heatmap", lang=lang_code),
         get_text("tab_drill", lang=lang_code),
+        "🔬 Comparison",
         get_text("tab_analytics", lang=lang_code),
         get_text("tab_users", lang=lang_code),
         get_text("tab_settings", lang=lang_code),
@@ -2595,7 +2599,14 @@ with tab_drill:
                                 copy_label="📋 Copy Snippet",
                             )
 
-# ══ TAB 6: ANALYTICS ══════════════════════════════════════════════════════
+# ══ TAB 6: COMPARISON ══════════════════════════════════════════════════════
+with tab_compare:
+    update_page_title("Comparison")
+    from app.components.document_comparison import render_document_comparison
+    render_document_comparison()
+
+
+# ══ TAB 7: ANALYTICS ══════════════════════════════════════════════════════
 with tab_analytics:
     update_page_title("Analytics")
     st.subheader("📊 Analytics Dashboard")
@@ -3183,6 +3194,8 @@ with _footer_col1:
         f"🎓 Semantic Plagiarism Detection System · v{APP_VERSION} · Streamlit · "
         "🐛 Report Bug / Feedback"
     )
+    from app.theme import render_session_status_banner
+    render_session_status_banner()
 with _footer_col2:
     if _latest_tag:
         st.markdown(

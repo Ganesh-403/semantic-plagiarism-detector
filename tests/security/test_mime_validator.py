@@ -191,7 +191,8 @@ def test_weak_pk_signature_without_full_magic_bytes_is_rejected():
     ) is False
 
 
-def test_too_many_archive_members_are_rejected(monkeypatch):    monkeypatch.setattr(
+def test_too_many_archive_members_are_rejected(monkeypatch):
+    monkeypatch.setattr(
         "src.security.mime_validator."
         "MAX_OOXML_ARCHIVE_ENTRIES",
         2,
