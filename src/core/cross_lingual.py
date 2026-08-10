@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from threading import RLock
 from dataclasses import asdict, dataclass
+from threading import RLock
 from typing import Callable, Iterable
 
 from langdetect import DetectorFactory, LangDetectException, detect_langs
@@ -25,7 +25,6 @@ DetectorFactory.seed = 0
 
 ENGLISH_CODES = {"en"}
 MIN_DETECTION_CHARACTERS = 20
-
 
 
 class TranslationMemoryCache:
@@ -150,7 +149,7 @@ def detect_language(text: str, min_confidence: float = 0.8) -> tuple[str, bool]:
                 "Low-confidence language detection (%.4f < %.2f) for text: %s. Defaulting to 'en'.",
                 confidence,
                 min_confidence,
-                cleaned[:50]
+                cleaned[:50],
             )
             return "en", False
 
@@ -187,9 +186,7 @@ def prepare_text_for_embedding(
     detector_fn = detector or detect_language
     translator_fn = translator or translate_text
     cache = (
-        translation_cache
-        if translation_cache is not None
-        else TRANSLATION_MEMORY_CACHE
+        translation_cache if translation_cache is not None else TRANSLATION_MEMORY_CACHE
     )
 
     try:
@@ -303,15 +300,3 @@ def prepare_documents_for_embedding(
         alignment_metadata[document_name] = metadata
 
     return translated_documents, alignment_metadata
-
-+--- a/src/core/cross_lingual.py
-+@@ -10,7 +10,7 @@ class CrossLingualTranslator:
-+     def translate(self, text, source_lang, target_lang):
-+-        translated_text = "Translated: " + text
-++        translated_text, confidence = self._translate_with_confidence(text, source_lang, target_lang)
-+         return translated_text
-+ 
-+-    def _translate(self, text, source_lang, target_lang):
-++    def _translate_with_confidence(self, text, source_lang, target_lang):
-+         # Placeholder for actual translation logic
-+         return "Translated: " + text, 0.95

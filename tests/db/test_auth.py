@@ -8,8 +8,13 @@ from src.db.auth import (
     delete_user,
     disable_2fa,
     enable_2fa,
+    format_user_created_date,
     get_2fa_status,
     get_active_users_count,
+    get_all_users,
+    get_distinct_audit_event_types,
+    get_security_audit_log_count,
+    get_security_audit_logs,
     get_user_active_status,
     get_user_last_login,
     get_user_role,
@@ -20,13 +25,8 @@ from src.db.auth import (
     set_user_active_status,
     set_user_theme,
     update_password,
-    get_security_audit_logs,
-    get_security_audit_log_count,
-    get_distinct_audit_event_types,
-    verify_user,
     update_user_profile,
-    get_all_users,
-    format_user_created_date,
+    verify_user,
 )
 from src.errors import StaleDataException
 
@@ -63,17 +63,7 @@ def test_verify_user():
     add_user(user, "SecurePass123!")
     assert verify_user(user, "SecurePass123!") is True
     assert verify_user(user, "WrongPass123!") is False
-def test_verify_user_rejects_suspended_user():
-    user = f"user_{uuid.uuid4().hex[:8]}"
-    add_user(user, "SecurePass123!")
 
-    assert verify_user(user, "SecurePass123!") is True
-
-    set_user_status(user, "suspended")
-
-    assert verify_user(user, "SecurePass123!") is False
-
-    delete_user(user)
 
 def test_get_user_role():
     user = f"user_{uuid.uuid4().hex[:8]}"
@@ -124,7 +114,8 @@ import unittest.mock as mock
 @pytest.fixture
 def mock_audit_db():
     conn = sqlite3.connect(":memory:")
-    conn.execute("""
+    conn.execute(
+        """
         CREATE TABLE security_audit_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             event_type TEXT,
@@ -132,7 +123,8 @@ def mock_audit_db():
             timestamp DATETIME,
             details TEXT
         )
-    """)
+    """
+    )
     conn.execute(
         "INSERT INTO security_audit_log (event_type, username, timestamp) VALUES ('login', 'alice', '2023-01-01 10:00:00')"
     )
@@ -227,33 +219,7 @@ def test_2fa_flow():
 
     delete_user(username)
 
-def test_set_user_status():
-    user = f"user_{uuid.uuid4().hex[:8]}"
-    add_user(user, "SecurePass123!")
 
-    set_user_status(user, "suspended")
-
-    with sqlite3.connect(src.db.auth._DB_PATH) as conn:
-        status, is_active = conn.execute(
-            "SELECT status, is_active FROM users WHERE username = ?",
-            (user,),
-        ).fetchone()
-
-    assert status == "suspended"
-    assert is_active == 0
-
-    set_user_status(user, "active")
-
-    with sqlite3.connect(src.db.auth._DB_PATH) as conn:
-        status, is_active = conn.execute(
-            "SELECT status, is_active FROM users WHERE username = ?",
-            (user,),
-        ).fetchone()
-
-    assert status == "active"
-    assert is_active == 1
-
-    delete_user(user)
 def test_suspend_account():
     username = f"user_{uuid.uuid4().hex[:8]}"
     add_user(username, "password123!")
@@ -416,7 +382,8 @@ def test_delete_user_removes_matching_session_and_authorization_rows(mock_db):
 def test_connect_uses_fifteen_second_timeout():
     """Verify that _connect helper sets sqlite3 timeout to 15.0 seconds."""
     from unittest.mock import patch
-    from src.db.auth import _connect, SQLITE_TIMEOUT
+
+    from src.db.auth import SQLITE_TIMEOUT, _connect
 
     assert SQLITE_TIMEOUT == 15.0
 
@@ -644,7 +611,9 @@ def test_password_history_validation_prevents_reuse_of_last_3_passwords(mock_db)
     for forbidden_pass in (pass1, pass2, pass3):
         with pytest.raises(ValueError) as exc_info:
             update_password(user, forbidden_pass)
-        assert "New password cannot be one of your last 3 passwords" in str(exc_info.value)
+        assert "New password cannot be one of your last 3 passwords" in str(
+            exc_info.value
+        )
 
     # 5. Update to pass4 (succeeds)
     update_password(user, pass4)
@@ -720,8 +689,10 @@ def test_password_change_required_flag(mock_db):
 
     # 6. Invalid credentials still return False (or dict with authenticated=False)
     assert verify_user(username, "WrongPassword!") is False
-    assert verify_user(username, "WrongPassword!", return_details=True) == {"authenticated": False, "must_change_password": False}
-
+    assert verify_user(username, "WrongPassword!", return_details=True) == {
+        "authenticated": False,
+        "must_change_password": False,
+    }
 
 
 # ── Issue #1778: SQL query shape regression guard ─────────────────────────
@@ -788,4 +759,3 @@ def test_get_active_users_count_zero_on_empty_database():
     result = get_active_users_count()
     assert result is not None
     assert result >= 0
-

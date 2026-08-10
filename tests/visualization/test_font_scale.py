@@ -7,14 +7,16 @@ Validates that the font_scale parameter correctly multiplies base font sizes
 in Plotly figure layouts across different visualization modules.
 """
 
-import pandas as pd
-import networkx as nx
-import pytest
 from unittest.mock import MagicMock, patch
 
+import networkx as nx
+import pandas as pd
+import plotly.graph_objects as go
+import pytest
+
 from src.visualization.network_graph import (
-    render_network_plotly,
     plot_similarity_network,
+    render_network_plotly,
 )
 
 
@@ -26,8 +28,8 @@ class TestNetworkFontScale:
         """Provide a minimal mock network data dictionary."""
         return {
             "shapes": [],
-            "edge_hover_trace": MagicMock(),
-            "node_trace": MagicMock(textfont=MagicMock(size=10)),
+            "edge_hover_trace": go.Scatter(),
+            "node_trace": go.Scatter(),
             "graph": nx.Graph(),
             "pos": {},
             "tag_color_map": {},
@@ -90,8 +92,7 @@ class TestNetworkFontScale:
     def test_node_trace_textfont_scaled(self, mock_network_data):
         """Verify the node trace textfont size is updated when scaled."""
         # Mock node_trace with updatable textfont
-        mock_node_trace = MagicMock()
-        mock_node_trace.textfont = MagicMock()
+        mock_node_trace = go.Scatter()
         mock_node_trace.textfont.size = 10
 
         mock_network_data["node_trace"] = mock_node_trace

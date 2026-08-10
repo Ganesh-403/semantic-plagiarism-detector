@@ -6,9 +6,6 @@ import sqlite3
 
 from .common import column_exists, run_migrations
 
-
-AUTH_SCHEMA_VERSION = 13
-
 AUTH_SCHEMA_VERSION = 14
 
 
@@ -241,34 +238,9 @@ AUTH_MIGRATIONS = {
     10: migration_010_add_password_changed_at,
     11: migration_011_add_version_column,
     12: migration_012_create_revoked_tokens_table,
-
-    13: migration_013_add_user_status
-
-    14: migration_013_create_password_history_table,
-    15: migration_014_add_must_change_password,
-
+    13: migration_013_create_password_history_table,
+    14: migration_014_add_must_change_password,
 }
-def migration_013_add_user_status(
-    connection: sqlite3.Connection,
-) -> None:
-    """Add account status field and migrate the legacy is_active flag."""
-    if not column_exists(connection, "users", "status"):
-        connection.execute(
-            """
-            ALTER TABLE users
-            ADD COLUMN status TEXT NOT NULL DEFAULT 'active'
-            """
-        )
-
-    connection.execute(
-        """
-        UPDATE users
-        SET status = CASE
-            WHEN is_active = 0 THEN 'suspended'
-            ELSE 'active'
-        END
-        """
-    )
 
 
 def migrate_auth_database(
