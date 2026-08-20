@@ -23,12 +23,12 @@ from src.api.routers import (
     admin_router,
     analysis_router,
     auth_router,
+    clustering_router,  # ← ADDED FOR ISSUE #2811
     corpus_router,
 )
 from src.version import APP_VERSION
 
 # Re-exports for backward compatibility with existing tests and scripts
-
 logger = logging.getLogger(__name__)
 
 # ── API Initialization ────────────────────────────────────────────────────────
@@ -47,6 +47,7 @@ app = FastAPI(
         {"name": "Plagiarism Detection", "description": "Scanning operations"},
         {"name": "System Administration", "description": "Admin operations"},
         {"name": "Health", "description": "Health checks"},
+        {"name": "Clustering", "description": "Background clustering operations"},
     ],
     dependencies=[Depends(verify_bearer_token)],
 )
@@ -79,10 +80,8 @@ app.state.limiter = limiter
 @app.middleware("http")
 async def otel_tracing_middleware(request: Request, call_next):
     """Middleware to create an OpenTelemetry root span for every HTTP request."""
-    # 1. Check if user_id was pre-set on request.state
     user_id = getattr(request.state, "user_id", None)
 
-    # 2. If missing, attempt to extract token from Authorization header
     if not user_id:
         auth_header = request.headers.get("authorization", "")
         if auth_header.lower().startswith("bearer "):
@@ -90,7 +89,6 @@ async def otel_tracing_middleware(request: Request, call_next):
             if token:
                 try:
                     from src.security.jwt_utils import verify_access_token
-
                     payload = verify_access_token(token)
                     user_id = str(
                         payload.get("sub")
@@ -108,7 +106,6 @@ async def otel_tracing_middleware(request: Request, call_next):
 
     try:
         from src.utils.tracing import get_tracer
-
         tracer = get_tracer()
     except Exception:
         tracer = None
@@ -128,7 +125,6 @@ async def otel_tracing_middleware(request: Request, call_next):
         try:
             response = await call_next(request)
             span.set_attribute("http.status_code", response.status_code)
-            # Update user.id if set or modified by route handler/dependencies
             final_user_id = getattr(request.state, "user_id", user_id)
             if final_user_id:
                 span.set_attribute("user.id", str(final_user_id))
@@ -141,21 +137,7 @@ async def otel_tracing_middleware(request: Request, call_next):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handle Pydantic validation errors from malformed API requests.
-    
-    Logs the detailed validation errors via logger.warning to help backend
-    engineers debug malformed requests from the frontend or third-party LMS
-    platforms, then returns a standardized JSON error response to the client.
-    
-    Args:
-        request: The incoming FastAPI Request object.
-        exc: The RequestValidationError containing Pydantic validation details.
-        
-    Returns:
-        JSONResponse with 422 status code and structured error details.
-    """
-    # Issue #2564: Log the detailed validation errors for backend debugging
-    # This helps identify malformed payloads from LMS integrations or frontend bugs
+    """Handle Pydantic validation errors from malformed API requests."""
     logger.warning(
         "Request validation failed for %s %s: %s",
         request.method,
@@ -286,6 +268,7 @@ app.add_middleware(SlowAPIMiddleware)
 app.include_router(auth_router)
 app.include_router(analysis_router)
 app.include_router(corpus_router)
+app.include_router(clustering_router)  # ← ADDED FOR ISSUE #2811
 app.include_router(admin_router)
 
 # ── Audit Events Endpoint (Issue #2732) ───────────────────────────────────────
@@ -303,10 +286,7 @@ def get_audit_events_api(
     username: str | None = Query(default=None, description="Filter by username"),
     _user: dict = Security(get_current_user, scopes=["admin"])
 ):
-    """Retrieve paginated security audit events.
-    
-    Supports pagination via limit and offset parameters (Issue #2732).
-    """
+    """Retrieve paginated security audit events."""
     from src.db.auth import get_security_audit_log_count, get_security_audit_logs
     
     events = get_security_audit_logs(
@@ -330,75 +310,3 @@ def get_audit_events_api(
             "total_pages": (total_count + limit - 1) // limit if limit > 0 else 0
         }
     }
-
-"""src/api/app.py - FastAPI REST API for LMS integration."""
-
-import logging
-import os
-
-from fastapi import Depends, FastAPI, Request, status
-from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
-from starlette.exceptions import HTTPException as StarletteHTTPException
-
-from src.api.dependencies import (
-    custom_rate_limit_exceeded_handler,
-    limiter,
-)
-from src.api.middleware import verify_bearer_token
-from src.api.routers import (
-    admin_router,
-    analysis_router,
-    auth_router,
-    corpus_router,
-)
-
-# Re-exports for backward compatibility with existing tests and scripts
-
-logger = logging.getLogger(__name__)
-
-# ── API Initialization ────────────────────────────────────────────────────────
-
-@app.get(
-    "/api/v1/audit/events",
-    tags=["System Administration"],
-    summary="Get paginated security audit events",
-    status_code=status.HTTP_200_OK,
-)
-def get_audit_events_api(
-    limit: int = Query(default=20, ge=1, le=100, description="Max events per page"),
-    offset: int = Query(default=0, ge=0, description="Number of events to skip (pagination)"),
-    event_type: str | None = Query(default=None, description="Filter by event type"),
-    username: str | None = Query(default=None, description="Filter by username"),
-    _user: dict = Security(get_current_user, scopes=["admin"])
-):
-    """Retrieve paginated security audit events.
-    
-    Supports pagination via limit and offset parameters (Issue #2732).
-    """
-    from src.db.auth import get_security_audit_log_count, get_security_audit_logs
-    
-    events = get_security_audit_logs(
-        limit=limit,
-        offset=offset,
-        event_type=event_type,
-        username=username
-    )
-    
-    total_count = get_security_audit_log_count(
-        event_type=event_type,
-        username=username
-    )
-    
-    return {
-        "events": events,
-        "pagination": {
-            "limit": limit,
-            "offset": offset,
-            "total_count": total_count,
-            "total_pages": (total_count + limit - 1) // limit if limit > 0 else 0
-        }
-    }
-app.include_router(admin_router)
