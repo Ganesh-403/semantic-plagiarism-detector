@@ -12,8 +12,12 @@ import pytest
 from datetime import datetime
 
 from src.core.report_generator import (
-    ReportGenerator, ReportConfig, PlagiarismReport, ReportFormat,
-    ReportType, ReportSection
+    ReportGenerator,
+    ReportConfig,
+    PlagiarismReport,
+    ReportFormat,
+    ReportType,
+    ReportSection,
 )
 
 
@@ -60,7 +64,9 @@ class TestReportGenerator:
 
     def test_generate_detailed_report(self):
         """Test detailed report generation."""
-        report = self.generator.generate_report(self.sample_results, ReportType.DETAILED)
+        report = self.generator.generate_report(
+            self.sample_results, ReportType.DETAILED
+        )
         assert isinstance(report, PlagiarismReport)
         assert report.report_type == ReportType.DETAILED
         assert report.summary["total_documents"] == 4
@@ -75,13 +81,17 @@ class TestReportGenerator:
 
     def test_generate_executive_report(self):
         """Test executive report generation."""
-        report = self.generator.generate_report(self.sample_results, ReportType.EXECUTIVE)
+        report = self.generator.generate_report(
+            self.sample_results, ReportType.EXECUTIVE
+        )
         assert report.report_type == ReportType.EXECUTIVE
         assert len(report.recommendations) > 0
 
     def test_custom_title(self):
         """Test custom report title."""
-        report = self.generator.generate_report(self.sample_results, title="Custom Title")
+        report = self.generator.generate_report(
+            self.sample_results, title="Custom Title"
+        )
         assert report.title == "Custom Title"
 
     def test_report_has_metadata(self):
@@ -181,20 +191,28 @@ class TestReportSections:
 
     def test_matches_section(self):
         """Test matches section content."""
-        results = {"total_documents": 2, "matches": [
-            {"doc_a": "a.pdf", "doc_b": "b.pdf", "similarity": 0.90},
-        ]}
+        results = {
+            "total_documents": 2,
+            "matches": [
+                {"doc_a": "a.pdf", "doc_b": "b.pdf", "similarity": 0.90},
+            ],
+        }
         report = self.generator.generate_report(results, ReportType.DETAILED)
-        matches_section = next((s for s in report.sections if s.title == "Detected Matches"), None)
+        matches_section = next(
+            (s for s in report.sections if s.title == "Detected Matches"), None
+        )
         assert matches_section is not None
 
     def test_statistics_section(self):
         """Test statistics section."""
-        results = {"total_documents": 3, "matches": [
-            {"similarity": 0.8}, {"similarity": 0.6}, {"similarity": 0.4}
-        ]}
+        results = {
+            "total_documents": 3,
+            "matches": [{"similarity": 0.8}, {"similarity": 0.6}, {"similarity": 0.4}],
+        }
         report = self.generator.generate_report(results, ReportType.DETAILED)
-        stats_section = next((s for s in report.sections if s.title == "Statistics"), None)
+        stats_section = next(
+            (s for s in report.sections if s.title == "Statistics"), None
+        )
         assert stats_section is not None
         assert "mean" in stats_section.data
 
@@ -207,17 +225,24 @@ class TestReportRecommendations:
 
     def test_high_severity_recommendation(self):
         """Test high severity triggers recommendation."""
-        results = {"total_documents": 2, "matches": [
-            {"similarity": 0.95}, {"similarity": 0.88}
-        ]}
+        results = {
+            "total_documents": 2,
+            "matches": [{"similarity": 0.95}, {"similarity": 0.88}],
+        }
         report = self.generator.generate_report(results)
-        assert any("review" in r.lower() or "immediate" in r.lower() for r in report.recommendations)
+        assert any(
+            "review" in r.lower() or "immediate" in r.lower()
+            for r in report.recommendations
+        )
 
     def test_low_plagiarism_recommendation(self):
         """Test low plagiarism gets positive recommendation."""
         results = {"total_documents": 2, "matches": []}
         report = self.generator.generate_report(results)
-        assert any("no immediate action" in r.lower() or "continue" in r.lower() for r in report.recommendations)
+        assert any(
+            "no immediate action" in r.lower() or "continue" in r.lower()
+            for r in report.recommendations
+        )
 
 
 class TestReportSerialization:

@@ -234,7 +234,7 @@ class SimilarityThresholds:
 
         if not plagiarism <= medium <= high:
             raise ValueError(
-                "Thresholds must satisfy " "0.0 <= plagiarism <= medium <= high <= 1.0."
+                "Thresholds must satisfy 0.0 <= plagiarism <= medium <= high <= 1.0."
             )
 
         object.__setattr__(self, "plagiarism", plagiarism)
@@ -263,7 +263,7 @@ def validate_thresholds(
 
     if not thresholds.plagiarism <= thresholds.medium <= thresholds.high:
         raise ValueError(
-            "Thresholds must satisfy " "0.0 <= plagiarism <= medium <= high <= 1.0."
+            "Thresholds must satisfy 0.0 <= plagiarism <= medium <= high <= 1.0."
         )
 
     return thresholds
@@ -409,32 +409,35 @@ def severity_rank(label: str) -> int:
     return SEVERITY_RANK[normalize_severity_label(label)]
 
 
-
 # ============================================================================
 # OFFLINE MODE CONFIGURATION
 # ============================================================================
 
+
 def get_offline_mode_status() -> bool:
     """Check if offline mode is enabled."""
     import os
+
     return os.getenv("OFFLINE_MODE", "false").lower() == "true"
 
 
 def get_offline_config() -> Dict[str, Any]:
     """Get offline mode configuration."""
     import os
+
     return {
         "enabled": get_offline_mode_status(),
         "cache_dir": os.getenv("OFFLINE_CACHE_DIR", ".cache/offline"),
         "model_cache_dir": os.getenv("OFFLINE_MODEL_CACHE_DIR", ".cache/models"),
         "max_cache_size_mb": int(os.getenv("OFFLINE_MAX_CACHE_SIZE_MB", "500")),
         "preload_models": os.getenv("OFFLINE_PRELOAD_MODELS", "true").lower() == "true",
-        "disable_telemetry": os.getenv("OFFLINE_DISABLE_TELEMETRY", "true").lower() == "true",
+        "disable_telemetry": os.getenv("OFFLINE_DISABLE_TELEMETRY", "true").lower()
+        == "true",
     }
+
 
 def test_branding_config_path_exists():
     """Test that BRANDING_CONFIG_PATH resolves to an existing file."""
     config_path = config_module.BRANDING_CONFIG_PATH  # noqa: F821
 
     assert os.path.isfile(config_path)
-

@@ -466,4 +466,3 @@ def managed_ocr_temp_dir(prefix: str = "tesseract_ocr_") -> Generator[str, None,
                     os.environ.pop(k, None)
                 else:
                     os.environ[k] = v
-

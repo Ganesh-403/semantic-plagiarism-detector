@@ -644,12 +644,12 @@ def test_css_variables_injected():
     # Verify values are valid hex colors
     import re
 
-    assert re.search(
-        r"--primary-bg:\s*#[0-9a-fA-F]+", css
-    ), "--primary-bg does not have a valid hex value"
-    assert re.search(
-        r"--text-color:\s*#[0-9a-fA-F]+", css
-    ), "--text-color does not have a valid hex value"
+    assert re.search(r"--primary-bg:\s*#[0-9a-fA-F]+", css), (
+        "--primary-bg does not have a valid hex value"
+    )
+    assert re.search(r"--text-color:\s*#[0-9a-fA-F]+", css), (
+        "--text-color does not have a valid hex value"
+    )
 
     # Verify component CSS uses var() instead of hardcoded
     assert "background-color: var(--primary-bg)" in css
@@ -667,9 +667,10 @@ def test_render_session_status_banner():
 
     mock_state = {}
 
-    with patch("app.theme.st.session_state", mock_state), patch(
-        "app.theme.st.caption"
-    ) as mock_caption:
+    with (
+        patch("app.theme.st.session_state", mock_state),
+        patch("app.theme.st.caption") as mock_caption,
+    ):
         # First call: should initialize session_start_time and render 0 mins
         render_session_status_banner()
         assert "session_start_time" in mock_state
@@ -677,11 +678,13 @@ def test_render_session_status_banner():
 
     # Second test: with established session start time in the past
     mock_state_past = {"session_start_time": time.time() - 45.2 * 60}
-    with patch("app.theme.st.session_state", mock_state_past), patch(
-        "app.theme.st.caption"
-    ) as mock_caption_past:
+    with (
+        patch("app.theme.st.session_state", mock_state_past),
+        patch("app.theme.st.caption") as mock_caption_past,
+    ):
         render_session_status_banner()
         mock_caption_past.assert_called_once_with("Active Session: 45 mins")
+
 
 # ==============================================================================
 # Issue #2353: severity_tier threshold boundary tests
@@ -706,6 +709,8 @@ def test_severity_tier_boundary_just_below_high():
 def test_severity_tier_boundary_at_high():
     """A score of 0.80 is classified as high."""
     assert severity_tier(0.80, 0.50) == "high"
+
+
 # sanitize_hex_color edge-case tests (Issue #2352)
 # ==============================================================================
 
@@ -723,4 +728,3 @@ def test_sanitize_hex_color_missing_hash():
 def test_sanitize_hex_color_invalid():
     """Invalid/non-hex values use the configured fallback."""
     assert sanitize_hex_color("not-a-color", fallback="#FFFFFF") == "#FFFFFF"
-

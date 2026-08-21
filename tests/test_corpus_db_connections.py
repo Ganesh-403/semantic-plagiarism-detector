@@ -5,7 +5,7 @@ from src.db.corpus_db import _all_connections, close_connections, get_connection
 
 def test_close_all_connections_across_threads(tmp_path):
     db_file = str(tmp_path / "test.db")
-    
+
     def worker():
         conn = get_connection(db_file)
         conn.execute("SELECT 1")

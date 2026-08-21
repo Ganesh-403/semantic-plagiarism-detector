@@ -85,8 +85,9 @@ def test_corpus_and_index_size_gauges_are_populated(fake_telemetry, tmp_path):
     index_file = tmp_path / "corpus.index"
     index_file.write_bytes(b"y" * 4096)
 
-    with patch("src.db.incidents.DEFAULT_DB_PATH", str(corpus_db)), patch(
-        "src.core.app_config.FAISS_INDEX_PATH", index_file
+    with (
+        patch("src.db.incidents.DEFAULT_DB_PATH", str(corpus_db)),
+        patch("src.core.app_config.FAISS_INDEX_PATH", index_file),
     ):
         metrics.sync_telemetry_gauges()
 
@@ -99,8 +100,9 @@ def test_missing_files_do_not_raise(fake_telemetry, tmp_path):
     missing_db = tmp_path / "nope.db"
     missing_index = tmp_path / "nope.index"
 
-    with patch("src.db.incidents.DEFAULT_DB_PATH", str(missing_db)), patch(
-        "src.core.app_config.FAISS_INDEX_PATH", missing_index
+    with (
+        patch("src.db.incidents.DEFAULT_DB_PATH", str(missing_db)),
+        patch("src.core.app_config.FAISS_INDEX_PATH", missing_index),
     ):
         metrics.sync_telemetry_gauges()  # must not raise
 

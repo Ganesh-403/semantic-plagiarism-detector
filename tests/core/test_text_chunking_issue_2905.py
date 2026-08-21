@@ -1,4 +1,5 @@
 """Regression tests for Issue #2905."""
+
 import ast
 from pathlib import Path
 from src.core import text_chunking
@@ -17,9 +18,11 @@ def test_nltk_import_is_module_level():
         )
         for node in tree.body
     )
-    splitter = next(node for node in tree.body
-                    if isinstance(node, ast.FunctionDef)
-                    and node.name == "_split_into_sentences")
+    splitter = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_split_into_sentences"
+    )
     assert not any(
         isinstance(node, ast.Import)
         and any(alias.name == "nltk" for alias in node.names)

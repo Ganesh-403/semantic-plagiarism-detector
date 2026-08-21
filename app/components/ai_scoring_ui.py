@@ -12,17 +12,24 @@ import plotly.graph_objects as go
 from typing import Dict, List, Any
 
 from src.core.ai_scoring_engine import (
-    AIScoringEngine, ScoringConfig, PlagiarismScore, SeverityLevel,
-    ContentFingerprinter
+    AIScoringEngine,
+    ScoringConfig,
+    PlagiarismScore,
+    SeverityLevel,
+    ContentFingerprinter,
 )
 
 
 def render_ai_scoring_dashboard():
     """Render the main AI scoring dashboard."""
     st.title("🤖 AI-Powered Plagiarism Scoring")
-    st.markdown("Advanced plagiarism detection with **multi-metric scoring** and **content fingerprinting**.")
+    st.markdown(
+        "Advanced plagiarism detection with **multi-metric scoring** and **content fingerprinting**."
+    )
 
-    tab_score, tab_fingerprint, tab_analytics = st.tabs(["📊 AI Scoring", "🔍 Fingerprinting", "📈 Analytics"])
+    tab_score, tab_fingerprint, tab_analytics = st.tabs(
+        ["📊 AI Scoring", "🔍 Fingerprinting", "📈 Analytics"]
+    )
 
     with tab_score:
         _render_scoring()
@@ -42,12 +49,18 @@ def _render_scoring():
         col1, col2 = st.columns(2)
         with col1:
             doc_a_name = st.text_input("Document A Name", value="Document A")
-            text_a = st.text_area("Document A Text", height=200,
-                placeholder="Paste the first document text here...")
+            text_a = st.text_area(
+                "Document A Text",
+                height=200,
+                placeholder="Paste the first document text here...",
+            )
         with col2:
             doc_b_name = st.text_input("Document B Name", value="Document B")
-            text_b = st.text_area("Document B Text", height=200,
-                placeholder="Paste the second document text here...")
+            text_b = st.text_area(
+                "Document B Text",
+                height=200,
+                placeholder="Paste the second document text here...",
+            )
 
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -57,13 +70,20 @@ def _render_scoring():
         with col3:
             enable_fp = st.checkbox("Enable Fingerprinting", value=True)
 
-        submitted = st.form_submit_button("🚀 Run AI Scoring", type="primary", use_container_width=True)
+        submitted = st.form_submit_button(
+            "🚀 Run AI Scoring", type="primary", use_container_width=True
+        )
 
     if submitted and text_a.strip() and text_b.strip():
         config = ScoringConfig(
-            weights={"semantic": semantic_weight, "lexical": lexical_weight,
-                    "structural": 0.15, "statistical": 0.15, "fingerprint": 0.10},
-            enable_fingerprint=enable_fp
+            weights={
+                "semantic": semantic_weight,
+                "lexical": lexical_weight,
+                "structural": 0.15,
+                "statistical": 0.15,
+                "fingerprint": 0.10,
+            },
+            enable_fingerprint=enable_fp,
         )
         engine = AIScoringEngine(config)
         score = engine.score_documents(text_a, text_b, doc_a_name, doc_b_name)
@@ -75,7 +95,13 @@ def _render_scoring():
 
 def _display_score_result(score: PlagiarismScore):
     """Display scoring result with visualizations."""
-    severity_colors = {"clean": "#22c55e", "low": "#84cc16", "moderate": "#eab308", "high": "#f97316", "critical": "#ef4444"}
+    severity_colors = {
+        "clean": "#22c55e",
+        "low": "#84cc16",
+        "moderate": "#eab308",
+        "high": "#f97316",
+        "critical": "#ef4444",
+    }
     color = severity_colors.get(score.severity.value, "#64748b")
 
     col1, col2, col3 = st.columns(3)
@@ -92,12 +118,17 @@ def _display_score_result(score: PlagiarismScore):
     component_data = []
     for comp in score.components:
         if comp.method != "ensemble":
-            component_data.append({
-                "Method": comp.method.title(),
-                "Score": f"{comp.score:.1%}",
-                "Confidence": f"{comp.confidence:.1%}",
-                "Details": ", ".join(f"{k}: {v:.3f}" if isinstance(v, float) else f"{k}: {v}" for k, v in comp.details.items())
-            })
+            component_data.append(
+                {
+                    "Method": comp.method.title(),
+                    "Score": f"{comp.score:.1%}",
+                    "Confidence": f"{comp.confidence:.1%}",
+                    "Details": ", ".join(
+                        f"{k}: {v:.3f}" if isinstance(v, float) else f"{k}: {v}"
+                        for k, v in comp.details.items()
+                    ),
+                }
+            )
     if component_data:
         st.dataframe(pd.DataFrame(component_data), use_container_width=True)
 
@@ -105,14 +136,20 @@ def _display_score_result(score: PlagiarismScore):
     radar_data = [c for c in score.components if c.method != "ensemble"]
     if radar_data:
         fig = go.Figure()
-        fig.add_trace(go.Scatterpolar(
-            r=[c.score for c in radar_data],
-            theta=[c.method.title() for c in radar_data],
-            fill='toself', name='Score',
-            line=dict(color=color)
-        ))
-        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 1])),
-                         showlegend=False, height=400)
+        fig.add_trace(
+            go.Scatterpolar(
+                r=[c.score for c in radar_data],
+                theta=[c.method.title() for c in radar_data],
+                fill="toself",
+                name="Score",
+                line=dict(color=color),
+            )
+        )
+        fig.update_layout(
+            polar=dict(radialaxis=dict(visible=True, range=[0, 1])),
+            showlegend=False,
+            height=400,
+        )
         st.plotly_chart(fig, use_container_width=True)
 
     with st.expander("📋 Full Details", expanded=False):
@@ -123,7 +160,9 @@ def _render_fingerprinting():
     """Render content fingerprinting interface."""
     st.subheader("Content Fingerprinting")
 
-    st.markdown("Generate and compare content fingerprints for **near-duplicate detection**.")
+    st.markdown(
+        "Generate and compare content fingerprints for **near-duplicate detection**."
+    )
 
     with st.form("fingerprint_form"):
         col1, col2 = st.columns(2)
@@ -139,7 +178,11 @@ def _render_fingerprinting():
                 fp_a = fp_engine.create_fingerprint(fp_text_a, "Doc A")
                 fp_b = fp_engine.create_fingerprint(fp_text_b, "Doc B")
                 similarity = fp_engine.compare_fingerprints(fp_a, fp_b)
-                st.session_state.fp_result = {"fp_a": fp_a, "fp_b": fp_b, "similarity": similarity}
+                st.session_state.fp_result = {
+                    "fp_a": fp_a,
+                    "fp_b": fp_b,
+                    "similarity": similarity,
+                }
 
     fp_result = st.session_state.get("fp_result")
     if fp_result:
@@ -167,22 +210,46 @@ def _render_analytics():
 
         components = [c for c in score.components if c.method != "ensemble"]
         if components:
-            fig = px.bar(x=[c.method.title() for c in components],
-                        y=[c.score for c in components],
-                        color=[c.score for c in components],
-                        color_continuous_scale=["#22c55e", "#eab308", "#ef4444"],
-                        title="Component Scores")
-            fig.update_layout(xaxis_title="Method", yaxis_title="Score", yaxis_range=[0, 1])
+            fig = px.bar(
+                x=[c.method.title() for c in components],
+                y=[c.score for c in components],
+                color=[c.score for c in components],
+                color_continuous_scale=["#22c55e", "#eab308", "#ef4444"],
+                title="Component Scores",
+            )
+            fig.update_layout(
+                xaxis_title="Method", yaxis_title="Score", yaxis_range=[0, 1]
+            )
             st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Run a scoring first to see analytics here.")
 
     st.subheader("📋 Scoring Methods Guide")
     methods = [
-        {"Method": "Semantic", "Description": "Word overlap and cosine similarity", "Weight": "35%"},
-        {"Method": "Lexical", "Description": "Bigram and trigram matching", "Weight": "25%"},
-        {"Method": "Structural", "Description": "Paragraph and sentence structure", "Weight": "15%"},
-        {"Method": "Statistical", "Description": "Type-token ratio and keyword overlap", "Weight": "15%"},
-        {"Method": "Fingerprint", "Description": "Shingling and MinHash comparison", "Weight": "10%"},
+        {
+            "Method": "Semantic",
+            "Description": "Word overlap and cosine similarity",
+            "Weight": "35%",
+        },
+        {
+            "Method": "Lexical",
+            "Description": "Bigram and trigram matching",
+            "Weight": "25%",
+        },
+        {
+            "Method": "Structural",
+            "Description": "Paragraph and sentence structure",
+            "Weight": "15%",
+        },
+        {
+            "Method": "Statistical",
+            "Description": "Type-token ratio and keyword overlap",
+            "Weight": "15%",
+        },
+        {
+            "Method": "Fingerprint",
+            "Description": "Shingling and MinHash comparison",
+            "Weight": "10%",
+        },
     ]
     st.dataframe(pd.DataFrame(methods), use_container_width=True)

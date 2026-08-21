@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
+
 def migrate_to_multitenancy(db_path: str) -> None:
     """Idempotent migration adding workspaces table and scoping existing tables by workspace_id."""
     conn = sqlite3.connect(db_path)
@@ -25,10 +26,13 @@ def migrate_to_multitenancy(db_path: str) -> None:
         # 2. Insert default workspace if not present
         default_ws_id = "default-workspace-id"
         now = datetime.now(timezone.utc).isoformat()
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT OR IGNORE INTO workspaces (id, name, created_at, is_active)
             VALUES (?, ?, ?, 1)
-        """, (default_ws_id, "Default Organization", now))
+        """,
+            (default_ws_id, "Default Organization", now),
+        )
 
         # 3. Add workspace_id columns to existing tables if missing
         tables = ["document_corpus", "incidents", "users", "translation_cache"]
@@ -37,11 +41,16 @@ def migrate_to_multitenancy(db_path: str) -> None:
             columns = [col[1] for col in cursor.fetchall()]
             if "workspace_id" not in columns:
                 logger.info("Adding workspace_id column to %s", table)
-                cursor.execute(f"ALTER TABLE {table} ADD COLUMN workspace_id TEXT DEFAULT '{default_ws_id}'")
+                cursor.execute(
+                    f"ALTER TABLE {table} ADD COLUMN workspace_id TEXT DEFAULT '{default_ws_id}'"
+                )
 
         # 4. Backfill existing null records into default workspace
         for table in tables:
-            cursor.execute(f"UPDATE {table} SET workspace_id = ? WHERE workspace_id IS NULL", (default_ws_id,))
+            cursor.execute(
+                f"UPDATE {table} SET workspace_id = ? WHERE workspace_id IS NULL",
+                (default_ws_id,),
+            )
 
         conn.commit()
         logger.info("Multi-tenancy migration completed successfully.")

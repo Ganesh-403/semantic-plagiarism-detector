@@ -21,7 +21,9 @@ from src.models.faiss_vector_model import (
 class FaissSemanticVectorEngine:
     """Core vector engine managing FAISS semantic search operations."""
 
-    def __init__(self, dimensions: int = 384, metric_type: str = "METRIC_INNER_PRODUCT"):
+    def __init__(
+        self, dimensions: int = 384, metric_type: str = "METRIC_INNER_PRODUCT"
+    ):
         self.dimensions = dimensions
         self.metric_type = metric_type
         self.indexed_chunks: Dict[str, VectorDocumentChunk] = {}
@@ -80,8 +82,12 @@ class FaissSemanticVectorEngine:
 
         for chunk_id, chunk in self.indexed_chunks.items():
             # Calculate Inner Product (Cosine Similarity)
-            dot_product = sum(a * b for a, b in zip(normalized_query, chunk.embedding_vector))
-            l2_dist = self.calculate_l2_distance(normalized_query, chunk.embedding_vector)
+            dot_product = sum(
+                a * b for a, b in zip(normalized_query, chunk.embedding_vector)
+            )
+            l2_dist = self.calculate_l2_distance(
+                normalized_query, chunk.embedding_vector
+            )
             candidates.append((dot_product, l2_dist, chunk))
 
         # Sort by similarity score descending

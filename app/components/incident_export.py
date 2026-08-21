@@ -27,7 +27,7 @@ def render_incident_export_panel(
         "Current warnings are synchronized into a persistent incident log. "
         "The first flagged date and review status are retained."
     )
-    
+
     pdf_buffer = generate_batch_plagiarism_report(get_all_incidents(db_path))
 
     pdf_filename = (

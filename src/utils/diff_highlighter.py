@@ -17,7 +17,7 @@ from typing import Tuple
 #: Inline style applied to every highlighted run. Kept as a module constant so
 #: the markup is identical everywhere and testable without a regex.
 MARK_OPEN_TAG = (
-    '<mark style="background-color: #fef08a; ' 'padding: 2px 4px; border-radius: 3px;">'
+    '<mark style="background-color: #fef08a; padding: 2px 4px; border-radius: 3px;">'
 )
 
 _WORD_RE = re.compile(r"\b\w+\b")

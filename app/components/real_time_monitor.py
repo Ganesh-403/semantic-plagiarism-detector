@@ -185,9 +185,7 @@ class MonitoringEngine:
             cache = get_cache()
             if cache.is_available():
                 keys = list(
-                    cache._client.scan_iter(
-                        match="spd:v1:session:*:last_interaction"
-                    )
+                    cache._client.scan_iter(match="spd:v1:session:*:last_interaction")
                 )
                 active = 0
                 now = time.time()
@@ -540,7 +538,9 @@ class HealthChecker:
         results["overall_status"] = (
             "healthy"
             if all(critical_checks)
-            else "degraded" if any(critical_checks) else "critical"
+            else "degraded"
+            if any(critical_checks)
+            else "critical"
         )
 
         return results
@@ -894,9 +894,7 @@ def render_monitoring_controls(monitor: MonitoringEngine):
 
     with col1:
         if monitor.running:
-            if st.button(
-                "⏹️ Stop Monitoring", type="primary", use_container_width=True
-            ):
+            if st.button("⏹️ Stop Monitoring", type="primary", use_container_width=True):
                 monitor.stop_monitoring()
                 st.rerun()
         else:

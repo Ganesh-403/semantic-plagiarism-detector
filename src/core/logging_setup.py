@@ -14,7 +14,9 @@ class JSONFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         # Build the structured JSON log entry
         log_data = {
-            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "timestamp": datetime.fromtimestamp(
+                record.created, tz=timezone.utc
+            ).isoformat(),
             "level": record.levelname,
             "name": record.name,
             "message": record.getMessage(),
@@ -33,7 +35,7 @@ class JSONFormatter(logging.Formatter):
 
 def setup_logging(log_level: str = "INFO") -> None:
     """Configure application logging using dictConfig.
-    
+
     Outputs plain text format in development environment, and structured JSON format in production.
     """
     is_production = os.getenv("APP_ENVIRONMENT", "production").lower() == "production"

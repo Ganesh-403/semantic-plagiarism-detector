@@ -18,8 +18,8 @@ class BaseSimilarityEngine(ABC):
     @abstractmethod
     def compute_pairwise_similarity(
         self,
-        doc1: Union[str, np.ndarray],
-        doc2: Union[str, np.ndarray],
+        doc1: str | np.ndarray,
+        doc2: str | np.ndarray,
     ) -> float:
         """
         Compute similarity score between two documents.
@@ -36,11 +36,7 @@ class BaseSimilarityEngine(ABC):
     @abstractmethod
     def compute_matrix(
         self,
-        documents: Union[
-            Dict[str, Union[str, np.ndarray]],
-            List[Union[str, np.ndarray]],
-            np.ndarray,
-        ],
+        documents: Dict[str, str | np.ndarray] | List[str | np.ndarray] | np.ndarray,
     ) -> np.ndarray:
         """
         Compute similarity matrix across a collection of documents.

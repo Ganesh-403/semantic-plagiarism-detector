@@ -848,9 +848,9 @@ def render_performance_metrics(monitor: PerformanceMonitor):
     for op_name, op_stats in stats.items():
         with st.expander(f"**{op_name.replace('_', ' ').title()}**", expanded=False):
             cols = st.columns(4)
-            cols[0].metric("Avg", f"{op_stats['avg']*1000:.1f}ms")
-            cols[1].metric("P95", f"{op_stats['p95']*1000:.1f}ms")
-            cols[2].metric("P99", f"{op_stats['p99']*1000:.1f}ms")
+            cols[0].metric("Avg", f"{op_stats['avg'] * 1000:.1f}ms")
+            cols[1].metric("P95", f"{op_stats['p95'] * 1000:.1f}ms")
+            cols[2].metric("P99", f"{op_stats['p99'] * 1000:.1f}ms")
             cols[3].metric("Count", op_stats["count"])
 
 

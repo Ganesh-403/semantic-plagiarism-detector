@@ -223,9 +223,9 @@ def test_docx_large_document_extraction_benchmark():
 
     assert len(extracted_text) > 0
     assert "Chapter 100: Section Overview" in extracted_text
-    assert (
-        elapsed_time < 2.0
-    ), f"DOCX extraction took {elapsed_time:.3f}s (expected < 2.0s)"
+    assert elapsed_time < 2.0, (
+        f"DOCX extraction took {elapsed_time:.3f}s (expected < 2.0s)"
+    )
 
 
 def test_extract_text_routing_odt():
@@ -300,7 +300,6 @@ def test_extract_from_txt_bytes():
 
 
 class TestCorruptedZipHandling:
-
     def test_extract_text_from_valid_zip(self):
         zip_bytes = _make_valid_zip_bytes(
             {
@@ -390,7 +389,6 @@ def test_parallel_extract_texts_matches_sequential(tmp_path):
 
 
 class TestStripBibliography:
-
     def test_strips_references_header(self):
         text = "Some body text.\n\nReferences\n[1] Smith, 2020.\n[2] Jones, 2021."
         result = strip_bibliography(text)
@@ -473,7 +471,6 @@ class TestStripBibliography:
 
 
 class TestRemoveIgnorePhrases:
-
     def test_removes_single_phrase(self):
         text = (
             "Q1: Explain the theory of relativity. This is my answer about relativity."
@@ -553,7 +550,6 @@ class TestRemoveIgnorePhrases:
 
 
 class TestCleanText:
-
     def test_collapses_multiple_blank_lines(self):
         text = "Line 1\n\n\n\nLine 2"
         result = clean_text(text)
@@ -753,9 +749,9 @@ def test_large_pdf_parsing_performance_benchmark():
     # 3. Assert duration and basic content checks
     assert len(parsed_text) > 0
     assert "Page 199" in parsed_text
-    assert (
-        duration < 3.0
-    ), f"Parsing 200-page PDF took too long: {duration:.2f} seconds (limit: 3.0s)"
+    assert duration < 3.0, (
+        f"Parsing 200-page PDF took too long: {duration:.2f} seconds (limit: 3.0s)"
+    )
 
 
 def test_extract_text_from_txt_utf16_fallback():
@@ -955,24 +951,26 @@ class TestNormalizeUnicodeNFC:
         mock_extract_txt.return_value = "cafe\u0301 resume\u0301"
 
         # Mock other dependencies to prevent side effects
-        with patch(
-            "src.core.document_parser.strip_bibliography", side_effect=lambda x: x
-        ), patch(
-            "src.core.document_parser.normalize_unicode_spaces", side_effect=lambda x: x
-        ), patch(
-            "src.core.document_parser.sanitize_zero_width_characters",
-            side_effect=lambda x, **k: x,
-        ), patch(
-            "src.core.document_parser.normalize_extended_punctuation",
-            side_effect=lambda x: x,
-        ), patch(
-            "src.core.document_parser.detect_text_language", return_value="en"
-        ), patch(
-            "src.core.document_parser._read_pdf_bytes", side_effect=lambda x: x
-        ), patch(
-            "src.security.mime_validator.validate_mime_type", return_value=True
+        with (
+            patch(
+                "src.core.document_parser.strip_bibliography", side_effect=lambda x: x
+            ),
+            patch(
+                "src.core.document_parser.normalize_unicode_spaces",
+                side_effect=lambda x: x,
+            ),
+            patch(
+                "src.core.document_parser.sanitize_zero_width_characters",
+                side_effect=lambda x, **k: x,
+            ),
+            patch(
+                "src.core.document_parser.normalize_extended_punctuation",
+                side_effect=lambda x: x,
+            ),
+            patch("src.core.document_parser.detect_text_language", return_value="en"),
+            patch("src.core.document_parser._read_pdf_bytes", side_effect=lambda x: x),
+            patch("src.security.mime_validator.validate_mime_type", return_value=True),
         ):
-
             result = extract_text(b"dummy", "test.txt")
 
         # Result should be NFC normalized
@@ -984,22 +982,25 @@ class TestNormalizeUnicodeNFC:
         """Verify extract_text pipeline applies lowercase when requested."""
         mock_extract_txt.return_value = "HELLO World!"
 
-        with patch(
-            "src.core.document_parser.strip_bibliography", side_effect=lambda x: x
-        ), patch(
-            "src.core.document_parser.normalize_unicode_spaces", side_effect=lambda x: x
-        ), patch(
-            "src.core.document_parser.sanitize_zero_width_characters",
-            side_effect=lambda x, **k: x,
-        ), patch(
-            "src.core.document_parser.normalize_extended_punctuation",
-            side_effect=lambda x: x,
-        ), patch(
-            "src.core.document_parser.detect_text_language", return_value="en"
-        ), patch(
-            "src.core.document_parser._read_pdf_bytes", side_effect=lambda x: x
-        ), patch(
-            "src.security.mime_validator.validate_mime_type", return_value=True
+        with (
+            patch(
+                "src.core.document_parser.strip_bibliography", side_effect=lambda x: x
+            ),
+            patch(
+                "src.core.document_parser.normalize_unicode_spaces",
+                side_effect=lambda x: x,
+            ),
+            patch(
+                "src.core.document_parser.sanitize_zero_width_characters",
+                side_effect=lambda x, **k: x,
+            ),
+            patch(
+                "src.core.document_parser.normalize_extended_punctuation",
+                side_effect=lambda x: x,
+            ),
+            patch("src.core.document_parser.detect_text_language", return_value="en"),
+            patch("src.core.document_parser._read_pdf_bytes", side_effect=lambda x: x),
+            patch("src.security.mime_validator.validate_mime_type", return_value=True),
         ):
             # Without lowercase
             result_default = extract_text(b"dummy", "test.txt")
@@ -1098,8 +1099,9 @@ class TestNormalizeUnicodeSpaces:
 @patch("src.core.document_parser.extract_text_from_txt")
 def test_extract_text_to_lowercase(mock_extract_txt):
     mock_extract_txt.return_value = "Mixed CASE TeXt"
-    with patch("src.core.document_parser._read_pdf_bytes", return_value=b""), patch(
-        "src.security.mime_validator.validate_mime_type", return_value=True
+    with (
+        patch("src.core.document_parser._read_pdf_bytes", return_value=b""),
+        patch("src.security.mime_validator.validate_mime_type", return_value=True),
     ):
         result = extract_text(b"dummy", "test.txt", to_lowercase=True)
     assert result == "mixed case text"
@@ -1115,6 +1117,7 @@ def test_resolve_process_pool_workers():
     assert _resolve_process_pool_workers(2, 10) == min(2, cpus)
     assert _resolve_process_pool_workers(100, 10) == min(100, cpus, 10)
 
+
 def test_extract_pptx_text_mocked(tmp_path):
     """Test that .pptx files are successfully parsed when using python-pptx."""
     from pptx import Presentation  # type: ignore
@@ -1124,7 +1127,7 @@ def test_extract_pptx_text_mocked(tmp_path):
         _allowed_file,
         _extract_pptx_text,
     )
-    
+
     assert ".pptx" in ALLOWED_EXTENSIONS
     assert _allowed_file("presentation.pptx") is True
 
@@ -1137,7 +1140,7 @@ def test_extract_pptx_text_mocked(tmp_path):
 
     with open(pptx_path, "rb") as f:
         extracted = _extract_pptx_text(f)
-    
+
     assert "Hello PowerPoint" in extracted
 
 
@@ -1151,4 +1154,3 @@ def test_markdown_extension_routing_consolidation():
     assert expected_text != ""
     assert extract_text(markdown_content, "doc.markdown") == expected_text
     assert extract_text(markdown_content, "doc.mdown") == expected_text
-

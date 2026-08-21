@@ -59,9 +59,9 @@ def test_raw_sqlite_transaction_rollback_on_halfway_error(sqlite_database_path):
     count = cursor.fetchone()[0]
     conn.close()
 
-    assert (
-        count == 0
-    ), "Database should contain 0 rows after halfway insertion failure rollback"
+    assert count == 0, (
+        "Database should contain 0 rows after halfway insertion failure rollback"
+    )
 
 
 def test_corpus_db_rollback_on_chunk_insertion_error():
@@ -91,9 +91,9 @@ def test_corpus_db_rollback_on_chunk_insertion_error():
 
     # Verify no chunks were persisted
     registry = get_chunk_registry()
-    assert (
-        len(registry) == 0
-    ), "No chunks should remain persisted after transaction rollback"
+    assert len(registry) == 0, (
+        "No chunks should remain persisted after transaction rollback"
+    )
 
 
 def test_corpus_db_multi_table_atomic_rollback():
@@ -130,9 +130,9 @@ def test_corpus_db_multi_table_atomic_rollback():
     # Verify atomic rollback: neither document nor chunk exists
     docs = get_all_documents()
     chunks = get_chunk_registry()
-    assert (
-        len(docs) == 0
-    ), "Document insertion must roll back when chunk insertion fails"
+    assert len(docs) == 0, (
+        "Document insertion must roll back when chunk insertion fails"
+    )
     assert len(chunks) == 0, "Chunk insertion must roll back completely"
 
 
@@ -173,8 +173,8 @@ def test_incidents_batch_insertion_rollback_on_error(sqlite_database_path):
         final_count = conn.execute(
             "SELECT COUNT(*) FROM plagiarism_incidents"
         ).fetchone()[0]
-        assert (
-            final_count == 0
-        ), "Plagiarism incidents table should have 0 rows after rollback"
+        assert final_count == 0, (
+            "Plagiarism incidents table should have 0 rows after rollback"
+        )
     finally:
         conn.close()

@@ -363,8 +363,9 @@ def test_zip_bomb_ratio_just_under_limit_passes():
     def mock_read(self, name_or_info):
         return b"some content"
 
-    with patch("zipfile.ZipFile.infolist", return_value=[info, mock_valid_info]), patch(
-        "zipfile.ZipFile.read", mock_read
+    with (
+        patch("zipfile.ZipFile.infolist", return_value=[info, mock_valid_info]),
+        patch("zipfile.ZipFile.read", mock_read),
     ):
         # Should NOT raise the ratio error (may raise total size error, but not ratio)
         try:
@@ -391,8 +392,9 @@ def test_zip_bomb_zero_compressed_size_handled():
     def mock_read(self, name_or_info):
         return b"some content"
 
-    with patch("zipfile.ZipFile.infolist", return_value=[info, mock_valid_info]), patch(
-        "zipfile.ZipFile.read", mock_read
+    with (
+        patch("zipfile.ZipFile.infolist", return_value=[info, mock_valid_info]),
+        patch("zipfile.ZipFile.read", mock_read),
     ):
         # Should not raise a ZeroDivisionError or ratio error
         try:

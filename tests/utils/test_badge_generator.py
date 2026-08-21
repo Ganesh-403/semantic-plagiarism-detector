@@ -43,9 +43,11 @@ def test_generate_badge_svg_custom_font_family():
     svg = generate_badge_svg(student_name="Alex", font_family="Arial, sans-serif")
     assert 'font-family="Arial, sans-serif"' in svg
 
+
 def test_generate_badge_svg_default_font_size():
     svg = generate_badge_svg(student_name="Alex")
     assert 'font-size="11"' in svg
+
 
 def test_generate_badge_svg_custom_font_size():
     svg = generate_badge_svg(student_name="Alex", font_size=20)

@@ -30,6 +30,7 @@ from src.db.auth import (
 )
 from src.exceptions import StaleDataException
 
+
 @pytest.fixture(autouse=True)
 def setup_test_db(mock_db):
     """Uses the mock_db fixture from conftest.py to isolate DB operations."""
@@ -177,9 +178,9 @@ def test_get_security_audit_logs_empty(mock_audit_db):
 
 def test_get_security_audit_logs_invalid_limit_offset(mock_audit_db):
     with pytest.raises(ValueError):
-         auth_repo.get_security_audit_logs(limit=-1)
+        auth_repo.get_security_audit_logs(limit=-1)
     with pytest.raises(ValueError):
-         auth_repo.get_security_audit_logs(offset=-1)
+        auth_repo.get_security_audit_logs(offset=-1)
 
 
 def test_get_security_audit_logs_negative_limit(mock_audit_db):
@@ -209,7 +210,7 @@ def test_get_security_audit_log_count_dropped_table(mock_audit_db):
         conn.execute("DROP TABLE security_audit_log")
 
     with pytest.raises(sqlite3.Error):
-         auth_repo.get_security_audit_log_count()
+        auth_repo.get_security_audit_log_count()
 
 
 def test_get_distinct_audit_event_types_caching_and_invalidation():
@@ -253,7 +254,6 @@ def test_get_distinct_audit_event_types_caching_and_invalidation():
     # 4. clear_distinct_audit_event_types_cache clears cache state
     clear_distinct_audit_event_types_cache()
     assert auth_repo._cached_event_types is None
-
 
 
 def test_2fa_flow():
@@ -321,7 +321,6 @@ def test_get_2fa_status():
     assert enabled is True
 
     delete_user(username)
-
 
 
 def test_suspend_account():
@@ -744,7 +743,9 @@ def test_get_recent_audit_events(mock_db):
 
     auth_repo.log_security_event("login_success", "alice", "Alice logged in")
     auth_repo.log_security_event("login_failure", "bob", "Bob failed login")
-    auth_repo.log_security_event("password_change", "charlie", "Charlie updated password")
+    auth_repo.log_security_event(
+        "password_change", "charlie", "Charlie updated password"
+    )
 
     events = auth_repo.get_recent_audit_events(limit=2)
     assert len(events) == 2
@@ -765,7 +766,7 @@ def test_get_recent_audit_events(mock_db):
 
     # Negative limit raises ValueError
     with pytest.raises(ValueError):
-         auth_repo.get_recent_audit_events(limit=-5)
+        auth_repo.get_recent_audit_events(limit=-5)
 
 
 def test_password_change_required_flag(mock_db):
@@ -926,6 +927,3 @@ def test_role_validation_with_allowed_user_roles_override(monkeypatch):
 
     with pytest.raises(ValueError, match="Role must be one of"):
         _validate_role("invalid_role")
-
-
-

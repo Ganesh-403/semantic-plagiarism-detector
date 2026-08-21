@@ -9,7 +9,9 @@ def render_ocr_match_card(match: Dict[str, Any]) -> str:
     ocr_pct = int(match.get("ocr_text_similarity", 0.0) * 100)
     layout_pct = int(match.get("layout_structure_similarity", 0.0) * 100)
 
-    badge_color = "#EF4444" if overall_pct > 75 else "#F59E0B" if overall_pct > 40 else "#10B981"
+    badge_color = (
+        "#EF4444" if overall_pct > 75 else "#F59E0B" if overall_pct > 40 else "#10B981"
+    )
 
     return f"""
     <div style="
@@ -30,7 +32,7 @@ def render_ocr_match_card(match: Dict[str, Any]) -> str:
                 padding: 4px 12px;
                 border-radius: 9999px;
             ">
-                OCR Engine: {match.get('ocr_engine_used')}
+                OCR Engine: {match.get("ocr_engine_used")}
             </span>
             <span style="
                 background: {badge_color}20;
@@ -46,7 +48,7 @@ def render_ocr_match_card(match: Dict[str, Any]) -> str:
         </div>
         
         <h4 style="color: white; font-weight: 900; margin: 0 0 8px 0;">
-            Image: {match.get('source_image_name')} ↔ Target: {match.get('target_reference_title')}
+            Image: {match.get("source_image_name")} ↔ Target: {match.get("target_reference_title")}
         </h4>
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;">

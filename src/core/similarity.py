@@ -73,9 +73,9 @@ def _validated_batch_size(batch_size: Optional[int]) -> Optional[int]:
 
 
 def _apply_min_percentile_filter(
-    matrix: Union[pd.DataFrame, np.ndarray],
+    matrix: pd.DataFrame | np.ndarray,
     min_percentile: Optional[float],
-) -> Union[pd.DataFrame, np.ndarray]:
+) -> pd.DataFrame | np.ndarray:
     """Zero out similarity scores below the given percentile threshold.
 
     The percentile is computed over the off-diagonal scores only, so a
@@ -161,13 +161,13 @@ def manhattan_similarity(
 
 
 def document_similarity_matrix(
-    doc_embeddings: Union[Dict[str, np.ndarray], np.ndarray, List[np.ndarray]],
+    doc_embeddings: Dict[str, np.ndarray] | np.ndarray | List[np.ndarray],
     batch_size: Optional[int] = None,
     min_threshold: float = 0.0,
     min_percentile: Optional[float] = None,
     top_k: Optional[int] = None,
     candidate_pairs: Optional[Set[Tuple[str, str]]] = None,
-) -> Union[pd.DataFrame, np.ndarray]:
+) -> pd.DataFrame | np.ndarray:
     """
     Build an N×N cosine similarity matrix between all document pairs.
 
@@ -239,7 +239,9 @@ def document_similarity_matrix(
         # Pre-filtering with FAISS top_k or candidate_pairs
         active_candidates = candidate_pairs
         if active_candidates is None and top_k is not None and top_k > 0 and n > top_k:
-            active_candidates = find_candidate_pairs(doc_names, doc_vectors, top_k=top_k)
+            active_candidates = find_candidate_pairs(
+                doc_names, doc_vectors, top_k=top_k
+            )
 
         if active_candidates is not None:
             name_to_idx = {name: i for i, name in enumerate(doc_names)}
@@ -271,13 +273,13 @@ def document_similarity_matrix(
 
 
 def compute_similarity_matrix(
-    embeddings: Union[Dict[str, np.ndarray], np.ndarray, List[np.ndarray]],
+    embeddings: Dict[str, np.ndarray] | np.ndarray | List[np.ndarray],
     batch_size: Optional[int] = None,
     min_threshold: float = 0.0,
     min_percentile: Optional[float] = None,
     top_k: Optional[int] = None,
     candidate_pairs: Optional[Set[Tuple[str, str]]] = None,
-) -> Union[pd.DataFrame, np.ndarray]:
+) -> pd.DataFrame | np.ndarray:
     """
     Direct alias/wrapper for document_similarity_matrix to maintain backwards compatibility
     with app/streamlit_app.py and external modules.
@@ -979,7 +981,7 @@ def detect_plagiarism_clusters(
             "suspicious_groups": [],
             "total_clusters": 0,
             "error": "networkx not installed",
-            "message": "Please install networkx: pip install networkx>=3.0"
+            "message": "Please install networkx: pip install networkx>=3.0",
         }
 
     doc_names = list(similarity_df.columns)
@@ -1033,6 +1035,7 @@ def detect_plagiarism_clusters(
         "total_clusters": len(clusters),
     }
 
+
 # ============================================================================
 # HYBRID SIMILARITY INTEGRATION - Issue #2676
 # ============================================================================
@@ -1048,13 +1051,13 @@ def compute_hybrid_similarity_df(
 ) -> pd.DataFrame:
     """
     Compute hybrid similarity DataFrame combining semantic and lexical scores.
-    
+
     Args:
         semantic_df: Semantic similarity DataFrame
         texts: Document texts
         alpha: Semantic weight (0.7 = 70% semantic, 30% lexical)
         lexical_method: Lexical method to use
-    
+
     Returns:
         Hybrid similarity DataFrame
     """
@@ -1068,11 +1071,11 @@ def flag_plagiarism_hybrid(
 ) -> List[Dict]:
     """
     Flag plagiarism using hybrid similarity scores.
-    
+
     Args:
         hybrid_df: Hybrid similarity DataFrame
         threshold: Flagging threshold
-    
+
     Returns:
         List of flagged pairs
     """

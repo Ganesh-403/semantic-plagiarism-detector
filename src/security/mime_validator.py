@@ -16,15 +16,13 @@ logger = logging.getLogger(__name__)
 ALLOWED_MIME_TYPES: dict[str, list[str]] = {
     "pdf": ["application/pdf"],
     "docx": [
-        "application/vnd.openxmlformats-officedocument."
-        "wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/zip",
         "application/x-zip-compressed",
         "application/octet-stream",
     ],
     "xlsx": [
-        "application/vnd.openxmlformats-officedocument."
-        "spreadsheetml.sheet",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "application/zip",
         "application/x-zip-compressed",
         "application/octet-stream",
@@ -96,7 +94,7 @@ OOXML_MAIN_CONTENT_TYPES = {
         "application/vnd.ms-word.document.macroEnabled.main+xml",
     },
     "xlsx": {
-        "application/vnd.openxmlformats-officedocument." "spreadsheetml.sheet.main+xml",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
         "application/vnd.ms-excel.sheet.macroEnabled.main+xml",
     },
 }
@@ -155,7 +153,7 @@ def _validate_ooxml_archive(
 
     if not file_bytes.startswith(b"PK"):
         logger.warning(
-            "[mime_validator] Invalid ZIP signature for OOXML file " "'%s'.",
+            "[mime_validator] Invalid ZIP signature for OOXML file '%s'.",
             filename,
         )
         return False
@@ -165,7 +163,7 @@ def _validate_ooxml_archive(
             members = archive.infolist()
             if len(members) > MAX_OOXML_ARCHIVE_ENTRIES:
                 logger.warning(
-                    "[mime_validator] OOXML archive '%s' contains " "too many entries.",
+                    "[mime_validator] OOXML archive '%s' contains too many entries.",
                     filename,
                 )
                 return False
@@ -186,8 +184,7 @@ def _validate_ooxml_archive(
 
             if not required.issubset(normalized_names):
                 logger.warning(
-                    "[mime_validator] '%s' is missing required %s "
-                    "OOXML package parts.",
+                    "[mime_validator] '%s' is missing required %s OOXML package parts.",
                     filename,
                     extension.upper(),
                 )
@@ -212,7 +209,7 @@ def _validate_ooxml_archive(
 
             if len(content_types_xml) > MAX_CONTENT_TYPES_XML_SIZE:
                 logger.warning(
-                    "[mime_validator] [Content_Types].xml in '%s' " "is too large.",
+                    "[mime_validator] [Content_Types].xml in '%s' is too large.",
                     filename,
                 )
                 return False
@@ -236,7 +233,7 @@ def _validate_ooxml_archive(
             bad_member = archive.testzip()
             if bad_member is not None:
                 logger.warning(
-                    "[mime_validator] Corrupt OOXML member '%s' in " "'%s'.",
+                    "[mime_validator] Corrupt OOXML member '%s' in '%s'.",
                     bad_member,
                     filename,
                 )
@@ -303,13 +300,12 @@ def _check_magic_bytes(
 
     except (ImportError, ModuleNotFoundError) as exception:
         logger.debug(
-            "[mime_validator] python-magic unavailable; using "
-            "fallback validation: %s",
+            "[mime_validator] python-magic unavailable; using fallback validation: %s",
             exception,
         )
     except Exception as exception:
         logger.debug(
-            "[mime_validator] python-magic failed; using fallback " "validation: %s",
+            "[mime_validator] python-magic failed; using fallback validation: %s",
             exception,
         )
 
@@ -330,7 +326,7 @@ def _check_extension_fallback(
             return True
 
         logger.warning(
-            "[mime_validator] Fallback magic-byte check failed for " "'%s'.",
+            "[mime_validator] Fallback magic-byte check failed for '%s'.",
             filename,
         )
         return False

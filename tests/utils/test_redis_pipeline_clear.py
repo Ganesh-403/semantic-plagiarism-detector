@@ -14,7 +14,7 @@ def test_clear_pattern_uses_redis_pipeline():
     cache = RedisCache.__new__(RedisCache)
     mock_client = MagicMock()
     mock_client.ping.return_value = True
-    
+
     # 5 matching keys
     test_keys = [f"spd:v1:session:sess123:key_{i}".encode("utf-8") for i in range(5)]
     mock_client.scan_iter.return_value = iter(test_keys)
@@ -23,7 +23,7 @@ def test_clear_pattern_uses_redis_pipeline():
     mock_pipeline = MagicMock()
     mock_pipeline.execute.return_value = [5]
     mock_client.pipeline.return_value = mock_pipeline
-    
+
     cache._client = mock_client
     cache._fallback_cache = {}
 
@@ -47,7 +47,7 @@ def test_clear_pattern_batches_large_key_sets():
     cache = RedisCache.__new__(RedisCache)
     mock_client = MagicMock()
     mock_client.ping.return_value = True
-    
+
     # 2500 matching keys (exceeds 1000 chunk size)
     test_keys = [f"key_{i}".encode("utf-8") for i in range(2500)]
     mock_client.scan_iter.return_value = iter(test_keys)
@@ -56,7 +56,7 @@ def test_clear_pattern_batches_large_key_sets():
     mock_pipeline = MagicMock()
     mock_pipeline.execute.return_value = [1000, 1000, 500]
     mock_client.pipeline.return_value = mock_pipeline
-    
+
     cache._client = mock_client
     cache._fallback_cache = {}
 

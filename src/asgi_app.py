@@ -224,7 +224,7 @@ class JSONContentTypeMiddleware(BaseHTTPMiddleware):
                 status_code=415,
                 content={
                     "detail": (
-                        "Unsupported Media Type: Request must be " "application/json"
+                        "Unsupported Media Type: Request must be application/json"
                     )
                 },
             )

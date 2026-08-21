@@ -127,7 +127,7 @@ async def otel_tracing_middleware(request: Request, call_next):
 
         try:
             response = await call_next(request)
-            
+
             # Use request.scope.get("route").path to extract generalized FastAPI route template for span name
             route = request.scope.get("route")
             if route and hasattr(route, "path"):
@@ -229,7 +229,9 @@ async def value_error_handler(request: Request, exc: ValueError):
 
 
 @app.exception_handler(sqlite3.OperationalError)
-async def sqlite_operational_error_handler(request: Request, exc: sqlite3.OperationalError):
+async def sqlite_operational_error_handler(
+    request: Request, exc: sqlite3.OperationalError
+):
     """Handle sqlite3.OperationalError, particularly database is locked, returning RFC 7807 response."""
     err_msg = str(exc)
     status_code = (
@@ -286,6 +288,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     trace_id = None
     try:
         from opentelemetry import trace
+
         current_span = trace.get_current_span()
         if current_span and current_span.get_span_context().is_valid:
             trace_id = trace.format_trace_id(current_span.get_span_context().trace_id)
@@ -371,6 +374,7 @@ app.include_router(admin_router)
 
 # ── Audit Events Endpoint (Issue #2732) ───────────────────────────────────────
 
+
 @app.get(
     "/api/v1/audit/events",
     tags=["System Administration"],
@@ -379,38 +383,35 @@ app.include_router(admin_router)
 )
 def get_audit_events_api(
     limit: int = Query(default=20, ge=1, le=100, description="Max events per page"),
-    offset: int = Query(default=0, ge=0, description="Number of events to skip (pagination)"),
+    offset: int = Query(
+        default=0, ge=0, description="Number of events to skip (pagination)"
+    ),
     event_type: str | None = Query(default=None, description="Filter by event type"),
     username: str | None = Query(default=None, description="Filter by username"),
-    _user: dict = Security(get_current_user, scopes=["admin"])
+    _user: dict = Security(get_current_user, scopes=["admin"]),
 ):
     """Retrieve paginated security audit events.
-    
+
     Supports pagination via limit and offset parameters (Issue #2732).
     """
     from src.db.auth import get_security_audit_log_count, get_security_audit_logs
-    
+
     events = get_security_audit_logs(
-        limit=limit,
-        offset=offset,
-        event_type=event_type,
-        username=username
+        limit=limit, offset=offset, event_type=event_type, username=username
     )
-    
-    total_count = get_security_audit_log_count(
-        event_type=event_type,
-        username=username
-    )
-    
+
+    total_count = get_security_audit_log_count(event_type=event_type, username=username)
+
     return {
         "events": events,
         "pagination": {
             "limit": limit,
             "offset": offset,
             "total_count": total_count,
-            "total_pages": (total_count + limit - 1) // limit if limit > 0 else 0
-        }
+            "total_pages": (total_count + limit - 1) // limit if limit > 0 else 0,
+        },
     }
+
 
 """src/api/app.py - FastAPI REST API for LMS integration."""
 
@@ -442,6 +443,7 @@ logger = logging.getLogger(__name__)
 
 # ── API Initialization ────────────────────────────────────────────────────────
 
+
 @app.get(
     "/api/v1/audit/events",
     tags=["System Administration"],
@@ -450,36 +452,34 @@ logger = logging.getLogger(__name__)
 )
 def get_audit_events_api(
     limit: int = Query(default=20, ge=1, le=100, description="Max events per page"),
-    offset: int = Query(default=0, ge=0, description="Number of events to skip (pagination)"),
+    offset: int = Query(
+        default=0, ge=0, description="Number of events to skip (pagination)"
+    ),
     event_type: str | None = Query(default=None, description="Filter by event type"),
     username: str | None = Query(default=None, description="Filter by username"),
-    _user: dict = Security(get_current_user, scopes=["admin"])
+    _user: dict = Security(get_current_user, scopes=["admin"]),
 ):
     """Retrieve paginated security audit events.
-    
+
     Supports pagination via limit and offset parameters (Issue #2732).
     """
     from src.db.auth import get_security_audit_log_count, get_security_audit_logs
-    
+
     events = get_security_audit_logs(
-        limit=limit,
-        offset=offset,
-        event_type=event_type,
-        username=username
+        limit=limit, offset=offset, event_type=event_type, username=username
     )
-    
-    total_count = get_security_audit_log_count(
-        event_type=event_type,
-        username=username
-    )
-    
+
+    total_count = get_security_audit_log_count(event_type=event_type, username=username)
+
     return {
         "events": events,
         "pagination": {
             "limit": limit,
             "offset": offset,
             "total_count": total_count,
-            "total_pages": (total_count + limit - 1) // limit if limit > 0 else 0
-        }
+            "total_pages": (total_count + limit - 1) // limit if limit > 0 else 0,
+        },
     }
+
+
 app.include_router(admin_router)

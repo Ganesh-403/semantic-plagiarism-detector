@@ -190,9 +190,9 @@ def test_csv_stream_sanitizes_header_and_index(malicious_matrix):
 
     reader = pd.read_csv(io.StringIO(full_csv), index_col=0)
     for label in list(reader.index) + list(reader.columns):
-        assert not str(label).startswith(
-            FORMULA_TRIGGER_PREFIXES
-        ), f"unsanitized CSV label: {label!r}"
+        assert not str(label).startswith(FORMULA_TRIGGER_PREFIXES), (
+            f"unsanitized CSV label: {label!r}"
+        )
 
 
 def test_csv_stream_preserves_row_count(malicious_matrix):

@@ -31,7 +31,7 @@ def render_stylometric_card(match: Dict[str, Any]) -> str:
                 padding: 4px 12px;
                 border-radius: 9999px;
             ">
-                Candidate: {match.get('candidate_author_alias')}
+                Candidate: {match.get("candidate_author_alias")}
             </span>
             <span style="
                 background: {badge_color}20;
@@ -47,7 +47,7 @@ def render_stylometric_card(match: Dict[str, Any]) -> str:
         </div>
         
         <h4 style="color: white; font-weight: 900; margin: 0 0 8px 0;">
-            Query Doc: {match.get('query_document_id')} ↔ Candidate Doc: {match.get('candidate_document_id')}
+            Query Doc: {match.get("query_document_id")} ↔ Candidate Doc: {match.get("candidate_document_id")}
         </h4>
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;">
@@ -57,7 +57,7 @@ def render_stylometric_card(match: Dict[str, Any]) -> str:
             </div>
             <div style="background: rgba(2, 6, 23, 0.6); padding: 12px; border-radius: 12px; border: 1px solid rgba(30, 41, 59, 1);">
                 <span style="color: #94A3B8; font-size: 11px;">Dominant Trait:</span>
-                <div style="color: #10B981; font-weight: 800; font-size: 14px;">{match.get('dominant_stylometric_trait')}</div>
+                <div style="color: #10B981; font-weight: 800; font-size: 14px;">{match.get("dominant_stylometric_trait")}</div>
             </div>
         </div>
     </div>

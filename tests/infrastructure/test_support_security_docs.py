@@ -21,7 +21,10 @@ def test_support_md_has_security_vulnerabilities_section():
     assert "Security Vulnerabilities" in content
     assert "security@domain.com" in content
     assert "SECURITY.md" in content
-    assert "please do NOT open a public GitHub issue" in content or "do NOT open a public" in content
+    assert (
+        "please do NOT open a public GitHub issue" in content
+        or "do NOT open a public" in content
+    )
 
 
 def test_security_md_has_security_email_alias():

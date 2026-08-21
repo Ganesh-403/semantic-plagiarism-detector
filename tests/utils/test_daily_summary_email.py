@@ -117,7 +117,12 @@ def test_get_admin_emails_valid_db_email(mock_get_users):
     """Test 1: Valid DB email returns valid emails from DB."""
     mock_get_users.return_value = [
         {"id": 1, "username": "admin1", "role": "admin", "email": "admin1@example.com"},
-        {"id": 2, "username": "teacher1", "role": "teacher", "email": "teacher1@example.com"},
+        {
+            "id": 2,
+            "username": "teacher1",
+            "role": "teacher",
+            "email": "teacher1@example.com",
+        },
         {"id": 3, "username": "admin2", "role": "admin", "email": "admin2@example.com"},
     ]
 
@@ -635,15 +640,18 @@ def test_send_email_invalid_recipient():
 def test_send_email_status_callback_success():
     """Test status_callback invocation on successful email delivery (#1514)."""
     callback = MagicMock()
-    with patch("smtplib.SMTP") as mock_smtp, patch.dict(
-        "os.environ",
-        {
-            "SMTP_SERVER": "smtp.example.com",
-            "SMTP_PORT": "587",
-            "SMTP_USERNAME": "test@example.com",
-            "SMTP_PASSWORD": "password",
-            "FROM_EMAIL": "test@example.com",
-        },
+    with (
+        patch("smtplib.SMTP") as mock_smtp,
+        patch.dict(
+            "os.environ",
+            {
+                "SMTP_SERVER": "smtp.example.com",
+                "SMTP_PORT": "587",
+                "SMTP_USERNAME": "test@example.com",
+                "SMTP_PASSWORD": "password",
+                "FROM_EMAIL": "test@example.com",
+            },
+        ),
     ):
         mock_server = MagicMock()
         mock_smtp.return_value.__enter__.return_value = mock_server
@@ -665,15 +673,18 @@ def test_send_email_status_callback_success():
 def test_send_email_status_callback_failure():
     """Test status_callback invocation on email delivery failure (#1514)."""
     callback = MagicMock()
-    with patch("smtplib.SMTP") as mock_smtp, patch.dict(
-        "os.environ",
-        {
-            "SMTP_SERVER": "smtp.example.com",
-            "SMTP_PORT": "587",
-            "SMTP_USERNAME": "test@example.com",
-            "SMTP_PASSWORD": "password",
-            "FROM_EMAIL": "test@example.com",
-        },
+    with (
+        patch("smtplib.SMTP") as mock_smtp,
+        patch.dict(
+            "os.environ",
+            {
+                "SMTP_SERVER": "smtp.example.com",
+                "SMTP_PORT": "587",
+                "SMTP_USERNAME": "test@example.com",
+                "SMTP_PASSWORD": "password",
+                "FROM_EMAIL": "test@example.com",
+            },
+        ),
     ):
         mock_server = MagicMock()
         mock_server.send_message.side_effect = Exception("SMTP Connection Failed")
@@ -696,15 +707,18 @@ def test_send_email_status_callback_failure():
 def test_send_email_passes_timeout_parameter():
     """Verify that timeout parameter is passed to smtplib.SMTP and SMTP_SSL (#1746)."""
     dummy_pass = "mock_" + "pass"
-    with patch("smtplib.SMTP") as mock_smtp, patch.dict(
-        "os.environ",
-        {
-            "SMTP_SERVER": "smtp.example.com",
-            "SMTP_PORT": "587",
-            "SMTP_USERNAME": "test@example.com",
-            "SMTP_PASSWORD": dummy_pass,
-            "FROM_EMAIL": "test@example.com",
-        },
+    with (
+        patch("smtplib.SMTP") as mock_smtp,
+        patch.dict(
+            "os.environ",
+            {
+                "SMTP_SERVER": "smtp.example.com",
+                "SMTP_PORT": "587",
+                "SMTP_USERNAME": "test@example.com",
+                "SMTP_PASSWORD": dummy_pass,
+                "FROM_EMAIL": "test@example.com",
+            },
+        ),
     ):
         mock_server = MagicMock()
         mock_smtp.return_value.__enter__.return_value = mock_server
@@ -715,15 +729,18 @@ def test_send_email_passes_timeout_parameter():
         )
         mock_smtp.assert_called_once_with("smtp.example.com", 587, timeout=15.5)
 
-    with patch("smtplib.SMTP_SSL") as mock_smtp_ssl, patch.dict(
-        "os.environ",
-        {
-            "SMTP_SERVER": "smtp.example.com",
-            "SMTP_PORT": "465",
-            "SMTP_USERNAME": "test@example.com",
-            "SMTP_PASSWORD": dummy_pass,
-            "FROM_EMAIL": "test@example.com",
-        },
+    with (
+        patch("smtplib.SMTP_SSL") as mock_smtp_ssl,
+        patch.dict(
+            "os.environ",
+            {
+                "SMTP_SERVER": "smtp.example.com",
+                "SMTP_PORT": "465",
+                "SMTP_USERNAME": "test@example.com",
+                "SMTP_PASSWORD": dummy_pass,
+                "FROM_EMAIL": "test@example.com",
+            },
+        ),
     ):
         mock_server_ssl = MagicMock()
         mock_smtp_ssl.return_value.__enter__.return_value = mock_server_ssl
@@ -883,9 +900,9 @@ class TestEmailFontStack:
 
         for family in font_families:
             # Every font-family declaration should start with -apple-system
-            assert family.strip().startswith(
-                "-apple-system"
-            ), f"Font stack should start with -apple-system, got: {family}"
+            assert family.strip().startswith("-apple-system"), (
+                f"Font stack should start with -apple-system, got: {family}"
+            )
 
     def test_font_stack_includes_segoe_ui(self):
         """Verify 'Segoe UI' is included for Windows optimization."""
@@ -1019,17 +1036,22 @@ class TestEmailStructureAndAccessibility:
 
         head_content = html.split("<head>")[1].split("</head>")[0]
         viewport_idx = head_content.find('<meta name="viewport"')
-        charset_idx = head_content.find('<meta charset=')
+        charset_idx = head_content.find("<meta charset=")
         assert viewport_idx != -1, "Viewport meta tag must be in <head>"
-        assert viewport_idx < charset_idx, "Viewport meta tag must be prepended before charset in <head>"
+        assert viewport_idx < charset_idx, (
+            "Viewport meta tag must be prepended before charset in <head>"
+        )
 
     def test_build_email_html_body_meta_viewport_prepended(self):
         """Verify viewport meta tag is present and prepended in build_email_html_body <head>."""
         html = build_email_html_body(incidents_data=[], total_scans=10)
-        assert '<meta name="viewport" content="width=device-width, initial-scale=1.0">' in html
+        assert (
+            '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+            in html
+        )
         head_content = html.split("<head>")[1].split("</head>")[0]
         viewport_idx = head_content.find('<meta name="viewport"')
-        charset_idx = head_content.find('<meta charset=')
+        charset_idx = head_content.find("<meta charset=")
         assert viewport_idx != -1
         assert viewport_idx < charset_idx
 
@@ -1050,4 +1072,3 @@ class TestEmailStructureAndAccessibility:
         assert ">0<" in html or ">0\n" in html
         assert "0.0%" in html
         assert "No high-similarity pairs detected today" in html
-

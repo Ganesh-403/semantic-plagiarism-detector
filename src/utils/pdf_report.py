@@ -63,6 +63,7 @@ def load_branding_logo() -> bytes | None:
     except Exception:
         return None
 
+
 def truncate_filename(filename: str, max_len: int = 30) -> str:
     """
     Truncates a filename to max_len characters with an ellipsis if needed,
@@ -79,7 +80,7 @@ def truncate_filename(filename: str, max_len: int = 30) -> str:
         return filename[: max_len - 3] + "..."
 
     half = needed_len // 2
-    truncated_name = f"{name[:half]}...{name[-(needed_len - half):]}"
+    truncated_name = f"{name[:half]}...{name[-(needed_len - half) :]}"
     return f"{truncated_name}{ext}"
 
 

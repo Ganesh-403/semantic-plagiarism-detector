@@ -1,6 +1,11 @@
 # Ruff configuration — shared between CI and pre-commit hooks
+target-version = "py310"
+
 [lint]
-select = ["E", "F", "I"]
+# Enable standard formatting rules (F), pyupgrade (UP), and flake8-typing (TCH)
+select = ["F", "E", "W", "UP", "TCH", "I"]
+# Explicitly ensure pyupgrade rule UP007 is active (Converts Union/Optional to |)
+extend-select = ["UP007"]
 # E402: Module level import not at top of file
 #   Required because app/streamlit_app.py and evaluation/evaluate.py
 #   modify sys.path before importing project modules.
@@ -16,3 +21,7 @@ ignore = ["E402", "E501"]
 # single E999 and never reached the rest.
 [lint.per-file-ignores]
 "app/streamlit_app.py" = ["F401", "F811", "F841"]
+
+[lint.pyupgrade]
+# Keep updates strict to modern native type declarations
+keep-runtime-typing = false

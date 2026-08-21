@@ -43,9 +43,9 @@ def test_get_export_timestamp_format():
     """Verify that get_export_timestamp() returns a valid ISO 8601 UTC timestamp string ending with Z."""
     ts = get_export_timestamp()
     assert isinstance(ts, str)
-    assert ISO_8601_UTC_PATTERN.match(
-        ts
-    ), f"Timestamp '{ts}' does not match ISO 8601 UTC pattern YYYY-MM-DDTHH:MM:SSZ"
+    assert ISO_8601_UTC_PATTERN.match(ts), (
+        f"Timestamp '{ts}' does not match ISO 8601 UTC pattern YYYY-MM-DDTHH:MM:SSZ"
+    )
 
 
 def test_export_to_json_includes_exported_at_timestamp():

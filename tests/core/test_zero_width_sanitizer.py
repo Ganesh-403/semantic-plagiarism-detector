@@ -55,7 +55,9 @@ def test_sanitize_zero_width_characters_all_variations():
     BOM (\\ufeff), and Word Joiner (\\u2060) is stripped of all zero-width characters while
     leaving the surrounding text intact (Issue #2699)."""
     # Create test string containing \u200b, \u200c, \u200d, \ufeff, and \u2060
-    dirty_text = "The\u200b quick\u200c brown\u200d fox\ufeff jumps\u2060 over the lazy dog."
+    dirty_text = (
+        "The\u200b quick\u200c brown\u200d fox\ufeff jumps\u2060 over the lazy dog."
+    )
     cleaned = sanitize_zero_width_characters(dirty_text)
 
     # Assert surrounding text is intact
@@ -79,6 +81,7 @@ def test_sanitize_zero_width_characters_consecutive_and_word_splitting():
 
 import pytest
 
+
 @pytest.mark.parametrize(
     "char_code, char_name",
     [
@@ -97,4 +100,3 @@ def test_sanitize_zero_width_characters_individual_variations(char_code, char_na
     cleaned = sanitize_zero_width_characters(dirty_text)
     assert cleaned == "prefixsuffix"
     assert char_code not in cleaned
-

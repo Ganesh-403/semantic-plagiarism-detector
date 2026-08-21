@@ -46,9 +46,7 @@ class TestExportMinMatchLength:
 
     def test_generate_incident_txt_with_min_match_length(self):
         """With min_match_length=20, only incidents with >= 20 matched words are exported."""
-        report = LMSExportEngine.generate_incident_txt(
-            INCIDENTS, min_match_length=20
-        )
+        report = LMSExportEngine.generate_incident_txt(INCIDENTS, min_match_length=20)
         assert report is not None
         assert "doc1.pdf" in report
         assert "doc3.pdf" not in report
@@ -56,9 +54,7 @@ class TestExportMinMatchLength:
 
     def test_generate_incident_txt_with_high_threshold(self):
         """With a threshold higher than all incidents, the report is None."""
-        report = LMSExportEngine.generate_incident_txt(
-            INCIDENTS, min_match_length=100
-        )
+        report = LMSExportEngine.generate_incident_txt(INCIDENTS, min_match_length=100)
         assert report is None
 
     def test_generate_html_report_without_filter(self):
@@ -82,9 +78,7 @@ class TestExportMinMatchLength:
 
     def test_generate_incident_html_via_export_engine(self):
         """The ExportEngine's HTML generator respects the filter."""
-        html = LMSExportEngine.generate_incident_html(
-            INCIDENTS, min_match_length=20
-        )
+        html = LMSExportEngine.generate_incident_html(INCIDENTS, min_match_length=20)
         assert html is not None
         assert "doc1.pdf" in html
         assert "doc3.pdf" not in html

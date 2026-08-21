@@ -474,7 +474,7 @@ def extract_stylometric_features(text: str) -> dict[str, float]:
 
     # Tokenize words using regex to extract alphanumeric sequences
     # This handles punctuation and contractions reasonably well for stylometry
-    words = re.findall(r'\b\w+\b', text.lower())
+    words = re.findall(r"\b\w+\b", text.lower())
 
     words = re.findall(r"\b\w+\b", text.lower())
 
@@ -529,7 +529,7 @@ def extract_stylometric_features(text: str) -> dict[str, float]:
         freq_of_freqs = Counter(word_freqs.values())
 
         # Compute the sum of (f_i * i^2)
-        sum_fi_i2 = sum(freq * (i ** 2) for i, freq in freq_of_freqs.items())
+        sum_fi_i2 = sum(freq * (i**2) for i, freq in freq_of_freqs.items())
         sum_fi_i2 = sum(freq * (i**2) for i, freq in freq_of_freqs.items())
 
         # Apply Yule's K formula
@@ -635,7 +635,6 @@ def categorize_ai_probability(score: float) -> str:
         return "Moderate Probability"
     else:
         return "Low Probability"
-
 
 
 def categorize_perplexity_score(score: float) -> str:

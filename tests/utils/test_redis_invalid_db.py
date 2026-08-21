@@ -17,6 +17,7 @@ def test_invalid_redis_db_falls_back_to_zero_and_logs_warning(caplog, monkeypatc
 
     with caplog.at_level(logging.WARNING):
         import src.utils.redis_cache
+
         importlib.reload(src.utils.redis_cache)
 
     assert src.utils.redis_cache.REDIS_DB == 0
@@ -30,6 +31,7 @@ def test_valid_redis_db_is_parsed_correctly(monkeypatch):
     """Verify that valid integer strings for REDIS_DB are parsed without issue."""
     monkeypatch.setenv("REDIS_DB", "3")
     import src.utils.redis_cache
+
     importlib.reload(src.utils.redis_cache)
 
     assert src.utils.redis_cache.REDIS_DB == 3

@@ -22,6 +22,7 @@ from src.errors import (
     EXPORT_WRITE_FAILED,
 )
 from src.exceptions import ExportFailedError
+
 logger = logging.getLogger(__name__)
 
 SAFE_DOWNLOAD_CONTENT_TYPES = {
@@ -54,9 +55,7 @@ class LMSExportEngine:
             return None
 
         try:
-            return generate_html_report(
-                incidents, min_match_length=min_match_length
-            )
+            return generate_html_report(incidents, min_match_length=min_match_length)
         except Exception as exception:
             logger.error("Failed to format incident data as HTML: %s", exception)
             return None
@@ -148,7 +147,8 @@ class LMSExportEngine:
         """
         if min_match_length > 0:
             incidents = [
-                i for i in incidents
+                i
+                for i in incidents
                 if int(i.get("matched_length", 0) or 0) >= min_match_length
             ]
 

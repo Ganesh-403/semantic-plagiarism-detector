@@ -378,7 +378,7 @@ def export_incidents_xlsx_stream(incidents_list: List[Dict]) -> bytes:
 
 def export_incidents_to_format(
     incidents_list: List[Dict],
-    format: Union[ExportFormat, str] = ExportFormat.CSV,
+    format: ExportFormat | str = ExportFormat.CSV,
 ) -> bytes:
     """Dispatcher function that routes incident data to the appropriate serializer.
 
@@ -444,7 +444,7 @@ def export_incidents_csv(
     delimiter: str = ",",
     quoting_style: int = csv.QUOTE_MINIMAL,
     filename: Optional[str] = None,
-) -> Union[bytes, Tuple[bytes, str]]:
+) -> bytes | Tuple[bytes, str]:
     """Export a list of incident dicts to a CSV-formatted byte stream.
 
     Validates that the delimiter is a single character string, falling back to a

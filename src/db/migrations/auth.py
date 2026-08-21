@@ -249,7 +249,9 @@ def _drop_column_if_exists(
 ) -> None:
     if column_exists(connection, table_name, column_name):
         try:
-            connection.execute(f'ALTER TABLE "{table_name}" DROP COLUMN "{column_name}"')
+            connection.execute(
+                f'ALTER TABLE "{table_name}" DROP COLUMN "{column_name}"'
+            )
         except sqlite3.OperationalError:
             pass
 

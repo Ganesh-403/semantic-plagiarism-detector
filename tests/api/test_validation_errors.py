@@ -35,15 +35,18 @@ def test_value_error_returns_400_bad_request():
     @test_router.get("/api/v1/test-value-error")
     def trigger_value_error(username: str = ""):
         from src.db.auth import _validate_username
+
         _validate_username(username)
         return {"status": "ok"}
 
     app.include_router(test_router)
 
-    response = client.get("/api/v1/test-value-error?username=", headers={"Authorization": "Bearer dummy-token"})
+    response = client.get(
+        "/api/v1/test-value-error?username=",
+        headers={"Authorization": "Bearer dummy-token"},
+    )
     assert response.status_code == 400
     data = response.json()
     assert data["error"] is True
     assert data["code"] == 400
     assert "Username cannot be empty" in data["message"]
-

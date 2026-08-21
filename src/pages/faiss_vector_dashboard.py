@@ -10,10 +10,26 @@ from src.services.faiss_vector_engine import FaissSemanticVectorEngine
 def init_demo_vector_database(engine: FaissSemanticVectorEngine):
     """Populates FAISS index with initial synthetic vector embeddings."""
     demo_docs = [
-        ("DOC-101", "Introduction to Machine Learning", "Supervised learning relies on labeled datasets to train models."),
-        ("DOC-102", "Deep Neural Networks Architecture", "Convolutional neural networks extract hierarchical spatial features."),
-        ("DOC-103", "Natural Language Processing Guide", "Transformer models leverage self-attention mechanisms for context."),
-        ("DOC-104", "Vector Databases & FAISS Indexing", "FAISS provides fast dense vector similarity search across high dimensions."),
+        (
+            "DOC-101",
+            "Introduction to Machine Learning",
+            "Supervised learning relies on labeled datasets to train models.",
+        ),
+        (
+            "DOC-102",
+            "Deep Neural Networks Architecture",
+            "Convolutional neural networks extract hierarchical spatial features.",
+        ),
+        (
+            "DOC-103",
+            "Natural Language Processing Guide",
+            "Transformer models leverage self-attention mechanisms for context.",
+        ),
+        (
+            "DOC-104",
+            "Vector Databases & FAISS Indexing",
+            "FAISS provides fast dense vector similarity search across high dimensions.",
+        ),
     ]
 
     for doc_id, title, text in demo_docs:

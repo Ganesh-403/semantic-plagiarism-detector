@@ -32,10 +32,10 @@ def render_stylometric_timeline(matches: List[Any]) -> str:
         ">
             <div>
                 <span style="color: #6EE7B7; font-weight: 800; font-size: 14px;">
-                    {m_dict.get('match_id', 'STYLE-NODE')}
+                    {m_dict.get("match_id", "STYLE-NODE")}
                 </span>
                 <div style="color: #94A3B8; font-size: 12px; margin-top: 4px;">
-                    Author Candidate: {m_dict.get('candidate_author_alias')} | Trait: {m_dict.get('dominant_stylometric_trait')}
+                    Author Candidate: {m_dict.get("candidate_author_alias")} | Trait: {m_dict.get("dominant_stylometric_trait")}
                 </div>
             </div>
             <div style="text-align: right;">

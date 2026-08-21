@@ -377,4 +377,3 @@ def test_get_backup_idle_timeout_zero_logs_warning_and_defaults_to_30(
 
     assert result == 30 * 60
     assert "Invalid backup timeout 0, defaulting to 30" in caplog.text
-

@@ -36,7 +36,7 @@ class TestFileValidatorSize:
         """Verify files over the size limit fail with FILE_TOO_LARGE."""
         validator = FileValidator(max_size_bytes=1024)
         result = validator.validate(b"x" * 1025, "large.pdf")
-        
+
         assert result.is_valid is False
         assert result.error_code == "FILE_TOO_LARGE"
         assert "too large" in result.error_message.lower()
@@ -45,7 +45,7 @@ class TestFileValidatorSize:
         """Verify empty files (0 bytes) fail with FILE_EMPTY."""
         validator = FileValidator()
         result = validator.validate(b"", "empty.txt")
-        
+
         assert result.is_valid is False
         assert result.error_code == "FILE_EMPTY"
 
@@ -68,7 +68,7 @@ class TestFileValidatorExtension:
         """Verify unsupported extensions fail with UNSUPPORTED_EXTENSION."""
         validator = FileValidator()
         result = validator.validate(b"content", "malware.exe")
-        
+
         assert result.is_valid is False
         assert result.error_code == "UNSUPPORTED_EXTENSION"
 
@@ -76,7 +76,7 @@ class TestFileValidatorExtension:
         """Verify files with no extension fail with MISSING_EXTENSION."""
         validator = FileValidator()
         result = validator.validate(b"content", "noextension")
-        
+
         assert result.is_valid is False
         assert result.error_code == "MISSING_EXTENSION"
 
@@ -89,7 +89,7 @@ class TestFileValidatorExtension:
     def test_custom_allowed_extensions(self):
         """Verify custom allowed_extensions set is respected."""
         validator = FileValidator(allowed_extensions={".custom"})
-        
+
         assert validator.validate(b"data", "file.custom").is_valid is True
         assert validator.validate(b"data", "file.txt").is_valid is False
 
@@ -112,12 +112,13 @@ class TestFileValidatorMagicBytes:
     def test_mismatched_magic_bytes_logs_warning(self, caplog):
         """Verify mismatched magic bytes log a warning but don't fail hard."""
         import logging
+
         validator = FileValidator()
-        
+
         # Pass a text file disguised as a PDF
         with caplog.at_level(logging.WARNING):
             result = validator.validate(b"This is plain text", "fake.pdf")
-            
+
         # Currently configured to pass but log warning
         assert result.is_valid is True
         assert any("Magic byte mismatch" in record.message for record in caplog.records)
@@ -137,10 +138,9 @@ class TestValidateUploadConvenience:
         # Valid file
         result = validate_upload(b"%PDF-1.4", "test.pdf")
         assert result.is_valid is True
-        
+
         # Invalid file (too large)
         large_data = b"x" * (MAX_FILE_SIZE_BYTES + 1)
         result = validate_upload(large_data, "huge.pdf")
         assert result.is_valid is False
         assert result.error_code == "FILE_TOO_LARGE"
-

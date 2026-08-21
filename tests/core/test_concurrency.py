@@ -141,9 +141,9 @@ def test_thread_pool_handles_1000_concurrent_tasks(tmp_path):
         list(executor.map(task, range(num_tasks)))
 
     assert not errors, f"Fatal exception(s) raised: {errors}"
-    assert (
-        len(results) == num_tasks
-    ), f"Expected {num_tasks} results, got {len(results)}"
+    assert len(results) == num_tasks, (
+        f"Expected {num_tasks} results, got {len(results)}"
+    )
 
 
 def test_faiss_lock_configurable_timeout(mocker):
@@ -187,4 +187,3 @@ def test_faiss_lock_acquire_sleep_jitter(tmp_path, mocker):
         assert 0.1 <= val <= 0.15
 
     assert len(set(sleep_args)) > 1
-

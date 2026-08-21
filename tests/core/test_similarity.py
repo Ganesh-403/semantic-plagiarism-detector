@@ -1005,6 +1005,7 @@ def test_find_most_similar_chunks_comparison_with_legacy():
         if emb_a.size == 0 or emb_b.size == 0:
             return []
         from sklearn.metrics.pairwise import cosine_similarity
+
         sim_matrix = cosine_similarity(emb_a, emb_b)
         pairs = []
         for i in range(sim_matrix.shape[0]):
@@ -1085,7 +1086,11 @@ def test_document_similarity_matrix_hnsw(dummy_embeddings):
 
 def test_document_similarity_matrix_hnsw_ndarray(dummy_embeddings):
     """Test document_similarity_matrix with HNSW enabled (using FAISS) on list/ndarray embeddings."""
-    embeddings_list = [dummy_embeddings["doc_A"][0], dummy_embeddings["doc_B"][0], dummy_embeddings["doc_C"][0]]
+    embeddings_list = [
+        dummy_embeddings["doc_A"][0],
+        dummy_embeddings["doc_B"][0],
+        dummy_embeddings["doc_C"][0],
+    ]
     sim = document_similarity_matrix(embeddings_list, use_hnsw=True)
     assert isinstance(sim, np.ndarray)
     assert sim.shape == (3, 3)
@@ -1096,6 +1101,7 @@ def test_document_similarity_matrix_hnsw_ndarray(dummy_embeddings):
 def test_document_similarity_matrix_hnsw_fallback(dummy_embeddings, monkeypatch):
     """Verify that document_similarity_matrix falls back to exact computation when FAISS raises error."""
     import sys
+
     # Mock FAISS import failure
     monkeypatch.setitem(sys.modules, "faiss", None)
 
@@ -1104,6 +1110,3 @@ def test_document_similarity_matrix_hnsw_fallback(dummy_embeddings, monkeypatch)
     assert df.shape == (3, 3)
     assert np.isclose(df.loc["doc_A", "doc_A"], 1.0)
     assert df.loc["doc_A", "doc_B"] > df.loc["doc_A", "doc_C"]
-
-
-

@@ -13,16 +13,23 @@ from datetime import datetime
 from typing import Dict, Any
 
 from src.core.report_generator import (
-    ReportGenerator, ReportConfig, ReportFormat, ReportType
+    ReportGenerator,
+    ReportConfig,
+    ReportFormat,
+    ReportType,
 )
 
 
 def render_report_generator_dashboard():
     """Render the report generator dashboard."""
     st.title("📄 Plagiarism Report Generator")
-    st.markdown("Generate comprehensive reports with **visualizations**, **statistics**, and **recommendations**.")
+    st.markdown(
+        "Generate comprehensive reports with **visualizations**, **statistics**, and **recommendations**."
+    )
 
-    tab_config, tab_generate, tab_preview = st.tabs(["⚙️ Configuration", "📝 Generate Report", "👁️ Preview Report"])
+    tab_config, tab_generate, tab_preview = st.tabs(
+        ["⚙️ Configuration", "📝 Generate Report", "👁️ Preview Report"]
+    )
 
     with tab_config:
         _render_configuration()
@@ -41,7 +48,9 @@ def _render_configuration():
     with st.form("report_config"):
         col1, col2 = st.columns(2)
         with col1:
-            company_name = st.text_input("Organization Name", value="Plagiarism Detection System")
+            company_name = st.text_input(
+                "Organization Name", value="Plagiarism Detection System"
+            )
             include_viz = st.checkbox("Include Visualizations", value=True)
             include_raw = st.checkbox("Include Raw Data", value=False)
             include_recs = st.checkbox("Include Recommendations", value=True)
@@ -67,23 +76,32 @@ def _render_generation():
     """Render report generation interface."""
     st.subheader("Generate Report")
 
-    report_type = st.selectbox("Report Type", ["detailed", "summary", "executive", "comparison", "batch"])
+    report_type = st.selectbox(
+        "Report Type", ["detailed", "summary", "executive", "comparison", "batch"]
+    )
     report_format = st.selectbox("Export Format", ["markdown", "json", "html", "text"])
 
-    custom_title = st.text_input("Custom Report Title", value="", placeholder="Leave empty for auto-generated title")
+    custom_title = st.text_input(
+        "Custom Report Title",
+        value="",
+        placeholder="Leave empty for auto-generated title",
+    )
 
     uploaded_files = st.file_uploader(
         "Upload detection results (JSON) or paste results",
         type=["json"],
-        help="Upload JSON output from plagiarism detection"
+        help="Upload JSON output from plagiarism detection",
     )
 
     if uploaded_files:
         import json
+
         try:
             results = json.load(uploaded_files)
             st.session_state.detection_results = results
-            st.success(f"✅ Loaded results: {len(results.get('matches', []))} matches found")
+            st.success(
+                f"✅ Loaded results: {len(results.get('matches', []))} matches found"
+            )
         except Exception as e:
             st.error(f"Error loading file: {e}")
 
@@ -101,7 +119,7 @@ def _render_generation():
             report = generator.generate_report(
                 st.session_state.detection_results,
                 ReportType(report_type),
-                title=custom_title or None
+                title=custom_title or None,
             )
             st.session_state.current_report = report
             st.session_state.report_format = report_format
@@ -137,8 +155,13 @@ def _render_preview():
             values=list(severity.values()),
             names=[f"{k.title()} ({v})" for k, v in severity.items()],
             title="Severity Distribution",
-            color_discrete_map={"Critical (0)": "#ef4444", "High (0)": "#f97316",
-                              "Moderate (0)": "#eab308", "Low (0)": "#84cc16", "Clean (0)": "#22c55e"}
+            color_discrete_map={
+                "Critical (0)": "#ef4444",
+                "High (0)": "#f97316",
+                "Moderate (0)": "#eab308",
+                "Low (0)": "#84cc16",
+                "Clean (0)": "#22c55e",
+            },
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -158,6 +181,7 @@ def _render_preview():
     fmt = st.session_state.get("report_format", "markdown")
     generator = ReportGenerator()
     import tempfile, os
+
     with tempfile.NamedTemporaryFile(suffix=f".{fmt}", delete=False) as f:
         temp_path = f.name
 
@@ -165,8 +189,15 @@ def _render_preview():
         generator.export_report(report, ReportFormat(fmt), temp_path)
         with open(temp_path, "r") as f:
             content = f.read()
-        mime = {"json": "application/json", "markdown": "text/markdown", "html": "text/html", "text": "text/plain"}.get(fmt, "text/plain")
-        st.download_button(f"⬇️ Download {fmt.upper()}", content, f"plagiarism_report.{fmt}", mime)
+        mime = {
+            "json": "application/json",
+            "markdown": "text/markdown",
+            "html": "text/html",
+            "text": "text/plain",
+        }.get(fmt, "text/plain")
+        st.download_button(
+            f"⬇️ Download {fmt.upper()}", content, f"plagiarism_report.{fmt}", mime
+        )
     finally:
         os.unlink(temp_path)
 
@@ -176,14 +207,47 @@ def _get_sample_results() -> Dict[str, Any]:
     return {
         "total_documents": 6,
         "matches": [
-            {"doc_a": "assignment_01.pdf", "doc_b": "assignment_03.pdf", "similarity": 0.92, "severity": "critical"},
-            {"doc_a": "assignment_01.pdf", "doc_b": "assignment_05.pdf", "similarity": 0.78, "severity": "high"},
-            {"doc_a": "assignment_02.pdf", "doc_b": "assignment_04.pdf", "similarity": 0.65, "severity": "moderate"},
-            {"doc_a": "assignment_03.pdf", "doc_b": "assignment_06.pdf", "similarity": 0.55, "severity": "moderate"},
-            {"doc_a": "assignment_02.pdf", "doc_b": "assignment_06.pdf", "similarity": 0.42, "severity": "low"},
+            {
+                "doc_a": "assignment_01.pdf",
+                "doc_b": "assignment_03.pdf",
+                "similarity": 0.92,
+                "severity": "critical",
+            },
+            {
+                "doc_a": "assignment_01.pdf",
+                "doc_b": "assignment_05.pdf",
+                "similarity": 0.78,
+                "severity": "high",
+            },
+            {
+                "doc_a": "assignment_02.pdf",
+                "doc_b": "assignment_04.pdf",
+                "similarity": 0.65,
+                "severity": "moderate",
+            },
+            {
+                "doc_a": "assignment_03.pdf",
+                "doc_b": "assignment_06.pdf",
+                "similarity": 0.55,
+                "severity": "moderate",
+            },
+            {
+                "doc_a": "assignment_02.pdf",
+                "doc_b": "assignment_06.pdf",
+                "similarity": 0.42,
+                "severity": "low",
+            },
         ],
         "flagged": [
-            {"doc_a": "assignment_01.pdf", "doc_b": "assignment_03.pdf", "similarity": 0.92},
-            {"doc_a": "assignment_01.pdf", "doc_b": "assignment_05.pdf", "similarity": 0.78},
+            {
+                "doc_a": "assignment_01.pdf",
+                "doc_b": "assignment_03.pdf",
+                "similarity": 0.92,
+            },
+            {
+                "doc_a": "assignment_01.pdf",
+                "doc_b": "assignment_05.pdf",
+                "similarity": 0.78,
+            },
         ],
     }

@@ -306,9 +306,15 @@ def migration_015_pattern_recognition(
             status TEXT NOT NULL DEFAULT 'active'
         )
     """)
-    connection.execute("CREATE INDEX IF NOT EXISTS idx_patterns_type ON plagiarism_patterns(pattern_type)")
-    connection.execute("CREATE INDEX IF NOT EXISTS idx_patterns_status ON plagiarism_patterns(status)")
-    connection.execute("CREATE INDEX IF NOT EXISTS idx_patterns_severity ON plagiarism_patterns(severity)")
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_patterns_type ON plagiarism_patterns(pattern_type)"
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_patterns_status ON plagiarism_patterns(status)"
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_patterns_severity ON plagiarism_patterns(severity)"
+    )
 
     connection.execute("""
         CREATE TABLE IF NOT EXISTS pattern_evolution (
@@ -322,8 +328,12 @@ def migration_015_pattern_recognition(
             FOREIGN KEY (pattern_id) REFERENCES plagiarism_patterns(pattern_id) ON DELETE CASCADE
         )
     """)
-    connection.execute("CREATE INDEX IF NOT EXISTS idx_evolution_pattern ON pattern_evolution(pattern_id)")
-    connection.execute("CREATE INDEX IF NOT EXISTS idx_evolution_date ON pattern_evolution(snapshot_date)")
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_evolution_pattern ON pattern_evolution(pattern_id)"
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_evolution_date ON pattern_evolution(snapshot_date)"
+    )
 
     if not table_exists(connection, "document_risk_scores"):
         connection.execute("""
@@ -336,7 +346,9 @@ def migration_015_pattern_recognition(
                 scored_at TEXT NOT NULL
             )
         """)
-        connection.execute("CREATE INDEX IF NOT EXISTS idx_risk_level ON document_risk_scores(risk_level)")
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_risk_level ON document_risk_scores(risk_level)"
+        )
 
     connection.execute("""
         CREATE TABLE IF NOT EXISTS proactive_recommendations (
@@ -352,8 +364,12 @@ def migration_015_pattern_recognition(
             FOREIGN KEY (pattern_id) REFERENCES plagiarism_patterns(pattern_id) ON DELETE SET NULL
         )
     """)
-    connection.execute("CREATE INDEX IF NOT EXISTS idx_recommendations_status ON proactive_recommendations(status)")
-    connection.execute("CREATE INDEX IF NOT EXISTS idx_recommendations_priority ON proactive_recommendations(priority)")
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_recommendations_status ON proactive_recommendations(status)"
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_recommendations_priority ON proactive_recommendations(priority)"
+    )
 
 
 CORPUS_MIGRATIONS = {
@@ -380,7 +396,9 @@ def _drop_column_if_exists(
 ) -> None:
     if column_exists(connection, table_name, column_name):
         try:
-            connection.execute(f'ALTER TABLE "{table_name}" DROP COLUMN "{column_name}"')
+            connection.execute(
+                f'ALTER TABLE "{table_name}" DROP COLUMN "{column_name}"'
+            )
         except sqlite3.OperationalError:
             pass
 
@@ -411,7 +429,9 @@ def down_005_add_false_positives(connection: sqlite3.Connection) -> None:
 
 
 def down_006_add_incident_threshold_snapshot(connection: sqlite3.Connection) -> None:
-    _drop_column_if_exists(connection, "plagiarism_incidents", "threshold_at_time_of_flag")
+    _drop_column_if_exists(
+        connection, "plagiarism_incidents", "threshold_at_time_of_flag"
+    )
 
 
 def down_007_add_document_language(connection: sqlite3.Connection) -> None:

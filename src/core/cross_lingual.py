@@ -177,7 +177,7 @@ def back_translate_chunk(
             target_lang=TARGET_LANGUAGE,
             source_lang=source_lang,
         )
-        
+
         # Validate translation result
         if not translated_text or not isinstance(translated_text, str):
             logger.warning(
@@ -187,9 +187,9 @@ def back_translate_chunk(
                 TARGET_LANGUAGE,
             )
             return text
-            
+
         translated_text = translated_text.strip()
-        
+
         # Check if translation is suspiciously identical to source
         # (could indicate translation service failure)
         if translated_text == text.strip() and source_lang != TARGET_LANGUAGE:
@@ -199,7 +199,7 @@ def back_translate_chunk(
                 source_lang,
                 TARGET_LANGUAGE,
             )
-        
+
     except Exception as exc:
         # Graceful fallback: return original text if translation fails
         logger.error(

@@ -82,10 +82,10 @@ class TestGetValidTokens:
 
     def test_filters_non_string_token_keys(self, caplog):
         """Verify filters out non-string token keys with warning."""
-        with patch.dict(
-            os.environ, {"API_BEARER_TOKENS_MAPPING": "{}"}, clear=True
-        ):
-            with patch("json.loads", return_value={"valid_token": ["read"], 123: ["write"]}):
+        with patch.dict(os.environ, {"API_BEARER_TOKENS_MAPPING": "{}"}, clear=True):
+            with patch(
+                "json.loads", return_value={"valid_token": ["read"], 123: ["write"]}
+            ):
                 with caplog.at_level(logging.WARNING):
                     result = get_valid_tokens()
 
@@ -205,10 +205,15 @@ class TestVerifyBearerToken:
             request = MagicMock()
             request.method = "GET"
             request.url.path = "/api/v1/protected"
-            creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid_token_123")
+            creds = HTTPAuthorizationCredentials(
+                scheme="Bearer", credentials="valid_token_123"
+            )
 
             with patch("src.db.auth.is_token_revoked", return_value=False):
-                with patch("src.security.jwt_utils.verify_access_token", return_value={"sub": "user"}):
+                with patch(
+                    "src.security.jwt_utils.verify_access_token",
+                    return_value={"sub": "user"},
+                ):
                     token = await verify_bearer_token(request, creds)
                     assert token == "valid_token_123"
 
@@ -228,9 +233,14 @@ class TestVerifyBearerToken:
             request = MagicMock()
             request.method = "GET"
             request.url.path = "/api/v1/protected"
-            creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid_token")
+            creds = HTTPAuthorizationCredentials(
+                scheme="Bearer", credentials="invalid_token"
+            )
 
-            with patch("src.security.jwt_utils.verify_access_token", side_effect=ValueError("Invalid signature")):
+            with patch(
+                "src.security.jwt_utils.verify_access_token",
+                side_effect=ValueError("Invalid signature"),
+            ):
                 with pytest.raises(HTTPException) as exc_info:
                     await verify_bearer_token(request, creds)
                 assert exc_info.value.status_code == 401
@@ -251,9 +261,14 @@ class TestVerifyBearerToken:
             request = MagicMock()
             request.method = "GET"
             request.url.path = "/api/v1/protected"
-            creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="some_token")
+            creds = HTTPAuthorizationCredentials(
+                scheme="Bearer", credentials="some_token"
+            )
 
-            with patch("src.security.jwt_utils.verify_access_token", side_effect=RuntimeError("Corrupted secret key configuration")):
+            with patch(
+                "src.security.jwt_utils.verify_access_token",
+                side_effect=RuntimeError("Corrupted secret key configuration"),
+            ):
                 with caplog.at_level(logging.ERROR):
                     with pytest.raises(HTTPException) as exc_info:
                         await verify_bearer_token(request, creds)
@@ -323,10 +338,15 @@ class TestVerifyBearerToken:
             request = MagicMock()
             request.method = "GET"
             request.url.path = "/api/v1/protected"
-            creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid_token_123")
+            creds = HTTPAuthorizationCredentials(
+                scheme="Bearer", credentials="valid_token_123"
+            )
 
             with patch("src.db.auth.is_token_revoked", return_value=False):
-                with patch("src.security.jwt_utils.verify_access_token", return_value={"sub": "user"}):
+                with patch(
+                    "src.security.jwt_utils.verify_access_token",
+                    return_value={"sub": "user"},
+                ):
                     token = await verify_bearer_token(request, creds)
                     assert token == "valid_token_123"
 
@@ -346,9 +366,14 @@ class TestVerifyBearerToken:
             request = MagicMock()
             request.method = "GET"
             request.url.path = "/api/v1/protected"
-            creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid_token")
+            creds = HTTPAuthorizationCredentials(
+                scheme="Bearer", credentials="invalid_token"
+            )
 
-            with patch("src.security.jwt_utils.verify_access_token", side_effect=ValueError("Invalid signature")):
+            with patch(
+                "src.security.jwt_utils.verify_access_token",
+                side_effect=ValueError("Invalid signature"),
+            ):
                 with pytest.raises(HTTPException) as exc_info:
                     await verify_bearer_token(request, creds)
                 assert exc_info.value.status_code == 401
@@ -369,9 +394,14 @@ class TestVerifyBearerToken:
             request = MagicMock()
             request.method = "GET"
             request.url.path = "/api/v1/protected"
-            creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="some_token")
+            creds = HTTPAuthorizationCredentials(
+                scheme="Bearer", credentials="some_token"
+            )
 
-            with patch("src.security.jwt_utils.verify_access_token", side_effect=RuntimeError("Corrupted secret key configuration")):
+            with patch(
+                "src.security.jwt_utils.verify_access_token",
+                side_effect=RuntimeError("Corrupted secret key configuration"),
+            ):
                 with caplog.at_level(logging.ERROR):
                     with pytest.raises(HTTPException) as exc_info:
                         await verify_bearer_token(request, creds)
@@ -411,19 +441,21 @@ def test_no_inline_imports_in_middleware_functions():
     import ast
     from pathlib import Path
 
-    middleware_path = Path(__file__).resolve().parent.parent.parent / "src" / "api" / "middleware.py"
+    middleware_path = (
+        Path(__file__).resolve().parent.parent.parent / "src" / "api" / "middleware.py"
+    )
     tree = ast.parse(middleware_path.read_text(encoding="utf-8"))
 
     # Traverse AST to ensure no Import or ImportFrom exists inside FunctionDef/AsyncFunctionDef
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             for child in ast.walk(node):
-                if child is not node and isinstance(child, (ast.Import, ast.ImportFrom)):
+                if child is not node and isinstance(
+                    child, (ast.Import, ast.ImportFrom)
+                ):
                     imported_names = [alias.name for alias in child.names]
                     module_name = getattr(child, "module", "")
                     pytest.fail(
                         f"Found inline import '{module_name} -> {imported_names}' inside function "
                         f"'{node.name}' at line {child.lineno} in {middleware_path.name}"
                     )
-
-

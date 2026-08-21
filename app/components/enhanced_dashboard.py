@@ -181,8 +181,8 @@ class PerformanceDashboard:
                 p95 = np.percentile(values, 95)
                 col.metric(
                     f"{name.replace('_', ' ').title()}",
-                    f"{avg*1000:.1f}ms",
-                    delta=f"P95: {p95*1000:.1f}ms",
+                    f"{avg * 1000:.1f}ms",
+                    delta=f"P95: {p95 * 1000:.1f}ms",
                 )
 
         # Performance trend chart

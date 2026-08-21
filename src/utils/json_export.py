@@ -51,7 +51,7 @@ def json_serializer_fallback(obj: Any) -> Any:
 
 
 def export_similarity_matrix_to_json(
-    df: Optional[Union[pd.DataFrame, Any]],
+    df: Optional[pd.DataFrame | Any],
     include_metadata: bool = False,
     indent: Optional[int] = 2,
 ) -> str:
@@ -101,7 +101,7 @@ def export_similarity_matrix_to_json(
 
     doc_names: List[str] = [str(col) for col in df.columns]
     n: int = len(doc_names)
-    pairs: List[Dict[str, Union[str, float]]] = []
+    pairs: List[Dict[str, str | float]] = []
 
     for i in range(n):
         for j in range(i + 1, n):
@@ -370,7 +370,7 @@ def export_filtered_similarity_matrix_to_json(
 
     doc_names: List[str] = [str(col) for col in df.columns]
     n: int = len(doc_names)
-    filtered_pairs: List[Dict[str, Union[str, float]]] = []
+    filtered_pairs: List[Dict[str, str | float]] = []
 
     for i in range(n):
         for j in range(i + 1, n):

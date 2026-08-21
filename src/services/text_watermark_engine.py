@@ -20,7 +20,9 @@ class AdversarialWatermarkEngine:
     """Core analytics engine for detecting statistical LLM text watermarks."""
 
     @staticmethod
-    def calculate_z_score(green_count: int, total_count: int, gamma: float = 0.5) -> float:
+    def calculate_z_score(
+        green_count: int, total_count: int, gamma: float = 0.5
+    ) -> float:
         """Calculates Kirchenbauer z-score test statistic for watermark detection.
 
         Formula: z = (S_g - gamma * N) / sqrt(gamma * (1 - gamma) * N)
@@ -83,9 +85,13 @@ class AdversarialWatermarkEngine:
         p_value = cls.calculate_p_value(z_score)
 
         is_present = z_score >= z_threshold
-        confidence = min(round(max(0.0, (z_score / (z_threshold * 1.5)) * 100), 2), 99.9)
+        confidence = min(
+            round(max(0.0, (z_score / (z_threshold * 1.5)) * 100), 2), 99.9
+        )
 
-        signature = "Kirchenbauer-Logits" if is_present else "Human-Written / Unwatermarked"
+        signature = (
+            "Kirchenbauer-Logits" if is_present else "Human-Written / Unwatermarked"
+        )
 
         # Entropy calculation
         entropy = 0.0

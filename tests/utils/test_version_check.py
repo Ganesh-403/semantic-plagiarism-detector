@@ -32,12 +32,8 @@ if "src" not in sys.modules:
     _src_stub.__path__ = [str(pathlib.Path(__file__).parent.parent.parent / "src")]
     sys.modules["src"] = _src_stub
 
-_VERSION_MOD_PATH = (
-    pathlib.Path(__file__).parent.parent.parent / "src" / "version.py"
-)
-_version_spec = importlib.util.spec_from_file_location(
-    "src.version", _VERSION_MOD_PATH
-)
+_VERSION_MOD_PATH = pathlib.Path(__file__).parent.parent.parent / "src" / "version.py"
+_version_spec = importlib.util.spec_from_file_location("src.version", _VERSION_MOD_PATH)
 _version_mod = importlib.util.module_from_spec(_version_spec)  # type: ignore[arg-type]
 sys.modules.setdefault("src.version", _version_mod)
 _version_spec.loader.exec_module(_version_mod)  # type: ignore[union-attr]

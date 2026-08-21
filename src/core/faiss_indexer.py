@@ -11,7 +11,7 @@ import numpy as np
 
 
 def build_index(
-    doc_embeddings: Union[Dict[str, np.ndarray], np.ndarray, List[np.ndarray]],
+    doc_embeddings: Dict[str, np.ndarray] | np.ndarray | List[np.ndarray],
     chunked_docs: Dict[str, List[str]] = None,
 ) -> Tuple[faiss.IndexFlatIP, List[Dict]]:
     """

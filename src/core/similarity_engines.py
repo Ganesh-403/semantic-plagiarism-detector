@@ -46,7 +46,7 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
         self.min_threshold = min_threshold
         self.min_percentile = min_percentile
 
-    def _get_embedding(self, doc: Union[str, np.ndarray]) -> np.ndarray:
+    def _get_embedding(self, doc: str | np.ndarray) -> np.ndarray:
         """Helper to resolve a document to its embedding representation."""
         if isinstance(doc, np.ndarray):
             return doc
@@ -61,14 +61,15 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
 
             # Lazy load fallback model to avoid circular import issues
             from src.core.embedding_model import get_document_embedding
+
             return get_document_embedding(doc)
 
         raise TypeError("Document must be a string or a numpy array of embeddings.")
 
     def compute_pairwise_similarity(
         self,
-        doc1: Union[str, np.ndarray],
-        doc2: Union[str, np.ndarray],
+        doc1: str | np.ndarray,
+        doc2: str | np.ndarray,
     ) -> float:
         emb1 = self._get_embedding(doc1)
         emb2 = self._get_embedding(doc2)
@@ -96,11 +97,7 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
 
     def compute_matrix(
         self,
-        documents: Union[
-            Dict[str, Union[str, np.ndarray]],
-            List[Union[str, np.ndarray]],
-            np.ndarray,
-        ],
+        documents: Dict[str, str | np.ndarray] | List[str | np.ndarray] | np.ndarray,
     ) -> np.ndarray:
         if isinstance(documents, dict):
             # Resolve all to embeddings
@@ -136,7 +133,7 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
 
     def search_similar_chunks(
         self,
-        query: Union[str, np.ndarray],
+        query: str | np.ndarray,
         top_k: int = 10,
         exclude_doc: Optional[str] = None,
         threshold: float = 0.0,
@@ -154,6 +151,7 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
             emb = query
 
         from src.core.faiss_index import search_similar_chunks
+
         return search_similar_chunks(
             emb,
             self.faiss_index,
@@ -196,8 +194,8 @@ class LexicalSimilarityEngine(BaseSimilarityEngine):
 
     def compute_pairwise_similarity(
         self,
-        doc1: Union[str, np.ndarray],
-        doc2: Union[str, np.ndarray],
+        doc1: str | np.ndarray,
+        doc2: str | np.ndarray,
     ) -> float:
         if not isinstance(doc1, str) or not isinstance(doc2, str):
             raise TypeError("Lexical similarity requires string document inputs.")
@@ -214,9 +212,7 @@ class LexicalSimilarityEngine(BaseSimilarityEngine):
                     calculate_lexical_similarity,
                 )
 
-                return calculate_lexical_similarity(
-                    doc1, doc2, self.custom_stopwords
-                )
+                return calculate_lexical_similarity(doc1, doc2, self.custom_stopwords)
 
         elif self.algorithm == "jaccard":
             from src.core.lexical_similarity import jaccard_similarity
@@ -260,11 +256,7 @@ class LexicalSimilarityEngine(BaseSimilarityEngine):
 
     def compute_matrix(
         self,
-        documents: Union[
-            Dict[str, Union[str, np.ndarray]],
-            List[Union[str, np.ndarray]],
-            np.ndarray,
-        ],
+        documents: Dict[str, str | np.ndarray] | List[str | np.ndarray] | np.ndarray,
     ) -> np.ndarray:
         if isinstance(documents, dict):
             # Resolve all values to str
@@ -305,9 +297,7 @@ class LexicalSimilarityEngine(BaseSimilarityEngine):
                     if i == j:
                         matrix[i][j] = 1.0
                     else:
-                        sim = self.compute_pairwise_similarity(
-                            doc_list[i], doc_list[j]
-                        )
+                        sim = self.compute_pairwise_similarity(doc_list[i], doc_list[j])
                         matrix[i][j] = sim
                         matrix[j][i] = sim
             return matrix
@@ -347,14 +337,12 @@ class HybridSimilarityEngine(BaseSimilarityEngine):
 
     def compute_pairwise_similarity(
         self,
-        doc1: Union[str, np.ndarray],
-        doc2: Union[str, np.ndarray],
+        doc1: str | np.ndarray,
+        doc2: str | np.ndarray,
     ) -> float:
         # Check if lexical computation is possible (e.g. requires string inputs)
         try:
-            lex_sim = self.lexical_engine.compute_pairwise_similarity(
-                doc1, doc2
-            )
+            lex_sim = self.lexical_engine.compute_pairwise_similarity(doc1, doc2)
             has_lex = True
         except (TypeError, ValueError):
             lex_sim = 0.0
@@ -370,11 +358,7 @@ class HybridSimilarityEngine(BaseSimilarityEngine):
 
     def compute_matrix(
         self,
-        documents: Union[
-            Dict[str, Union[str, np.ndarray]],
-            List[Union[str, np.ndarray]],
-            np.ndarray,
-        ],
+        documents: Dict[str, str | np.ndarray] | List[str | np.ndarray] | np.ndarray,
     ) -> np.ndarray:
         sem_matrix = self.semantic_engine.compute_matrix(documents)
 

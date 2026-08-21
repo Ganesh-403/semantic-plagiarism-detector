@@ -241,7 +241,7 @@ def build_email_html_body(
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
         <h2 style="color: #333333; text-align: center; border-bottom: 2px solid #007bff; padding-bottom: 10px;">Daily Plagiarism Summary</h2>
         <p style="color: #666666; font-size: 14px; text-align: right;">
-            Report generated on: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}
+            Report generated on: {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}
         </p>
 
         <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
@@ -263,7 +263,7 @@ def build_email_html_body(
         {footer_note_html}
 
         <p style="color: #888888; text-align: center; font-size: 14px; margin-top: 30px;">
-            <a href="{os.getenv('APP_BASE_URL', 'http://localhost:8501')}" style="color: #007bff; text-decoration: none;">Review all incidents in the dashboard</a>
+            <a href="{os.getenv("APP_BASE_URL", "http://localhost:8501")}" style="color: #007bff; text-decoration: none;">Review all incidents in the dashboard</a>
         </p>
     </div>
     </body>
@@ -420,7 +420,6 @@ def send_email(
     attachment_filename: str = "daily_plagiarism_summary.csv",
     timeout: float = 10.0,
     reply_to: Optional[str] = None,
-
 ) -> bool:
     """
     Send an email using SMTP.
@@ -463,8 +462,6 @@ def send_email(
         if status_callback:
             status_callback(False, msg)
         return False
-
-
 
     max_retries = 3
     for attempt in range(max_retries + 1):

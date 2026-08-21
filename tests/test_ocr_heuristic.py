@@ -14,15 +14,17 @@ def test_ocr_fallback_heuristic(mock_image_to_string):
     """
     # 1. Test case: Page with 7 native words (below threshold, should trigger OCR)
     low_word_page = "one two three four five six seven"
-    
+
     # Mock return value for pytesseract OCR
     mock_image_to_string.return_value = "ocr extracted text"
 
     # Process page through router
     process_pdf_page(low_word_page, min_threshold=8)
-    
+
     # Assert pytesseract was called
-    assert mock_image_to_string.called, "Expected OCR to be triggered for low native word count page."
+    assert mock_image_to_string.called, (
+        "Expected OCR to be triggered for low native word count page."
+    )
 
     # Reset mock state
     mock_image_to_string.reset_mock()
@@ -33,4 +35,6 @@ def test_ocr_fallback_heuristic(mock_image_to_string):
     process_pdf_page(high_word_page, min_threshold=8)
 
     # Assert pytesseract was NOT called
-    assert not mock_image_to_string.called, "Expected OCR to be skipped for sufficient native word count page."
+    assert not mock_image_to_string.called, (
+        "Expected OCR to be skipped for sufficient native word count page."
+    )

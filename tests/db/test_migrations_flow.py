@@ -107,9 +107,9 @@ class TestCorpusMigrationFlow:
                 "date_flagged",
                 "last_seen",
             ):
-                assert column_exists(
-                    conn, "plagiarism_incidents", col
-                ), f"Missing: {col}"
+                assert column_exists(conn, "plagiarism_incidents", col), (
+                    f"Missing: {col}"
+                )
             assert index_exists(conn, "idx_incidents_status")
         finally:
             conn.close()

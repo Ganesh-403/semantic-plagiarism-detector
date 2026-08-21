@@ -47,10 +47,10 @@ class ChunkRecord:
 PipelineChunkRecord = ChunkRecord
 
 
-
 # ============================================================================
 # CROSS-LINGUAL INTEGRATION
 # ============================================================================
+
 
 def _get_cross_lingual_mode() -> bool:
     """Get cross-lingual mode from session state."""
@@ -61,12 +61,11 @@ def _get_cross_lingual_mode() -> bool:
 
 
 def _process_chunks_cross_lingual(
-    chunked_docs: Dict[str, List[str]],
-    cross_lingual_mode: bool = False
+    chunked_docs: Dict[str, List[str]], cross_lingual_mode: bool = False
 ) -> Tuple[Dict[str, List[str]], Dict[str, List[Dict[str, Any]]]]:
     """
     Process chunks with cross-lingual translation if enabled.
-    
+
     Returns:
         Tuple of (processed_chunks, metadata)
     """
@@ -74,12 +73,15 @@ def _process_chunks_cross_lingual(
         # Return original chunks with empty metadata
         metadata = {doc_name: [] for doc_name in chunked_docs}
         return chunked_docs, metadata
-    
+
     try:
         from src.core.cross_lingual import prepare_documents_for_embedding
+
         return prepare_documents_for_embedding(chunked_docs)
     except ImportError:
-        logger.warning("Cross-lingual module not available. Falling back to standard processing.")
+        logger.warning(
+            "Cross-lingual module not available. Falling back to standard processing."
+        )
         metadata = {doc_name: [] for doc_name in chunked_docs}
         return chunked_docs, metadata
 
@@ -87,6 +89,7 @@ def _process_chunks_cross_lingual(
 # ============================================================================
 # MAIN PIPELINE FUNCTIONS
 # ============================================================================
+
 
 def run_pipeline(
     file_bytes_dict: dict,
@@ -189,22 +192,22 @@ def run_pipeline(
     if cross_lingual_mode and chunked_docs:
         try:
             from src.core.cross_lingual import prepare_documents_for_embedding
-            
+
             # Convert chunked_docs to dict format
             doc_chunks = {}  # noqa: F841
             for doc_name, chunks in zip(file_bytes_dict.keys(), [chunked_docs]):
                 # Rebuild document chunks
                 pass
-            
+
             # Process with cross-lingual
             logger.info("Processing chunks with cross-lingual translation...")
             translated_docs, metadata = prepare_documents_for_embedding(
                 {name: [] for name in file_bytes_dict.keys()}
             )
-            
+
             # Store metadata for later use
             translation_metadata = metadata
-            
+
         except ImportError as e:
             logger.warning(f"Cross-lingual module unavailable: {e}")
     # ===================================
@@ -310,24 +313,28 @@ def run_extraction_pipeline(
     chunked_docs = chunk_documents(
         raw_texts_dict, chunk_size=chunk_size, chunk_overlap=chunk_overlap
     )
-    
+
     # ===== CROSS-LINGUAL PROCESSING =====
     translation_metadata = {}
-    
+
     if cross_lingual_mode:
         try:
             from src.core.cross_lingual import prepare_documents_for_embedding
-            
+
             logger.info("Processing documents with cross-lingual translation...")
-            translated_chunked_docs, metadata = prepare_documents_for_embedding(chunked_docs)
-            
+            translated_chunked_docs, metadata = prepare_documents_for_embedding(
+                chunked_docs
+            )
+
             # Store metadata for UI
             translation_metadata = metadata
-            
+
             # Use translated chunks for embedding
             processed_chunked_docs = translated_chunked_docs
-            logger.info(f"Cross-lingual processing complete for {len(processed_chunked_docs)} documents")
-            
+            logger.info(
+                f"Cross-lingual processing complete for {len(processed_chunked_docs)} documents"
+            )
+
         except ImportError as e:
             logger.warning(f"Cross-lingual module unavailable: {e}")
             # Fallback to standard processing

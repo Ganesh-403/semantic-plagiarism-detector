@@ -34,15 +34,22 @@ class TestGetActiveSessionsCount:
                 return now - 1200  # expired (20 min ago)
             return None
 
-        with patch("app.state_manager.get_cache", return_value=mock_cache), patch(
-            "app.state_manager.get_session_state", side_effect=mock_get_session_state
+        with (
+            patch("app.state_manager.get_cache", return_value=mock_cache),
+            patch(
+                "app.state_manager.get_session_state",
+                side_effect=mock_get_session_state,
+            ),
         ):
             count = get_active_sessions_count()
             assert count == 1
             mock_cache._client.scan_iter.assert_called_once_with(
                 match="spd:v1:session:*:last_interaction"
             )
-            assert not hasattr(mock_cache._client, "keys") or not mock_cache._client.keys.called
+            assert (
+                not hasattr(mock_cache._client, "keys")
+                or not mock_cache._client.keys.called
+            )
 
     def test_active_sessions_count_uses_scan_iter_instead_of_keys(self):
         """Explicitly verify that .scan_iter(match=...) is used instead of .keys() (Issue #2786)."""
@@ -90,7 +97,9 @@ class TestGetActiveSessionsCount:
 
     def test_active_sessions_count_returns_minus_one_on_unhandled_exception(self):
         """Test returns -1 when an unexpected exception is raised."""
-        with patch("app.state_manager.get_cache", side_effect=RuntimeError("Fatal error")):
+        with patch(
+            "app.state_manager.get_cache", side_effect=RuntimeError("Fatal error")
+        ):
             count = get_active_sessions_count()
             assert count == -1
 
@@ -108,12 +117,14 @@ class TestBackupDaemonSafety:
             "spd:v1:global:last_activity": time.time() - 3600,
         }.get(k, None)
 
-        with patch("app.state_manager.get_cache", return_value=mock_cache), patch(
-            "app.state_manager.get_active_sessions_count", return_value=-1
-        ), patch("src.core.app_config.get_backup_idle_timeout", return_value=1800), patch(
-            "src.db.database_backup.create_corpus_database_snapshot"
-        ) as mock_snapshot, patch(
-            "time.sleep", side_effect=InterruptedError("Stop loop")
+        with (
+            patch("app.state_manager.get_cache", return_value=mock_cache),
+            patch("app.state_manager.get_active_sessions_count", return_value=-1),
+            patch("src.core.app_config.get_backup_idle_timeout", return_value=1800),
+            patch(
+                "src.db.database_backup.create_corpus_database_snapshot"
+            ) as mock_snapshot,
+            patch("time.sleep", side_effect=InterruptedError("Stop loop")),
         ):
             try:
                 _run_backup_daemon()
@@ -136,14 +147,16 @@ class TestBackupDaemonSafety:
         fake_db = tmp_path / "corpus.db"
         fake_db.write_bytes(b"mock_db")
 
-        with patch("app.state_manager.get_cache", return_value=mock_cache), patch(
-            "app.state_manager.get_active_sessions_count", return_value=0
-        ), patch("src.core.app_config.get_backup_idle_timeout", return_value=1800), patch(
-            "src.db.corpus_db.get_corpus_db_path", return_value=fake_db
-        ), patch(
-            "src.db.database_backup.create_corpus_database_snapshot", return_value=b"snapshot_data"
-        ) as mock_snapshot, patch(
-            "time.sleep", side_effect=[None, InterruptedError("Stop loop")]
+        with (
+            patch("app.state_manager.get_cache", return_value=mock_cache),
+            patch("app.state_manager.get_active_sessions_count", return_value=0),
+            patch("src.core.app_config.get_backup_idle_timeout", return_value=1800),
+            patch("src.db.corpus_db.get_corpus_db_path", return_value=fake_db),
+            patch(
+                "src.db.database_backup.create_corpus_database_snapshot",
+                return_value=b"snapshot_data",
+            ) as mock_snapshot,
+            patch("time.sleep", side_effect=[None, InterruptedError("Stop loop")]),
         ):
             try:
                 _run_backup_daemon()

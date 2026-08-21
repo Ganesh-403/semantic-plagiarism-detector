@@ -190,9 +190,7 @@ def test_embedding_model_manager_raises_descriptive_error_when_all_models_fail(
     def fail_every_model(model_name, cache_folder=None):
         raise RuntimeError(f"failed to load {model_name}")
 
-    monkeypatch.setattr(
-        embedding_model, "SentenceTransformer", fail_every_model
-    )
+    monkeypatch.setattr(embedding_model, "SentenceTransformer", fail_every_model)
 
     manager = EmbeddingModelManager.get_instance()
 
@@ -231,9 +229,9 @@ def test_embedding_model_device_logging(caplog, monkeypatch):
         "SentenceTransformer model [paraphrase-multilingual-MiniLM-L12-v2] "
         "running on device [cpu]"
     )
-    assert any(
-        expected_log in record.message for record in caplog.records
-    ), f"Expected device log message not found in: {[r.message for r in caplog.records]}"
+    assert any(expected_log in record.message for record in caplog.records), (
+        f"Expected device log message not found in: {[r.message for r in caplog.records]}"
+    )
 
 
 def test_detect_device_helper():

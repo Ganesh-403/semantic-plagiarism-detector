@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 class AnomalyType(Enum):
     """Types of anomalies detected."""
+
     CLUSTER = "cluster"
     OUTLIER = "outlier"
     PATTERN = "pattern"
@@ -31,6 +32,7 @@ class AnomalyType(Enum):
 
 class AnomalySeverity(Enum):
     """Severity of detected anomalies."""
+
     INFO = "info"
     LOW = "low"
     MEDIUM = "medium"
@@ -41,6 +43,7 @@ class AnomalySeverity(Enum):
 @dataclass
 class Anomaly:
     """A detected anomaly."""
+
     anomaly_id: str
     anomaly_type: AnomalyType
     severity: AnomalySeverity
@@ -68,6 +71,7 @@ class Anomaly:
 @dataclass
 class AnomalyResult:
     """Complete anomaly detection result."""
+
     anomalies: List[Anomaly]
     summary: Dict[str, Any]
     statistics: Dict[str, Any]
@@ -87,6 +91,7 @@ class AnomalyResult:
 @dataclass
 class AnomalyConfig:
     """Configuration for anomaly detection."""
+
     z_score_threshold: float = 2.5
     cluster_min_size: int = 3
     cluster_similarity_threshold: float = 0.85
@@ -106,7 +111,9 @@ class StatisticalAnalyzer:
     def __init__(self, config: AnomalyConfig):
         self.config = config
 
-    def z_score_analysis(self, scores: List[float]) -> List[Tuple[int, float, AnomalySeverity]]:
+    def z_score_analysis(
+        self, scores: List[float]
+    ) -> List[Tuple[int, float, AnomalySeverity]]:
         """Identify outliers using Z-score."""
         if len(scores) < 3:
             return []
@@ -119,7 +126,13 @@ class StatisticalAnalyzer:
         for i, score in enumerate(scores):
             z = (score - mean) / std
             if abs(z) >= self.config.z_score_threshold:
-                severity = AnomalySeverity.CRITICAL if z >= 3.5 else AnomalySeverity.HIGH if z >= 3.0 else AnomalySeverity.MEDIUM
+                severity = (
+                    AnomalySeverity.CRITICAL
+                    if z >= 3.5
+                    else AnomalySeverity.HIGH
+                    if z >= 3.0
+                    else AnomalySeverity.MEDIUM
+                )
                 anomalies.append((i, z, severity))
         return anomalies
 
@@ -154,7 +167,9 @@ class StatisticalAnalyzer:
             return None
         arr = np.array(scores)
         skewness = float(np.mean(((arr - np.mean(arr)) / (np.std(arr) + 1e-10)) ** 3))
-        kurtosis = float(np.mean(((arr - np.mean(arr)) / (np.std(arr) + 1e-10)) ** 4) - 3)
+        kurtosis = float(
+            np.mean(((arr - np.mean(arr)) / (np.std(arr) + 1e-10)) ** 4) - 3
+        )
         if abs(skewness) > 2 or kurtosis > 5:
             return Anomaly(
                 anomaly_id="STAT-DIST-001",
@@ -176,7 +191,9 @@ class ClusterAnalyzer:
     def __init__(self, config: AnomalyConfig):
         self.config = config
 
-    def find_similarity_clusters(self, doc_names: List[str], similarity_matrix: np.ndarray) -> List[Dict[str, Any]]:
+    def find_similarity_clusters(
+        self, doc_names: List[str], similarity_matrix: np.ndarray
+    ) -> List[Dict[str, Any]]:
         """Find clusters of highly similar documents."""
         n = len(doc_names)
         visited = set()
@@ -193,30 +210,50 @@ class ClusterAnalyzer:
                     cluster.append(j)
             if len(cluster) >= self.config.cluster_min_size:
                 visited.update(cluster)
-                clusters.append({
-                    "documents": [doc_names[idx] for idx in cluster],
-                    "size": len(cluster),
-                    "avg_similarity": float(np.mean([similarity_matrix[a, b]
-                        for a in cluster for b in cluster if a < b])),
-                })
+                clusters.append(
+                    {
+                        "documents": [doc_names[idx] for idx in cluster],
+                        "size": len(cluster),
+                        "avg_similarity": float(
+                            np.mean(
+                                [
+                                    similarity_matrix[a, b]
+                                    for a in cluster
+                                    for b in cluster
+                                    if a < b
+                                ]
+                            )
+                        ),
+                    }
+                )
         return clusters
 
-    def detect_collusion_clusters(self, clusters: List[Dict[str, Any]]) -> List[Anomaly]:
+    def detect_collusion_clusters(
+        self, clusters: List[Dict[str, Any]]
+    ) -> List[Anomaly]:
         """Detect potential collusion from similarity clusters."""
         anomalies = []
         for i, cluster in enumerate(clusters):
-            if cluster["size"] >= self.config.cluster_min_size and cluster["avg_similarity"] >= self.config.collusion_threshold:
-                anomalies.append(Anomaly(
-                    anomaly_id=f"COLLUSION-{i+1:03d}",
-                    anomaly_type=AnomalyType.COLLUSION,
-                    severity=AnomalySeverity.HIGH,
-                    title=f"Potential Collusion Cluster ({cluster['size']} documents)",
-                    description=f"Group of {cluster['size']} documents with {cluster['avg_similarity']:.1%} average similarity suggests possible collaboration or shared source.",
-                    affected_documents=cluster["documents"],
-                    confidence=cluster["avg_similarity"],
-                    evidence={"cluster_size": cluster["size"], "avg_similarity": cluster["avg_similarity"]},
-                    detected_at=datetime.now().isoformat(),
-                ))
+            if (
+                cluster["size"] >= self.config.cluster_min_size
+                and cluster["avg_similarity"] >= self.config.collusion_threshold
+            ):
+                anomalies.append(
+                    Anomaly(
+                        anomaly_id=f"COLLUSION-{i + 1:03d}",
+                        anomaly_type=AnomalyType.COLLUSION,
+                        severity=AnomalySeverity.HIGH,
+                        title=f"Potential Collusion Cluster ({cluster['size']} documents)",
+                        description=f"Group of {cluster['size']} documents with {cluster['avg_similarity']:.1%} average similarity suggests possible collaboration or shared source.",
+                        affected_documents=cluster["documents"],
+                        confidence=cluster["avg_similarity"],
+                        evidence={
+                            "cluster_size": cluster["size"],
+                            "avg_similarity": cluster["avg_similarity"],
+                        },
+                        detected_at=datetime.now().isoformat(),
+                    )
+                )
         return anomalies
 
 
@@ -226,26 +263,32 @@ class PatternAnalyzer:
     def __init__(self, config: AnomalyConfig):
         self.config = config
 
-    def find_repeated_phrases(self, documents: Dict[str, str], min_length: int = 20) -> List[Dict[str, Any]]:
+    def find_repeated_phrases(
+        self, documents: Dict[str, str], min_length: int = 20
+    ) -> List[Dict[str, Any]]:
         """Find repeated phrases across documents."""
         phrase_docs: Dict[str, Set[str]] = defaultdict(set)
         for doc_name, text in documents.items():
             words = text.lower().split()
             for i in range(len(words) - min_length + 1):
-                phrase = " ".join(words[i:i + min_length])
+                phrase = " ".join(words[i : i + min_length])
                 phrase_docs[phrase].add(doc_name)
 
         repeated = []
         for phrase, doc_set in phrase_docs.items():
             if len(doc_set) >= 2:
-                repeated.append({
-                    "phrase": phrase[:100] + "..." if len(phrase) > 100 else phrase,
-                    "documents": list(doc_set),
-                    "document_count": len(doc_set),
-                })
+                repeated.append(
+                    {
+                        "phrase": phrase[:100] + "..." if len(phrase) > 100 else phrase,
+                        "documents": list(doc_set),
+                        "document_count": len(doc_set),
+                    }
+                )
         return sorted(repeated, key=lambda x: x["document_count"], reverse=True)[:20]
 
-    def detect_template_anomalies(self, documents: Dict[str, str], repeated_phrases: List[Dict]) -> List[Anomaly]:
+    def detect_template_anomalies(
+        self, documents: Dict[str, str], repeated_phrases: List[Dict]
+    ) -> List[Anomaly]:
         """Detect template-based plagiarism."""
         anomalies = []
         doc_template_count: Dict[str, int] = Counter()
@@ -255,17 +298,19 @@ class PatternAnalyzer:
 
         for doc, count in doc_template_count.items():
             if count >= 3:
-                anomalies.append(Anomaly(
-                    anomaly_id=f"TEMPLATE-{doc[:20]}",
-                    anomaly_type=AnomalyType.TEMPLATE,
-                    severity=AnomalySeverity.MEDIUM,
-                    title=f"Template Usage: {doc}",
-                    description=f"Document contains {count} repeated phrases found in other documents, suggesting template or shared source usage.",
-                    affected_documents=[doc],
-                    confidence=min(count / 10, 1.0),
-                    evidence={"repeated_phrase_count": count},
-                    detected_at=datetime.now().isoformat(),
-                ))
+                anomalies.append(
+                    Anomaly(
+                        anomaly_id=f"TEMPLATE-{doc[:20]}",
+                        anomaly_type=AnomalyType.TEMPLATE,
+                        severity=AnomalySeverity.MEDIUM,
+                        title=f"Template Usage: {doc}",
+                        description=f"Document contains {count} repeated phrases found in other documents, suggesting template or shared source usage.",
+                        affected_documents=[doc],
+                        confidence=min(count / 10, 1.0),
+                        evidence={"repeated_phrase_count": count},
+                        detected_at=datetime.now().isoformat(),
+                    )
+                )
         return anomalies
 
     def detect_copy_patterns(self, documents: Dict[str, str]) -> List[Anomaly]:
@@ -276,23 +321,34 @@ class PatternAnalyzer:
             for j in range(i + 1, len(doc_names)):
                 text_a = documents[doc_names[i]].lower()
                 text_b = documents[doc_names[j]].lower()
-                if len(text_a) < self.config.pattern_min_length or len(text_b) < self.config.pattern_min_length:
+                if (
+                    len(text_a) < self.config.pattern_min_length
+                    or len(text_b) < self.config.pattern_min_length
+                ):
                     continue
                 words_a = set(text_a.split())
                 words_b = set(text_b.split())
-                overlap = len(words_a & words_b) / min(len(words_a), len(words_b)) if min(len(words_a), len(words_b)) > 0 else 0
+                overlap = (
+                    len(words_a & words_b) / min(len(words_a), len(words_b))
+                    if min(len(words_a), len(words_b)) > 0
+                    else 0
+                )
                 if overlap > self.config.template_threshold:
-                    anomalies.append(Anomaly(
-                        anomaly_id=f"COPY-{doc_names[i][:10]}-{doc_names[j][:10]}",
-                        anomaly_type=AnomalyType.PATTERN,
-                        severity=AnomalySeverity.HIGH if overlap > 0.9 else AnomalySeverity.MEDIUM,
-                        title=f"Copy Pattern: {doc_names[i]} ↔ {doc_names[j]}",
-                        description=f"Word overlap of {overlap:.1%} detected between documents, suggesting direct copying.",
-                        affected_documents=[doc_names[i], doc_names[j]],
-                        confidence=overlap,
-                        evidence={"word_overlap": overlap},
-                        detected_at=datetime.now().isoformat(),
-                    ))
+                    anomalies.append(
+                        Anomaly(
+                            anomaly_id=f"COPY-{doc_names[i][:10]}-{doc_names[j][:10]}",
+                            anomaly_type=AnomalyType.PATTERN,
+                            severity=AnomalySeverity.HIGH
+                            if overlap > 0.9
+                            else AnomalySeverity.MEDIUM,
+                            title=f"Copy Pattern: {doc_names[i]} ↔ {doc_names[j]}",
+                            description=f"Word overlap of {overlap:.1%} detected between documents, suggesting direct copying.",
+                            affected_documents=[doc_names[i], doc_names[j]],
+                            confidence=overlap,
+                            evidence={"word_overlap": overlap},
+                            detected_at=datetime.now().isoformat(),
+                        )
+                    )
         return anomalies
 
 
@@ -335,39 +391,52 @@ class AnomalyDetector:
         if self.config.enable_statistical and similarity_scores:
             z_anomalies = self.stat_analyzer.z_score_analysis(similarity_scores)
             for idx, z_score, severity in z_anomalies:
-                anomalies.append(Anomaly(
-                    anomaly_id=f"STAT-Z-{idx:03d}",
-                    anomaly_type=AnomalyType.STATISTICAL,
-                    severity=severity,
-                    title=f"Statistical Outlier (Z-score: {z_score:.2f})",
-                    description=f"Similarity score at position {idx} is {z_score:.2f} standard deviations from the mean.",
-                    affected_documents=[],
-                    confidence=min(abs(z_score) / 5, 1.0),
-                    evidence={"z_score": z_score, "position": idx},
-                    detected_at=datetime.now().isoformat(),
-                ))
-            dist_anomaly = self.stat_analyzer.detect_distribution_anomaly(similarity_scores)
+                anomalies.append(
+                    Anomaly(
+                        anomaly_id=f"STAT-Z-{idx:03d}",
+                        anomaly_type=AnomalyType.STATISTICAL,
+                        severity=severity,
+                        title=f"Statistical Outlier (Z-score: {z_score:.2f})",
+                        description=f"Similarity score at position {idx} is {z_score:.2f} standard deviations from the mean.",
+                        affected_documents=[],
+                        confidence=min(abs(z_score) / 5, 1.0),
+                        evidence={"z_score": z_score, "position": idx},
+                        detected_at=datetime.now().isoformat(),
+                    )
+                )
+            dist_anomaly = self.stat_analyzer.detect_distribution_anomaly(
+                similarity_scores
+            )
             if dist_anomaly:
                 anomalies.append(dist_anomaly)
 
         # Cluster analysis
         if self.config.enable_cluster and similarity_matrix is not None:
-            clusters = self.cluster_analyzer.find_similarity_clusters(doc_names, similarity_matrix)
+            clusters = self.cluster_analyzer.find_similarity_clusters(
+                doc_names, similarity_matrix
+            )
             collusion = self.cluster_analyzer.detect_collusion_clusters(clusters)
             anomalies.extend(collusion)
 
         # Pattern analysis
         if self.config.enable_pattern:
             repeated = self.pattern_analyzer.find_repeated_phrases(documents)
-            template_anomalies = self.pattern_analyzer.detect_template_anomalies(documents, repeated)
+            template_anomalies = self.pattern_analyzer.detect_template_anomalies(
+                documents, repeated
+            )
             anomalies.extend(template_anomalies)
             copy_anomalies = self.pattern_analyzer.detect_copy_patterns(documents)
             anomalies.extend(copy_anomalies)
 
-        anomalies.sort(key=lambda a: (
-            {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}[a.severity.value],
-            a.confidence
-        ), reverse=True)
+        anomalies.sort(
+            key=lambda a: (
+                {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}[
+                    a.severity.value
+                ],
+                a.confidence,
+            ),
+            reverse=True,
+        )
 
         processing_time = (datetime.now() - start_time).total_seconds()
 
@@ -375,14 +444,18 @@ class AnomalyDetector:
             "total_anomalies": len(anomalies),
             "by_type": dict(Counter(a.anomaly_type.value for a in anomalies)),
             "by_severity": dict(Counter(a.severity.value for a in anomalies)),
-            "high_priority_count": sum(1 for a in anomalies if a.severity.value in ("high", "critical")),
+            "high_priority_count": sum(
+                1 for a in anomalies if a.severity.value in ("high", "critical")
+            ),
             "documents_analyzed": len(documents),
         }
 
         statistics = {}
         if similarity_scores:
             statistics = {
-                "score_distribution": self.stat_analyzer.percentile_analysis(similarity_scores),
+                "score_distribution": self.stat_analyzer.percentile_analysis(
+                    similarity_scores
+                ),
                 "mean_score": float(np.mean(similarity_scores)),
                 "std_score": float(np.std(similarity_scores)),
             }
@@ -390,21 +463,32 @@ class AnomalyDetector:
         recommendations = self._generate_recommendations(anomalies, summary)
 
         return AnomalyResult(
-            anomalies=anomalies, summary=summary, statistics=statistics,
-            recommendations=recommendations, processing_time=processing_time,
+            anomalies=anomalies,
+            summary=summary,
+            statistics=statistics,
+            recommendations=recommendations,
+            processing_time=processing_time,
         )
 
-    def _generate_recommendations(self, anomalies: List[Anomaly], summary: Dict) -> List[str]:
+    def _generate_recommendations(
+        self, anomalies: List[Anomaly], summary: Dict
+    ) -> List[str]:
         """Generate recommendations based on detected anomalies."""
         recs = []
         if summary.get("by_type", {}).get("collusion", 0) > 0:
-            recs.append("🔴 Collusion clusters detected. Consider interviewing affected students.")
+            recs.append(
+                "🔴 Collusion clusters detected. Consider interviewing affected students."
+            )
         if summary.get("by_type", {}).get("template", 0) > 0:
-            recs.append("🟠 Template usage found. Consider revising assignment prompts.")
+            recs.append(
+                "🟠 Template usage found. Consider revising assignment prompts."
+            )
         if summary.get("by_type", {}).get("pattern", 0) > 0:
             recs.append("🟡 Copy patterns detected. Manual review recommended.")
         if summary.get("high_priority_count", 0) > 5:
-            recs.append("⚠️ High volume of anomalies. Consider expanding investigation scope.")
+            recs.append(
+                "⚠️ High volume of anomalies. Consider expanding investigation scope."
+            )
         if not recs:
             recs.append("✅ No significant anomalies detected. Continue monitoring.")
         return recs

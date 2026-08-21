@@ -208,6 +208,7 @@ def _get_base_tokens(text: str) -> list[str]:
 
     try:
         from nltk.tokenize import word_tokenize as _nltk_word_tokenize
+
         raw_tokens = _nltk_word_tokenize(text)
         return [
             tok.lower()
@@ -360,7 +361,7 @@ def jaccard_similarity(
     """Compute Jaccard similarity with optional stopword filtering."""
     if not text_a or not text_b:
         return 0.0
-    
+
     if use_stopwords:
         if stopwords is None:
             stopwords = get_stopword_manager().get_stopwords()
@@ -368,14 +369,15 @@ def jaccard_similarity(
         set_b = tokenize_filtered(text_b, stopwords)
     else:
         from src.core.lexical_similarity import tokenize
+
         set_a = tokenize(text_a, stopwords)
         set_b = tokenize(text_b, stopwords)
-    
+
     if not set_a and not set_b:
         return 1.0
     if not set_a or not set_b:
         return 0.0
-    
+
     intersection = len(set_a & set_b)
     union = len(set_a | set_b)
     return intersection / union if union > 0 else 0.0

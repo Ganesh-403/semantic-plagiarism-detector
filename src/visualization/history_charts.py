@@ -24,6 +24,7 @@ def _resolve_color(theme_colors: dict | None, key: str, default: str) -> str:
     """Resolve a theme color with a fallback to the default color."""
     return theme_colors.get(key, default) if theme_colors else default
 
+
 def plot_similarity_trend_line(
     history_data: List[Dict],
     theme_colors: Optional[Dict] = None,

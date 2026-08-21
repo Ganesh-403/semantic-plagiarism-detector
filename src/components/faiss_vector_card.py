@@ -9,7 +9,9 @@ def render_vector_match_card(match: Dict[str, Any]) -> str:
     l2_dist = match.get("l2_distance", 0.0)
     rank = match.get("rank_position", 1)
 
-    badge_color = "#10B981" if sim_pct > 80 else "#F59E0B" if sim_pct > 50 else "#6366F1"
+    badge_color = (
+        "#10B981" if sim_pct > 80 else "#F59E0B" if sim_pct > 50 else "#6366F1"
+    )
 
     return f"""
     <div style="
@@ -46,17 +48,17 @@ def render_vector_match_card(match: Dict[str, Any]) -> str:
         </div>
         
         <h4 style="color: white; font-weight: 900; margin: 0 0 8px 0;">
-            Document: {match.get('matched_document_title')} ({match.get('matched_chunk_id')})
+            Document: {match.get("matched_document_title")} ({match.get("matched_chunk_id")})
         </h4>
         
         <p style="color: #94A3B8; font-size: 13px; font-style: italic; margin-bottom: 16px; background: rgba(2, 6, 23, 0.5); padding: 12px; border-radius: 12px; border: 1px solid rgba(30, 41, 59, 0.8);">
-            "{match.get('matched_text_snippet')}"
+            "{match.get("matched_text_snippet")}"
         </p>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
             <div style="background: rgba(2, 6, 23, 0.6); padding: 12px; border-radius: 12px; border: 1px solid rgba(30, 41, 59, 1);">
                 <span style="color: #94A3B8; font-size: 11px;">Inner Product Score:</span>
-                <div style="color: #10B981; font-weight: 800; font-size: 16px;">{match.get('cosine_similarity_score')}</div>
+                <div style="color: #10B981; font-weight: 800; font-size: 16px;">{match.get("cosine_similarity_score")}</div>
             </div>
             <div style="background: rgba(2, 6, 23, 0.6); padding: 12px; border-radius: 12px; border: 1px solid rgba(30, 41, 59, 1);">
                 <span style="color: #94A3B8; font-size: 11px;">L2 Distance:</span>

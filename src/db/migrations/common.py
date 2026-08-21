@@ -161,6 +161,7 @@ def migration_transaction(connection: sqlite3.Connection):
 
 from datetime import datetime, timezone
 
+
 def ensure_migration_history_table(connection: sqlite3.Connection) -> None:
     """Ensure that the migration_history table exists."""
     connection.execute("""
@@ -187,9 +188,7 @@ def record_migration_applied(
     )
 
 
-def record_migration_rolled_back(
-    connection: sqlite3.Connection, version: int
-) -> None:
+def record_migration_rolled_back(connection: sqlite3.Connection, version: int) -> None:
     """Remove a rolled-back migration from migration_history table."""
     ensure_migration_history_table(connection)
     connection.execute(

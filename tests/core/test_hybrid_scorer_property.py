@@ -77,9 +77,7 @@ def massive_identical_text(draw):
     Produces strings of length 1..5000 by repeating a small alphabetic
     seed. Used to stress-test the upper bound and the lexical caches.
     """
-    seed = draw(
-        st.text(alphabet=string.ascii_letters, min_size=1, max_size=10)
-    )
+    seed = draw(st.text(alphabet=string.ascii_letters, min_size=1, max_size=10))
     repeats = draw(st.integers(min_value=1, max_value=500))
     return seed * repeats
 
@@ -264,9 +262,7 @@ class TestHybridScoreEdgeCases:
     @settings(max_examples=100, deadline=None)
     def test_empty_strings(self, method, semantic_score, alpha):
         scorer = HybridScorer(HybridConfig(alpha=alpha, lexical_method=method))
-        score = scorer.compute_hybrid_similarity(
-            "", "", semantic_score=semantic_score
-        )
+        score = scorer.compute_hybrid_similarity("", "", semantic_score=semantic_score)
         scorer.clear_cache()
         assert 0.0 <= score <= 1.0
 
@@ -339,8 +335,10 @@ class TestHybridScoreClamping:
         text_a=ascii_text,
         text_b=ascii_text,
         semantic_score=st.floats(
-            min_value=-1000.0, max_value=1000.0,
-            allow_nan=False, allow_infinity=False,
+            min_value=-1000.0,
+            max_value=1000.0,
+            allow_nan=False,
+            allow_infinity=False,
         ),
         alpha=unit_float,
     )
@@ -377,9 +375,7 @@ class TestHybridScoreBlendProperties:
         deadline=None,
         suppress_health_check=[HealthCheck.function_scoped_fixture],
     )
-    def test_alpha_zero_uses_lexical_only(
-        self, text_a, text_b, semantic_score, alpha
-    ):
+    def test_alpha_zero_uses_lexical_only(self, text_a, text_b, semantic_score, alpha):
         """With alpha=0, hybrid score must equal the (clamped) lexical score."""
         scorer = HybridScorer(HybridConfig(alpha=alpha, lexical_method="jaccard"))
         lexical = scorer._compute_lexical_score(text_a, text_b, "jaccard")
@@ -403,9 +399,7 @@ class TestHybridScoreBlendProperties:
         deadline=None,
         suppress_health_check=[HealthCheck.function_scoped_fixture],
     )
-    def test_alpha_one_uses_semantic_only(
-        self, text_a, text_b, semantic_score, alpha
-    ):
+    def test_alpha_one_uses_semantic_only(self, text_a, text_b, semantic_score, alpha):
         """With alpha=1, hybrid score must equal the (clamped) semantic score."""
         scorer = HybridScorer(HybridConfig(alpha=alpha, lexical_method="jaccard"))
         hybrid = scorer.compute_hybrid_similarity(

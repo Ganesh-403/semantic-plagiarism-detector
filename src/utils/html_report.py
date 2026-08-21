@@ -24,7 +24,8 @@ def generate_html_report(
     """
     if min_match_length > 0:
         incidents = [
-            i for i in incidents
+            i
+            for i in incidents
             if int(i.get("matched_length", 0) or 0) >= min_match_length
         ]
 

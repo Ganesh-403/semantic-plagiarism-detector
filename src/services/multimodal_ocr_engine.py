@@ -75,7 +75,11 @@ class MultimodalOcrEngine:
     ) -> MultimodalImageOcrMatch:
         """Compares OCR text extracted from an image against a target reference document."""
         ocr_sim = cls.calculate_text_jaccard_similarity(raw_ocr_text, reference_text)
-        layout_sim = round(random.uniform(0.70, 0.95), 4) if ocr_sim > 0.40 else round(random.uniform(0.10, 0.40), 4)
+        layout_sim = (
+            round(random.uniform(0.70, 0.95), 4)
+            if ocr_sim > 0.40
+            else round(random.uniform(0.10, 0.40), 4)
+        )
 
         overall_score = round((ocr_sim * 0.7) + (layout_sim * 0.3), 4)
 

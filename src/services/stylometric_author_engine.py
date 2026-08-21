@@ -17,8 +17,26 @@ from src.models.stylometric_author_model import (
 )
 
 COMMON_FUNCTION_WORDS = {
-    "the", "be", "to", "of", "and", "a", "in", "that", "have", "i",
-    "it", "for", "not", "on", "with", "he", "as", "you", "do", "at",
+    "the",
+    "be",
+    "to",
+    "of",
+    "and",
+    "a",
+    "in",
+    "that",
+    "have",
+    "i",
+    "it",
+    "for",
+    "not",
+    "on",
+    "with",
+    "he",
+    "as",
+    "you",
+    "do",
+    "at",
 }
 
 
@@ -33,9 +51,17 @@ class StylometricAuthorEngine:
         sentences = [s.strip() for s in re.split(r"[.!?]+", text_content) if s.strip()]
         sentence_lengths = [len(s.split()) for s in sentences] if sentences else [0]
 
-        avg_sent_len = round(sum(sentence_lengths) / len(sentence_lengths), 2) if sentence_lengths else 0.0
+        avg_sent_len = (
+            round(sum(sentence_lengths) / len(sentence_lengths), 2)
+            if sentence_lengths
+            else 0.0
+        )
         variance = (
-            round(sum((l - avg_sent_len) ** 2 for l in sentence_lengths) / len(sentence_lengths), 2)
+            round(
+                sum((l - avg_sent_len) ** 2 for l in sentence_lengths)
+                / len(sentence_lengths),
+                2,
+            )
             if sentence_lengths
             else 0.0
         )
@@ -114,7 +140,11 @@ class StylometricAuthorEngine:
 
         # Convert distance to confidence percentage
         confidence = max(0.0, round(100.0 - (dist * 18.0), 2))
-        trait = "Function Word Distribution" if dist <= 2.0 else "Sentence Length & Vocabulary TTR"
+        trait = (
+            "Function Word Distribution"
+            if dist <= 2.0
+            else "Sentence Length & Vocabulary TTR"
+        )
 
         return StylometricAuthorMatch(
             match_id=f"STYLE-{uuid.uuid4().hex[:8].upper()}",

@@ -192,5 +192,3 @@ def test_build_download_response_instance_call():
     )
     assert payload == b"hello"
     assert headers["Content-Type"] == "text/csv; charset=utf-8"
-
-

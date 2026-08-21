@@ -123,7 +123,9 @@ class PatternRepository(BaseRepository):
             if pattern_type:
                 where_clauses.append("pattern_type = ?")
                 params.append(pattern_type)
-            where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+            where_sql = (
+                ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+            )
             rows = conn.execute(
                 f"""
                 SELECT * FROM plagiarism_patterns
@@ -202,7 +204,14 @@ class PatternRepository(BaseRepository):
                     avg_similarity, confidence_score, drift_score
                 ) VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (pattern_id, date, occurrence_count, avg_similarity, confidence_score, drift_score),
+                (
+                    pattern_id,
+                    date,
+                    occurrence_count,
+                    avg_similarity,
+                    confidence_score,
+                    drift_score,
+                ),
             )
             conn.commit()
 
@@ -234,7 +243,9 @@ class PatternRepository(BaseRepository):
         contributing_factors: list[str] | None = None,
         model_version: str | None = None,
     ) -> None:
-        factors_json = json.dumps(contributing_factors) if contributing_factors else None
+        factors_json = (
+            json.dumps(contributing_factors) if contributing_factors else None
+        )
         with closing(_get_connection(self._db_path)) as conn:
             conn.execute(
                 """
@@ -249,7 +260,14 @@ class PatternRepository(BaseRepository):
                     model_version = excluded.model_version,
                     scored_at = excluded.scored_at
                 """,
-                (document_name, risk_score, risk_level, factors_json, model_version, _utc_now_iso()),
+                (
+                    document_name,
+                    risk_score,
+                    risk_level,
+                    factors_json,
+                    model_version,
+                    _utc_now_iso(),
+                ),
             )
             conn.commit()
 
@@ -308,7 +326,16 @@ class PatternRepository(BaseRepository):
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
                 ON CONFLICT(recommendation_id) DO NOTHING
                 """,
-                (recommendation_id, pattern_id, recommendation_type, priority, target, message, items_json, _utc_now_iso()),
+                (
+                    recommendation_id,
+                    pattern_id,
+                    recommendation_type,
+                    priority,
+                    target,
+                    message,
+                    items_json,
+                    _utc_now_iso(),
+                ),
             )
             conn.commit()
 
@@ -343,9 +370,7 @@ class PatternRepository(BaseRepository):
             return [dict(r) for r in rows]
 
     @with_sqlite_retry
-    def update_recommendation_status(
-        self, recommendation_id: str, status: str
-    ) -> bool:
+    def update_recommendation_status(self, recommendation_id: str, status: str) -> bool:
         with closing(_get_connection(self._db_path)) as conn:
             cursor = conn.execute(
                 "UPDATE proactive_recommendations SET status = ? WHERE recommendation_id = ?",

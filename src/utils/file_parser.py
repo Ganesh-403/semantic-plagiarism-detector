@@ -11,7 +11,6 @@ Supports decrypted and password-protected PDF parsing using PyMuPDF (fitz),
 along with file categorization and validation helpers.
 """
 
-
 import logging
 from typing import Any, List, Optional, Tuple, Union
 
@@ -21,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── String & Name Formatting ─────────────────────────────────────────────────
+
 
 def truncate_filename(name: str, max_len: int = 35) -> str:
     """Truncate filename with ellipsis if it exceeds max_len."""
@@ -72,7 +72,7 @@ class EncryptedPDFError(Exception):
 
 
 def get_file_mime_type_from_bytes(
-    file_bytes: Union[bytes, bytearray, memoryview],
+    file_bytes: bytes | bytearray | memoryview,
 ) -> str:
     """Inspect raw byte headers to determine the file's MIME type.
 
@@ -146,7 +146,7 @@ def get_file_mime_type_from_bytes(
     return "application/octet-stream"
 
 
-def is_office_open_xml(file_bytes: Union[bytes, bytearray]) -> bool:
+def is_office_open_xml(file_bytes: bytes | bytearray) -> bool:
     """Check if a ZIP file is specifically an Office Open XML document (DOCX, XLSX).
 
     Office documents are ZIP archives containing a specific [Content_Types].xml
@@ -199,8 +199,6 @@ def get_file_size_formatted(num_bytes: int) -> str:
     return f"{size:.2f} {units[-1]}"
 
 
-
-
 def validate_pdf_page_count(
     file_bytes: bytes,
     max_pages: int = 500,
@@ -244,10 +242,7 @@ def validate_pdf_page_count(
         doc.close()
 
     if page_count > max_pages:
-        raise ValueError(
-            "PDF exceeds maximum allowed page limit "
-            f"({max_pages} pages)"
-        )
+        raise ValueError(f"PDF exceeds maximum allowed page limit ({max_pages} pages)")
 
     return page_count
 

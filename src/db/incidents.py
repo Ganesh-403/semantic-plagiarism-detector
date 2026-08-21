@@ -63,7 +63,6 @@ def get_incidents_repo() -> IncidentsRepository:
     return incidents_repo
 
 
-
 def configure_db_path(db_path: str | Path) -> None:
     """Configure the SQLite database path used by the incidents module."""
     global DEFAULT_DB_PATH
@@ -84,9 +83,7 @@ def _validate_iso_timestamp(val: Any) -> str | None:
         return None
     try:
         norm_val = (
-            clean_val.replace("Z", "+00:00")
-            if clean_val.endswith("Z")
-            else clean_val
+            clean_val.replace("Z", "+00:00") if clean_val.endswith("Z") else clean_val
         )
         datetime.fromisoformat(norm_val)
         return clean_val
@@ -311,8 +308,7 @@ def sync_flagged_incidents(
                     or timestamp
                 )
                 flag_last_seen = (
-                    _validate_iso_timestamp(flag.get("last_seen"))
-                    or timestamp
+                    _validate_iso_timestamp(flag.get("last_seen")) or timestamp
                 )
 
                 bulk_records.append(
@@ -1287,4 +1283,3 @@ def get_incidents_repo(db_path: str | Path | None = None) -> IncidentsRepository
     if db_path is None:
         return IncidentsRepository()
     return IncidentsRepository(db_path)
-

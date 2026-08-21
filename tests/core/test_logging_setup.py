@@ -33,6 +33,7 @@ def test_json_formatter_includes_exception():
         raise ValueError("Boom exception")
     except ValueError as e:
         import sys
+
         exc_info = sys.exc_info()
 
     record = logging.LogRecord(
@@ -55,7 +56,7 @@ def test_setup_logging_development(monkeypatch):
     """Verify setup_logging configures root logger with text format in dev."""
     monkeypatch.setenv("APP_ENVIRONMENT", "development")
     setup_logging(log_level="DEBUG")
-    
+
     root_logger = logging.getLogger()
     assert root_logger.level == logging.DEBUG
     assert len(root_logger.handlers) == 1
@@ -68,7 +69,7 @@ def test_setup_logging_production(monkeypatch):
     """Verify setup_logging configures root logger with JSONFormatter in production."""
     monkeypatch.setenv("APP_ENVIRONMENT", "production")
     setup_logging(log_level="WARNING")
-    
+
     root_logger = logging.getLogger()
     assert root_logger.level == logging.WARNING
     assert len(root_logger.handlers) == 1

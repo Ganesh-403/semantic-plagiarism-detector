@@ -12,6 +12,7 @@ try:
     from opentelemetry.trace.propagation.tracecontext import (
         TraceContextTextMapPropagator,
     )
+
     HAS_OPENTELEMETRY = True
 except ImportError:
     HAS_OPENTELEMETRY = False
@@ -21,6 +22,7 @@ except ImportError:
 
 _tracer_provider: Optional[Any] = None
 _initialized = False
+
 
 def init_tracer_provider(exporter: Optional[Any] = None) -> Any:
     """Initialize or retrieve the global TracerProvider idempotently."""
@@ -39,6 +41,7 @@ def init_tracer_provider(exporter: Optional[Any] = None) -> Any:
     otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
     if exporter:
         from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
         provider.add_span_processor(SimpleSpanProcessor(exporter))
     elif otlp_endpoint:
         otlp_exporter = OTLPSpanExporter(endpoint=otlp_endpoint)
@@ -49,6 +52,7 @@ def init_tracer_provider(exporter: Optional[Any] = None) -> Any:
     _initialized = True
     return provider
 
+
 def get_tracer(name: str = "semantic-plagiarism.detector") -> Any:
     """Get an OpenTelemetry tracer instance lazily."""
     if not HAS_OPENTELEMETRY:
@@ -57,10 +61,12 @@ def get_tracer(name: str = "semantic-plagiarism.detector") -> Any:
         init_tracer_provider()
     return trace.get_tracer(name)
 
+
 def inject_traceparent(carrier: dict[str, str]) -> None:
     """Inject current trace context into carrier dict (e.g., HTTP headers)."""
     if HAS_OPENTELEMETRY:
         TraceContextTextMapPropagator().inject(carrier=carrier)
+
 
 def extract_traceparent(carrier: dict[str, str]) -> Any:
     """Extract trace context from carrier dict."""

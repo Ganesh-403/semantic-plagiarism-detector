@@ -156,9 +156,7 @@ def count_recent_failed_logins(
 
         db_path = str(get_auth_db_path())
 
-    cutoff_time = (
-        datetime.utcnow() - timedelta(minutes=window_minutes)
-    ).isoformat()
+    cutoff_time = (datetime.utcnow() - timedelta(minutes=window_minutes)).isoformat()
 
     try:
         with sqlite3.connect(db_path) as conn:

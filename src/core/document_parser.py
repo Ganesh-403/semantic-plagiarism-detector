@@ -257,9 +257,7 @@ def get_stopwords() -> frozenset:
     return ENGLISH_STOPWORDS | load_custom_stopwords()
 
 
-def reject_zero_width_characters(
-    text: str, filename: Optional[str] = None
-) -> str:
+def reject_zero_width_characters(text: str, filename: Optional[str] = None) -> str:
     """Reject text containing zero-width Unicode characters."""
     if not text:
         return text
@@ -473,16 +471,14 @@ def validate_ocr_language(value: str) -> str:
     if not parts or any(not p for p in parts):
         supported = ", ".join(sorted(SUPPORTED_OCR_LANGUAGES))
         raise ValueError(
-            f"Unsupported OCR language '{value}'. "
-            f"Supported values: {supported}."
+            f"Unsupported OCR language '{value}'. Supported values: {supported}."
         )
 
     for part in parts:
         if part not in SUPPORTED_OCR_LANGUAGES:
             supported = ", ".join(sorted(SUPPORTED_OCR_LANGUAGES))
             raise ValueError(
-                f"Unsupported OCR language '{part}'. "
-                f"Supported values: {supported}."
+                f"Unsupported OCR language '{part}'. Supported values: {supported}."
             )
 
     return "+".join(dict.fromkeys(parts))
@@ -1856,7 +1852,9 @@ def extract_text_from_image(
                         f"[document_parser] OCR image extraction failed due to memory exhaustion: {exc}"
                     )
                 else:
-                    logger.warning(f"[document_parser] OCR image extraction failed: {exc}")
+                    logger.warning(
+                        f"[document_parser] OCR image extraction failed: {exc}"
+                    )
                 return "[OCR extraction failed for the file]"
     except pytesseract.TesseractNotFoundError as exc:
         from src.errors import OCR_TESSERACT_NOT_FOUND

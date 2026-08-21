@@ -164,10 +164,14 @@ def _verify_jwt_token(
     try:
         actual_sig = base64url_decode(encoded_signature)
     except Exception:
-        raise ValueError(f"Invalid {expected_type} token: invalid base64 signature encoding.")
+        raise ValueError(
+            f"Invalid {expected_type} token: invalid base64 signature encoding."
+        )
 
     if not hmac.compare_digest(expected_sig, actual_sig):
-        raise ValueError(f"Invalid {expected_type} token: signature verification failed.")
+        raise ValueError(
+            f"Invalid {expected_type} token: signature verification failed."
+        )
 
     try:
         payload_bytes = base64url_decode(encoded_payload)
@@ -186,7 +190,9 @@ def _verify_jwt_token(
 
     token_type = payload.get("type")
     if token_type and token_type != expected_type:
-        raise ValueError(f"Invalid token type: expected '{expected_type}', got '{token_type}'.")
+        raise ValueError(
+            f"Invalid token type: expected '{expected_type}', got '{token_type}'."
+        )
 
     return payload
 
@@ -242,4 +248,3 @@ def verify_access_token(
         ValueError: If token signature is invalid, expired, wrong type, or secret is missing.
     """
     return _verify_jwt_token(token, "access", secret_key)
-

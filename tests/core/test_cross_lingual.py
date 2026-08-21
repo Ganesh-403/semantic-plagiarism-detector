@@ -392,23 +392,24 @@ class TestBackTranslateChunk:
 
 # ── Issue #2222: Add Italian and Portuguese language detection heuristics ─────
 
+
 class TestItalianPortugueseLanguageDetection:
     """Test suite for Italian and Portuguese language detection (Issue #2222)."""
 
     def test_detects_italian_text(self):
         """Verify Italian text is correctly identified."""
         italian_text = "Il gatto è sul tavolo e la donna legge un libro in biblioteca"
-        
+
         result = detect_chunk_language(italian_text)
-        
+
         assert result == "it"
 
     def test_detects_italian_with_mixed_case(self):
         """Verify Italian detection works with mixed case."""
         italian_text = "IL GATTO È SUL TAVOLO E LA DONNA LEGGE UN LIBRO"
-        
+
         result = detect_chunk_language(italian_text)
-        
+
         assert result == "it"
 
     def test_detects_italian_academic_text(self):
@@ -417,25 +418,25 @@ class TestItalianPortugueseLanguageDetection:
             "La ricerca dimostra che il metodo sperimentale è fondamentale "
             "per la validazione delle ipotesi scientifiche in chimica"
         )
-        
+
         result = detect_chunk_language(italian_text)
-        
+
         assert result == "it"
 
     def test_detects_portuguese_text(self):
         """Verify Portuguese text is correctly identified."""
         portuguese_text = "O gato está na mesa e a mulher lê um livro na biblioteca"
-        
+
         result = detect_chunk_language(portuguese_text)
-        
+
         assert result == "pt"
 
     def test_detects_portuguese_with_mixed_case(self):
         """Verify Portuguese detection works with mixed case."""
         portuguese_text = "O GATO ESTÁ NA MESA E A MULHER LÊ UM LIVRO"
-        
+
         result = detect_chunk_language(portuguese_text)
-        
+
         assert result == "pt"
 
     def test_detects_portuguese_academic_text(self):
@@ -444,16 +445,16 @@ class TestItalianPortugueseLanguageDetection:
             "A pesquisa demonstra que o método experimental é fundamental "
             "para a validação das hipóteses científicas em química"
         )
-        
+
         result = detect_chunk_language(portuguese_text)
-        
+
         assert result == "pt"
 
     def test_italian_vs_spanish_distinction(self):
         """Verify Italian and Spanish are distinguished correctly."""
         italian = "Il gatto è sul tavolo e la donna legge"
         spanish = "El gato está en la mesa y la mujer lee"
-        
+
         assert detect_chunk_language(italian) == "it"
         assert detect_chunk_language(spanish) == "es"
 
@@ -461,7 +462,7 @@ class TestItalianPortugueseLanguageDetection:
         """Verify Portuguese and Spanish are distinguished correctly."""
         portuguese = "O gato está na mesa e a mulher lê"
         spanish = "El gato está en la mesa y la mujer lee"
-        
+
         assert detect_chunk_language(portuguese) == "pt"
         assert detect_chunk_language(spanish) == "es"
 
@@ -469,9 +470,9 @@ class TestItalianPortugueseLanguageDetection:
         """Verify Italian text with low stop word density defaults to English."""
         # Text with very few Italian stop words
         low_density_text = "cat dog house car tree"
-        
+
         result = detect_chunk_language(low_density_text)
-        
+
         # Should default to English when stop word density < 10%
         assert result == "en"
 
@@ -479,32 +480,32 @@ class TestItalianPortugueseLanguageDetection:
         """Verify Portuguese text with low stop word density defaults to English."""
         # Text with very few Portuguese stop words
         low_density_text = "computer programming algorithm data structure"
-        
+
         result = detect_chunk_language(low_density_text)
-        
+
         # Should default to English when stop word density < 10%
         assert result == "en"
 
     def test_italian_in_heuristics_dict(self):
         """Verify Italian pattern exists in _LANGUAGE_HEURISTICS."""
         from src.core.cross_lingual import _LANGUAGE_HEURISTICS
-        
+
         assert "it" in _LANGUAGE_HEURISTICS
         assert isinstance(_LANGUAGE_HEURISTICS["it"], type(re.compile("")))
 
     def test_portuguese_in_heuristics_dict(self):
         """Verify Portuguese pattern exists in _LANGUAGE_HEURISTICS."""
         from src.core.cross_lingual import _LANGUAGE_HEURISTICS
-        
+
         assert "pt" in _LANGUAGE_HEURISTICS
         assert isinstance(_LANGUAGE_HEURISTICS["pt"], type(re.compile("")))
 
     def test_italian_pattern_matches_stop_words(self):
         """Verify Italian regex pattern matches common stop words."""
         from src.core.cross_lingual import _LANGUAGE_HEURISTICS
-        
+
         pattern = _LANGUAGE_HEURISTICS["it"]
-        
+
         # Test common Italian stop words
         assert pattern.search("il gatto")
         assert pattern.search("la donna")
@@ -515,9 +516,9 @@ class TestItalianPortugueseLanguageDetection:
     def test_portuguese_pattern_matches_stop_words(self):
         """Verify Portuguese regex pattern matches common stop words."""
         from src.core.cross_lingual import _LANGUAGE_HEURISTICS
-        
+
         pattern = _LANGUAGE_HEURISTICS["pt"]
-        
+
         # Test common Portuguese stop words
         assert pattern.search("o gato")
         assert pattern.search("a mulher")
@@ -529,7 +530,7 @@ class TestItalianPortugueseLanguageDetection:
         """Verify very short text (< 3 words) defaults to English."""
         short_italian = "Il gatto"
         short_portuguese = "O gato"
-        
+
         # Should default to English for very short text
         assert detect_chunk_language(short_italian) == "en"
         assert detect_chunk_language(short_portuguese) == "en"
@@ -555,9 +556,9 @@ class TestItalianPortugueseLanguageDetection:
         """Verify academic phrases in multiple languages are detected correctly."""
         # Add more context to meet minimum word count
         full_text = f"{text} nella università oggi"
-        
+
         result = detect_chunk_language(full_text)
-        
+
         assert result == expected_lang
 
 
@@ -611,9 +612,9 @@ class TestBackTranslateChunkRealTranslation:
     ):
         """Verify translate_text is called with correct arguments."""
         mock_translate.return_value = "Hello world"
-        
+
         result = back_translate_chunk("Hola mundo", source_lang="es")
-        
+
         mock_translate.assert_called_once_with(
             "Hola mundo",
             target_lang="en",
@@ -630,9 +631,9 @@ class TestBackTranslateChunkRealTranslation:
     ):
         """Verify successful translation is saved to cache."""
         mock_translate.return_value = "Good morning"
-        
+
         result = back_translate_chunk("Bonjour", source_lang="fr", use_cache=True)
-        
+
         mock_save.assert_called_once_with(
             "Bonjour",
             "fr",
@@ -650,9 +651,9 @@ class TestBackTranslateChunkRealTranslation:
     ):
         """Verify fallback to original text when translation fails."""
         original_text = "Guten Tag"
-        
+
         result = back_translate_chunk(original_text, source_lang="de")
-        
+
         # Should return original text, not raise exception
         assert result == original_text
         # Should not save failed translation to cache
@@ -667,9 +668,9 @@ class TestBackTranslateChunkRealTranslation:
     ):
         """Verify fallback to original text when translation returns empty string."""
         original_text = "Buongiorno"
-        
+
         result = back_translate_chunk(original_text, source_lang="it")
-        
+
         assert result == original_text
         mock_save.assert_not_called()
 
@@ -682,9 +683,9 @@ class TestBackTranslateChunkRealTranslation:
     ):
         """Verify fallback to original text when translation returns None."""
         original_text = "Bom dia"
-        
+
         result = back_translate_chunk(original_text, source_lang="pt")
-        
+
         assert result == original_text
         mock_save.assert_not_called()
 
@@ -697,7 +698,7 @@ class TestBackTranslateChunkRealTranslation:
     ):
         """Verify whitespace is stripped from translation result."""
         result = back_translate_chunk("Hola", source_lang="es")
-        
+
         assert result == "Hello"
         # Cache should store stripped version
         mock_save.assert_called_once_with("Hola", "es", "en", "Hello")
@@ -711,9 +712,9 @@ class TestBackTranslateChunkRealTranslation:
     ):
         """Verify cache is skipped when use_cache=False."""
         mock_translate.return_value = "Hello"
-        
+
         result = back_translate_chunk("Hola", source_lang="es", use_cache=False)
-        
+
         # Should not check cache
         mock_cache.assert_not_called()
         # Should not save to cache
@@ -725,9 +726,9 @@ class TestBackTranslateChunkRealTranslation:
     def test_skips_translation_for_target_language(self, mock_detect, mock_translate):
         """Verify no translation occurs when source is already target language."""
         text = "Hello world"
-        
+
         result = back_translate_chunk(text, source_lang="en")
-        
+
         # Should not call translate_text
         mock_translate.assert_not_called()
         # Should return original text unchanged
@@ -744,11 +745,14 @@ class TestBackTranslateChunkRealTranslation:
         assert back_translate_chunk([]) == ""
 
     @patch("src.core.cross_lingual.translate_text", return_value="Hello world")
-    @patch("src.core.cross_lingual.get_cached_translation", return_value="Cached translation")
+    @patch(
+        "src.core.cross_lingual.get_cached_translation",
+        return_value="Cached translation",
+    )
     def test_prefers_cache_over_translation(self, mock_cache, mock_translate):
         """Verify cached translation is preferred over new translation."""
         result = back_translate_chunk("Hola mundo", source_lang="es", use_cache=True)
-        
+
         # Should return cached value
         assert result == "Cached translation"
         # Should not call translate_text

@@ -75,9 +75,9 @@ def _process_scan_job(
         extracted_text = extract_text(file_input, filename)
         if not extracted_text.strip():
             scan_jobs[job_id]["status"] = "failed"
-            scan_jobs[job_id][
-                "error"
-            ] = "Failed to extract readable text from the uploaded file."
+            scan_jobs[job_id]["error"] = (
+                "Failed to extract readable text from the uploaded file."
+            )
             return
 
         words = extracted_text.split()

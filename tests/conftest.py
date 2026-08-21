@@ -251,12 +251,10 @@ def mock_db(tmp_path):
 
     import unittest.mock
 
-    with unittest.mock.patch(
-        "src.db.corpus_db._DB_PATH", str(corpus_db_file)
-    ), unittest.mock.patch(
-        "src.db.incidents.DEFAULT_DB_PATH", str(corpus_db_file)
-    ), unittest.mock.patch(
-        "src.db.auth._DB_PATH", str(auth_db_file)
+    with (
+        unittest.mock.patch("src.db.corpus_db._DB_PATH", str(corpus_db_file)),
+        unittest.mock.patch("src.db.incidents.DEFAULT_DB_PATH", str(corpus_db_file)),
+        unittest.mock.patch("src.db.auth._DB_PATH", str(auth_db_file)),
     ):
         try:
             from src.db.auth import init_db
@@ -364,6 +362,7 @@ def _cleanup_corpus_db_connections():
     yield
     try:
         from src.db.corpus_db import close_connections
+
         close_connections(all_threads=True)
     except ImportError:
         pass
@@ -378,24 +377,24 @@ import pytest
 @pytest.fixture
 def db_connection(tmp_path: Path) -> sqlite3.Connection:
     """Provide a clean, initialized SQLite database connection for testing.
-    
+
     This fixture creates a temporary SQLite database in the pytest tmp_path,
     initializes the required schema (incidents, documents, etc.), yields the
     active connection for the test to use, and automatically closes the
     connection during teardown.
-    
+
     This eliminates the need for manual sqlite3.connect() and conn.close()
     calls in every test function (Issue #2725).
-    
+
     Yields:
         sqlite3.Connection: An active, initialized database connection.
     """
     db_path = tmp_path / "test_plagiarism.db"
-    
+
     # Create connection with row factory for dictionary-like access
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
-    
+
     # Initialize schema (simplified for test environment)
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS documents (
@@ -424,10 +423,10 @@ def db_connection(tmp_path: Path) -> sqlite3.Connection:
         ON plagiarism_incidents(document_a, document_b);
     """)
     conn.commit()
-    
+
     # Yield the connection to the test
     yield conn
-    
+
     # Teardown: Close the connection
     conn.close()
 
@@ -435,7 +434,7 @@ def db_connection(tmp_path: Path) -> sqlite3.Connection:
 @pytest.fixture
 def populated_db_connection(db_connection: sqlite3.Connection) -> sqlite3.Connection:
     """Provide a database connection pre-populated with sample incident data.
-    
+
     Builds on the base db_connection fixture by inserting 50 sample
     plagiarism incidents with varying severities and similarities.
     """
@@ -443,27 +442,27 @@ def populated_db_connection(db_connection: sqlite3.Connection) -> sqlite3.Connec
     for i in range(50):
         sim = 0.50 + (i * 0.01)
         severity = "High" if sim >= 0.80 else ("Medium" if sim >= 0.60 else "Low")
-        sample_incidents.append((
-            f"INC-{i:04d}",
-            f"student_{i}_a.pdf",
-            f"student_{i}_b.pdf",
-            sim,
-            severity,
-            f"2024-01-{(i % 28) + 1:02d}T10:00:00",
-            0.59,
-            "Pending"
-        ))
-        
+        sample_incidents.append(
+            (
+                f"INC-{i:04d}",
+                f"student_{i}_a.pdf",
+                f"student_{i}_b.pdf",
+                sim,
+                severity,
+                f"2024-01-{(i % 28) + 1:02d}T10:00:00",
+                0.59,
+                "Pending",
+            )
+        )
+
     db_connection.executemany(
         """
         INSERT INTO plagiarism_incidents 
         (incident_id, document_a, document_b, similarity, severity, timestamp, threshold_at_time_of_flag, review_status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        sample_incidents
+        sample_incidents,
     )
     db_connection.commit()
-    
+
     yield db_connection
-
-

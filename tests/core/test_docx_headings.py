@@ -49,7 +49,7 @@ def test_docx_headings_extraction_and_chunking():
         elif "deeply nested third section" in chunk:
             assert chunk.metadata.get("section_title") == "### Heading 3 Title"
             found_heading_3 = True
-            
+
     assert found_heading_2
     assert found_heading_3
 
@@ -86,6 +86,7 @@ def test_extract_text_from_docx_with_tables():
     from src.core.parsers.docx_parser import (
         extract_text_from_docx as parser_extract_docx,
     )
+
     # Create an in-memory DOCX file with a 2x2 table
     doc = docx.Document()
     table = doc.add_table(rows=2, cols=2)
@@ -114,5 +115,3 @@ def test_extract_text_from_docx_with_tables():
     assert "Cell 1,2 Text" in parsed_text_2
     assert "Cell 2,1 Text" in parsed_text_2
     assert "Cell 2,2 Text" in parsed_text_2
-
-        

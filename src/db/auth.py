@@ -35,6 +35,7 @@ from src.db.connection import get_connection
 from src.db.migrations import migrate_auth_database, table_exists
 from src.db.security_audit import count_recent_failed_logins, log_security_event
 from src.exceptions import StaleDataException
+
 logger = logging.getLogger(__name__)
 
 from src.core.app_config import AUTH_DB_PATH, get_valid_roles
@@ -96,36 +97,35 @@ LOCKOUT_WINDOW_MINUTES = 15
 
 
 def is_account_locked(
-    username: str, 
+    username: str,
     max_attempts: int = MAX_FAILED_ATTEMPTS,
-    window_minutes: int = LOCKOUT_WINDOW_MINUTES
+    window_minutes: int = LOCKOUT_WINDOW_MINUTES,
 ) -> bool:
     """Check if an account is temporarily locked due to too many failed login attempts.
-    
+
     Args:
         username: The username to check.
         max_attempts: Maximum allowed failed attempts before lockout.
         window_minutes: Time window in minutes for counting attempts.
-        
+
     Returns:
         True if the account is locked, False otherwise.
     """
     if not username:
         return False
-        
-    failed_count = count_recent_failed_logins(
-        username, 
-        window_minutes=window_minutes
-    )
-    
+
+    failed_count = count_recent_failed_logins(username, window_minutes=window_minutes)
+
     is_locked = failed_count >= max_attempts
-    
+
     if is_locked:
         logger.warning(
             "Account lockout triggered for %s: %d failed attempts in last %d minutes.",
-            username, failed_count, window_minutes
+            username,
+            failed_count,
+            window_minutes,
         )
-        
+
     return is_locked
 
 
@@ -561,7 +561,7 @@ def verify_user(
     If return_details is True, returns a dict
     ``{"authenticated": bool, "must_change_password": bool, "password_expired": bool}``.
     Otherwise returns a boolean (True on success, False on failure).
-    
+
     Implements account lockout protection (Issue #2704) by checking for
     recent failed login attempts before verifying the password hash.
     """
@@ -572,7 +572,7 @@ def verify_user(
         if return_details:
             return {"authenticated": False, "must_change_password": False}
         return False
-    
+
     try:
         with _connect() as conn:
             row = conn.execute(
@@ -596,7 +596,7 @@ def verify_user(
             log_security_event(
                 event_type="login_blocked_lockout",
                 username=username,
-                details=f"Login attempt blocked due to lockout ({MAX_FAILED_ATTEMPTS} failures in {LOCKOUT_WINDOW_MINUTES}m)"
+                details=f"Login attempt blocked due to lockout ({MAX_FAILED_ATTEMPTS} failures in {LOCKOUT_WINDOW_MINUTES}m)",
             )
             if return_details:
                 return {"authenticated": False, "must_change_password": False}
@@ -644,15 +644,15 @@ def verify_user(
                 log_security_event(
                     event_type="login_success_password_expired",
                     username=username,
-                    details="Successful login but password requires rotation"
+                    details="Successful login but password requires rotation",
                 )
             else:
                 log_security_event(
                     event_type="login_success",
                     username=username,
-                    details="Successful authentication"
+                    details="Successful authentication",
                 )
-        
+
         if return_details:
             return {
                 "authenticated": authenticated,

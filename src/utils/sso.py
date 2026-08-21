@@ -162,7 +162,9 @@ def exchange_github_code(code: str) -> tuple[dict | None, str | None]:
 
     token_json = token_resp.json()
     if token_json.get("error"):
-        logger.error(f"GitHub OAuth error response: {token_json.get('error_description') or token_json.get('error')}")
+        logger.error(
+            f"GitHub OAuth error response: {token_json.get('error_description') or token_json.get('error')}"
+        )
         return None, "Invalid or expired SSO authorization code"
 
     access_token = token_json.get("access_token")
@@ -190,7 +192,9 @@ def exchange_github_code(code: str) -> tuple[dict | None, str | None]:
     user_data = user_info_resp.json()
 
     # Filter out users.noreply.github.com email in user profile info
-    if user_data.get("email") and user_data["email"].endswith("@users.noreply.github.com"):
+    if user_data.get("email") and user_data["email"].endswith(
+        "@users.noreply.github.com"
+    ):
         user_data["email"] = None
 
     # GitHub might not return email in /user if it's private, fetch explicitly
@@ -215,11 +219,15 @@ def exchange_github_code(code: str) -> tuple[dict | None, str | None]:
             emails = emails_resp.json()
             # Filter emails: must be verified and not a noreply address
             valid_emails = [
-                e for e in emails 
-                if e.get("verified") and not e["email"].endswith("@users.noreply.github.com")
+                e
+                for e in emails
+                if e.get("verified")
+                and not e["email"].endswith("@users.noreply.github.com")
             ]
             # Try primary first, then fallback to first available valid email
-            primary_email = next((e["email"] for e in valid_emails if e.get("primary")), None)
+            primary_email = next(
+                (e["email"] for e in valid_emails if e.get("primary")), None
+            )
             if primary_email:
                 user_data["email"] = primary_email
             elif valid_emails:
@@ -229,6 +237,8 @@ def exchange_github_code(code: str) -> tuple[dict | None, str | None]:
 
     if not user_data.get("email"):
         # We raise a ValueError to reject login with message requesting a public email.
-        raise ValueError("GitHub login failed: A verified public email is required. Please update your GitHub settings.")
+        raise ValueError(
+            "GitHub login failed: A verified public email is required. Please update your GitHub settings."
+        )
 
     return user_data, None

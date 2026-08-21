@@ -218,8 +218,16 @@ class TestRedisFaultTolerance:
         mock_client = MagicMock()
         mock_client.ping.return_value = True
 
-        uploaded_doc1 = {"doc_id": "doc_101", "content": "Sample student essay text", "user": "alice"}
-        uploaded_doc2 = {"doc_id": "doc_102", "content": "Sample secondary essay text", "user": "alice"}
+        uploaded_doc1 = {
+            "doc_id": "doc_101",
+            "content": "Sample student essay text",
+            "user": "alice",
+        }
+        uploaded_doc2 = {
+            "doc_id": "doc_102",
+            "content": "Sample secondary essay text",
+            "user": "alice",
+        }
 
         # First call succeeds returning doc1 from Redis
         # Second call raises ConnectionError (simulating connection drop mid-session)
@@ -239,13 +247,19 @@ class TestRedisFaultTolerance:
         assert result_doc2_initial is None
 
         # 3. Subsequent set() should succeed by storing into memory without dropping data
-        mock_client.set.side_effect = mock_redis_module.ConnectionError("Connection refused")
-        mock_client.setex.side_effect = mock_redis_module.ConnectionError("Connection refused")
+        mock_client.set.side_effect = mock_redis_module.ConnectionError(
+            "Connection refused"
+        )
+        mock_client.setex.side_effect = mock_redis_module.ConnectionError(
+            "Connection refused"
+        )
         set_result = cache.set("spd:v1:upload:doc_102", uploaded_doc2, ttl=300)
         assert set_result is True
 
         # 4. Subsequent get() successfully returns stored upload from fallback in-memory cache
-        mock_client.get.side_effect = mock_redis_module.ConnectionError("Connection refused")
+        mock_client.get.side_effect = mock_redis_module.ConnectionError(
+            "Connection refused"
+        )
         recovered_doc2 = cache.get("spd:v1:upload:doc_102")
         assert recovered_doc2 == uploaded_doc2
         assert recovered_doc2["content"] == "Sample secondary essay text"

@@ -92,7 +92,7 @@ __all__ = [
     "CLI_INVALID_COMMAND",
     "EXPORT_WRITE_FAILED",
     "EXPORT_GENERATION_IO_FAILED",
-]# Authentication Errors
+]  # Authentication Errors
 AUTH_USERNAME_EMPTY = "Username cannot be empty."
 AUTH_PASSWORD_TOO_SHORT = "Password must be at least 6 characters long."
 AUTH_INVALID_ROLE = "Role must be one of: {roles}"
@@ -229,7 +229,8 @@ CLI_THRESHOLD_INVALID = "Error: Threshold must be a float between 0.0 and 1.0.\n
 CLI_INVALID_COMMAND = "Error: Invalid command '{command}'.\n"
 
 
-EXPORT_WRITE_FAILED = (    "Unable to write the {format_name} export to '{destination}'. "
+EXPORT_WRITE_FAILED = (
+    "Unable to write the {format_name} export to '{destination}'. "
     "Check the destination permissions and available disk space, then try again."
 )
 

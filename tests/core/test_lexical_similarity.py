@@ -322,6 +322,7 @@ def test_tokenize_optimization_caching():
 def test_tokenize_optimized_punctuation_handling():
     """Verify that our optimized tokenization handles punctuation correctly (ignores it)."""
     from src.core.lexical_similarity import tokenize
+
     text = "Machine learning! Natural language processing..."
     tokens = tokenize(text)
     assert "machine" in tokens
@@ -330,4 +331,3 @@ def test_tokenize_optimized_punctuation_handling():
     assert "processing" in tokens
     assert "!" not in tokens
     assert "..." not in tokens
-

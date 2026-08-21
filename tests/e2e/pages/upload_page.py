@@ -17,6 +17,7 @@ The plagiarism score is rendered as:
   followed by an HTML badge:
   ``<span ...>Similarity: {score*100:.1f}%</span>``
 """
+
 from __future__ import annotations
 
 import re

@@ -14,26 +14,26 @@ def get_memory_usage() -> Dict[str, Any]:
     try:
         process = psutil.Process(os.getpid())
         mem_info = process.memory_info()
-        
+
         return {
             "rss_mb": mem_info.rss / (1024 * 1024),
             "vms_mb": mem_info.vms / (1024 * 1024),
             "percent": process.memory_percent(),
-            "cpu_percent": process.cpu_percent(interval=0.1)
+            "cpu_percent": process.cpu_percent(interval=0.1),
         }
     except Exception as e:
         logger.error("Failed to get memory usage: %s", e)
-        return {
-            "rss_mb": 0,
-            "vms_mb": 0,
-            "percent": 0,
-            "cpu_percent": 0
-        }
+        return {"rss_mb": 0, "vms_mb": 0, "percent": 0, "cpu_percent": 0}
 
 
 def log_memory_usage(tag: str = "") -> Dict[str, Any]:
     """Log current memory usage with a tag."""
     usage = get_memory_usage()
-    logger.info("[Memory] %s - RSS: %.1fMB, VMS: %.1fMB, Process: %.1f%%", tag, usage['rss_mb'], usage['vms_mb'], usage['percent'])
+    logger.info(
+        "[Memory] %s - RSS: %.1fMB, VMS: %.1fMB, Process: %.1f%%",
+        tag,
+        usage["rss_mb"],
+        usage["vms_mb"],
+        usage["percent"],
+    )
     return usage
-

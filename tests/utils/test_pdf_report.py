@@ -671,7 +671,9 @@ def test_pdf_report_headers_french():
 
 def test_break_long_urls():
     """Test that break_long_urls inserts zero-width spaces into long URLs."""
-    url = "https://example.com/very/long/path/with/parameters?key=value&other=123#section"
+    url = (
+        "https://example.com/very/long/path/with/parameters?key=value&other=123#section"
+    )
     broken = break_long_urls(url)
     assert "\u200b" in broken
     assert broken.replace("\u200b", "") == url
@@ -705,4 +707,3 @@ def test_pdf_report_with_long_url_generates_successfully():
     assert pdf_bytes.startswith(b"%PDF")
     text = _read_text(pdf_bytes)
     assert "paper_a.pdf" in text
-

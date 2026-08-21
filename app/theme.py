@@ -1001,7 +1001,7 @@ def inject_css() -> None:
 
     .stFileUploader [data-testid="stFileUploaderDropzone"]:hover {{
         border-color: var(--accent-color) !important;
-        background-color: {colors['neutral_soft']} !important;
+        background-color: {colors["neutral_soft"]} !important;
         cursor: pointer !important;
     }}
 
@@ -1378,7 +1378,7 @@ def render_notification_badge(count: int) -> str:
     if count <= 0:
         return ""
 
-    return '<span class="notification-badge">' f"{count}" "</span>"
+    return f'<span class="notification-badge">{count}</span>'
 
 
 # ── UI helpers ────────────────────────────────────────────────────────────────
@@ -1450,7 +1450,9 @@ def pipeline_progress_html(
     except ImportError:
         duration = f"{estimated_seconds}s"
 
-    eta = f'<div class="{PIPELINE_ETA}">Estimated processing time: about {duration}</div>'
+    eta = (
+        f'<div class="{PIPELINE_ETA}">Estimated processing time: about {duration}</div>'
+    )
     return f"{progress}{eta}"
 
 
@@ -1817,11 +1819,11 @@ def generate_sidebar_theme_stylesheet(
     section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"][aria-selected="true"],
     section[data-testid="stSidebar"] button[aria-selected="true"],
     .stButton button[data-selected="true"] {{
-        border-left: {template['border_width']} {template['border_style']} {border} !important;
-        border-radius: {template['border_radius']} !important;
-        box-shadow: {template['shadow']} !important;
-        background-color: {colors.get('neutral_soft', '#F1F5F9')} !important;
-        color: {colors.get('accent', '#0D9488')} !important;
+        border-left: {template["border_width"]} {template["border_style"]} {border} !important;
+        border-radius: {template["border_radius"]} !important;
+        box-shadow: {template["shadow"]} !important;
+        background-color: {colors.get("neutral_soft", "#F1F5F9")} !important;
+        color: {colors.get("accent", "#0D9488")} !important;
         font-weight: 700 !important;
     }}
     """

@@ -38,6 +38,7 @@ from src.core.parsers.cleaners import (
 # Section 1: Non-Existent File & Missing Environment Variable Recovery Tests
 # ---------------------------------------------------------------------------
 
+
 def test_load_custom_stopwords_missing_file_env_var(monkeypatch):
     """Set STOPWORDS_FILE env var to a non-existent file path and assert
     that load_custom_stopwords() catches OSError and returns frozenset()."""
@@ -93,6 +94,7 @@ def test_load_custom_stopwords_empty_string_env_var(monkeypatch):
 # Section 2: Successful Custom Stopwords File Parsing Tests
 # ---------------------------------------------------------------------------
 
+
 def test_load_custom_stopwords_valid_file_parsing():
     """Create a temporary stopwords file and verify parsing, lowercasing, and whitespace stripping."""
     stopwords_content = "  CUSTOM_WORD_ONE  \n\nCustom_Word_Two\n\tTHIRD_WORD\t\n"
@@ -127,6 +129,7 @@ def test_load_custom_stopwords_empty_file():
 # Section 3: Permission & OS Error Exception Handling
 # ---------------------------------------------------------------------------
 
+
 def test_load_custom_stopwords_permission_error_mocked():
     """Mock open to raise PermissionError (subclass of OSError) and assert recovery."""
     with patch("builtins.open", side_effect=PermissionError("Permission denied")):
@@ -147,6 +150,7 @@ def test_load_custom_stopwords_general_oserror_mocked():
 # ---------------------------------------------------------------------------
 # Section 4: Integration with Stopword Aggregation & Text Cleaning
 # ---------------------------------------------------------------------------
+
 
 def test_get_stopwords_integration_with_missing_file(monkeypatch):
     """Verify get_stopwords() returns standard English stopwords when custom file is missing."""

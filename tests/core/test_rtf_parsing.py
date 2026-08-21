@@ -31,7 +31,6 @@ def test_extract_text_from_unicode_escape_rtf():
     assert "Unicode" in text
 
 
-
 def test_extract_text_from_rtf_rejects_oversized_bytes_before_striprtf(monkeypatch):
     """Oversized RTF payloads are rejected before striprtf is invoked."""
 
@@ -90,7 +89,9 @@ def test_extract_text_from_rtf_rejects_oversized_bytesio_before_reading(monkeypa
     assert called is False
 
 
-def test_extract_text_from_rtf_rejects_oversized_file_path_before_read(tmp_path, monkeypatch):
+def test_extract_text_from_rtf_rejects_oversized_file_path_before_read(
+    tmp_path, monkeypatch
+):
     """An oversized RTF file on disk is rejected using its file size first."""
 
     called = False

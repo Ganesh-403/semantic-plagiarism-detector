@@ -141,9 +141,7 @@ def test_no_module_docstring_is_shadowed():
         "These modules have a docstring that Python does not see, because a "
         "statement precedes it (usually `from __future__ import annotations`). "
         "Move the docstring to the top of the file:\n"
-        + "\n".join(
-            f"  {path}:{line}" for path, line in sorted(offenders.items())
-        )
+        + "\n".join(f"  {path}:{line}" for path, line in sorted(offenders.items()))
     )
 
 

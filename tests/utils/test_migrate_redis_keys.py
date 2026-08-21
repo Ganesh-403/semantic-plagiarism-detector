@@ -19,7 +19,9 @@ class TestCacheNamespaceEnum:
         """Ensure all LEGACY_* attributes are removed from CacheNamespace."""
         enum_names = [e.name for e in CacheNamespace]
         legacy_names = [name for name in enum_names if name.startswith("LEGACY_")]
-        assert legacy_names == [], f"Found legacy attributes in CacheNamespace: {legacy_names}"
+        assert legacy_names == [], (
+            f"Found legacy attributes in CacheNamespace: {legacy_names}"
+        )
 
     def test_modern_namespaces_present(self):
         """Ensure standard modern namespaces are present."""
@@ -105,9 +107,13 @@ class TestMigrateRedisKeys:
         assert stats["skipped"] == 0
         assert stats["errors"] == 0
         assert mock_client.rename.call_count == 3
-        mock_client.rename.assert_any_call(b"similarity:query123", b"spd:v1:analysis:query123")
+        mock_client.rename.assert_any_call(
+            b"similarity:query123", b"spd:v1:analysis:query123"
+        )
         mock_client.rename.assert_any_call(b"doc:99", b"spd:v1:analysis:doc:99")
-        mock_client.rename.assert_any_call(b"analysis:result1", b"spd:v1:analysis:result1")
+        mock_client.rename.assert_any_call(
+            b"analysis:result1", b"spd:v1:analysis:result1"
+        )
 
     def test_migrate_handles_rename_error(self):
         """Test error handling when Redis rename raises an exception."""

@@ -20,7 +20,9 @@ class NeuralCodeCloneEngine:
     """Core analytics engine for detecting syntactic and semantic code clones."""
 
     @staticmethod
-    def calculate_token_cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
+    def calculate_token_cosine_similarity(
+        vec1: List[float], vec2: List[float]
+    ) -> float:
         """Calculates cosine similarity between two vector embeddings."""
         if not vec1 or not vec2 or len(vec1) != len(vec2):
             return 0.0
@@ -75,9 +77,13 @@ class NeuralCodeCloneEngine:
 
         # Simulated transformer neural semantic score
         semantic_sim = round((ast_sim * 0.6) + (token_sim * 0.4), 4)
-        overall_score = round((ast_sim * 0.4) + (token_sim * 0.3) + (semantic_sim * 0.3), 4)
+        overall_score = round(
+            (ast_sim * 0.4) + (token_sim * 0.3) + (semantic_sim * 0.3), 4
+        )
 
-        clone_type, obfuscation = cls.classify_clone_type(ast_sim, token_sim, semantic_sim)
+        clone_type, obfuscation = cls.classify_clone_type(
+            ast_sim, token_sim, semantic_sim
+        )
 
         return CodeCloneMatch(
             clone_id=f"CLONE-{uuid.uuid4().hex[:8].upper()}",

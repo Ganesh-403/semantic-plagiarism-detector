@@ -448,15 +448,17 @@ class TestUserAgentHeaderInspection:
 
     @patch("src.security.ssrf_protector.requests.head")
     @patch.object(SSRFProtector, "_validate_url_target", return_value="93.184.216.34")
-    def test_default_user_agent_attached_to_head_request(self, mock_validate, mock_head):
+    def test_default_user_agent_attached_to_head_request(
+        self, mock_validate, mock_head
+    ):
         """Verify DEFAULT_USER_AGENT is attached to outgoing HEAD requests."""
         mock_head.return_value = MagicMock(status_code=200)
-        
+
         SSRFProtector.validate_webhook_url("https://example.com/webhook")
-        
+
         mock_head.assert_called_once()
         call_kwargs = mock_head.call_args[1]
-        
+
         assert "headers" in call_kwargs
         assert call_kwargs["headers"]["User-Agent"] == DEFAULT_USER_AGENT
         assert call_kwargs["headers"]["User-Agent"] == "SemanticPlagiarismDetector/1.0"
@@ -464,19 +466,21 @@ class TestUserAgentHeaderInspection:
     @patch("src.security.ssrf_protector.requests.head")
     @patch("src.security.ssrf_protector.requests.get")
     @patch.object(SSRFProtector, "_validate_url_target", return_value="93.184.216.34")
-    def test_fallback_to_get_when_head_rejected(self, mock_validate, mock_get, mock_head):
+    def test_fallback_to_get_when_head_rejected(
+        self, mock_validate, mock_get, mock_head
+    ):
         """Verify fallback to GET when server rejects HEAD with 405."""
         # HEAD returns 405 Method Not Allowed
         mock_head.return_value = MagicMock(status_code=405)
         # GET succeeds
         mock_get.return_value = MagicMock(status_code=200)
-        
+
         SSRFProtector.validate_webhook_url("https://example.com/webhook")
-        
+
         # Both HEAD and GET should be called
         mock_head.assert_called_once()
         mock_get.assert_called_once()
-        
+
         # GET should also have User-Agent header
         get_kwargs = mock_get.call_args[1]
         assert get_kwargs["headers"]["User-Agent"] == DEFAULT_USER_AGENT
@@ -487,24 +491,25 @@ class TestUserAgentHeaderInspection:
         """Verify custom User-Agent can override the default."""
         mock_head.return_value = MagicMock(status_code=200)
         custom_ua = "CustomBot/2.0"
-        
+
         SSRFProtector.validate_webhook_url(
-            "https://example.com/webhook",
-            user_agent=custom_ua
+            "https://example.com/webhook", user_agent=custom_ua
         )
-        
+
         call_kwargs = mock_head.call_args[1]
         assert call_kwargs["headers"]["User-Agent"] == custom_ua
 
     @patch("src.security.ssrf_protector.requests.head")
     @patch.object(SSRFProtector, "_check_redirect_depth", return_value=None)
     @patch.object(SSRFProtector, "_validate_url_target", return_value="93.184.216.34")
-    def test_user_agent_attached_to_redirect_validation(self, mock_validate, mock_redirect, mock_head):
+    def test_user_agent_attached_to_redirect_validation(
+        self, mock_validate, mock_redirect, mock_head
+    ):
         """Verify User-Agent is attached to requests during redirect chain validation."""
         mock_head.return_value = MagicMock(status_code=200)
-        
+
         SSRFProtector.validate_url_safety("https://example.com/webhook")
-        
+
         # User-Agent should be in the HEAD request
         call_kwargs = mock_head.call_args[1]
         assert call_kwargs["headers"]["User-Agent"] == DEFAULT_USER_AGENT
@@ -566,7 +571,7 @@ class TestURLValidation:
         """Verify empty URLs are rejected."""
         with pytest.raises(SSRFSecurityException, match="empty"):
             SSRFProtector._validate_url_target("")
-            
+
         with pytest.raises(SSRFSecurityException, match="empty"):
             SSRFProtector._validate_url_target(None)
 
@@ -602,9 +607,9 @@ class TestRedirectChainValidation:
     def test_no_redirect_returns_original_url(self, mock_validate, mock_head):
         """Verify URL without redirects returns original URL."""
         mock_head.return_value = MagicMock(status_code=200, headers={})
-        
+
         final_url, ip = SSRFProtector.validate_url_safety("https://example.com/webhook")
-        
+
         assert final_url == "https://example.com/webhook"
         assert ip == "93.184.216.34"
 
@@ -614,12 +619,14 @@ class TestRedirectChainValidation:
         """Verify single redirect is followed and validated."""
         # First request returns redirect
         mock_head.side_effect = [
-            MagicMock(status_code=301, headers={"Location": "https://example.com/final"}),
+            MagicMock(
+                status_code=301, headers={"Location": "https://example.com/final"}
+            ),
             MagicMock(status_code=200, headers={}),
         ]
-        
+
         final_url, ip = SSRFProtector.validate_url_safety("https://example.com/start")
-        
+
         assert final_url == "https://example.com/final"
 
     @patch("src.security.ssrf_protector.requests.head")
@@ -627,10 +634,14 @@ class TestRedirectChainValidation:
     def test_max_redirects_exceeded_raises(self, mock_validate, mock_head):
         """Verify exceeding max redirects raises exception."""
         # Always return redirect
-        mock_head.return_value = MagicMock(status_code=301, headers={"Location": "https://example.com/loop"})
-        
+        mock_head.return_value = MagicMock(
+            status_code=301, headers={"Location": "https://example.com/loop"}
+        )
+
         with pytest.raises(SSRFSecurityException, match="max redirects"):
-            SSRFProtector.validate_url_safety("https://example.com/start", max_redirects=2)
+            SSRFProtector.validate_url_safety(
+                "https://example.com/start", max_redirects=2
+            )
 
     @patch("src.security.ssrf_protector.requests.head")
     @patch.object(SSRFProtector, "_validate_url_target", return_value="93.184.216.34")
@@ -641,15 +652,14 @@ class TestRedirectChainValidation:
             MagicMock(status_code=301, headers={"Location": "https://example.com/b"}),
             MagicMock(status_code=301, headers={"Location": "https://example.com/a"}),
         ]
-        
+
         with pytest.raises(SSRFSecurityException, match="circular"):
             SSRFProtector.validate_url_safety("https://example.com/a")
 
 
-
 class TestEmptyAllowedDomainsBehavior:
     """Test suite for empty allowed_domains behavior (Issue #2434).
-    
+
     Verifies that when allowed_domains is empty or None, the SSRF protector
     permits all external domains while still enforcing private IP restrictions.
     This is critical security behavior that must be explicitly tested.
@@ -660,10 +670,9 @@ class TestEmptyAllowedDomainsBehavior:
         """Verify empty allowed_domains list permits random external domains."""
         # Pass an empty list explicitly
         ip = SSRFProtector._validate_url_target(
-            "https://random-external-domain.com/webhook",
-            allowed_domains=[]
+            "https://random-external-domain.com/webhook", allowed_domains=[]
         )
-        
+
         # Should succeed and return the resolved IP
         assert ip == "93.184.216.34"
         mock_resolve.assert_called_once_with("random-external-domain.com")
@@ -672,12 +681,13 @@ class TestEmptyAllowedDomainsBehavior:
     def test_none_permits_any_external_domain(self, mock_resolve):
         """Verify None allowed_domains permits any external domain."""
         # Pass None explicitly (will trigger get_allowed_webhook_domains fallback)
-        with patch("src.security.ssrf_protector.get_allowed_webhook_domains", return_value=[]):
+        with patch(
+            "src.security.ssrf_protector.get_allowed_webhook_domains", return_value=[]
+        ):
             ip = SSRFProtector._validate_url_target(
-                "https://another-random-domain.com/webhook",
-                allowed_domains=None
+                "https://another-random-domain.com/webhook", allowed_domains=None
             )
-            
+
             assert ip == "104.16.132.229"
 
     @patch.object(SSRFProtector, "_resolve_hostname", return_value="127.0.0.1")
@@ -686,8 +696,7 @@ class TestEmptyAllowedDomainsBehavior:
         # Even with empty allowlist, loopback should be blocked
         with pytest.raises(SSRFSecurityException, match="loopback"):
             SSRFProtector._validate_url_target(
-                "https://localhost/webhook",
-                allowed_domains=[]
+                "https://localhost/webhook", allowed_domains=[]
             )
 
     @patch.object(SSRFProtector, "_resolve_hostname", return_value="192.168.1.100")
@@ -696,8 +705,7 @@ class TestEmptyAllowedDomainsBehavior:
         # Even with empty allowlist, private IPs should be blocked
         with pytest.raises(SSRFSecurityException, match="private"):
             SSRFProtector._validate_url_target(
-                "https://internal.local/webhook",
-                allowed_domains=[]
+                "https://internal.local/webhook", allowed_domains=[]
             )
 
     @patch.object(SSRFProtector, "_resolve_hostname", return_value="10.0.0.5")
@@ -705,8 +713,7 @@ class TestEmptyAllowedDomainsBehavior:
         """Verify empty allowlist still blocks 10.0.0.0/8 private range."""
         with pytest.raises(SSRFSecurityException, match="private"):
             SSRFProtector._validate_url_target(
-                "https://internal.corp/webhook",
-                allowed_domains=[]
+                "https://internal.corp/webhook", allowed_domains=[]
             )
 
     @patch.object(SSRFProtector, "_resolve_hostname", return_value="172.16.0.100")
@@ -714,8 +721,7 @@ class TestEmptyAllowedDomainsBehavior:
         """Verify empty allowlist still blocks 172.16.0.0/12 private range."""
         with pytest.raises(SSRFSecurityException, match="private"):
             SSRFProtector._validate_url_target(
-                "https://internal.vpc/webhook",
-                allowed_domains=[]
+                "https://internal.vpc/webhook", allowed_domains=[]
             )
 
     @patch.object(SSRFProtector, "_resolve_hostname", return_value="169.254.1.1")
@@ -723,8 +729,7 @@ class TestEmptyAllowedDomainsBehavior:
         """Verify empty allowlist still blocks link-local addresses (169.254.x.x)."""
         with pytest.raises(SSRFSecurityException, match="link-local"):
             SSRFProtector._validate_url_target(
-                "https://linklocal/webhook",
-                allowed_domains=[]
+                "https://linklocal/webhook", allowed_domains=[]
             )
 
     @patch.object(SSRFProtector, "_resolve_hostname", return_value="93.184.216.34")
@@ -732,16 +737,15 @@ class TestEmptyAllowedDomainsBehavior:
         """Verify non-empty allowlist restricts to approved domains only."""
         # Should succeed for approved domain
         ip = SSRFProtector._validate_url_target(
-            "https://slack.com/webhook",
-            allowed_domains=["slack.com", "discord.com"]
+            "https://slack.com/webhook", allowed_domains=["slack.com", "discord.com"]
         )
         assert ip == "93.184.216.34"
-        
+
         # Should fail for non-approved domain
         with pytest.raises(SSRFSecurityException, match="not in the allowed domains"):
             SSRFProtector._validate_url_target(
                 "https://malicious.com/webhook",
-                allowed_domains=["slack.com", "discord.com"]
+                allowed_domains=["slack.com", "discord.com"],
             )
 
     @patch.object(SSRFProtector, "_resolve_hostname", return_value="93.184.216.34")
@@ -749,20 +753,20 @@ class TestEmptyAllowedDomainsBehavior:
         """Verify subdomains work correctly with empty allowlist."""
         # Any subdomain should be permitted when allowlist is empty
         ip = SSRFProtector._validate_url_target(
-            "https://api.random-service.com/webhook",
-            allowed_domains=[]
+            "https://api.random-service.com/webhook", allowed_domains=[]
         )
         assert ip == "93.184.216.34"
 
     def test_empty_list_logs_debug_message(self, caplog):
         """Verify empty allowlist logs a debug message for audit trail."""
-        with patch.object(SSRFProtector, "_resolve_hostname", return_value="93.184.216.34"):
+        with patch.object(
+            SSRFProtector, "_resolve_hostname", return_value="93.184.216.34"
+        ):
             with caplog.at_level("DEBUG"):
                 SSRFProtector._validate_url_target(
-                    "https://example.com/webhook",
-                    allowed_domains=[]
+                    "https://example.com/webhook", allowed_domains=[]
                 )
-                
+
                 # Should log that allowlist is empty
                 assert any(
                     "Domain allowlist is empty" in record.message
@@ -778,7 +782,9 @@ def test_is_ip_in_cidr_block_ipv4_mapped_ipv6_loopback():
 @patch("src.security.ssrf_protector.socket.getaddrinfo")
 def test_resolve_hostname_caching_behavior(mock_getaddrinfo):
     """Verify that SSRFProtector._resolve_hostname successfully uses cached DNS entries on repeated lookups."""
-    mock_getaddrinfo.return_value = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 80))]
+    mock_getaddrinfo.return_value = [
+        (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 80))
+    ]
 
     # First lookup
     ip1 = SSRFProtector._resolve_hostname("example.com")
@@ -790,7 +796,7 @@ def test_resolve_hostname_caching_behavior(mock_getaddrinfo):
     assert ip2 == "93.184.216.34"
     assert mock_getaddrinfo.call_count == 1
 
+
 def test_is_ip_in_cidr_block_strips_padded_ip():
     """Whitespace-padded private IPs must still match the CIDR block."""
     assert is_ip_in_cidr_block(" 127.0.0.1 ", "127.0.0.0/8") is True
-

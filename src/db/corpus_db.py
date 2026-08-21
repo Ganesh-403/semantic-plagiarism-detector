@@ -781,7 +781,10 @@ def get_chunks_for_documents(
 
     result: dict[str, tuple[list[str], np.ndarray]] = {}
     for filename, (texts, vectors) in grouped.items():
-        result[filename] = (texts, np.vstack(vectors) if vectors else np.empty((0, 384), dtype=np.float32))
+        result[filename] = (
+            texts,
+            np.vstack(vectors) if vectors else np.empty((0, 384), dtype=np.float32),
+        )
     return result
 
 

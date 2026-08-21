@@ -9,7 +9,9 @@ def render_code_clone_card(clone: Dict[str, Any]) -> str:
     ast_pct = int(clone.get("ast_similarity_score", 0.0) * 100)
     semantic_pct = int(clone.get("neural_semantic_similarity", 0.0) * 100)
 
-    badge_color = "#10B981" if overall_pct < 40 else "#F59E0B" if overall_pct < 75 else "#EF4444"
+    badge_color = (
+        "#10B981" if overall_pct < 40 else "#F59E0B" if overall_pct < 75 else "#EF4444"
+    )
 
     return f"""
     <div style="
@@ -30,7 +32,7 @@ def render_code_clone_card(clone: Dict[str, Any]) -> str:
                 padding: 4px 12px;
                 border-radius: 9999px;
             ">
-                {clone.get('clone_type', 'Type-3 Clone')}
+                {clone.get("clone_type", "Type-3 Clone")}
             </span>
             <span style="
                 background: {badge_color}20;
@@ -46,7 +48,7 @@ def render_code_clone_card(clone: Dict[str, Any]) -> str:
         </div>
         
         <h4 style="color: white; font-weight: 900; margin: 0 0 8px 0;">
-            Source: {clone.get('source_file_id')} vs Target: {clone.get('target_file_id')}
+            Source: {clone.get("source_file_id")} vs Target: {clone.get("target_file_id")}
         </h4>
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;">
