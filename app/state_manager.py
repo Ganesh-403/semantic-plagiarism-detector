@@ -94,7 +94,6 @@ def get_active_sessions_count() -> int:
         try:
             fallback_dict = getattr(cache, "fallback_cache", {})
             if fallback_dict is not None:
-                # FIXED: Wrap in list() to avoid dictionary changed size during iteration (Thread-safe)
                 fallback_keys = [
                     k
                     for k in list(fallback_dict.keys())
@@ -183,6 +182,15 @@ def _run_backup_daemon():
 
     logger.info("Database backup daemon started.")
 
+    # FIX (#2785): Ensure last_activity is explicitly initialized on daemon startup 
+    # so that restarts with 0 active sessions don't instantly trigger a backup.
+    try:
+        cache = get_cache()
+        if cache.get("spd:v1:global:last_activity") is None:
+            cache.set("spd:v1:global:last_activity", time.time())
+    except Exception:
+        pass
+
     while True:
         time.sleep(30)
 
@@ -258,8 +266,8 @@ def init_backup_daemon():
 
 def init_session_state():
     """Initialize session state keys and global background services."""
-    from app.session_manager import initialize_and_verify_session
-    st.session_state[SessionKeys.SESSION_ID] = initialize_and_verify_session()
+    import app.session_manager as sm
+    st.session_state[SessionKeys.SESSION_ID] = sm.initialize_and_verify_session()
 
     if SessionKeys.AUTHENTICATED not in st.session_state:
         st.session_state[SessionKeys.AUTHENTICATED] = False
