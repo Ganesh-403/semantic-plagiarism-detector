@@ -1,16 +1,29 @@
 changelog:
   categories:
-    - title: 🚀 Enhancements
+    - title: 🚀 Features
       labels:
         - enhancement
+        - feature
+        - "New feature"
 
     - title: 🐛 Bug Fixes
       labels:
         - bug
+        - "Bug fix"
+    - title: ⚡ Performance
+      labels:
+        - Performance
+        - "Performance improvement"
 
     - title: 📚 Documentation
       labels:
+        - docs
         - documentation
+        - "Documentation update"
+    
+    - title: 🔒 Security
+      labels:
+        - Security
 
     - title: Other Changes
       labels:
