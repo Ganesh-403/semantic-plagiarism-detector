@@ -53,6 +53,48 @@ router = APIRouter(tags=["Plagiarism Detection"])
 total_scans = 0
 scan_jobs: Dict[str, Dict[str, Any]] = {}
 
+def check_exact_match_fast_path(
+    file_input: Any,
+    filename: str,
+    word_count: int,
+    chunk_count: int,
+    threshold: float
+) -> Dict[str, Any] | None:
+    file_hash = None
+    try:
+        file_hash = calculate_file_sha256(file_input)
+    except Exception as e:
+        logger.warning(f"Failed to hash input for fast path: {e}")
+
+    exact_match_filename = None
+    if file_hash:
+        try:
+            exact_match_filename = get_document_by_hash(file_hash)
+        except Exception as e:
+            logger.warning(f"Failed to query hash for fast path: {e}")
+
+    if exact_match_filename and exact_match_filename != filename:
+        return {
+            "filename": filename,
+            "word_count": word_count,
+            "chunk_count": chunk_count,
+            "plagiarism_flagged": True,
+            "threshold_used": threshold,
+            "plagiarism_density": 100,
+            "overall_document_similarity": 1.0,
+            "max_chunk_similarity": 1.0,
+            "matched_documents_count": 1,
+            "matched_documents": [
+                {
+                    "filename": exact_match_filename,
+                    "document_similarity_score": 1.0,
+                    "max_chunk_similarity_score": 1.0,
+                    "severity": "🔴 High",
+                    "flagged_chunks": [],
+                }
+            ],
+        }
+    return None
 
 def _process_scan_job(
     job_id: str,
@@ -86,6 +128,19 @@ def _process_scan_job(
         chunks = chunk_document(extracted_text)
         if not chunks:
             chunks = [extracted_text[:1000]]
+
+        fast_path_result = check_exact_match_fast_path(
+            file_input=file_input,
+            filename=filename,
+            word_count=word_count,
+            chunk_count=len(chunks),
+            threshold=threshold,
+        )
+        if fast_path_result:
+            scan_jobs[job_id]["status"] = "completed"
+            scan_jobs[job_id]["completed_at"] = datetime.now(timezone.utc).isoformat()
+            scan_jobs[job_id]["result"] = fast_path_result
+            return
 
         uploaded_embeddings = embed_chunks(chunks)
         doc_embedding = get_document_embedding(uploaded_embeddings)
@@ -161,7 +216,7 @@ def _process_scan_job(
             key=lambda x: x["max_chunk_similarity_score"], reverse=True
         )
         is_flagged = len(matched_documents) > 0 or max_chunk_overall_score >= threshold
-        
+
         total_flagged = int(np.sum(uploaded_chunks_flagged))
         plagiarism_density = int(round((total_flagged / len(chunks)) * 100)) if len(chunks) > 0 else 0
 
@@ -318,6 +373,16 @@ async def scan_document(
         if not chunks:
             chunks = [extracted_text[:1000]]
 
+        fast_path_result = check_exact_match_fast_path(
+            file_input=temp_path,
+            filename=filename,
+            word_count=word_count,
+            chunk_count=len(chunks),
+            threshold=threshold,
+        )
+        if fast_path_result:
+            return fast_path_result
+
         uploaded_embeddings = embed_chunks(chunks)
         doc_embedding = get_document_embedding(uploaded_embeddings)
         corpus_docs = get_corpus_documents_with_embeddings()
@@ -393,7 +458,7 @@ async def scan_document(
             key=lambda x: x["max_chunk_similarity_score"], reverse=True
         )
         is_flagged = len(matched_documents) > 0 or max_chunk_overall_score >= threshold
-        
+
         total_flagged = int(np.sum(uploaded_chunks_flagged))
         plagiarism_density = int(round((total_flagged / len(chunks)) * 100)) if len(chunks) > 0 else 0
 
