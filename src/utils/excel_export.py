@@ -21,6 +21,8 @@ from openpyxl.comments import Comment
 from openpyxl.formatting.rule import ColorScaleRule
 from openpyxl.styles import Alignment, Font, PatternFill
 
+from src.core.config import severity_from_score
+
 
 def _create_managed_temp_file(suffix: str = ".xlsx", prefix: str = "temp_") -> str:
     """Helper to create a temporary file that is automatically deleted on exit."""
@@ -192,6 +194,51 @@ def build_similarity_workbook(df: pd.DataFrame, threshold: float = 0.59) -> Work
         max_len = max(len(str(cell.value or "")) for cell in col)
         col_letter = col[0].column_letter
         ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    # --- Flagged Pairs worksheet ---
+    flagged_pairs = []
+    for row_label in df.index:
+        for col_label in df.columns:
+            if str(row_label) == str(col_label):
+                continue
+            score = df.at[row_label, col_label]
+            if pd.isna(score) or float(score) < threshold:
+                continue
+            flagged_pairs.append(
+                (
+                    sanitize_spreadsheet_value(str(row_label)),
+                    sanitize_spreadsheet_value(str(col_label)),
+                    float(score),
+                    severity_from_score(float(score)),
+                )
+            )
+
+    if flagged_pairs:
+        flagged_pairs.sort(key=lambda r: r[2], reverse=True)
+
+        ws_flagged = wb.create_sheet(title="Flagged Pairs")
+        ws_flagged.append(["Document A", "Document B", "Similarity Score", "Severity"])
+
+        for doc_a, doc_b, score, severity in flagged_pairs:
+            ws_flagged.append([doc_a, doc_b, score, severity])
+
+        # Apply same header styling as the matrix sheet
+        for cell in ws_flagged[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        # Format similarity scores as percentages
+        for row in ws_flagged.iter_rows(min_row=2, min_col=3, max_col=3):
+            for cell in row:
+                cell.number_format = "0.0%"
+                cell.alignment = Alignment(horizontal="right")
+
+        # Auto-adjust column widths
+        for col in ws_flagged.columns:
+            max_len = max(len(str(cell.value or "")) for cell in col)
+            col_letter = col[0].column_letter
+            ws_flagged.column_dimensions[col_letter].width = max(max_len + 3, 12)
 
     return wb
 

@@ -96,3 +96,104 @@ def test_export_incidents_xlsx_stream_persists_metadata():
     assert wb.properties.creator == "Semantic Plagiarism Detector"
     assert wb.properties.created is not None
 
+
+def test_flagged_pairs_sheet_lists_pairs_above_threshold():
+    """Verify the Flagged Pairs worksheet contains pairs at or above threshold (#3433)."""
+    data = {
+        "DocA.txt": [1.0, 0.80, 0.30],
+        "DocB.txt": [0.80, 1.0, 0.20],
+        "DocC.txt": [0.30, 0.20, 1.0],
+    }
+    df = pd.DataFrame(data, index=["DocA.txt", "DocB.txt", "DocC.txt"])
+
+    wb = build_similarity_workbook(df, threshold=0.59)
+    ws_flagged = wb["Flagged Pairs"]
+
+    assert ws_flagged.cell(row=1, column=1).value == "Document A"
+    assert ws_flagged.cell(row=1, column=2).value == "Document B"
+    assert ws_flagged.cell(row=1, column=3).value == "Similarity Score"
+    assert ws_flagged.cell(row=1, column=4).value == "Severity"
+
+    pairs = set()
+    for row in ws_flagged.iter_rows(min_row=2, max_col=2, values_only=True):
+        pairs.add(tuple(row))
+    assert ("DocA.txt", "DocB.txt") in pairs
+    assert ("DocB.txt", "DocA.txt") in pairs
+    assert ("DocA.txt", "DocC.txt") not in pairs
+    assert ("DocC.txt", "DocA.txt") not in pairs
+    assert ("DocB.txt", "DocC.txt") not in pairs
+    assert ("DocC.txt", "DocB.txt") not in pairs
+
+
+def test_flagged_pairs_sorted_by_similarity_descending():
+    """Verify flagged pairs are sorted highest similarity first (#3433)."""
+    data = {
+        "DocA.txt": [1.0, 0.95, 0.70],
+        "DocB.txt": [0.95, 1.0, 0.65],
+        "DocC.txt": [0.70, 0.65, 1.0],
+    }
+    df = pd.DataFrame(data, index=["DocA.txt", "DocB.txt", "DocC.txt"])
+
+    wb = build_similarity_workbook(df, threshold=0.59)
+    ws_flagged = wb["Flagged Pairs"]
+
+    scores = []
+    for row in ws_flagged.iter_rows(min_row=2, min_col=3, max_col=3, values_only=True):
+        scores.append(row[0])
+
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_flagged_pairs_severity_labels():
+    """Verify severity labels are correctly assigned (#3433)."""
+    data = {
+        "DocA.txt": [1.0, 0.80, 0.92],
+        "DocB.txt": [0.80, 1.0, 0.60],
+        "DocC.txt": [0.92, 0.60, 1.0],
+    }
+    df = pd.DataFrame(data, index=["DocA.txt", "DocB.txt", "DocC.txt"])
+
+    wb = build_similarity_workbook(df, threshold=0.59)
+    ws_flagged = wb["Flagged Pairs"]
+
+    severities = {}
+    for row in ws_flagged.iter_rows(min_row=2, max_col=4, values_only=True):
+        key = (row[0], row[1])
+        severities[key] = row[3]
+
+    assert severities[("DocA.txt", "DocB.txt")] == "Medium"
+    assert severities[("DocB.txt", "DocA.txt")] == "Medium"
+    assert severities[("DocA.txt", "DocC.txt")] == "High"
+    assert severities[("DocC.txt", "DocA.txt")] == "High"
+    assert severities[("DocB.txt", "DocC.txt")] == "Low"
+    assert severities[("DocC.txt", "DocB.txt")] == "Low"
+
+
+def test_no_flagged_pairs_sheet_when_none_above_threshold():
+    """Verify no Flagged Pairs sheet is created when all scores are below threshold (#3433)."""
+    data = {
+        "DocA.txt": [1.0, 0.30],
+        "DocB.txt": [0.30, 1.0],
+    }
+    df = pd.DataFrame(data, index=["DocA.txt", "DocB.txt"])
+
+    wb = build_similarity_workbook(df, threshold=0.59)
+    sheet_names = wb.sheetnames
+    assert "Similarity Matrix" in sheet_names
+    assert "Flagged Pairs" not in sheet_names
+
+
+def test_flagged_pairs_diagonal_excluded():
+    """Verify self-pairs (diagonal) are excluded from Flagged Pairs (#3433)."""
+    data = {
+        "DocA.txt": [1.0, 0.85],
+        "DocB.txt": [0.85, 1.0],
+    }
+    df = pd.DataFrame(data, index=["DocA.txt", "DocB.txt"])
+
+    wb = build_similarity_workbook(df, threshold=0.59)
+    ws_flagged = wb["Flagged Pairs"]
+
+    for row in ws_flagged.iter_rows(min_row=2, max_col=2, values_only=True):
+        assert row[0] != row[1], f"Self-pair detected: {row}"
+
