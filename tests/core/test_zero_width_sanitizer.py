@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Tests for zero-width unicode character sanitizer (Issue #609)."""
 
 import logging
@@ -55,7 +77,9 @@ def test_sanitize_zero_width_characters_all_variations():
     BOM (\\ufeff), and Word Joiner (\\u2060) is stripped of all zero-width characters while
     leaving the surrounding text intact (Issue #2699)."""
     # Create test string containing \u200b, \u200c, \u200d, \ufeff, and \u2060
-    dirty_text = "The\u200b quick\u200c brown\u200d fox\ufeff jumps\u2060 over the lazy dog."
+    dirty_text = (
+        "The\u200b quick\u200c brown\u200d fox\ufeff jumps\u2060 over the lazy dog."
+    )
     cleaned = sanitize_zero_width_characters(dirty_text)
 
     # Assert surrounding text is intact
@@ -98,4 +122,3 @@ def test_sanitize_zero_width_characters_individual_variations(char_code, char_na
     cleaned = sanitize_zero_width_characters(dirty_text)
     assert cleaned == "prefixsuffix"
     assert char_code not in cleaned
-

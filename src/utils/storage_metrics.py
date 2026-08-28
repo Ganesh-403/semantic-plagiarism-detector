@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """src/utils/storage_metrics.py - Disk usage calculation for SQLite databases and FAISS index."""
 
 from __future__ import annotations
@@ -207,9 +229,9 @@ def get_directory_size_bytes(directory: Union[str, Path]) -> int:
 
 def calculate_database_fragmentation(db_path: str) -> dict[str, float | int | str]:
     """
-    Queries SQLite storage engine page allocations to evaluate structural 
+    Queries SQLite storage engine page allocations to evaluate structural
     fragmentation levels and identify if an analytical VACUUM routine is required.
-    
+
     Returns:
         Dict detailing page counts, freelist counts, and calculated fragmentation ratio.
     """
@@ -218,46 +240,46 @@ def calculate_database_fragmentation(db_path: str) -> dict[str, float | int | st
         # Establish a read-only or direct cursor sequence into the target SQLite file
         connection = sqlite3.connect(db_path)
         cursor = connection.cursor()
-        
+
         # 1. Retrieve the count of empty, deleted, or unallocated database pages
         cursor.execute("PRAGMA freelist_count;")
         freelist_count: int = cursor.fetchone()[0]
-        
+
         # 2. Retrieve the cumulative count of total structural database pages
         cursor.execute("PRAGMA page_count;")
         page_count: int = cursor.fetchone()[0]
-        
+
         # Handle zero-allocation edge cases gracefully to avoid ZeroDivisionError logs
         if page_count == 0:
             return {
                 "freelist_count": 0,
                 "page_count": 0,
                 "fragmentation_percentage": 0.0,
-                "status": "EMPTY_DATABASE"
+                "status": "EMPTY_DATABASE",
             }
-            
+
         # Calculate fragmentation percentage based on space-recovery eligibility
         fragmentation_percentage: float = (freelist_count / page_count) * 100.0
-        
+
         # Determine actionable optimization benchmarks
         # Standard administrative threshold sets optimization need at > 20% bloat
         needs_vacuum: bool = fragmentation_percentage > 20.0
-        
+
         return {
             "freelist_count": freelist_count,
             "page_count": page_count,
             "fragmentation_percentage": round(fragmentation_percentage, 2),
-            "status": "VACUUM_RECOMMENDED" if needs_vacuum else "OPTIMAL"
+            "status": "VACUUM_RECOMMENDED" if needs_vacuum else "OPTIMAL",
         }
-        
+
     except sqlite3.Error as error:
         # Capture engine connectivity abnormalities safely
         return {
             "error": "SQLITE_QUERY_FAILURE",
             "details": str(error),
-            "fragmentation_percentage": -1.0
+            "fragmentation_percentage": -1.0,
         }
-        
+
     finally:
         if connection:
             connection.close()

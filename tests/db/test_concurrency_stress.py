@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import os
 import queue
 import sqlite3
@@ -19,29 +41,37 @@ def init_isolated_wal_db(db_path: str) -> None:
     cursor.execute("PRAGMA synchronous=NORMAL;")
 
     # Establish baseline structures matching criteria profiles
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS documents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             content TEXT NOT NULL
         );
-    """)
-    cursor.execute("""
+    """
+    )
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS incidents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL
         );
-    """)
+    """
+    )
 
     # Pre-seed incidents table to support simultaneous parallel extraction reads
     for i in range(10):
-        cursor.execute("INSERT INTO incidents (title) VALUES (?);", (f"Pre-existing Alert {i}",))
+        cursor.execute(
+            "INSERT INTO incidents (title) VALUES (?);", (f"Pre-existing Alert {i}",)
+        )
 
     conn.commit()
     conn.close()
 
 
 # --- Worker Function executing Concurrent Reads & Writes ---
-def stress_worker_pipeline(db_path: str, worker_id: int, ops_count: int, error_queue: queue.Queue) -> None:
+def stress_worker_pipeline(
+    db_path: str, worker_id: int, ops_count: int, error_queue: queue.Queue
+) -> None:
     """Executes consecutive reads and writes within isolated thread database connections."""
     try:
         # Each thread must instantiate its own isolated connection pool anchor link
@@ -52,7 +82,9 @@ def stress_worker_pipeline(db_path: str, worker_id: int, ops_count: int, error_q
             # Operation 1: High-contention write insertion block
             cursor.execute(
                 "INSERT INTO documents (content) VALUES (?);",
-                (f"Thread {worker_id} - Document Content Batch payload item chunk {i}",)
+                (
+                    f"Thread {worker_id} - Document Content Batch payload item chunk {i}",
+                ),
             )
             conn.commit()
 
@@ -67,6 +99,7 @@ def stress_worker_pipeline(db_path: str, worker_id: int, ops_count: int, error_q
 
 
 # --- Stress Verification Suite ---
+
 
 @pytest.fixture(scope="function")
 def sqlite_stress_file(tmp_path):
@@ -104,7 +137,7 @@ def test_sqlite_wal_concurrency_stress_under_high_contention(sqlite_stress_file)
     for i in range(threads_count):
         t = threading.Thread(
             target=stress_worker_pipeline,
-            args=(db_path, i, operations_per_thread, error_sharing_queue)
+            args=(db_path, i, operations_per_thread, error_sharing_queue),
         )
         thread_pool.append(t)
 
@@ -135,6 +168,6 @@ def test_sqlite_wal_concurrency_stress_under_high_contention(sqlite_stress_file)
     conn.close()
 
     expected_total_records = threads_count * operations_per_thread
-    assert total_inserted_docs == expected_total_records, (
-        f"Data drift detected! Expected {expected_total_records} logs but got {total_inserted_docs}"
-    )
+    assert (
+        total_inserted_docs == expected_total_records
+    ), f"Data drift detected! Expected {expected_total_records} logs but got {total_inserted_docs}"

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/utils/test_file_validator_signatures.py
 -----------------------------------------------
@@ -8,6 +30,7 @@ matching headers and rejects invalid/mismatched headers.
 """
 
 import pytest
+
 from src.utils.file_validator import MAGIC_SIGNATURES, FileValidator
 
 
@@ -34,7 +57,9 @@ class TestMagicSignaturesValidHeaders:
         filename = f"sample_document{ext}"
         result = validator.validate(header_data, filename)
 
-        assert result.is_valid is True, f"Failed validation for {ext}: {result.error_message}"
+        assert (
+            result.is_valid is True
+        ), f"Failed validation for {ext}: {result.error_message}"
         assert result.error_code is None
 
 
@@ -86,7 +111,9 @@ class TestMagicSignaturesMismatchedHeaders:
         filename = f"corrupt_file{ext}"
         result = validator.validate(garbage_data, filename)
 
-        assert result.is_valid is False, f"Expected failure for {ext} with garbage bytes"
+        assert (
+            result.is_valid is False
+        ), f"Expected failure for {ext} with garbage bytes"
         assert result.error_code == "MAGIC_BYTE_MISMATCH"
 
 
@@ -95,5 +122,15 @@ class TestMagicSignaturesCompleteness:
 
     def test_all_defined_magic_signatures_have_tests(self):
         """Verify that all keys in MAGIC_SIGNATURES are covered."""
-        expected_extensions = {".pdf", ".docx", ".doc", ".rtf", ".odt", ".png", ".jpg", ".jpeg", ".epub"}
+        expected_extensions = {
+            ".pdf",
+            ".docx",
+            ".doc",
+            ".rtf",
+            ".odt",
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".epub",
+        }
         assert expected_extensions.issubset(set(MAGIC_SIGNATURES.keys()))

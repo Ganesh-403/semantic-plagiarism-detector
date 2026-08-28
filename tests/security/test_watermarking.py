@@ -1,22 +1,46 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/security/test_watermarking.py
 -----------------------------------
 Comprehensive unit tests for the document watermarking and leak tracking system.
 """
 
-import pytest
 import hashlib
-from src.security.watermark_engine import (
-    embed_watermark,
-    generate_watermark_id,
-    ZWC_START,
-    ZWC_END,
-)
+
+import pytest
+
 from src.core.watermark_extractor import extract_watermark, strip_watermarks
 from src.db.watermark_logs_db import (
+    identify_leak_source,
     initialize_watermark_db,
     log_watermark_generation,
-    identify_leak_source,
+)
+from src.security.watermark_engine import (
+    ZWC_END,
+    ZWC_START,
+    embed_watermark,
+    generate_watermark_id,
 )
 
 

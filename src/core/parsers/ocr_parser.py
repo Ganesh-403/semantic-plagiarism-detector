@@ -1,8 +1,31 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """src/core/parsers/ocr_parser.py - Optical Character Recognition (OCR) strategies."""
 
 import io
 import logging
 import os
+
 from PIL import Image
 
 from src.core.parsers.common import DEFAULT_OCR_DPI, DEFAULT_OCR_LANGUAGE, PDFInput
@@ -55,7 +78,6 @@ def check_ocr_dependencies() -> None:
         from src.errors import OCR_TESSERACT_NOT_FOUND
 
         raise OCRDependencyError(OCR_TESSERACT_NOT_FOUND) from exc
-
 
 
 def _is_blank_scanned_page(
@@ -159,7 +181,9 @@ def preprocess_image_for_ocr(image):
         from PIL import ImageEnhance, ImageFilter
 
         # Convert palette/RGBA modes to RGB for uniform channel processing
-        if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
+        if image.mode in ("RGBA", "LA") or (
+            image.mode == "P" and "transparency" in image.info
+        ):
             bg = Image.new("RGB", image.size, (255, 255, 255))
             if image.mode == "P":
                 image = image.convert("RGBA")
@@ -245,7 +269,9 @@ def extract_text_from_image(
                         f"[document_parser] OCR image extraction failed due to memory exhaustion: {exc}"
                     )
                 else:
-                    logger.warning(f"[document_parser] OCR image extraction failed: {exc}")
+                    logger.warning(
+                        f"[document_parser] OCR image extraction failed: {exc}"
+                    )
                 return "[OCR extraction failed for the file]"
     except pytesseract.TesseractNotFoundError as exc:
         from src.errors import OCR_TESSERACT_NOT_FOUND

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 cli.py
 ------
@@ -18,11 +40,7 @@ from pathlib import Path
 
 from src.core.app_config import FAISS_INDEX_PATH
 from src.core.cross_lingual import prepare_text_for_embedding
-from src.core.document_parser import (
-    DEFAULT_OCR_DPI,
-    DEFAULT_OCR_LANGUAGE,
-    extract_text,
-)
+from src.core.document_parser import DEFAULT_OCR_DPI, DEFAULT_OCR_LANGUAGE, extract_text
 from src.core.embedding_model import embed_documents, release_large_batch_memory
 from src.core.export_engine import LMSExportEngine
 from src.core.logging_setup import setup_logging
@@ -194,7 +212,9 @@ def run_scan(
             for doc_name, chunks in chunked_docs.items():
                 translated_chunked_docs[doc_name] = []
                 for chunk in chunks:
-                    prepared = prepare_text_for_embedding(chunk.text if hasattr(chunk, "text") else chunk)
+                    prepared = prepare_text_for_embedding(
+                        chunk.text if hasattr(chunk, "text") else chunk
+                    )
                     translated_chunked_docs[doc_name].append(prepared["embedding_text"])
 
             embeddings = embed_documents(translated_chunked_docs)
@@ -763,6 +783,7 @@ def main() -> None:
         elif getattr(args, "db_action", None) == "footprint":
             try:
                 from src.db.corpus_db import get_embedding_storage_footprint
+
                 res = get_embedding_storage_footprint()
             except Exception as e:
                 sys.stderr.write(f"Error calculating storage footprint: {e}\n")
@@ -775,7 +796,9 @@ def main() -> None:
                 print("----------------------------------")
                 print(f"Total Database Size: {res['database_bytes']:,} bytes")
                 print(f"Total Embedding Size: {res['embedding_bytes']:,} bytes")
-                print(f"Embedding Storage Percentage: {res['embedding_percentage']:.2f}%")
+                print(
+                    f"Embedding Storage Percentage: {res['embedding_percentage']:.2f}%"
+                )
                 print(f"Total Chunks: {res['chunk_count']:,}")
             sys.exit(0)
         else:

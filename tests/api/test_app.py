@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 from fastapi.testclient import TestClient
 
 from src.api.app import app
@@ -356,13 +378,19 @@ def test_scope_enforcement_clear_endpoint(tmp_path):
 def test_clear_corpus_audit_logging(tmp_path):
     """Verify that successful /api/v1/clear logs a security event with event_type='CORPUS_CLEARED'."""
     from fastapi.testclient import TestClient
+
     from src.api.app import app
-    from src.db.auth import add_user, configure_db_path, init_db, get_security_audit_logs
+    from src.db.auth import (
+        add_user,
+        configure_db_path,
+        get_security_audit_logs,
+        init_db,
+    )
 
     db_file = tmp_path / "test_clear_audit.db"
     configure_db_path(db_file)
     init_db()
-    
+
     try:
         add_user("admin_user", "password123", role="admin")
     except ValueError:
@@ -385,7 +413,6 @@ def test_clear_corpus_audit_logging(tmp_path):
     assert event["username"] == "admin_user"
     assert "Client IP:" in event["details"]
     assert "Timestamp:" in event["details"]
-
 
 
 # ── Asynchronous Background Scan Job Queue Tests (#1372) ─────────────────────
@@ -926,9 +953,10 @@ def test_api_usage_endpoint():
 
 def test_total_scans_persistence():
     """Verify that total_scans persists in the database / Redis across resets."""
-    from src.db.corpus_db import get_total_scans, increment_total_scans
     import sqlite3
+
     from src.core.app_config import CORPUS_DB_PATH
+    from src.db.corpus_db import get_total_scans, increment_total_scans
 
     initial = get_total_scans()
     incremented = increment_total_scans()
@@ -937,7 +965,9 @@ def test_total_scans_persistence():
     # Read from database to verify persistence
     conn = sqlite3.connect(str(CORPUS_DB_PATH))
     try:
-        cursor = conn.execute("SELECT metric_value FROM system_metrics WHERE metric_name = 'total_scans'")
+        cursor = conn.execute(
+            "SELECT metric_value FROM system_metrics WHERE metric_name = 'total_scans'"
+        )
         row = cursor.fetchone()
         assert row is not None
     except sqlite3.OperationalError:
@@ -1127,25 +1157,27 @@ def test_custom_http_exception_handler_dictionary_detail():
     from starlette.exceptions import HTTPException as StarletteHTTPException
 
     from src.api.app import custom_http_exception_handler
-    
+
     mock_request = Mock()
     mock_request.method = "GET"
     mock_request.url.path = "/test"
-    
+
     dict_detail = {"key": "value", "reason": "invalid request"}
     exc = StarletteHTTPException(status_code=400, detail=dict_detail)
-    
+
     response = asyncio.run(custom_http_exception_handler(mock_request, exc))
-    
+
     import json
+
     body = json.loads(response.body)
-    
+
     assert response.status_code == 400
     assert body["error"] is True
     assert body["code"] == 400
     assert body["message"] == dict_detail
     assert body["message"]["key"] == "value"
     assert "timestamp" not in body
+
 
 def test_custom_http_exception_handler_string_detail():
     import asyncio
@@ -1154,18 +1186,18 @@ def test_custom_http_exception_handler_string_detail():
     from starlette.exceptions import HTTPException as StarletteHTTPException
 
     from src.api.app import custom_http_exception_handler
-    
+
     mock_request = Mock()
     mock_request.method = "GET"
     mock_request.url.path = "/test"
-    
+
     exc = StarletteHTTPException(status_code=400, detail="string error")
-    
+
     response = asyncio.run(custom_http_exception_handler(mock_request, exc))
-    
+
     import json
+
     body = json.loads(response.body)
-    
+
     assert response.status_code == 400
     assert body["message"] == "string error"
-

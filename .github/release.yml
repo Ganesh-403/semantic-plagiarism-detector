@@ -14,7 +14,7 @@ changelog:
     - title: ⚡ Performance
       labels:
         - Performance
-        - "Performance improvement" 
+        - "Performance improvement"
 
     - title: 📚 Documentation
       labels:

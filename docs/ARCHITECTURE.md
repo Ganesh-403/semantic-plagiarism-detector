@@ -48,6 +48,7 @@ sequenceDiagram
 ### `app/`
 
 **Purpose**: The user interface and primary entry point.
+
 - Hosts the Streamlit dashboard (`streamlit_app.py`) and UI themes (`theme.py`).
 - Orchestrates the backend modules (parsing, embedding, search, scoring) based on user interactions.
 - Displays plagiarism warnings, heatmaps, and analytics.
@@ -55,6 +56,7 @@ sequenceDiagram
 ### `src/core/`
 
 **Purpose**: The core processing and natural language processing logic.
+
 - **Document Parsing (`document_parser.py`)**: Extracts text from PDFs and Word documents, using Tesseract OCR for scanned pages.
 - **Text Chunking (`text_chunking.py`)**: Splits documents into semantically meaningful chunks (paragraphs).
 - **Embedding Model (`embedding_model.py`)**: Wraps the Hugging Face `SentenceTransformer` to generate semantic vectors.
@@ -64,6 +66,7 @@ sequenceDiagram
 ### `src/db/`
 
 **Purpose**: Local persistent storage and data management.
+
 - **Corpus DB (`corpus_db.py`)**: SQLite interface for storing document metadata, chunk text, and raw embedding BLOBs.
 - **Auth DB (`auth.py`)**: Manages user authentication, roles (Admin/Teacher), and passwords.
 - **Migrations (`migrations/`)**: Handles versioned SQLite schema upgrades.
@@ -71,6 +74,7 @@ sequenceDiagram
 ### `src/security/`
 
 **Purpose**: Application security and safety.
+
 - **SSRF Protection (`ssrf_protector.py`)**: Validates URLs to prevent Server-Side Request Forgery attacks.
 - **MIME Validation (`mime_validator.py`)**: Verifies uploaded file types to prevent malicious uploads.
 - **Metadata Stripping (`metadata_stripper.py`)**: Removes sensitive metadata from files.
@@ -78,11 +82,13 @@ sequenceDiagram
 ### `src/utils/`
 
 **Purpose**: Shared helper functions and generic utilities.
+
 - Contains modules for caching (`redis_cache.py`), file naming (`filename.py`), report generation (`pdf_report.py`, `excel_export.py`), and managing temporary files (`temp_manager.py`).
 
 ### `src/visualization/`
 
 **Purpose**: Data visualization generation.
+
 - Generates the interactive Plotly and Seaborn visual components used in the dashboard.
 - Includes modules for heatmaps (`heatmap.py`), network graphs (`network_graph.py`), and analytics charts (`analytics.py`).
 
@@ -91,6 +97,7 @@ sequenceDiagram
 ## Database Relationships
 
 The system relies on a relational schema in `corpus.db` to maintain the relationships between documents and their contents:
+
 - **`documents`**: The parent table containing `filename`, `file_hash`, and upload metadata.
 - **`chunks`**: The child table linking back to `documents` via `filename`. It stores the raw `chunk_text` and the binary `embedding` vector.
 
@@ -105,6 +112,7 @@ The system uses `paraphrase-multilingual-MiniLM-L12-v2`. This model was chosen f
 ## Scoring Pipeline
 
 Scoring happens at two levels:
+
 1. **Document-Level**: Chunk embeddings are mean-pooled into a single vector per document. Cosine similarity is computed between these document vectors.
 2. **Chunk-Level**: Computes the maximum pairwise cosine similarity between individual chunks of two documents to detect localized plagiarism.
 Based on configured thresholds (e.g. 0.75 for Medium, 0.90 for High), the scoring pipeline flags plagiarized documents.

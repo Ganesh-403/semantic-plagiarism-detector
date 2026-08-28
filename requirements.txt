@@ -1,98 +1,95 @@
-# ── Vector Search ─────────────────────────────────────────────────────────────
-faiss-cpu>=1.8.0                 # FAISS ANN search (use faiss-gpu if CUDA available)
-
-# ── Core NLP ──────────────────────────────────────────────────────────────────
-sentence-transformers>=5.6.0     # Transformer embeddings (all-MiniLM-L6-v2)
-torch>=2.0.0                     # PyTorch backend for sentence-transformers
-transformers>=4.30.0             # HuggingFace transformers for AI detection
-langdetect>=1.0.9                # Language detection for cross-lingual NLP
-nltk>=3.8.0                      # Stop-word filtering for lexical fallback (#222)
-
-# ── PDF & Document Parsing ────────────────────────────────────────────────────
-pymupdf>=1.24.0                  # PyMuPDF for rendering & highlighting PDF matches
-pypdf>=5.0.0                     # Extract text from PDF files
-pdfplumber>=0.11.0               # Robust PDF text extraction
-python-docx>=1.1.0               # Extract text from Word documents
-pypdf>=3.9.0                       # Legacy PDF manipulation support
-reportlab>=5.0.0                 # PDF document generation
-pytesseract>=0.3.13              # OCR text extraction from scanned images
-Pillow>=10.0.0                   # Image processing library
-python-magic>=0.4.27             # File magic bytes verification
-striprtf>=0.0.20                  # Strip RTF formatting
-EbookLib>=0.18                   # EPUB e-book parsing
-thefuzz>=0.22.1                  # Fuzzy string matching
-networkx>=3.0                    # Plagiarism network graphs
 argon2-cffi>=23.1.0              # Password hashing
-zxcvbn>=4.4.28                   # Password strength and common dictionary checks
 
-# ── Web UI ────────────────────────────────────────────────────────────────────
-streamlit>=1.61.1                # Dashboard framework
+# ── Azure Integration ────────────────────────────────────────────────────────
+azure-storage-blob>=12.20.0      # Upload plagiarism reports to Azure Blob Storage (#3465)
 bcrypt>=4.0.0                    # Password hashing for auth
-pyotp>=2.10.0                     # TOTP generator/verifier for 2FA
-qrcode>=7.4.2                    # Local QR code generator for 2FA setup
-cryptography>=42.0.0              # Symmetric encryption for TOTP secrets
-python-dotenv>=1.0.0             # Load credentials from .env
-plotly>=5.20.0                   # Interactive heatmap with hover values
-deep-translator>=1.11.4          # Translation alignment for cross-lingual support
-streamlit-tour>=1.1.0            # Interactive guided tour component
-streamlit-plotly-events==0.0.6
-
-# ── Data & ML ─────────────────────────────────────────────────────────────────
-numpy>=2.0.0
-pandas>=2.2.0
-scikit-learn>=1.4.0              # cosine_similarity utility
-openpyxl>=3.1.5                  # Engine for exporting DataFrames to Excel
-networkx>=3.0                     # Plagiarism cluster detection
-
-# ── Visualisation ─────────────────────────────────────────────────────────────
-matplotlib>=3.8.0
-seaborn>=0.13.0
-networkx>=3.0                     # Plagiarism cluster detection
-
-# ── Development & Testing ─────────────────────────────────────────────────────
-faker>=20.0.0                   # Fake data generation for mock essay utility (#255)
-hypothesis>=6.100.0             # Property-based testing for filename sanitization (#963)
-jsonschema>=4.20.0               # JSON Schema validation for API error-response tests
-
-# ── Caching & Session Management ───────────────────────────────────────────────
-
-cachetools>=5.3.0               # In-memory TTL cache for revoked tokens & rate limiting
-redis>=5.0.0                    # Redis client for session state and caching
-psutil>=5.9.0                   # System memory monitoring
 
 
 # ── Web Scraping ───────────────────────────────────────────────────────────────
 beautifulsoup4>=4.15.0          # HTML parsing for URL content extraction
-requests>=2.31.0                # HTTP library for fetching web content
-tenacity>=8.2.3               # Retry transient webhook failures (#435)
+
+# ── Caching & Session Management ───────────────────────────────────────────────
+
+cachetools>=5.3.0               # In-memory TTL cache for revoked tokens & rate limiting
+cryptography>=42.0.0              # Symmetric encryption for TOTP secrets
+deep-translator>=1.11.4          # Translation alignment for cross-lingual support
+EbookLib>=0.18                   # EPUB e-book parsing
+# ── Vector Search ─────────────────────────────────────────────────────────────
+faiss-cpu>=1.8.0                 # FAISS ANN search (use faiss-gpu if CUDA available)
+
+# ── Development & Testing ─────────────────────────────────────────────────────
+faker>=20.0.0                   # Fake data generation for mock essay utility (#255)
 # ── REST API & LMS Integration ────────────────────────────────────────────────
 fastapi>=0.109.0                # REST API framework for LMS integrations
-uvicorn>=0.27.0                 # ASGI server implementation
-python-multipart>=0.0.6         # Multipart form parsing for file uploads
-httpx>=0.26.0                   # Async HTTP client for API testing
-
-qrcode>=7.4.2
-# ── Observability & Monitoring ────────────────────────────────────────────────
-prometheus-client>=0.26.0       # Prometheus metrics export for production monitoring
-# ── Code Formatting & Linting ──────────────────────────────────────────────────
-pre-commit>=3.6.0               # Client-side Git hooks manager
-isort>=5.13.0                   # Import sorting library
 
 # ── Google Integration ─────────────────────────────────────────────────────────
 google-api-python-client>=2.198.0
 google-auth>=2.56.2
+hiredis>=2.3.0                  # C-extension Redis parser for faster RQ job dequeue
+httpx>=0.26.0                   # Async HTTP client for API testing
+hypothesis>=6.100.0             # Property-based testing for filename sanitization (#963)
+isort>=5.13.0                   # Import sorting library
+jsonschema>=4.20.0               # JSON Schema validation for API error-response tests
+langdetect>=1.0.9                # Language detection for cross-lingual NLP
 
-# ── Azure Integration ────────────────────────────────────────────────────────
-azure-storage-blob>=12.20.0      # Upload plagiarism reports to Azure Blob Storage (#3465)
+# ── Visualisation ─────────────────────────────────────────────────────────────
+matplotlib>=3.8.0
+networkx>=3.0                    # Plagiarism network graphs
+networkx>=3.0                     # Plagiarism cluster detection
+nltk>=3.8.0                      # Stop-word filtering for lexical fallback (#222)
+
+# ── Data & ML ─────────────────────────────────────────────────────────────────
+numpy>=2.0.0
+openpyxl>=3.1.5                  # Engine for exporting DataFrames to Excel
+pandas>=2.2.0
+pdfplumber>=0.11.0               # Robust PDF text extraction
+Pillow>=10.0.0                   # Image processing library
+plotly>=5.20.0                   # Interactive heatmap with hover values
+# ── Code Formatting & Linting ──────────────────────────────────────────────────
+pre-commit>=3.6.0               # Client-side Git hooks manager
+# ── Observability & Monitoring ────────────────────────────────────────────────
+prometheus-client>=0.26.0       # Prometheus metrics export for production monitoring
+psutil>=5.9.0                   # System memory monitoring
+
+# ── PDF & Document Parsing ────────────────────────────────────────────────────
+pymupdf>=1.24.0                  # PyMuPDF for rendering & highlighting PDF matches
+pyotp>=2.10.0                     # TOTP generator/verifier for 2FA
+pypdf>=5.0.0                     # Extract text from PDF files
+pypdf>=3.9.0                       # Legacy PDF manipulation support
+pytesseract>=0.3.13              # OCR text extraction from scanned images
+python-docx>=1.1.0               # Extract text from Word documents
+python-dotenv>=1.0.0             # Load credentials from .env
+python-magic>=0.4.27             # File magic bytes verification
+python-multipart>=0.0.6         # Multipart form parsing for file uploads
 
 # ── ZIP Encryption ────────────────────────────────────────────────────────────
 pyzipper>=0.4.0                 # AES-256 encrypted ZIP archives for backups
 
+qrcode>=7.4.2
+qrcode>=7.4.2                    # Local QR code generator for 2FA setup
+redis>=5.0.0                    # Redis client for session state and caching
+reportlab>=5.0.0                 # PDF document generation
+requests>=2.31.0                # HTTP library for fetching web content
+
 # ── Background Task Queue ─────────────────────────────────────────────────────
 rq>=2.10.0                      # Redis-backed background job queue for async upload processing
-hiredis>=2.3.0                  # C-extension Redis parser for faster RQ job dequeue
+scikit-learn>=1.4.0              # cosine_similarity utility
+seaborn>=0.13.0
+
+# ── Core NLP ──────────────────────────────────────────────────────────────────
+sentence-transformers>=5.6.0     # Transformer embeddings (all-MiniLM-L6-v2)
 slowapi
 
+# ── Web UI ────────────────────────────────────────────────────────────────────
+streamlit>=1.61.1                # Dashboard framework
+
 streamlit-autorefresh>=1.0.1
-
-
+streamlit-plotly-events==0.0.6
+streamlit-tour>=1.1.0            # Interactive guided tour component
+striprtf>=0.0.20                  # Strip RTF formatting
+tenacity>=8.2.3               # Retry transient webhook failures (#435)
+thefuzz>=0.22.1                  # Fuzzy string matching
+torch>=2.0.0                     # PyTorch backend for sentence-transformers
+transformers>=4.30.0             # HuggingFace transformers for AI detection
+uvicorn>=0.27.0                 # ASGI server implementation
+zxcvbn>=4.4.28                   # Password strength and common dictionary checks

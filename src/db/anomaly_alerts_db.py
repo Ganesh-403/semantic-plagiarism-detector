@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/db/anomaly_alerts_db.py
 ---------------------------
@@ -31,6 +53,7 @@ DEFAULT_DB_PATH = Path("data/anomaly_alerts.db")
 # Connection management
 # ---------------------------------------------------------------------------
 
+
 @contextmanager
 def get_connection(db_path: Optional[Path] = None):
     """Context manager for SQLite connections."""
@@ -55,10 +78,12 @@ def get_connection(db_path: Optional[Path] = None):
 # Schema initialisation
 # ---------------------------------------------------------------------------
 
+
 def init_anomaly_alerts_db(db_path: Optional[Path] = None) -> None:
     """Create all tables for the anomaly alerts system."""
     with get_connection(db_path) as conn:
-        conn.executescript("""
+        conn.executescript(
+            """
             CREATE TABLE IF NOT EXISTS anomaly_scans (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
                 scan_type       TEXT    NOT NULL DEFAULT 'full',
@@ -118,13 +143,15 @@ def init_anomaly_alerts_db(db_path: Optional[Path] = None) -> None:
             );
 
             INSERT OR IGNORE INTO anomaly_config (id) VALUES (1);
-        """)
+        """
+        )
     logger.info("Anomaly alerts DB initialized at %s", db_path or DEFAULT_DB_PATH)
 
 
 # ---------------------------------------------------------------------------
 # AnomalyAlertRepository
 # ---------------------------------------------------------------------------
+
 
 class AnomalyAlertRepository:
     """CRUD + analytics for anomaly alerts and scans."""
@@ -199,7 +226,8 @@ class AnomalyAlertRepository:
 
         with self._conn() as conn:
             total = conn.execute(
-                f"SELECT COUNT(*) FROM anomaly_scans{where}", params  # nosec
+                f"SELECT COUNT(*) FROM anomaly_scans{where}",
+                params,  # nosec
             ).fetchone()[0]
 
             offset = (page - 1) * per_page
@@ -251,9 +279,15 @@ class AnomalyAlertRepository:
                     confidence, affected_docs, evidence, detected_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    scan_id, anomaly_type, severity, title, description,
-                    confidence, json.dumps(affected_docs or []),
-                    json.dumps(evidence or {}), now,
+                    scan_id,
+                    anomaly_type,
+                    severity,
+                    title,
+                    description,
+                    confidence,
+                    json.dumps(affected_docs or []),
+                    json.dumps(evidence or {}),
+                    now,
                 ),
             )
             return cursor.lastrowid
@@ -305,7 +339,8 @@ class AnomalyAlertRepository:
 
         with self._conn() as conn:
             total = conn.execute(
-                f"SELECT COUNT(*) FROM anomaly_alerts{where}", params  # nosec
+                f"SELECT COUNT(*) FROM anomaly_alerts{where}",
+                params,  # nosec
             ).fetchone()[0]
 
             offset = (page - 1) * per_page
@@ -390,9 +425,7 @@ class AnomalyAlertRepository:
     def analytics_summary(self) -> dict[str, Any]:
         """Return aggregate statistics across all alerts."""
         with self._conn() as conn:
-            total = conn.execute(
-                "SELECT COUNT(*) FROM anomaly_alerts"
-            ).fetchone()[0]
+            total = conn.execute("SELECT COUNT(*) FROM anomaly_alerts").fetchone()[0]
             unacknowledged = conn.execute(
                 "SELECT COUNT(*) FROM anomaly_alerts WHERE is_acknowledged = 0"
             ).fetchone()[0]
@@ -404,13 +437,14 @@ class AnomalyAlertRepository:
                    WHERE is_resolved = 0 AND severity = 'critical'"""
             ).fetchone()[0]
 
-            avg_confidence = conn.execute(
-                "SELECT AVG(confidence) FROM anomaly_alerts"
-            ).fetchone()[0] or 0.0
+            avg_confidence = (
+                conn.execute("SELECT AVG(confidence) FROM anomaly_alerts").fetchone()[0]
+                or 0.0
+            )
 
-            total_scans = conn.execute(
-                "SELECT COUNT(*) FROM anomaly_scans"
-            ).fetchone()[0]
+            total_scans = conn.execute("SELECT COUNT(*) FROM anomaly_scans").fetchone()[
+                0
+            ]
 
             completed_scans = conn.execute(
                 "SELECT COUNT(*) FROM anomaly_scans WHERE status = 'completed'"
@@ -488,17 +522,21 @@ class AnomalyAlertRepository:
     def get_config(self) -> dict[str, Any]:
         """Get the current anomaly detection configuration."""
         with self._conn() as conn:
-            row = conn.execute(
-                "SELECT * FROM anomaly_config WHERE id = 1"
-            ).fetchone()
+            row = conn.execute("SELECT * FROM anomaly_config WHERE id = 1").fetchone()
             return dict(row) if row else {}
 
     def update_config(self, **kwargs) -> dict[str, Any]:
         """Update anomaly detection configuration."""
         allowed = {
-            "z_score_threshold", "cluster_min_size", "cluster_similarity",
-            "outlier_percentile", "collusion_threshold", "template_threshold",
-            "enable_statistical", "enable_cluster", "enable_pattern",
+            "z_score_threshold",
+            "cluster_min_size",
+            "cluster_similarity",
+            "outlier_percentile",
+            "collusion_threshold",
+            "template_threshold",
+            "enable_statistical",
+            "enable_cluster",
+            "enable_pattern",
             "enable_collusion",
         }
         updates = {k: v for k, v in kwargs.items() if k in allowed}

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Comprehensive Unit Tests for ISO-639 Language Code Validation
 Issue: #3415
@@ -11,7 +33,20 @@ import pytest
 # ==============================================================================
 
 # A simplified list of standard ISO-639-1 codes
-VALID_LANGUAGE_CODES = {"en", "fr", "es", "de", "it", "pt", "ja", "zh", "hi", "ar", "ru", "ko"}
+VALID_LANGUAGE_CODES = {
+    "en",
+    "fr",
+    "es",
+    "de",
+    "it",
+    "pt",
+    "ja",
+    "zh",
+    "hi",
+    "ar",
+    "ru",
+    "ko",
+}
 
 
 def validate_language_code(language_code: str) -> bool:
@@ -36,6 +71,7 @@ def add_document(title: str, language_code: str) -> bool:
 # ==============================================================================
 # SECTION 2: Testing Valid Language Codes
 # ==============================================================================
+
 
 class TestValidLanguageCodes:
     def test_english_code(self):
@@ -79,6 +115,7 @@ class TestValidLanguageCodes:
 # SECTION 3: Testing Case Insensitivity
 # ==============================================================================
 
+
 class TestCaseInsensitivity:
     def test_uppercase_code(self):
         """Should accept uppercase codes."""
@@ -100,6 +137,7 @@ class TestCaseInsensitivity:
 # ==============================================================================
 # SECTION 4: Testing Invalid Language Codes
 # ==============================================================================
+
 
 class TestInvalidLanguageCodes:
     def test_invalid_code(self):
@@ -139,6 +177,7 @@ class TestInvalidLanguageCodes:
 # SECTION 5: Testing Input Types
 # ==============================================================================
 
+
 class TestInputTypes:
     def test_none_input(self):
         """Should reject None."""
@@ -165,6 +204,7 @@ class TestInputTypes:
 # SECTION 6: Testing the add_document Function
 # ==============================================================================
 
+
 class TestAddDocument:
     def test_add_document_success(self):
         """Should return True for a valid document."""
@@ -190,14 +230,16 @@ class TestAddDocument:
 # SECTION 7: Randomized Fuzz Testing
 # ==============================================================================
 
+
 class TestRandomizedFuzz:
     def test_fuzz_random_strings_are_rejected(self):
         """Random strings should almost never be valid."""
         import random
         import string
+
         random.seed(42)
         for _ in range(100):
-            random_string = ''.join(random.choices(string.ascii_lowercase, k=3))
+            random_string = "".join(random.choices(string.ascii_lowercase, k=3))
             # Very unlikely to be a valid ISO code
             assert validate_language_code(random_string) in [True, False]
             # Ensure no crash
@@ -207,7 +249,8 @@ class TestRandomizedFuzz:
         """Special characters should be rejected."""
         import random
         import string
+
         random.seed(99)
         for _ in range(50):
-            random_string = ''.join(random.choices(string.punctuation, k=2))
+            random_string = "".join(random.choices(string.punctuation, k=2))
             assert validate_language_code(random_string) is False

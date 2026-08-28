@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -34,8 +56,11 @@ def test_healthz_db_not_exist():
 def test_healthz_high_memory_default_threshold():
     """Verify that /healthz returns 503 degraded when memory exceeds default 95% threshold."""
     from unittest.mock import MagicMock
+
     mock_memory = MagicMock(percent=96.0, available=1024 * 1024)
-    with patch("psutil.virtual_memory", return_value=mock_memory), patch.dict("os.environ", {}, clear=False):
+    with patch("psutil.virtual_memory", return_value=mock_memory), patch.dict(
+        "os.environ", {}, clear=False
+    ):
         response = client.get("/healthz")
         assert response.status_code == 503
         data = response.json()
@@ -48,6 +73,7 @@ def test_healthz_high_memory_default_threshold():
 def test_healthz_configurable_memory_threshold():
     """Verify that HEALTHZ_MAX_MEMORY_PERCENT environment variable configures memory threshold."""
     from unittest.mock import MagicMock
+
     mock_memory = MagicMock(percent=85.0, available=1024 * 1024)
 
     # With threshold at 80%, 85% usage should trigger 503 degraded
@@ -77,6 +103,7 @@ def test_healthz_configurable_memory_threshold():
 def test_healthz_invalid_memory_threshold_fallback():
     """Verify that invalid HEALTHZ_MAX_MEMORY_PERCENT values fall back to 95.0% default."""
     from unittest.mock import MagicMock
+
     mock_memory = MagicMock(percent=92.0, available=1024 * 1024)
 
     with patch("psutil.virtual_memory", return_value=mock_memory), patch.dict(
@@ -85,7 +112,6 @@ def test_healthz_invalid_memory_threshold_fallback():
         response = client.get("/healthz")
         assert response.status_code == 200
         assert response.json()["status"] == "ok"
-
 
 
 def test_metrics_prometheus_endpoint():
@@ -111,7 +137,12 @@ def test_metrics_json_endpoint():
 
 def test_cache_prometheus_metrics(tmp_path):
     """Verify that translation and Redis cache hit/miss events register in Prometheus /metrics."""
-    from src.db.translation_cache import get_cached_translation, save_translation, configure_db_path, init_translation_cache
+    from src.db.translation_cache import (
+        configure_db_path,
+        get_cached_translation,
+        init_translation_cache,
+        save_translation,
+    )
     from src.utils.redis_cache import get_cache
 
     # 1. Setup a clean translation cache DB file
@@ -140,8 +171,7 @@ def test_cache_prometheus_metrics(tmp_path):
     # Assert metric counters are defined in the exporter output
     assert "spd_cache_hits_total" in content
     assert "spd_cache_misses_total" in content
-    
+
     # Assert labels are present
     assert 'cache_type="translation"' in content
     assert 'cache_type="redis"' in content
-

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 faiss_index.py
 --------------
@@ -22,11 +44,11 @@ inner product == cosine similarity.
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from src.core.text_chunking import ChunkString
-
 # FAISS has no official type stubs; suppress Pylance false positives
 import faiss  # type: ignore
 import numpy as np
+
+from src.core.text_chunking import ChunkString
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +79,6 @@ class ChunkRecord:
 
 
 FaissChunkRecord = ChunkRecord
-
 
 
 def build_index(
@@ -95,7 +116,9 @@ def build_index(
         for i, (vec, chunk) in enumerate(zip(emb, chunks)):
             all_vectors.append(vec.astype("float32"))
             if isinstance(chunk, ChunkString):
-                registry.append(ChunkRecord(doc_name, i, chunk.text, metadata=chunk.metadata))
+                registry.append(
+                    ChunkRecord(doc_name, i, chunk.text, metadata=chunk.metadata)
+                )
             else:
                 registry.append(ChunkRecord(doc_name, i, chunk))
 
@@ -320,7 +343,9 @@ def add_to_index(
         for i, (vec, chunk) in enumerate(zip(emb, chunks)):
             new_vectors.append(vec.astype("float32"))
             if isinstance(chunk, ChunkString):
-                new_registry.append(ChunkRecord(doc_name, i, chunk.text, metadata=chunk.metadata))
+                new_registry.append(
+                    ChunkRecord(doc_name, i, chunk.text, metadata=chunk.metadata)
+                )
             else:
                 new_registry.append(ChunkRecord(doc_name, i, chunk))
 
@@ -528,7 +553,9 @@ def load_or_rebuild_index(filepath: str) -> tuple[faiss.Index, list[ChunkRecord]
     if n_matrix != n_registry:
         from src.errors import FAISS_EMB_REGISTRY_MISMATCH
 
-        raise ValueError(FAISS_EMB_REGISTRY_MISMATCH.format(emb_count=n_matrix, reg_count=n_registry))
+        raise ValueError(
+            FAISS_EMB_REGISTRY_MISMATCH.format(emb_count=n_matrix, reg_count=n_registry)
+        )
 
     if os.path.exists(filepath):
         try:

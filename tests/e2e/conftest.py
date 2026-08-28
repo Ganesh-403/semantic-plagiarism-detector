@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/e2e/conftest.py
 ---------------------
@@ -14,6 +36,7 @@ Responsibilities
 - Provide a synchronous ``page`` fixture so individual test files stay
   short and focused on the critical path.
 """
+
 from __future__ import annotations
 
 import os
@@ -73,8 +96,10 @@ def _seed_test_user(auth_db_path: Path) -> None:
     import importlib
 
     from src.core import app_config
+
     importlib.reload(app_config)
     from src.db import auth as auth_mod
+
     importlib.reload(auth_mod)
 
     auth_mod.init_db()
@@ -111,13 +136,21 @@ def streamlit_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
 
     proc = subprocess.Popen(
         [
-            sys.executable, "-m", "streamlit", "run",
+            sys.executable,
+            "-m",
+            "streamlit",
+            "run",
             str(REPO_ROOT / "app" / "streamlit_app.py"),
-            "--server.port", str(port),
-            "--server.address", "127.0.0.1",
-            "--server.headless", "true",
-            "--browser.gatherUsageStats", "false",
-            "--global.developmentMode", "false",
+            "--server.port",
+            str(port),
+            "--server.address",
+            "127.0.0.1",
+            "--server.headless",
+            "true",
+            "--browser.gatherUsageStats",
+            "false",
+            "--global.developmentMode",
+            "false",
         ],
         cwd=str(REPO_ROOT),
         env=env,

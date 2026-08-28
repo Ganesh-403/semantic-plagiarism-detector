@@ -86,7 +86,7 @@ class CitationProvenanceEngine {
     getCitationsFiltered(query = '') {
         if (!query) return this.citationEntries;
         const q = query.toLowerCase();
-        return this.citationEntries.filter(c => 
+        return this.citationEntries.filter(c =>
             c.refId.toLowerCase().includes(q) ||
             c.title.toLowerCase().includes(q) ||
             c.doi.toLowerCase().includes(q) ||

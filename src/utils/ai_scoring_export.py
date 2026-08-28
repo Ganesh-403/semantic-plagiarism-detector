@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 AI Scoring Export Utilities.
 
@@ -37,13 +59,15 @@ class AIScoringExporter:
         path = os.path.join(self.output_dir, filename)
         rows = []
         for s in scores:
-            rows.append({
-                "doc_a": s.get("doc_a", ""),
-                "doc_b": s.get("doc_b", ""),
-                "overall_score": s.get("overall_score", 0),
-                "severity": s.get("severity", ""),
-                "fingerprint_match": s.get("fingerprint_match", False),
-            })
+            rows.append(
+                {
+                    "doc_a": s.get("doc_a", ""),
+                    "doc_b": s.get("doc_b", ""),
+                    "overall_score": s.get("overall_score", 0),
+                    "severity": s.get("severity", ""),
+                    "fingerprint_match": s.get("fingerprint_match", False),
+                }
+            )
         with open(path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=rows[0].keys())
             writer.writeheader()
@@ -51,11 +75,15 @@ class AIScoringExporter:
         logger.info(f"Exported CSV: {path}")
         return path
 
-    def export_summary_report(self, scores: list[dict], filename: str = "scoring_summary.txt") -> str:
+    def export_summary_report(
+        self, scores: list[dict], filename: str = "scoring_summary.txt"
+    ) -> str:
         """Export human-readable summary report."""
         path = os.path.join(self.output_dir, filename)
         total = len(scores)
-        avg_score = sum(s.get("overall_score", 0) for s in scores) / total if total else 0
+        avg_score = (
+            sum(s.get("overall_score", 0) for s in scores) / total if total else 0
+        )
         critical = sum(1 for s in scores if s.get("severity") == "critical")
         high = sum(1 for s in scores if s.get("severity") == "high")
 
@@ -72,7 +100,9 @@ class AIScoringExporter:
             "TOP MATCHES:",
         ]
         for i, s in enumerate(scores[:10], 1):
-            lines.append(f"  #{i} {s.get('doc_a')} ↔ {s.get('doc_b')} — {s.get('overall_score', 0):.1%} ({s.get('severity')})")
+            lines.append(
+                f"  #{i} {s.get('doc_a')} ↔ {s.get('doc_b')} — {s.get('overall_score', 0):.1%} ({s.get('severity')})"
+            )
         lines.extend(["", "=" * 60])
 
         with open(path, "w", encoding="utf-8") as f:

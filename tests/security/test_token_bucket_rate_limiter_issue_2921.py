@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 test_token_bucket_rate_limiter_issue_2921.py
 ---------------------------------------------
@@ -15,10 +37,7 @@ from fastapi import HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
 
 from src.api.middleware import verify_bearer_token
-from src.security.rate_limiter import (
-    TokenBucketRateLimiter,
-    get_token_bucket_limiter,
-)
+from src.security.rate_limiter import TokenBucketRateLimiter, get_token_bucket_limiter
 
 
 def test_token_bucket_consume_basic():
@@ -70,10 +89,11 @@ async def test_verify_bearer_token_rate_limiting_exceeded():
 
     limiter = TokenBucketRateLimiter(capacity=1.0, refill_rate=0.0)
 
-    with patch("src.api.middleware.get_valid_tokens", return_value={test_token: ["read"]}), \
-         patch("src.api.middleware.db_auth.is_token_revoked", return_value=False), \
-         patch("src.api.middleware.get_token_bucket_limiter", return_value=limiter):
-
+    with patch(
+        "src.api.middleware.get_valid_tokens", return_value={test_token: ["read"]}
+    ), patch("src.api.middleware.db_auth.is_token_revoked", return_value=False), patch(
+        "src.api.middleware.get_token_bucket_limiter", return_value=limiter
+    ):
         # First request consumes the single available token
         result = await verify_bearer_token(mock_request, credentials)
         assert result == test_token

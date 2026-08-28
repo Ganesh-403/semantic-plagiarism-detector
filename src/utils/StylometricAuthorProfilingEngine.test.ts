@@ -7,7 +7,7 @@ import {
 
 describe('StylometricAuthorProfilingEngine', () => {
   const textSample1 = `The rapid advancement of artificial intelligence models has profoundly altered modern computing. Furthermore, neural network architectures continue to evolve at an unprecedented speed, enabling complex pattern recognition and semantic text analysis across diverse domain datasets.`;
-  
+
   const textSample2 = `AI technology is moving fast and changing how software works! However, we must be careful about data quality, training efficiency, and model evaluation metrics to prevent unexpected errors.`;
 
   it('should extract comprehensive stylometric profile metrics', () => {

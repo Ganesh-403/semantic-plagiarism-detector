@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/utils/test_redis_pipeline_clear.py
 ----------------------------------------
@@ -14,16 +36,16 @@ def test_clear_pattern_uses_redis_pipeline():
     cache = RedisCache.__new__(RedisCache)
     mock_client = MagicMock()
     mock_client.ping.return_value = True
-    
+
     # 5 matching keys
-    test_keys = [f"spd:v1:session:sess123:key_{i}".encode("utf-8") for i in range(5)]
+    test_keys = [f"spd:v1:session:sess123:key_{i}".encode() for i in range(5)]
     mock_client.scan_iter.return_value = iter(test_keys)
     mock_client.keys.return_value = test_keys
 
     mock_pipeline = MagicMock()
     mock_pipeline.execute.return_value = [5]
     mock_client.pipeline.return_value = mock_pipeline
-    
+
     cache._client = mock_client
     cache._fallback_cache = {}
 
@@ -47,16 +69,16 @@ def test_clear_pattern_batches_large_key_sets():
     cache = RedisCache.__new__(RedisCache)
     mock_client = MagicMock()
     mock_client.ping.return_value = True
-    
+
     # 2500 matching keys (exceeds 1000 chunk size)
-    test_keys = [f"key_{i}".encode("utf-8") for i in range(2500)]
+    test_keys = [f"key_{i}".encode() for i in range(2500)]
     mock_client.scan_iter.return_value = iter(test_keys)
     mock_client.keys.return_value = test_keys
 
     mock_pipeline = MagicMock()
     mock_pipeline.execute.return_value = [1000, 1000, 500]
     mock_client.pipeline.return_value = mock_pipeline
-    
+
     cache._client = mock_client
     cache._fallback_cache = {}
 

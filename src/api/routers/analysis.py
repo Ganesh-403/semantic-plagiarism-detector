@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """src/api/routers/analysis.py - Plagiarism analysis and scan job management router."""
 
 import hashlib
@@ -43,10 +65,7 @@ from src.core.embedding_model import (
     release_large_batch_memory,
 )
 from src.core.metrics import spd_scan_duration_seconds
-from src.core.similarity import (
-    PLAGIARISM_THRESHOLD,
-    find_most_similar_chunks,
-)
+from src.core.similarity import PLAGIARISM_THRESHOLD, find_most_similar_chunks
 from src.core.text_chunking import chunk_document
 from src.db.corpus_db import get_document_by_hash
 from src.security.mime_validator import is_executable_upload
@@ -149,7 +168,9 @@ def _process_scan_job(
         if not extracted_text.strip():
             if not _is_cancelled():
                 scan_jobs[job_id]["status"] = "failed"
-                scan_jobs[job_id]["completed_at"] = datetime.now(timezone.utc).isoformat()
+                scan_jobs[job_id]["completed_at"] = datetime.now(
+                    timezone.utc
+                ).isoformat()
                 scan_jobs[job_id][
                     "error"
                 ] = "Failed to extract readable text from the uploaded file."
@@ -176,7 +197,9 @@ def _process_scan_job(
                 scan_jobs[job_id]["status"] = "completed"
                 scan_jobs[job_id]["progress_percent"] = 100
                 scan_jobs[job_id]["stage"] = "done"
-                scan_jobs[job_id]["completed_at"] = datetime.now(timezone.utc).isoformat()
+                scan_jobs[job_id]["completed_at"] = datetime.now(
+                    timezone.utc
+                ).isoformat()
                 scan_jobs[job_id]["result"] = {
                     "filename": filename,
                     "word_count": word_count,
@@ -236,7 +259,7 @@ def _process_scan_job(
                 sim_chunk = float(np.max(sim_matrix))
 
                 chunk_maxes = np.max(sim_matrix, axis=1)
-                uploaded_chunks_flagged |= (chunk_maxes >= threshold)
+                uploaded_chunks_flagged |= chunk_maxes >= threshold
 
                 combined_score = max(sim_doc, sim_chunk)
                 max_overall_score = max(max_overall_score, sim_doc)
@@ -276,10 +299,16 @@ def _process_scan_job(
             matched_documents.sort(
                 key=lambda x: x["max_chunk_similarity_score"], reverse=True
             )
-            is_flagged = len(matched_documents) > 0 or max_chunk_overall_score >= threshold
-            
+            is_flagged = (
+                len(matched_documents) > 0 or max_chunk_overall_score >= threshold
+            )
+
             total_flagged = int(np.sum(uploaded_chunks_flagged))
-            plagiarism_density = int(round((total_flagged / len(chunks)) * 100)) if len(chunks) > 0 else 0
+            plagiarism_density = (
+                int(round((total_flagged / len(chunks)) * 100))
+                if len(chunks) > 0
+                else 0
+            )
 
         scan_jobs[job_id]["progress_percent"] = 90
         scan_jobs[job_id]["stage"] = "comparison"
@@ -510,7 +539,7 @@ def _perform_text_scan(
             sim_chunk = float(np.max(sim_matrix))
 
             chunk_maxes = np.max(sim_matrix, axis=1)
-            uploaded_chunks_flagged |= (chunk_maxes >= threshold)
+            uploaded_chunks_flagged |= chunk_maxes >= threshold
 
             combined_score = max(sim_doc, sim_chunk)
             max_overall_score = max(max_overall_score, sim_doc)

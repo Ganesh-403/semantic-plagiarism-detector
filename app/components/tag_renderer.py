@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 app/components/tag_renderer.py
 ------------------------------
@@ -30,21 +52,21 @@ _TAG_CSS = """
         line-height: 1.4;
         border: 1px solid transparent;
     }
-    
+
     /* High confidence / Manual tags (Default theme colors) */
     .tag-high-confidence, .tag-source-manual {
         background-color: rgba(37, 99, 235, 0.15); /* Blue-600 with alpha */
         color: #2563eb;
         border-color: rgba(37, 99, 235, 0.3);
     }
-    
+
     /* AI Generated tags (High confidence) */
     .tag-source-ai_generated.tag-high-confidence {
         background-color: rgba(16, 185, 129, 0.15); /* Emerald-500 with alpha */
         color: #10b981;
         border-color: rgba(16, 185, 129, 0.3);
     }
-    
+
     /* Low confidence tags (Muted/Warning styling) - Issue #2812 */
     .tag-low-confidence {
         background-color: rgba(245, 158, 11, 0.15); /* Amber-500 with alpha */
@@ -52,12 +74,12 @@ _TAG_CSS = """
         border-color: rgba(245, 158, 11, 0.4);
         border-style: dashed;
     }
-    
+
     .tag-warning-icon {
         margin-right: 4px;
         font-size: 0.9rem;
     }
-    
+
     /* Dark mode overrides */
     @media (prefers-color-scheme: dark) {
         .tag-high-confidence, .tag-source-manual {

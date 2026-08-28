@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Tests for the pattern recognition and prediction system (issue #2840).
 
 Covers: PatternDetectionEngine, PatternRepository, RecommendationEngine,
@@ -77,15 +99,35 @@ class TestPatternDetectionEngine:
 
         engine = PatternDetectionEngine()
         incidents = [
-            _make_incident("s1_essay1.pdf", "s1_essay2.pdf", 0.75, owner_a="student1", owner_b="student2"),
-            _make_incident("s1_essay3.pdf", "s1_essay4.pdf", 0.80, owner_a="student1", owner_b="student3"),
-            _make_incident("s1_essay5.pdf", "s1_essay6.pdf", 0.72, owner_a="student1", owner_b="student4"),
+            _make_incident(
+                "s1_essay1.pdf",
+                "s1_essay2.pdf",
+                0.75,
+                owner_a="student1",
+                owner_b="student2",
+            ),
+            _make_incident(
+                "s1_essay3.pdf",
+                "s1_essay4.pdf",
+                0.80,
+                owner_a="student1",
+                owner_b="student3",
+            ),
+            _make_incident(
+                "s1_essay5.pdf",
+                "s1_essay6.pdf",
+                0.72,
+                owner_a="student1",
+                owner_b="student4",
+            ),
         ]
         patterns = engine.detect_recurring_patterns(incidents, min_occurrence=2)
 
         author_patterns = [p for p in patterns if p["pattern_type"] == "collaborative"]
         assert len(author_patterns) >= 1
-        student1_pattern = next(p for p in author_patterns if "student1" in (p["author_group"] or []))
+        student1_pattern = next(
+            p for p in author_patterns if "student1" in (p["author_group"] or [])
+        )
         assert student1_pattern["occurrence_count"] == 3
 
     def test_detect_assignment_hotspots(self):
@@ -99,7 +141,9 @@ class TestPatternDetectionEngine:
         ]
         patterns = engine.detect_recurring_patterns(incidents, min_occurrence=2)
 
-        assignment_patterns = [p for p in patterns if p.get("assignment_title") == "Essay 1"]
+        assignment_patterns = [
+            p for p in patterns if p.get("assignment_title") == "Essay 1"
+        ]
         assert len(assignment_patterns) >= 1
 
     def test_no_patterns_below_threshold(self):
@@ -159,7 +203,13 @@ class TestPatternDetectionEngine:
 
         assert result["risk_score"] >= 0.0
         assert result["risk_score"] <= 1.0
-        assert result["risk_level"] in ("Critical", "High", "Medium", "Low", "Negligible")
+        assert result["risk_level"] in (
+            "Critical",
+            "High",
+            "Medium",
+            "Low",
+            "Negligible",
+        )
         assert len(result["contributing_factors"]) > 0
 
     def test_evaluate_detection_accuracy(self):
@@ -256,18 +306,28 @@ class TestPatternRepository:
 
     def test_get_patterns_with_filters(self, repo):
         repo.upsert_pattern(
-            pattern_id="PAT-F01", pattern_type="copy_paste",
-            document_group=["a.pdf"], avg_similarity=0.9,
-            occurrence_count=2, confidence_score=0.7,
-            severity="High", first_seen="2026-01-01T00:00:00+00:00",
-            last_seen="2026-01-01T00:00:00+00:00", status="active",
+            pattern_id="PAT-F01",
+            pattern_type="copy_paste",
+            document_group=["a.pdf"],
+            avg_similarity=0.9,
+            occurrence_count=2,
+            confidence_score=0.7,
+            severity="High",
+            first_seen="2026-01-01T00:00:00+00:00",
+            last_seen="2026-01-01T00:00:00+00:00",
+            status="active",
         )
         repo.upsert_pattern(
-            pattern_id="PAT-F02", pattern_type="paraphrase",
-            document_group=["b.pdf"], avg_similarity=0.6,
-            occurrence_count=2, confidence_score=0.5,
-            severity="Medium", first_seen="2026-01-01T00:00:00+00:00",
-            last_seen="2026-01-01T00:00:00+00:00", status="resolved",
+            pattern_id="PAT-F02",
+            pattern_type="paraphrase",
+            document_group=["b.pdf"],
+            avg_similarity=0.6,
+            occurrence_count=2,
+            confidence_score=0.5,
+            severity="Medium",
+            first_seen="2026-01-01T00:00:00+00:00",
+            last_seen="2026-01-01T00:00:00+00:00",
+            status="resolved",
         )
         active = repo.get_patterns(status="active")
         assert len(active) == 1
@@ -275,10 +335,14 @@ class TestPatternRepository:
 
     def test_update_pattern_status(self, repo):
         repo.upsert_pattern(
-            pattern_id="PAT-S01", pattern_type="copy_paste",
-            document_group=["a.pdf"], avg_similarity=0.9,
-            occurrence_count=2, confidence_score=0.7,
-            severity="High", first_seen="2026-01-01T00:00:00+00:00",
+            pattern_id="PAT-S01",
+            pattern_type="copy_paste",
+            document_group=["a.pdf"],
+            avg_similarity=0.9,
+            occurrence_count=2,
+            confidence_score=0.7,
+            severity="High",
+            first_seen="2026-01-01T00:00:00+00:00",
             last_seen="2026-01-01T00:00:00+00:00",
         )
         assert repo.update_pattern_status("PAT-S01", "resolved")
@@ -287,19 +351,27 @@ class TestPatternRepository:
 
     def test_evolution_snapshot(self, repo):
         repo.upsert_pattern(
-            pattern_id="PAT-E01", pattern_type="copy_paste",
-            document_group=["a.pdf"], avg_similarity=0.9,
-            occurrence_count=2, confidence_score=0.7,
-            severity="High", first_seen="2026-01-01T00:00:00+00:00",
+            pattern_id="PAT-E01",
+            pattern_type="copy_paste",
+            document_group=["a.pdf"],
+            avg_similarity=0.9,
+            occurrence_count=2,
+            confidence_score=0.7,
+            severity="High",
+            first_seen="2026-01-01T00:00:00+00:00",
             last_seen="2026-01-01T00:00:00+00:00",
         )
         repo.record_evolution_snapshot(
-            pattern_id="PAT-E01", occurrence_count=2,
-            avg_similarity=0.9, confidence_score=0.7,
+            pattern_id="PAT-E01",
+            occurrence_count=2,
+            avg_similarity=0.9,
+            confidence_score=0.7,
         )
         repo.record_evolution_snapshot(
-            pattern_id="PAT-E01", occurrence_count=4,
-            avg_similarity=0.88, confidence_score=0.8,
+            pattern_id="PAT-E01",
+            occurrence_count=4,
+            avg_similarity=0.88,
+            confidence_score=0.8,
             drift_score=0.05,
         )
         ts = repo.get_evolution_timeseries("PAT-E01", days=365)
@@ -346,18 +418,28 @@ class TestPatternRepository:
 
     def test_pattern_summary(self, repo):
         repo.upsert_pattern(
-            pattern_id="PAT-SUM1", pattern_type="copy_paste",
-            document_group=["a.pdf"], avg_similarity=0.9,
-            occurrence_count=2, confidence_score=0.7,
-            severity="High", first_seen="2026-01-01T00:00:00+00:00",
-            last_seen="2026-01-01T00:00:00+00:00", status="active",
+            pattern_id="PAT-SUM1",
+            pattern_type="copy_paste",
+            document_group=["a.pdf"],
+            avg_similarity=0.9,
+            occurrence_count=2,
+            confidence_score=0.7,
+            severity="High",
+            first_seen="2026-01-01T00:00:00+00:00",
+            last_seen="2026-01-01T00:00:00+00:00",
+            status="active",
         )
         repo.upsert_pattern(
-            pattern_id="PAT-SUM2", pattern_type="paraphrase",
-            document_group=["b.pdf"], avg_similarity=0.6,
-            occurrence_count=2, confidence_score=0.5,
-            severity="Medium", first_seen="2026-01-01T00:00:00+00:00",
-            last_seen="2026-01-01T00:00:00+00:00", status="active",
+            pattern_id="PAT-SUM2",
+            pattern_type="paraphrase",
+            document_group=["b.pdf"],
+            avg_similarity=0.6,
+            occurrence_count=2,
+            confidence_score=0.5,
+            severity="Medium",
+            first_seen="2026-01-01T00:00:00+00:00",
+            last_seen="2026-01-01T00:00:00+00:00",
+            status="active",
         )
         summary = repo.get_pattern_summary()
         assert summary["total"] == 2
@@ -421,7 +503,11 @@ class TestRecommendationEngine:
 
         engine = RecommendationEngine()
         risk_scores = [
-            {"document_name": f"doc{i}.pdf", "risk_score": 0.9, "risk_level": "Critical"}
+            {
+                "document_name": f"doc{i}.pdf",
+                "risk_score": 0.9,
+                "risk_level": "Critical",
+            }
             for i in range(6)
         ]
         recs = engine.generate_recommendations([], risk_scores, None)

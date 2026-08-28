@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 document_health_scorer.py
 -------------------------
@@ -44,6 +66,7 @@ CHUNK_STDEV_MAX = 300  # acceptable standard deviation of chunk word counts
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class DimensionScore:
@@ -93,6 +116,7 @@ class HealthReport:
 # ---------------------------------------------------------------------------
 # Scoring helpers
 # ---------------------------------------------------------------------------
+
 
 def _score_metadata_completeness(doc: dict[str, Any]) -> DimensionScore:
     """Evaluate how complete the document metadata is."""
@@ -166,7 +190,9 @@ def _score_chunk_balance(chunk_word_counts: list[int]) -> DimensionScore:
     )
 
 
-def _score_embedding_coverage(total_chunks: int, chunks_with_embeddings: int) -> DimensionScore:
+def _score_embedding_coverage(
+    total_chunks: int, chunks_with_embeddings: int
+) -> DimensionScore:
     """Evaluate embedding coverage ratio."""
     if total_chunks == 0:
         return DimensionScore(
@@ -178,7 +204,9 @@ def _score_embedding_coverage(total_chunks: int, chunks_with_embeddings: int) ->
 
     ratio = chunks_with_embeddings / total_chunks
     score = ratio * 100
-    detail = f"{chunks_with_embeddings}/{total_chunks} chunks have embeddings ({ratio:.0%})"
+    detail = (
+        f"{chunks_with_embeddings}/{total_chunks} chunks have embeddings ({ratio:.0%})"
+    )
     return DimensionScore(
         name="embedding_coverage",
         score=round(score, 2),
@@ -219,11 +247,54 @@ def _score_content_quality(
 
     # --- Stop-word ratio penalty ---
     common_words = {
-        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-        "have", "has", "had", "do", "does", "did", "will", "would", "could",
-        "should", "may", "might", "can", "shall", "to", "of", "in", "for",
-        "on", "with", "at", "by", "from", "as", "into", "about", "it", "its",
-        "this", "that", "these", "those", "i", "you", "he", "she", "we", "they",
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "can",
+        "shall",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "about",
+        "it",
+        "its",
+        "this",
+        "that",
+        "these",
+        "those",
+        "i",
+        "you",
+        "he",
+        "she",
+        "we",
+        "they",
     }
     words = re.findall(r"\b\w+\b", full_text.lower())
     if words:
@@ -284,6 +355,7 @@ def _score_fingerprint(file_hash: str, existing_hashes: set[str]) -> DimensionSc
 # Grade assignment
 # ---------------------------------------------------------------------------
 
+
 def _assign_grade(score: float) -> str:
     """Map a 0–100 numeric score to a letter grade."""
     if score >= 97:
@@ -308,6 +380,7 @@ def _assign_grade(score: float) -> str:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def score_document(
     doc: dict[str, Any],
@@ -432,7 +505,17 @@ def compute_quality_gate(
     Returns:
         Dict with 'passed' bool, reason, and the score/grade.
     """
-    grade_order = {"F": 0, "D": 1, "C": 2, "B-": 3, "B": 4, "B+": 5, "A-": 6, "A": 7, "A+": 8}
+    grade_order = {
+        "F": 0,
+        "D": 1,
+        "C": 2,
+        "B-": 3,
+        "B": 4,
+        "B+": 5,
+        "A-": 6,
+        "A": 7,
+        "A+": 8,
+    }
 
     passed = True
     reasons: list[str] = []
@@ -447,9 +530,7 @@ def compute_quality_gate(
     min_grade_rank = grade_order.get(min_grade, -1)
     if doc_grade_rank < min_grade_rank:
         passed = False
-        reasons.append(
-            f"Grade {report.grade} is below minimum {min_grade}"
-        )
+        reasons.append(f"Grade {report.grade} is below minimum {min_grade}")
 
     # Check for any dimension scoring below 25
     critical_dims = [d for d in report.dimensions if d.score < 25]
@@ -471,6 +552,7 @@ def compute_quality_gate(
 # ---------------------------------------------------------------------------
 # Batch analytics
 # ---------------------------------------------------------------------------
+
 
 def aggregate_reports(reports: list[HealthReport]) -> dict[str, Any]:
     """Compute aggregate statistics across a batch of health reports."""
@@ -501,8 +583,7 @@ def aggregate_reports(reports: list[HealthReport]) -> dict[str, Any]:
             dim_totals[d.name] = dim_totals.get(d.name, 0) + d.score
             dim_counts[d.name] = dim_counts.get(d.name, 0) + 1
     dim_avgs = {
-        name: round(dim_totals[name] / dim_counts[name], 2)
-        for name in dim_totals
+        name: round(dim_totals[name] / dim_counts[name], 2) for name in dim_totals
     }
 
     # Pass rate (score >= 60)

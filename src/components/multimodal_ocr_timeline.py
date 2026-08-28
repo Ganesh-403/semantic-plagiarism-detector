@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Telemetry Ledger Component for Multimodal Image OCR Audit Records."""
 
 from typing import Any, List
@@ -16,7 +38,13 @@ def render_ocr_timeline(matches: list[Any]) -> str:
     for match in matches:
         m_dict = match if isinstance(match, dict) else match.__dict__
         overall_pct = int(m_dict.get("overall_multimodal_score", 0.0) * 100)
-        status_color = "#EF4444" if overall_pct > 75 else "#F59E0B" if overall_pct > 40 else "#10B981"
+        status_color = (
+            "#EF4444"
+            if overall_pct > 75
+            else "#F59E0B"
+            if overall_pct > 40
+            else "#10B981"
+        )
 
         items_html += f"""
         <div style="

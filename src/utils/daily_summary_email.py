@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 daily_summary_email.py
 ----------------------
@@ -343,7 +365,7 @@ def generate_daily_summary_html(stats: dict[str, Any]) -> str:
             <tr>
                 <td align="center" style="padding: 40px 20px;">
                     <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                        
+
                         <!-- Header -->
                         <tr>
                             <td style="background-color: #2563eb; padding: 30px; border-radius: 8px 8px 0 0; text-align: center;">
@@ -355,7 +377,7 @@ def generate_daily_summary_html(stats: dict[str, Any]) -> str:
                                 </p>
                             </td>
                         </tr>
-                        
+
                         <!-- Stats Grid -->
                         <tr>
                             <td style="padding: 30px;">
@@ -377,7 +399,7 @@ def generate_daily_summary_html(stats: dict[str, Any]) -> str:
                                 </table>
                             </td>
                         </tr>
-                        
+
                         <!-- Top Pairs Table -->
                         <tr>
                             <td style="padding: 0 30px 30px 30px;">
@@ -398,7 +420,7 @@ def generate_daily_summary_html(stats: dict[str, Any]) -> str:
                                 </table>
                             </td>
                         </tr>
-                        
+
                         <!-- Footer -->
                         <tr>
                             <td style="padding: 20px 30px; background-color: #f8fafc; border-radius: 0 0 8px 8px; text-align: center;">
@@ -407,7 +429,7 @@ def generate_daily_summary_html(stats: dict[str, Any]) -> str:
                                 </p>
                             </td>
                         </tr>
-                        
+
                     </table>
                 </td>
             </tr>

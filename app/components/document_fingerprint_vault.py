@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Document Fingerprint Vault
 ===========================
@@ -25,7 +47,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import streamlit as st
 
-
 # =============================================================================
 # DATA CLASSES
 # =============================================================================
@@ -34,6 +55,7 @@ import streamlit as st
 @dataclass
 class Fingerprint:
     """A document fingerprint with multiple hash representations."""
+
     doc_id: str
     doc_title: str
     author: str
@@ -55,6 +77,7 @@ class Fingerprint:
 @dataclass
 class FingerprintMatch:
     """A match found between two document fingerprints."""
+
     match_id: str
     source_doc_id: str
     source_title: str
@@ -74,10 +97,13 @@ class FingerprintMatch:
 @dataclass
 class TamperEvent:
     """A detected tampering event."""
+
     event_id: str
     doc_id: str
     doc_title: str
-    tamper_type: str  # content_modification, metadata_tampering, hash_mismatch, time_anomaly
+    tamper_type: (
+        str  # content_modification, metadata_tampering, hash_mismatch, time_anomaly
+    )
     severity: str
     description: str
     original_hash: str
@@ -90,6 +116,7 @@ class TamperEvent:
 @dataclass
 class FingerprintCluster:
     """A cluster of similar document fingerprints."""
+
     cluster_id: str
     doc_ids: List[str]
     doc_titles: List[str]
@@ -104,6 +131,7 @@ class FingerprintCluster:
 @dataclass
 class HashPerformance:
     """Performance metrics for a hashing algorithm."""
+
     algorithm: str
     avg_time_ms: float
     collision_rate: float
@@ -119,7 +147,7 @@ class HashPerformance:
 
 
 def generate_hash(length: int = 32) -> str:
-    return ''.join(random.choices(string.hexdigits[:16], k=length))
+    return "".join(random.choices(string.hexdigits[:16], k=length))
 
 
 def generate_minhash(size: int = 128) -> List[int]:
@@ -128,47 +156,79 @@ def generate_minhash(size: int = 128) -> List[int]:
 
 def generate_fingerprints(count: int = 30) -> List[Fingerprint]:
     titles = [
-        "Neural Network Architecture Survey", "Transformer-Based Language Models",
-        "Semantic Text Similarity Methods", "Code Clone Detection Algorithms",
-        "Plagiarism Detection in Academia", "Cross-Lingual Transfer Learning",
-        "Knowledge Graph Construction", "Real-Time Document Processing",
-        "Adversarial Text Generation", "Federated Learning for NLP",
-        "Graph Neural Networks for Citations", "Multi-Modal Document Understanding",
-        "Efficient Fine-Tuning Methods", "Bias Detection in AI Systems",
-        "Zero-Shot Classification", "Temporal Text Analysis",
-        "Sentiment Analysis Across Domains", "Scientific Paper Summarization",
-        "Question Answering Systems", "Spam Detection in Publishing",
-        "Plagiarism Obfuscation Analysis", "Semantic Web Technologies",
-        "Low-Resource Language Processing", "AI Text Detection Methods",
-        "Embedding Model Benchmarks", "Document Layout Analysis",
-        "Automated Essay Evaluation", "Named Entity Recognition Survey",
-        "Speech-to-Text Comparison", "Multilingual Information Retrieval",
+        "Neural Network Architecture Survey",
+        "Transformer-Based Language Models",
+        "Semantic Text Similarity Methods",
+        "Code Clone Detection Algorithms",
+        "Plagiarism Detection in Academia",
+        "Cross-Lingual Transfer Learning",
+        "Knowledge Graph Construction",
+        "Real-Time Document Processing",
+        "Adversarial Text Generation",
+        "Federated Learning for NLP",
+        "Graph Neural Networks for Citations",
+        "Multi-Modal Document Understanding",
+        "Efficient Fine-Tuning Methods",
+        "Bias Detection in AI Systems",
+        "Zero-Shot Classification",
+        "Temporal Text Analysis",
+        "Sentiment Analysis Across Domains",
+        "Scientific Paper Summarization",
+        "Question Answering Systems",
+        "Spam Detection in Publishing",
+        "Plagiarism Obfuscation Analysis",
+        "Semantic Web Technologies",
+        "Low-Resource Language Processing",
+        "AI Text Detection Methods",
+        "Embedding Model Benchmarks",
+        "Document Layout Analysis",
+        "Automated Essay Evaluation",
+        "Named Entity Recognition Survey",
+        "Speech-to-Text Comparison",
+        "Multilingual Information Retrieval",
     ]
-    authors = ["Smith J.", "Chen W.", "Patel A.", "Kim S.", "Mueller K.", "Garcia M.", "Lee H.", "Brown T."]
+    authors = [
+        "Smith J.",
+        "Chen W.",
+        "Patel A.",
+        "Kim S.",
+        "Mueller K.",
+        "Garcia M.",
+        "Lee H.",
+        "Brown T.",
+    ]
     statuses = ["valid", "valid", "valid", "tampered", "valid", "valid"]
 
     fps = []
     for i in range(count):
         status = random.choice(statuses)
-        verified = (datetime.now() - timedelta(days=random.randint(0, 30))).isoformat() if status == "valid" else None
-        fps.append(Fingerprint(
-            doc_id=f"fp_{i+1:03d}",
-            doc_title=titles[i % len(titles)],
-            author=random.choice(authors),
-            upload_date=(datetime.now() - timedelta(days=random.randint(0, 90))).strftime("%Y-%m-%d"),
-            file_size=random.randint(50000, 5000000),
-            word_count=random.randint(2000, 25000),
-            page_count=random.randint(5, 80),
-            md5_hash=generate_hash(32),
-            sha256_hash=generate_hash(64),
-            simhash=f"{random.randint(0, 2**63):016x}",
-            minhash=generate_minhash(64),
-            shingle_count=random.randint(50, 500),
-            ngram_size=random.choice([3, 4, 5]),
-            algorithm_version="2.1",
-            integrity_status=status,
-            verified_date=verified,
-        ))
+        verified = (
+            (datetime.now() - timedelta(days=random.randint(0, 30))).isoformat()
+            if status == "valid"
+            else None
+        )
+        fps.append(
+            Fingerprint(
+                doc_id=f"fp_{i+1:03d}",
+                doc_title=titles[i % len(titles)],
+                author=random.choice(authors),
+                upload_date=(
+                    datetime.now() - timedelta(days=random.randint(0, 90))
+                ).strftime("%Y-%m-%d"),
+                file_size=random.randint(50000, 5000000),
+                word_count=random.randint(2000, 25000),
+                page_count=random.randint(5, 80),
+                md5_hash=generate_hash(32),
+                sha256_hash=generate_hash(64),
+                simhash=f"{random.randint(0, 2**63):016x}",
+                minhash=generate_minhash(64),
+                shingle_count=random.randint(50, 500),
+                ngram_size=random.choice([3, 4, 5]),
+                algorithm_version="2.1",
+                integrity_status=status,
+                verified_date=verified,
+            )
+        )
     return fps
 
 
@@ -181,21 +241,35 @@ def generate_matches(fps: List[Fingerprint], count: int = 20) -> List[Fingerprin
         t = random.choice([f for f in fps if f.doc_id != s.doc_id])
         mt = random.choice(types)
         sim = random.uniform(0.15, 0.98) if mt != "exact" else random.uniform(0.95, 1.0)
-        risk = "critical" if sim > 0.9 else "high" if sim > 0.7 else "medium" if sim > 0.4 else "low"
+        risk = (
+            "critical"
+            if sim > 0.9
+            else "high"
+            if sim > 0.7
+            else "medium"
+            if sim > 0.4
+            else "low"
+        )
         shared = random.randint(10, 400)
         total = random.randint(200, 600)
-        matches.append(FingerprintMatch(
-            match_id=f"FM-{i+1:03d}",
-            source_doc_id=s.doc_id, source_title=s.doc_title,
-            target_doc_id=t.doc_id, target_title=t.doc_title,
-            similarity_type=mt, similarity_score=round(sim, 3),
-            matching_algorithm=random.choice(algos),
-            hamming_distance=random.randint(0, 50),
-            jaccard_similarity=round(random.uniform(0.1, 0.95), 3),
-            shared_shingles=shared, total_shingles=total,
-            confidence=round(random.uniform(0.5, 0.98), 3),
-            risk_level=risk,
-        ))
+        matches.append(
+            FingerprintMatch(
+                match_id=f"FM-{i+1:03d}",
+                source_doc_id=s.doc_id,
+                source_title=s.doc_title,
+                target_doc_id=t.doc_id,
+                target_title=t.doc_title,
+                similarity_type=mt,
+                similarity_score=round(sim, 3),
+                matching_algorithm=random.choice(algos),
+                hamming_distance=random.randint(0, 50),
+                jaccard_similarity=round(random.uniform(0.1, 0.95), 3),
+                shared_shingles=shared,
+                total_shingles=total,
+                confidence=round(random.uniform(0.5, 0.98), 3),
+                risk_level=risk,
+            )
+        )
     return sorted(matches, key=lambda m: m.similarity_score, reverse=True)
 
 
@@ -203,33 +277,53 @@ def generate_tamper_events(fps: List[Fingerprint]) -> List[TamperEvent]:
     tampered = [f for f in fps if f.integrity_status == "tampered"]
     events = []
     for f in tampered[:5]:
-        events.append(TamperEvent(
-            event_id=f"TE-{uuid.uuid4().hex[:6]}",
-            doc_id=f.doc_id, doc_title=f.doc_title,
-            tamper_type=random.choice(["content_modification", "metadata_tampering", "hash_mismatch", "time_anomaly"]),
-            severity=random.choice(["critical", "high", "medium"]),
-            description=f"Document '{f.doc_title}' shows hash mismatch between stored and computed fingerprints.",
-            original_hash=f.md5_hash,
-            current_hash=generate_hash(32),
-            detected_at=(datetime.now() - timedelta(hours=random.randint(1, 48))).isoformat(),
-            evidence={"bytes_changed": random.randint(100, 5000), "sections_affected": random.randint(1, 5)},
-            status=random.choice(["open", "investigating"]),
-        ))
+        events.append(
+            TamperEvent(
+                event_id=f"TE-{uuid.uuid4().hex[:6]}",
+                doc_id=f.doc_id,
+                doc_title=f.doc_title,
+                tamper_type=random.choice(
+                    [
+                        "content_modification",
+                        "metadata_tampering",
+                        "hash_mismatch",
+                        "time_anomaly",
+                    ]
+                ),
+                severity=random.choice(["critical", "high", "medium"]),
+                description=f"Document '{f.doc_title}' shows hash mismatch between stored and computed fingerprints.",
+                original_hash=f.md5_hash,
+                current_hash=generate_hash(32),
+                detected_at=(
+                    datetime.now() - timedelta(hours=random.randint(1, 48))
+                ).isoformat(),
+                evidence={
+                    "bytes_changed": random.randint(100, 5000),
+                    "sections_affected": random.randint(1, 5),
+                },
+                status=random.choice(["open", "investigating"]),
+            )
+        )
     # Add extra simulated events
     for _ in range(3):
         f = random.choice(fps)
-        events.append(TamperEvent(
-            event_id=f"TE-{uuid.uuid4().hex[:6]}",
-            doc_id=f.doc_id, doc_title=f.doc_title,
-            tamper_type=random.choice(["content_modification", "time_anomaly"]),
-            severity=random.choice(["medium", "low"]),
-            description=f"Suspected content modification in '{f.doc_title}'. Timestamps inconsistent.",
-            original_hash=f.md5_hash,
-            current_hash=generate_hash(32),
-            detected_at=(datetime.now() - timedelta(hours=random.randint(1, 72))).isoformat(),
-            evidence={"bytes_changed": random.randint(50, 2000)},
-            status=random.choice(["open", "resolved"]),
-        ))
+        events.append(
+            TamperEvent(
+                event_id=f"TE-{uuid.uuid4().hex[:6]}",
+                doc_id=f.doc_id,
+                doc_title=f.doc_title,
+                tamper_type=random.choice(["content_modification", "time_anomaly"]),
+                severity=random.choice(["medium", "low"]),
+                description=f"Suspected content modification in '{f.doc_title}'. Timestamps inconsistent.",
+                original_hash=f.md5_hash,
+                current_hash=generate_hash(32),
+                detected_at=(
+                    datetime.now() - timedelta(hours=random.randint(1, 72))
+                ).isoformat(),
+                evidence={"bytes_changed": random.randint(50, 2000)},
+                status=random.choice(["open", "resolved"]),
+            )
+        )
     return events
 
 
@@ -238,17 +332,23 @@ def generate_clusters(fps: List[Fingerprint]) -> List[FingerprintCluster]:
     for i in range(5):
         n = random.randint(2, 5)
         selected = random.sample(fps, min(n, len(fps)))
-        clusters.append(FingerprintCluster(
-            cluster_id=f"CL-{i+1:03d}",
-            doc_ids=[f.doc_id for f in selected],
-            doc_titles=[f.doc_title for f in selected],
-            centroid_hash=generate_hash(32),
-            avg_internal_similarity=round(random.uniform(0.5, 0.95), 3),
-            cluster_size=len(selected),
-            risk_level="high" if random.random() > 0.5 else "medium",
-            first_seen=(datetime.now() - timedelta(days=random.randint(10, 60))).isoformat(),
-            last_updated=(datetime.now() - timedelta(days=random.randint(0, 10))).isoformat(),
-        ))
+        clusters.append(
+            FingerprintCluster(
+                cluster_id=f"CL-{i+1:03d}",
+                doc_ids=[f.doc_id for f in selected],
+                doc_titles=[f.doc_title for f in selected],
+                centroid_hash=generate_hash(32),
+                avg_internal_similarity=round(random.uniform(0.5, 0.95), 3),
+                cluster_size=len(selected),
+                risk_level="high" if random.random() > 0.5 else "medium",
+                first_seen=(
+                    datetime.now() - timedelta(days=random.randint(10, 60))
+                ).isoformat(),
+                last_updated=(
+                    datetime.now() - timedelta(days=random.randint(0, 10))
+                ).isoformat(),
+            )
+        )
     return clusters
 
 
@@ -258,7 +358,15 @@ def generate_hash_performance() -> List[HashPerformance]:
         HashPerformance("SHA-256", 2.5, 0.0001, 256, 3, 1, "Cryptographic integrity"),
         HashPerformance("SimHash", 5.2, 0.05, 64, 2, 2, "Near-duplicate detection"),
         HashPerformance("MinHash", 8.1, 0.03, 512, 4, 2, "Large-scale similarity"),
-        HashPerformance("Locality-Sensitive Hash", 6.5, 0.04, 128, 5, 2, "Approximate nearest neighbor"),
+        HashPerformance(
+            "Locality-Sensitive Hash",
+            6.5,
+            0.04,
+            128,
+            5,
+            2,
+            "Approximate nearest neighbor",
+        ),
     ]
 
 
@@ -268,40 +376,56 @@ def generate_hash_performance() -> List[HashPerformance]:
 
 
 def status_color(s: str) -> str:
-    return {"valid": "#22c55e", "tampered": "#ef4444", "unknown": "#94a3b8"}.get(s, "#6b7280")
+    return {"valid": "#22c55e", "tampered": "#ef4444", "unknown": "#94a3b8"}.get(
+        s, "#6b7280"
+    )
 
 
 def sim_color(s: float) -> str:
-    if s > 0.9: return "#ef4444"
-    if s > 0.7: return "#f97316"
-    if s > 0.4: return "#eab308"
+    if s > 0.9:
+        return "#ef4444"
+    if s > 0.7:
+        return "#f97316"
+    if s > 0.4:
+        return "#eab308"
     return "#22c55e"
 
 
 def severity_color(s: str) -> str:
-    return {"critical": "#ef4444", "high": "#f97316", "medium": "#eab308", "low": "#22c55e"}.get(s, "#6b7280")
+    return {
+        "critical": "#ef4444",
+        "high": "#f97316",
+        "medium": "#eab308",
+        "low": "#22c55e",
+    }.get(s, "#6b7280")
 
 
 def format_size(b: int) -> str:
-    if b >= 1000000: return f"{b/1000000:.1f} MB"
-    if b >= 1000: return f"{b/1000:.1f} KB"
+    if b >= 1000000:
+        return f"{b/1000000:.1f} MB"
+    if b >= 1000:
+        return f"{b/1000:.1f} KB"
     return f"{b} B"
 
 
 def render_kpi(label: str, value: str, subtitle: str, color: str) -> None:
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div style="background:rgba(255,255,255,0.06);border-radius:14px;padding:18px 14px;
          border:1px solid rgba(255,255,255,0.08);text-align:center;">
         <div style="font-size:26px;font-weight:800;color:{color};margin-bottom:4px;">{value}</div>
         <div style="font-size:12px;font-weight:600;color:#e2e8f0;margin-bottom:2px;">{label}</div>
         <div style="font-size:10px;color:#94a3b8;">{subtitle}</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_fingerprint_card(fp: Fingerprint, expanded: bool = False) -> None:
     ic = status_color(fp.integrity_status)
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:14px;
          border-left:4px solid {ic};margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -319,10 +443,13 @@ def render_fingerprint_card(fp: Fingerprint, expanded: bool = False) -> None:
             <span>🔢 {fp.shingle_count} shingles</span>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
     if expanded:
-        st.markdown(f"""
+        st.markdown(
+            f"""
         <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:10px;margin-top:6px;">
             <div style="font-size:11px;color:#94a3b8;margin-bottom:4px;"><b>MD5:</b> <span style="font-family:monospace;color:#e2e8f0;">{fp.md5_hash[:32]}...</span></div>
             <div style="font-size:11px;color:#94a3b8;margin-bottom:4px;"><b>SHA-256:</b> <span style="font-family:monospace;color:#e2e8f0;">{fp.sha256_hash[:48]}...</span></div>
@@ -330,14 +457,22 @@ def render_fingerprint_card(fp: Fingerprint, expanded: bool = False) -> None:
             <div style="font-size:11px;color:#94a3b8;margin-bottom:4px;"><b>MinHash:</b> <span style="font-family:monospace;color:#e2e8f0;">[{', '.join(str(h)[:8] for h in fp.minhash[:4])}...]</span></div>
             <div style="font-size:11px;color:#94a3b8;"><b>N-gram:</b> {fp.ngram_size}-shingles · <b>Algorithm:</b> v{fp.algorithm_version} · <b>Verified:</b> {fp.verified_date[:10] if fp.verified_date else 'Never'}</div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
 
 def render_match_card(m: FingerprintMatch) -> None:
     sc = sim_color(m.similarity_score)
-    type_colors = {"exact": "#ef4444", "near_duplicate": "#f97316", "partial": "#eab308", "structural": "#8b5cf6"}
+    type_colors = {
+        "exact": "#ef4444",
+        "near_duplicate": "#f97316",
+        "partial": "#eab308",
+        "structural": "#8b5cf6",
+    }
     tc = type_colors.get(m.similarity_type, "#6b7280")
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:14px;
          border-left:4px solid {sc};margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -361,14 +496,21 @@ def render_match_card(m: FingerprintMatch) -> None:
             <div style="height:100%;width:{m.similarity_score*100}%;background:{sc};border-radius:4px;"></div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_tamper_card(te: TamperEvent) -> None:
     sc = severity_color(te.severity)
-    status_colors = {"open": "#ef4444", "investigating": "#f59e0b", "resolved": "#22c55e"}
+    status_colors = {
+        "open": "#ef4444",
+        "investigating": "#f59e0b",
+        "resolved": "#22c55e",
+    }
     stc = status_colors.get(te.status, "#6b7280")
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:14px;
          border-left:4px solid {sc};margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -384,7 +526,9 @@ def render_tamper_card(te: TamperEvent) -> None:
             Original: {te.original_hash[:20]}... → Current: {te.current_hash[:20]}...
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 # =============================================================================
@@ -393,11 +537,14 @@ def render_tamper_card(te: TamperEvent) -> None:
 
 
 def render_fingerprint_vault() -> None:
-    st.markdown("""
+    st.markdown(
+        """
     <style>
     .block-container { padding-top: 1rem; }
     </style>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
     fps = generate_fingerprints(30)
     matches = generate_matches(fps, 20)
@@ -406,7 +553,8 @@ def render_fingerprint_vault() -> None:
     perf = generate_hash_performance()
 
     # Header
-    st.markdown("""
+    st.markdown(
+        """
     <div style="text-align:center;margin-bottom:20px;">
         <div style="font-size:36px;margin-bottom:8px;">🔐</div>
         <h1 style="font-size:28px;font-weight:800;margin:0;
@@ -418,7 +566,9 @@ def render_fingerprint_vault() -> None:
             Generate, compare, and verify document fingerprints for integrity
         </p>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
     # KPIs
     total_fps = len(fps)
@@ -434,8 +584,18 @@ def render_fingerprint_vault() -> None:
         ("Valid", str(valid_fps), f"{valid_fps/total_fps:.0%} integrity", "#22c55e"),
         ("Tampered", str(tampered_fps), "need investigation", "#ef4444"),
         ("Matches Found", str(total_matches), "similarities detected", "#8b5cf6"),
-        ("Exact Matches", str(exact_matches), "potential duplicates", "#ef4444" if exact_matches > 2 else "#eab308"),
-        ("Open Tampers", str(open_tampers), "events to review", "#ef4444" if open_tampers > 1 else "#22c55e"),
+        (
+            "Exact Matches",
+            str(exact_matches),
+            "potential duplicates",
+            "#ef4444" if exact_matches > 2 else "#eab308",
+        ),
+        (
+            "Open Tampers",
+            str(open_tampers),
+            "events to review",
+            "#ef4444" if open_tampers > 1 else "#22c55e",
+        ),
     ]
     for col, (l, v, s, c) in zip(cols, kpis):
         with col:
@@ -460,9 +620,13 @@ def render_fingerprint_vault() -> None:
 def _render_vault(fps):
     col1, col2, col3 = st.columns(3)
     with col1:
-        status_filter = st.selectbox("Integrity Status", ["All", "Valid", "Tampered", "Unknown"])
+        status_filter = st.selectbox(
+            "Integrity Status", ["All", "Valid", "Tampered", "Unknown"]
+        )
     with col2:
-        sort_by = st.selectbox("Sort By", ["Upload Date", "Word Count", "File Size", "Shingle Count"])
+        sort_by = st.selectbox(
+            "Sort By", ["Upload Date", "Word Count", "File Size", "Shingle Count"]
+        )
     with col3:
         search = st.text_input("🔍 Search documents...")
 
@@ -470,34 +634,58 @@ def _render_vault(fps):
     if status_filter != "All":
         filtered = [f for f in filtered if f.integrity_status == status_filter.lower()]
     if search:
-        filtered = [f for f in filtered if search.lower() in f.doc_title.lower() or search.lower() in f.author.lower()]
+        filtered = [
+            f
+            for f in filtered
+            if search.lower() in f.doc_title.lower()
+            or search.lower() in f.author.lower()
+        ]
 
-    sort_map = {"Upload Date": lambda f: f.upload_date, "Word Count": lambda f: f.word_count, "File Size": lambda f: f.file_size, "Shingle Count": lambda f: f.shingle_count}
+    sort_map = {
+        "Upload Date": lambda f: f.upload_date,
+        "Word Count": lambda f: f.word_count,
+        "File Size": lambda f: f.file_size,
+        "Shingle Count": lambda f: f.shingle_count,
+    }
     filtered.sort(key=sort_map[sort_by], reverse=True)
 
     st.markdown(f"**{len(filtered)} fingerprints** in vault")
 
     for fp in filtered:
-        with st.expander(f"{fp.doc_title} — {fp.integrity_status.title()}", expanded=False):
+        with st.expander(
+            f"{fp.doc_title} — {fp.integrity_status.title()}", expanded=False
+        ):
             render_fingerprint_card(fp, expanded=True)
 
 
 def _render_matches(matches):
     col1, col2, col3 = st.columns(3)
     with col1:
-        type_filter = st.selectbox("Match Type", ["All", "Exact", "Near Duplicate", "Partial", "Structural"])
+        type_filter = st.selectbox(
+            "Match Type", ["All", "Exact", "Near Duplicate", "Partial", "Structural"]
+        )
     with col2:
-        risk_filter = st.selectbox("Risk Level", ["All", "Critical", "High", "Medium", "Low"])
+        risk_filter = st.selectbox(
+            "Risk Level", ["All", "Critical", "High", "Medium", "Low"]
+        )
     with col3:
         sort_by = st.selectbox("Sort By", ["Similarity", "Jaccard", "Hamming Distance"])
 
     filtered = matches[:]
     if type_filter != "All":
-        filtered = [m for m in filtered if m.similarity_type == type_filter.lower().replace(' ', '_')]
+        filtered = [
+            m
+            for m in filtered
+            if m.similarity_type == type_filter.lower().replace(" ", "_")
+        ]
     if risk_filter != "All":
         filtered = [m for m in filtered if m.risk_level == risk_filter.lower()]
 
-    sort_map = {"Similarity": lambda m: m.similarity_score, "Jaccard": lambda m: m.jaccard_similarity, "Hamming Distance": lambda m: m.hamming_distance}
+    sort_map = {
+        "Similarity": lambda m: m.similarity_score,
+        "Jaccard": lambda m: m.jaccard_similarity,
+        "Hamming Distance": lambda m: m.hamming_distance,
+    }
     filtered.sort(key=sort_map[sort_by], reverse=(sort_by != "Hamming Distance"))
 
     st.markdown(f"**{len(filtered)} matches** found")
@@ -516,7 +704,8 @@ def _render_tamper(tampers):
         sev_counts = Counter(t.severity for t in tampers)
         for sev, count in sev_counts.most_common():
             sc = severity_color(sev)
-            st.markdown(f"""
+            st.markdown(
+                f"""
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
                 <span style="font-size:11px;color:#94a3b8;width:70px;">{sev.title()}</span>
                 <div style="flex:1;height:10px;background:rgba(255,255,255,0.08);border-radius:5px;">
@@ -524,7 +713,9 @@ def _render_tamper(tampers):
                 </div>
                 <span style="font-size:11px;color:{sc};font-weight:700;">{count}</span>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
 
         st.markdown("#### 📊 Type Distribution")
         type_counts = Counter(t.tamper_type for t in tampers)
@@ -534,15 +725,23 @@ def _render_tamper(tampers):
         st.markdown("#### 📊 Status")
         stat_counts = Counter(t.status for t in tampers)
         for st_, count in stat_counts.most_common():
-            stc = {"open": "#ef4444", "investigating": "#f59e0b", "resolved": "#22c55e"}.get(st_, "#6b7280")
-            st.markdown(f'<div style="font-size:12px;color:{stc};margin-bottom:4px;">{st_.title()}: <b>{count}</b></div>', unsafe_allow_html=True)
+            stc = {
+                "open": "#ef4444",
+                "investigating": "#f59e0b",
+                "resolved": "#22c55e",
+            }.get(st_, "#6b7280")
+            st.markdown(
+                f'<div style="font-size:12px;color:{stc};margin-bottom:4px;">{st_.title()}: <b>{count}</b></div>',
+                unsafe_allow_html=True,
+            )
 
 
 def _render_clusters(clusters, fps):
     st.markdown("#### 📊 Fingerprint Clusters")
     for cl in clusters:
         rc = sim_color(cl.avg_internal_similarity)
-        st.markdown(f"""
+        st.markdown(
+            f"""
         <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:14px;
              border:1px solid rgba(255,255,255,0.08);margin-bottom:10px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -560,7 +759,9 @@ def _render_clusters(clusters, fps):
                 {''.join(f'<span style="font-size:10px;padding:2px 8px;border-radius:12px;background:rgba(139,92,246,0.12);color:#c4b5fd;">{t[:35]}...</span>' for t in cl.doc_titles)}
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
 
 def _render_performance(perf):
@@ -568,7 +769,8 @@ def _render_performance(perf):
     for p in perf:
         speed_pct = (6 - p.speed_rank) / 5 * 100
         acc_pct = (6 - p.accuracy_rank) / 5 * 100
-        st.markdown(f"""
+        st.markdown(
+            f"""
         <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:14px;
              border:1px solid rgba(255,255,255,0.08);margin-bottom:10px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -596,7 +798,9 @@ def _render_performance(perf):
                 </div>
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
 
 # =============================================================================

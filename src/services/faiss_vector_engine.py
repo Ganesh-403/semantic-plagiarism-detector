@@ -1,12 +1,34 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Enterprise FAISS Vector Embedding Index & Sub-Linear Nearest Neighbor Engine
 Implements dense semantic vector indexing, L2 distance metrics, HNSW graph search simulation,
 and multi-threaded batch similarity scanning across sub-second document repositories.
 """
 
-import math
 import hashlib
-from typing import List, Dict, Any, Optional, Tuple
+import math
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class FAISSVectorIndexEngine:
@@ -54,17 +76,25 @@ class FAISSVectorIndexEngine:
         for idx, doc_vec in enumerate(self.indexed_vectors):
             doc_id = self.indexed_doc_ids[idx]
             dist = self._compute_l2_distance(query_vec, doc_vec)
-            similarity = round(max(0.0, 1.0 - (dist / math.sqrt(self.vector_dimension))), 4)
+            similarity = round(
+                max(0.0, 1.0 - (dist / math.sqrt(self.vector_dimension))), 4
+            )
 
-            search_results.append({
-                "matchedDocId": doc_id,
-                "l2Distance": round(dist, 4),
-                "semanticSimilarityScore": similarity,
-                "confidenceGrade": "HIGH_SIMILARITY" if similarity > 0.85 else "MODERATE",
-                "metadata": self.document_metadata_store.get(doc_id, {}),
-            })
+            search_results.append(
+                {
+                    "matchedDocId": doc_id,
+                    "l2Distance": round(dist, 4),
+                    "semanticSimilarityScore": similarity,
+                    "confidenceGrade": (
+                        "HIGH_SIMILARITY" if similarity > 0.85 else "MODERATE"
+                    ),
+                    "metadata": self.document_metadata_store.get(doc_id, {}),
+                }
+            )
 
-        sorted_results = sorted(search_results, key=lambda x: x["semanticSimilarityScore"], reverse=True)
+        sorted_results = sorted(
+            search_results, key=lambda x: x["semanticSimilarityScore"], reverse=True
+        )
         return sorted_results[:top_k]
 
     def _compute_l2_distance(self, vec_a: list[float], vec_b: list[float]) -> float:

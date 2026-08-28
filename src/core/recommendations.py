@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Proactive recommendation engine for plagiarism pattern response.
 
 Generates actionable intervention recommendations based on detected patterns,
@@ -76,7 +98,11 @@ class RecommendationEngine:
                 try:
                     self._repo.create_recommendation(**rec)
                 except Exception as exc:
-                    logger.warning("Failed to persist recommendation %s: %s", rec.get("recommendation_id"), exc)
+                    logger.warning(
+                        "Failed to persist recommendation %s: %s",
+                        rec.get("recommendation_id"),
+                        exc,
+                    )
 
         return recommendations
 
@@ -89,7 +115,9 @@ class RecommendationEngine:
     def acknowledge_recommendation(self, recommendation_id: str) -> bool:
         if not self._repo:
             return False
-        return self._repo.update_recommendation_status(recommendation_id, "acknowledged")
+        return self._repo.update_recommendation_status(
+            recommendation_id, "acknowledged"
+        )
 
     def dismiss_recommendation(self, recommendation_id: str) -> bool:
         if not self._repo:
@@ -113,36 +141,42 @@ class RecommendationEngine:
 
                 occ = pattern.get("occurrence_count", 0)
                 if occ >= 5:
-                    recs.append({
-                        "recommendation_id": _make_rec_id("escalate_author", author),
-                        "pattern_id": pattern.get("pattern_id"),
-                        "recommendation_type": "escalate",
-                        "priority": PRIORITY_CRITICAL,
-                        "target": author,
-                        "message": f"Author '{author}' has {occ} plagiarism incidents. "
-                                   "Immediate escalation to academic integrity office recommended.",
-                        "action_items": [
-                            "Notify academic integrity office",
-                            "Schedule investigation meeting",
-                            "Review all submissions from this author",
-                            "Consider temporary submission hold",
-                        ],
-                    })
+                    recs.append(
+                        {
+                            "recommendation_id": _make_rec_id(
+                                "escalate_author", author
+                            ),
+                            "pattern_id": pattern.get("pattern_id"),
+                            "recommendation_type": "escalate",
+                            "priority": PRIORITY_CRITICAL,
+                            "target": author,
+                            "message": f"Author '{author}' has {occ} plagiarism incidents. "
+                            "Immediate escalation to academic integrity office recommended.",
+                            "action_items": [
+                                "Notify academic integrity office",
+                                "Schedule investigation meeting",
+                                "Review all submissions from this author",
+                                "Consider temporary submission hold",
+                            ],
+                        }
+                    )
                 elif occ >= 3:
-                    recs.append({
-                        "recommendation_id": _make_rec_id("monitor_author", author),
-                        "pattern_id": pattern.get("pattern_id"),
-                        "recommendation_type": "monitor_author",
-                        "priority": PRIORITY_HIGH,
-                        "target": author,
-                        "message": f"Author '{author}' has {occ} incidents. "
-                                   "Enhanced monitoring recommended.",
-                        "action_items": [
-                            "Flag future submissions for priority review",
-                            "Review submission patterns and timing",
-                            "Consider academic counseling referral",
-                        ],
-                    })
+                    recs.append(
+                        {
+                            "recommendation_id": _make_rec_id("monitor_author", author),
+                            "pattern_id": pattern.get("pattern_id"),
+                            "recommendation_type": "monitor_author",
+                            "priority": PRIORITY_HIGH,
+                            "target": author,
+                            "message": f"Author '{author}' has {occ} incidents. "
+                            "Enhanced monitoring recommended.",
+                            "action_items": [
+                                "Flag future submissions for priority review",
+                                "Review submission patterns and timing",
+                                "Consider academic counseling referral",
+                            ],
+                        }
+                    )
 
         return recs
 
@@ -163,22 +197,26 @@ class RecommendationEngine:
             doc_count = len(docs) if isinstance(docs, list) else 0
 
             if doc_count > 0 and occ / max(doc_count, 1) > 0.2:
-                recs.append({
-                    "recommendation_id": _make_rec_id("redesign_assignment", assignment),
-                    "pattern_id": pattern.get("pattern_id"),
-                    "recommendation_type": "redesign_assignment",
-                    "priority": PRIORITY_HIGH,
-                    "target": assignment,
-                    "message": f"Assignment '{assignment}' has a high plagiarism rate "
-                               f"({occ} incidents across {doc_count} documents). "
-                               "Consider redesigning the assignment.",
-                    "action_items": [
-                        "Review assignment prompt for ambiguity",
-                        "Add unique sub-topics per student",
-                        "Implement staged submission deadlines",
-                        "Require source annotations",
-                    ],
-                })
+                recs.append(
+                    {
+                        "recommendation_id": _make_rec_id(
+                            "redesign_assignment", assignment
+                        ),
+                        "pattern_id": pattern.get("pattern_id"),
+                        "recommendation_type": "redesign_assignment",
+                        "priority": PRIORITY_HIGH,
+                        "target": assignment,
+                        "message": f"Assignment '{assignment}' has a high plagiarism rate "
+                        f"({occ} incidents across {doc_count} documents). "
+                        "Consider redesigning the assignment.",
+                        "action_items": [
+                            "Review assignment prompt for ambiguity",
+                            "Add unique sub-topics per student",
+                            "Implement staged submission deadlines",
+                            "Require source annotations",
+                        ],
+                    }
+                )
 
         return recs
 
@@ -196,53 +234,65 @@ class RecommendationEngine:
                 continue
 
             if ptype == "collaborative" and severity in ("Critical", "High"):
-                recs.append({
-                    "recommendation_id": _make_rec_id("investigate_collaboration", pattern.get("pattern_id", "")),
-                    "pattern_id": pattern.get("pattern_id"),
-                    "recommendation_type": "policy_review",
-                    "priority": PRIORITY_HIGH,
-                    "target": pattern.get("pattern_id", ""),
-                    "message": f"Collaborative plagiarism pattern detected with "
-                               f"{confidence:.0%} confidence. Possible collusion between authors.",
-                    "action_items": [
-                        "Review submission timestamps for coordination",
-                        "Compare document metadata and authorship",
-                        "Interview involved students",
-                        "Review collaboration policy",
-                    ],
-                })
+                recs.append(
+                    {
+                        "recommendation_id": _make_rec_id(
+                            "investigate_collaboration", pattern.get("pattern_id", "")
+                        ),
+                        "pattern_id": pattern.get("pattern_id"),
+                        "recommendation_type": "policy_review",
+                        "priority": PRIORITY_HIGH,
+                        "target": pattern.get("pattern_id", ""),
+                        "message": f"Collaborative plagiarism pattern detected with "
+                        f"{confidence:.0%} confidence. Possible collusion between authors.",
+                        "action_items": [
+                            "Review submission timestamps for coordination",
+                            "Compare document metadata and authorship",
+                            "Interview involved students",
+                            "Review collaboration policy",
+                        ],
+                    }
+                )
 
             if ptype == "copy_paste" and severity in ("Critical", "High"):
-                recs.append({
-                    "recommendation_id": _make_rec_id("strengthen_detection", pattern.get("pattern_id", "")),
-                    "pattern_id": pattern.get("pattern_id"),
-                    "recommendation_type": "strengthen_detection",
-                    "priority": PRIORITY_MEDIUM,
-                    "target": pattern.get("pattern_id", ""),
-                    "message": "Copy-paste plagiarism detected. "
-                               "Consider lowering similarity threshold for this assignment type.",
-                    "action_items": [
-                        "Lower detection threshold by 5%",
-                        "Enable strict text-matching mode",
-                        "Review original source materials",
-                    ],
-                })
+                recs.append(
+                    {
+                        "recommendation_id": _make_rec_id(
+                            "strengthen_detection", pattern.get("pattern_id", "")
+                        ),
+                        "pattern_id": pattern.get("pattern_id"),
+                        "recommendation_type": "strengthen_detection",
+                        "priority": PRIORITY_MEDIUM,
+                        "target": pattern.get("pattern_id", ""),
+                        "message": "Copy-paste plagiarism detected. "
+                        "Consider lowering similarity threshold for this assignment type.",
+                        "action_items": [
+                            "Lower detection threshold by 5%",
+                            "Enable strict text-matching mode",
+                            "Review original source materials",
+                        ],
+                    }
+                )
 
             if ptype == "template_reuse":
-                recs.append({
-                    "recommendation_id": _make_rec_id("update_template", pattern.get("pattern_id", "")),
-                    "pattern_id": pattern.get("pattern_id"),
-                    "recommendation_type": "stagger_deadlines",
-                    "priority": PRIORITY_LOW,
-                    "target": pattern.get("pattern_id", ""),
-                    "message": "Template reuse pattern detected. "
-                               "Consider providing unique templates or varying assignment structure.",
-                    "action_items": [
-                        "Distribute unique assignment templates",
-                        "Vary question phrasing across sections",
-                        "Add randomized component requirements",
-                    ],
-                })
+                recs.append(
+                    {
+                        "recommendation_id": _make_rec_id(
+                            "update_template", pattern.get("pattern_id", "")
+                        ),
+                        "pattern_id": pattern.get("pattern_id"),
+                        "recommendation_type": "stagger_deadlines",
+                        "priority": PRIORITY_LOW,
+                        "target": pattern.get("pattern_id", ""),
+                        "message": "Template reuse pattern detected. "
+                        "Consider providing unique templates or varying assignment structure.",
+                        "action_items": [
+                            "Distribute unique assignment templates",
+                            "Vary question phrasing across sections",
+                            "Add randomized component requirements",
+                        ],
+                    }
+                )
 
         return recs
 
@@ -252,43 +302,46 @@ class RecommendationEngine:
         recs: list[dict[str, Any]] = []
 
         critical_docs = [
-            r for r in risk_scores
-            if r.get("risk_level") in ("Critical", "High")
+            r for r in risk_scores if r.get("risk_level") in ("Critical", "High")
         ]
 
         if len(critical_docs) >= 5:
-            recs.append({
-                "recommendation_id": _make_rec_id("batch_review", "critical_batch"),
-                "pattern_id": None,
-                "recommendation_type": "escalate",
-                "priority": PRIORITY_CRITICAL,
-                "target": "batch",
-                "message": f"{len(critical_docs)} documents flagged as critical/high risk. "
-                           "Batch review recommended.",
-                "action_items": [
-                    "Prioritize review of critical-risk documents",
-                    "Assign review team for batch processing",
-                    "Generate detailed risk report for stakeholders",
-                ],
-            })
+            recs.append(
+                {
+                    "recommendation_id": _make_rec_id("batch_review", "critical_batch"),
+                    "pattern_id": None,
+                    "recommendation_type": "escalate",
+                    "priority": PRIORITY_CRITICAL,
+                    "target": "batch",
+                    "message": f"{len(critical_docs)} documents flagged as critical/high risk. "
+                    "Batch review recommended.",
+                    "action_items": [
+                        "Prioritize review of critical-risk documents",
+                        "Assign review team for batch processing",
+                        "Generate detailed risk report for stakeholders",
+                    ],
+                }
+            )
 
         for doc in critical_docs[:3]:
             doc_name = doc.get("document_name", "")
             risk_score = doc.get("risk_score", 0)
-            recs.append({
-                "recommendation_id": _make_rec_id("review_document", doc_name),
-                "pattern_id": None,
-                "recommendation_type": "monitor_author",
-                "priority": PRIORITY_HIGH if risk_score >= 0.8 else PRIORITY_MEDIUM,
-                "target": doc_name,
-                "message": f"Document '{doc_name}' has risk score {risk_score:.2%}. "
-                           "Priority review recommended.",
-                "action_items": [
-                    "Review document against top similar matches",
-                    "Check submission metadata and timing",
-                    "Contact author for clarification if needed",
-                ],
-            })
+            recs.append(
+                {
+                    "recommendation_id": _make_rec_id("review_document", doc_name),
+                    "pattern_id": None,
+                    "recommendation_type": "monitor_author",
+                    "priority": PRIORITY_HIGH if risk_score >= 0.8 else PRIORITY_MEDIUM,
+                    "target": doc_name,
+                    "message": f"Document '{doc_name}' has risk score {risk_score:.2%}. "
+                    "Priority review recommended.",
+                    "action_items": [
+                        "Review document against top similar matches",
+                        "Check submission metadata and timing",
+                        "Contact author for clarification if needed",
+                    ],
+                }
+            )
 
         return recs
 
@@ -301,37 +354,43 @@ class RecommendationEngine:
         drift_score = trend_data.get("drift_score", 0)
 
         if direction == "increasing" and drift_score > 0.1:
-            recs.append({
-                "recommendation_id": _make_rec_id("escalate_trend", "increasing"),
-                "pattern_id": None,
-                "recommendation_type": "escalate",
-                "priority": PRIORITY_HIGH,
-                "target": "department",
-                "message": f"Plagiarism trend is increasing (drift: {drift_score:.3f}). "
-                           "Departmental review recommended.",
-                "action_items": [
-                    "Prepare trend report for department head",
-                    "Review current prevention measures",
-                    "Consider additional training sessions",
-                    "Evaluate detection threshold adequacy",
-                ],
-            })
+            recs.append(
+                {
+                    "recommendation_id": _make_rec_id("escalate_trend", "increasing"),
+                    "pattern_id": None,
+                    "recommendation_type": "escalate",
+                    "priority": PRIORITY_HIGH,
+                    "target": "department",
+                    "message": f"Plagiarism trend is increasing (drift: {drift_score:.3f}). "
+                    "Departmental review recommended.",
+                    "action_items": [
+                        "Prepare trend report for department head",
+                        "Review current prevention measures",
+                        "Consider additional training sessions",
+                        "Evaluate detection threshold adequacy",
+                    ],
+                }
+            )
 
         emerging = trend_data.get("emerging_techniques", [])
         if emerging:
-            recs.append({
-                "recommendation_id": _make_rec_id("new_technique", "|".join(emerging[:3])),
-                "pattern_id": None,
-                "recommendation_type": "strengthen_detection",
-                "priority": PRIORITY_MEDIUM,
-                "target": "detection_system",
-                "message": f"Emerging plagiarism techniques detected: {', '.join(emerging)}. "
-                           "Detection system review recommended.",
-                "action_items": [
-                    "Review and update detection parameters",
-                    "Test detection accuracy on new technique samples",
-                    "Update training data for ML models",
-                ],
-            })
+            recs.append(
+                {
+                    "recommendation_id": _make_rec_id(
+                        "new_technique", "|".join(emerging[:3])
+                    ),
+                    "pattern_id": None,
+                    "recommendation_type": "strengthen_detection",
+                    "priority": PRIORITY_MEDIUM,
+                    "target": "detection_system",
+                    "message": f"Emerging plagiarism techniques detected: {', '.join(emerging)}. "
+                    "Detection system review recommended.",
+                    "action_items": [
+                        "Review and update detection parameters",
+                        "Test detection accuracy on new technique samples",
+                        "Update training data for ML models",
+                    ],
+                }
+            )
 
         return recs

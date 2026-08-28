@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/scripts/test_benchmark_similarity.py
 -------------------------------------------
@@ -78,8 +100,12 @@ class TestSimilarityFunctions:
         vec_b = np.array([1.0, 0.0, 0.0])
         vec_c = np.array([0.0, 1.0, 0.0])
 
-        assert np.isclose(benchmark_similarity.compute_cosine_similarity(vec_a, vec_b), 1.0)
-        assert np.isclose(benchmark_similarity.compute_cosine_similarity(vec_a, vec_c), 0.0)
+        assert np.isclose(
+            benchmark_similarity.compute_cosine_similarity(vec_a, vec_b), 1.0
+        )
+        assert np.isclose(
+            benchmark_similarity.compute_cosine_similarity(vec_a, vec_c), 0.0
+        )
 
         # Zero vector handling
         assert benchmark_similarity.compute_cosine_similarity(np.zeros(3), vec_a) == 0.0
@@ -137,7 +163,9 @@ class TestBenchmarkExecution:
     def test_create_comparison_pairs_error_handling(self):
         """Verify error raised when items list has fewer than 2 items."""
         with pytest.raises(ValueError, match="Need at least 2 items"):
-            benchmark_similarity.create_comparison_pairs(["single_item"], num_comparisons=10)
+            benchmark_similarity.create_comparison_pairs(
+                ["single_item"], num_comparisons=10
+            )
 
     def test_benchmark_single_algorithm_metrics(self):
         """Verify single algorithm benchmarking returns all expected metric fields."""
@@ -204,7 +232,9 @@ class TestReportingAndFormatting:
             },
         ]
 
-        table_str = benchmark_similarity.format_summary_table(mock_results, word_count=500)
+        table_str = benchmark_similarity.format_summary_table(
+            mock_results, word_count=500
+        )
         assert "Similarity Algorithm Benchmark Summary" in table_str
         assert "Jaccard" in table_str
         assert "Cosine" in table_str
@@ -249,11 +279,16 @@ class TestCLIArgumentsAndMain:
         """Verify custom CLI arguments."""
         test_args = [
             "benchmark_similarity.py",
-            "--num-comparisons", "500",
-            "--word-count", "250",
-            "--num-docs", "10",
-            "--embedding-dim", "128",
-            "--seed", "99",
+            "--num-comparisons",
+            "500",
+            "--word-count",
+            "250",
+            "--num-docs",
+            "10",
+            "--embedding-dim",
+            "128",
+            "--seed",
+            "99",
             "--json",
         ]
         with patch("sys.argv", test_args):
@@ -278,7 +313,15 @@ class TestCLIArgumentsAndMain:
     def test_main_cli_json_output(self, capsys):
         """Verify main() with --json outputs valid JSON string."""
         exit_code = benchmark_similarity.main(
-            ["--num-comparisons", "10", "--word-count", "50", "--num-docs", "4", "--json"]
+            [
+                "--num-comparisons",
+                "10",
+                "--word-count",
+                "50",
+                "--num-docs",
+                "4",
+                "--json",
+            ]
         )
         assert exit_code == 0
         captured = capsys.readouterr()

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import io
 
 from src.core import document_parser
@@ -29,7 +51,6 @@ def test_extract_text_from_unicode_escape_rtf():
     assert isinstance(text, str)
     assert text.strip() != ""
     assert "Unicode" in text
-
 
 
 def test_extract_text_from_rtf_rejects_oversized_bytes_before_striprtf(monkeypatch):
@@ -90,7 +111,9 @@ def test_extract_text_from_rtf_rejects_oversized_bytesio_before_reading(monkeypa
     assert called is False
 
 
-def test_extract_text_from_rtf_rejects_oversized_file_path_before_read(tmp_path, monkeypatch):
+def test_extract_text_from_rtf_rejects_oversized_file_path_before_read(
+    tmp_path, monkeypatch
+):
     """An oversized RTF file on disk is rejected using its file size first."""
 
     called = False
@@ -151,4 +174,3 @@ def test_text_parser_extract_rtf_raises_unsupported_format_error(monkeypatch):
     rtf_content = r"{\rtf1\ansi Hello World!}"
     with pytest.raises(UnsupportedFormatError, match="striprtf is required"):
         text_parser.extract_text_from_rtf(rtf_content.encode("utf-8"))
-

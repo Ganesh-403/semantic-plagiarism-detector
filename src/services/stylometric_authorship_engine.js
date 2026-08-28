@@ -88,7 +88,7 @@ class StylometricAuthorshipEngine {
     getProfilesFiltered(query = '') {
         if (!query) return this.authorshipProfiles;
         const q = query.toLowerCase();
-        return this.authorshipProfiles.filter(p => 
+        return this.authorshipProfiles.filter(p =>
             p.profileId.toLowerCase().includes(q) ||
             p.suspectedAuthor.toLowerCase().includes(q) ||
             p.targetDoc.toLowerCase().includes(q) ||

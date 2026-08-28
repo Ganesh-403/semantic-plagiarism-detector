@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/db/federation_registry_db.py
 --------------------------------
@@ -7,13 +29,13 @@ Manages trusted institutional nodes and persists imported LSH bands
 for cross-institutional plagiarism queries.
 """
 
-import sqlite3
 import json
 import logging
-from pathlib import Path
-from typing import Optional, Dict, Any, List
+import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +99,7 @@ def register_trusted_node(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO trusted_nodes 
+                INSERT OR REPLACE INTO trusted_nodes
                 (institution_id, name, public_key_hash, added_at)
                 VALUES (?, ?, ?, ?)
                 """,
@@ -100,7 +122,7 @@ def store_federated_signature(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO federated_signatures 
+                INSERT OR REPLACE INTO federated_signatures
                 (document_id, institution_id, lsh_bands_json, created_at)
                 VALUES (?, ?, ?, ?)
                 """,

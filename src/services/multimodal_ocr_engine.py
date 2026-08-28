@@ -1,12 +1,34 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Enterprise Multimodal PDF OCR & Paraphrase Neural Alignment Engine
 Provides high-precision OCR extraction for scanned PDF documents, layout structure analysis,
 deep neural paraphrase detection, and multi-modal alignment scoring.
 """
 
-import math
 import hashlib
-from typing import List, Dict, Any, Optional
+import math
+from typing import Any, Dict, List, Optional
 
 
 class MultimodalPDFOCREngine:
@@ -46,13 +68,10 @@ class MultimodalPDFOCREngine:
     def get_extraction_summary(self) -> dict[str, Any]:
         """Calculates aggregate OCR confidence and total pages processed telemetry."""
         total_pages = len(self.processed_pages_log)
-        avg_confidence = (
-            sum(
-                p["layoutMetadata"]["ocrConfidenceScorePct"]
-                for p in self.processed_pages_log
-            )
-            / (total_pages or 1)
-        )
+        avg_confidence = sum(
+            p["layoutMetadata"]["ocrConfidenceScorePct"]
+            for p in self.processed_pages_log
+        ) / (total_pages or 1)
 
         return {
             "totalPagesProcessed": total_pages,
@@ -71,9 +90,7 @@ class ParaphraseNeuralAlignmentEngine:
         self.semantic_threshold = semantic_threshold
         self.aligned_sentence_pairs: list[dict[str, Any]] = []
 
-    def align_sentence_pair(
-        self, sentence_a: str, sentence_b: str
-    ) -> dict[str, Any]:
+    def align_sentence_pair(self, sentence_a: str, sentence_b: str) -> dict[str, Any]:
         """Aligns two candidate sentences and computes contextual paraphrase score."""
         vec_a = self._vectorize_sentence(sentence_a)
         vec_b = self._vectorize_sentence(sentence_b)
@@ -90,7 +107,9 @@ class ParaphraseNeuralAlignmentEngine:
             "sentenceB": sentence_b,
             "paraphraseSimilarityScore": round(similarity, 4),
             "isParaphraseDetected": is_paraphrase,
-            "confidenceGrade": "HIGH_PARAPHRASE" if similarity > 0.88 else "LOW_PROBABILITY",
+            "confidenceGrade": (
+                "HIGH_PARAPHRASE" if similarity > 0.88 else "LOW_PROBABILITY"
+            ),
         }
         self.aligned_sentence_pairs.append(alignment_record)
         return alignment_record

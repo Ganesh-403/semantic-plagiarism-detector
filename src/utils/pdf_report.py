@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 pdf_report.py
 -------------
@@ -96,6 +118,7 @@ def load_branding_logo() -> bytes | None:
             return img_f.read()
     except Exception:
         return None
+
 
 def truncate_filename(filename: str, max_len: int = 30) -> str:
     """
@@ -257,16 +280,15 @@ def generate_plagiarism_report(
     overall_similarity: float,
     threshold: float,
     top_pairs: list[tuple[str, str, float]],
-    doc_a_text: Optional[str] = None,
-    doc_b_text: Optional[str] = None,
+    doc_a_text: str | None = None,
+    doc_b_text: str | None = None,
     report_title: str = "Plagiarism Detection Report",
-    logo_image: Optional[bytes] = None,
-    brand_color: Optional[str] = None,
-    incident_id: Optional[str] = None,
-    dark_mode: Optional[bool] = None,
+    logo_image: bytes | None = None,
+    brand_color: str | None = None,
+    incident_id: str | None = None,
+    dark_mode: bool | None = None,
     language: str = "en",
 ) -> BytesIO:
-
     from src.i18n.translator import get_text
 
     brand_hex = brand_color or "#1e3a8a"

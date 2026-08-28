@@ -1,4 +1,26 @@
-﻿"""tests/api/test_scan_stage_metrics.py
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+"""tests/api/test_scan_stage_metrics.py
 --------------------------------------
 Tests for Prometheus histogram tracking scan pipeline stages (parsing, chunking, embedding, matrix comparison).
 Issue #3478.
@@ -11,7 +33,11 @@ import numpy as np
 from fastapi.testclient import TestClient
 
 from src.api.app import app
-from src.api.dependencies import get_current_user, validate_content_type, verify_bearer_token
+from src.api.dependencies import (
+    get_current_user,
+    validate_content_type,
+    verify_bearer_token,
+)
 from src.api.routers.analysis import _process_scan_job, scan_jobs
 from src.core.metrics import spd_scan_duration_seconds
 
@@ -44,7 +70,9 @@ def test_process_scan_job_records_all_stages():
         "It contains enough words to generate chunks and embeddings for verification."
     )
 
-    with patch("src.api.routers.analysis.extract_text", return_value=sample_text), patch(
+    with patch(
+        "src.api.routers.analysis.extract_text", return_value=sample_text
+    ), patch(
         "src.api.routers.analysis.embed_chunks",
         return_value=np.ones((2, 384), dtype=np.float32),
     ), patch(
@@ -69,7 +97,10 @@ def test_process_scan_job_records_all_stages():
 
 def test_scan_endpoint_records_all_stages():
     """Verify that POST /api/v1/scan records durations for all pipeline stages in spd_scan_duration_seconds."""
-    app.dependency_overrides[get_current_user] = lambda: {"sub": "tester", "scopes": ["write"]}
+    app.dependency_overrides[get_current_user] = lambda: {
+        "sub": "tester",
+        "scopes": ["write"],
+    }
     app.dependency_overrides[validate_content_type] = lambda: None
     app.dependency_overrides[verify_bearer_token] = lambda: "valid_token"
 
@@ -83,7 +114,8 @@ def test_scan_endpoint_records_all_stages():
         )
 
         with patch(
-            "src.api.routers.analysis.stream_upload_file_to_disk", return_value="dummy_path.txt"
+            "src.api.routers.analysis.stream_upload_file_to_disk",
+            return_value="dummy_path.txt",
         ), patch(
             "src.api.routers.analysis.extract_text", return_value=sample_text
         ), patch(
@@ -96,10 +128,10 @@ def test_scan_endpoint_records_all_stages():
             "src.api.routers.analysis.calculate_file_sha256", return_value="abc123hash"
         ), patch(
             "src.api.routers.analysis.get_document_by_hash", return_value=None
-        ), patch(
-            "os.path.exists", return_value=False
-        ):
-            file_payload = {"file": ("test_doc.txt", io.BytesIO(b"dummy binary data"), "text/plain")}
+        ), patch("os.path.exists", return_value=False):
+            file_payload = {
+                "file": ("test_doc.txt", io.BytesIO(b"dummy binary data"), "text/plain")
+            }
             response = client.post(
                 "/api/v1/scan",
                 files=file_payload,
@@ -110,7 +142,9 @@ def test_scan_endpoint_records_all_stages():
 
         for stage in stages:
             count_after = _get_stage_count(stage)
-            assert count_after > counts_before[stage], f"Stage {stage} was not observed in /api/v1/scan"
+            assert (
+                count_after > counts_before[stage]
+            ), f"Stage {stage} was not observed in /api/v1/scan"
     finally:
         app.dependency_overrides.clear()
 

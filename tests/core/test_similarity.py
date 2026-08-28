@@ -1,11 +1,33 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
 import pytest
 
+from src.core.lexical_similarity import STOPWORDS  # noqa: E402
 from src.core.lexical_similarity import (
-    STOPWORDS,  # noqa: E402
     jaccard_similarity,
     lexical_similarity_matrix,
     remove_stopwords,
@@ -1007,9 +1029,9 @@ def test_rerank_candidates_with_cross_encoder_rescores_and_sorts():
 
     import src.core.similarity as sim_mod
 
-    sim_mod._CROSS_ENCODER_MODELS["cross-encoder/ms-marco-MiniLM-L-6-v2"] = (
-        DummyCrossEncoder()
-    )
+    sim_mod._CROSS_ENCODER_MODELS[
+        "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    ] = DummyCrossEncoder()
 
     rescored = rerank_candidates_with_cross_encoder(
         pairs, model_name="cross-encoder/ms-marco-MiniLM-L-6-v2"
@@ -1125,6 +1147,7 @@ def test_find_most_similar_chunks_comparison_with_legacy():
         if emb_a.size == 0 or emb_b.size == 0:
             return []
         from sklearn.metrics.pairwise import cosine_similarity
+
         sim_matrix = cosine_similarity(emb_a, emb_b)
         pairs = []
         for i in range(sim_matrix.shape[0]):
@@ -1205,7 +1228,11 @@ def test_document_similarity_matrix_hnsw(dummy_embeddings):
 
 def test_document_similarity_matrix_hnsw_ndarray(dummy_embeddings):
     """Test document_similarity_matrix with HNSW enabled (using FAISS) on list/ndarray embeddings."""
-    embeddings_list = [dummy_embeddings["doc_A"][0], dummy_embeddings["doc_B"][0], dummy_embeddings["doc_C"][0]]
+    embeddings_list = [
+        dummy_embeddings["doc_A"][0],
+        dummy_embeddings["doc_B"][0],
+        dummy_embeddings["doc_C"][0],
+    ]
     sim = document_similarity_matrix(embeddings_list, use_hnsw=True)
     assert isinstance(sim, np.ndarray)
     assert sim.shape == (3, 3)
@@ -1216,6 +1243,7 @@ def test_document_similarity_matrix_hnsw_ndarray(dummy_embeddings):
 def test_document_similarity_matrix_hnsw_fallback(dummy_embeddings, monkeypatch):
     """Verify that document_similarity_matrix falls back to exact computation when FAISS raises error."""
     import sys
+
     # Mock FAISS import failure
     monkeypatch.setitem(sys.modules, "faiss", None)
 
@@ -1254,7 +1282,3 @@ def test_apply_min_percentile_filter_non_square_matrix():
     assert filtered_df.loc["query2", "docA"] == 0.7
     assert filtered_df.loc["query2", "docB"] == 0.9
     assert filtered_df.loc["query2", "docC"] == 0.0
-
-
-
-

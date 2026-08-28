@@ -1,24 +1,47 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Comprehensive Unit Tests for Multi-threaded close_connections
 Issue: #3419
 Tests concurrent safety, atomicity, and thread-safety of connection closure.
 """
 
-import pytest
+import logging
 import threading
 import time
-import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
 
+import pytest
 
 # ==============================================================================
 # SECTION 1: Simulated Database Connection Class
 # ==============================================================================
 
+
 class MockDatabaseConnection:
     """Simulates a database connection with a thread-safe close method."""
-    
+
     def __init__(self):
         self.is_closed = False
         self._lock = threading.Lock()
@@ -40,6 +63,7 @@ class MockDatabaseConnection:
 # ==============================================================================
 # SECTION 2: Simulated Database Manager (Under Test)
 # ==============================================================================
+
 
 class DatabaseManager:
     """Manages a pool of database connections."""
@@ -69,15 +93,16 @@ class DatabaseManager:
 # SECTION 3: Core Thread-Safety Tests
 # ==============================================================================
 
+
 class TestThreadSafety:
     def test_single_thread_close(self):
         """A single thread should close the connection properly."""
         manager = DatabaseManager()
         conn = MockDatabaseConnection()
         manager.add_connection(conn)
-        
+
         manager.close_all_connections()
-        
+
         assert conn.is_closed is True
         assert conn.close_call_count == 1
 
@@ -86,7 +111,7 @@ class TestThreadSafety:
         manager = DatabaseManager()
         conn = MockDatabaseConnection()
         manager.add_connection(conn)
-        
+
         def close_connection():
             manager.close_all_connections()
 
@@ -95,7 +120,7 @@ class TestThreadSafety:
             t.start()
         for t in threads:
             t.join()
-            
+
         assert conn.is_closed is True
         assert conn.close_call_count == 1  # Should only actually close once due to lock
 
@@ -103,6 +128,7 @@ class TestThreadSafety:
 # ==============================================================================
 # SECTION 4: Concurrency Stress Tests (Using ThreadPoolExecutor)
 # ==============================================================================
+
 
 class TestConcurrencyStress:
     def test_thread_pool_executor_close(self):
@@ -155,13 +181,14 @@ class TestConcurrencyStress:
         thread = threading.Thread(target=safe_close)
         thread.start()
         thread.join(timeout=5)  # If it takes longer than 5 seconds, it's a deadlock
-        
+
         assert not thread.is_alive()
 
 
 # ==============================================================================
 # SECTION 5: Edge Cases and Logging
 # ==============================================================================
+
 
 class TestEdgeCases:
     def test_close_no_connections(self):
@@ -174,10 +201,10 @@ class TestEdgeCases:
         manager = DatabaseManager()
         conn = MockDatabaseConnection()
         manager.add_connection(conn)
-        
+
         manager.close_all_connections()
         manager.close_all_connections()  # Closing again should not crash
-        
+
         assert conn.is_closed is True
 
     def test_active_count_after_close(self):
@@ -187,11 +214,11 @@ class TestEdgeCases:
         conn2 = MockDatabaseConnection()
         manager.add_connection(conn1)
         manager.add_connection(conn2)
-        
+
         assert manager.get_active_connection_count() == 2
-        
+
         manager.close_all_connections()
-        
+
         assert manager.get_active_connection_count() == 0
 
     def test_logging_on_close(self, caplog):
@@ -199,7 +226,7 @@ class TestEdgeCases:
         manager = DatabaseManager()
         conn = MockDatabaseConnection()
         manager.add_connection(conn)
-        
+
         with caplog.at_level(logging.INFO):
             manager.close_all_connections()
             # We are not asserting a specific log message, just ensuring no crash

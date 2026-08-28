@@ -98,7 +98,7 @@ class MultimodalPDFOCREngine {
     getMatchesFiltered(query = '') {
         if (!query) return this.ocrMatches;
         const q = query.toLowerCase();
-        return this.ocrMatches.filter(m => 
+        return this.ocrMatches.filter(m =>
             m.matchId.toLowerCase().includes(q) ||
             m.primaryPDF.toLowerCase().includes(q) ||
             m.candidateFile.toLowerCase().includes(q) ||

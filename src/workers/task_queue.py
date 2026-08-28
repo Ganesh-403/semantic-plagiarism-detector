@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/workers/task_queue.py
 -------------------------
@@ -46,13 +68,13 @@ class TaskQueue:
         worker_id: str = "queue-orchestrator",
         max_retries: int = 3,
         poll_interval: float = 0.5,
-        db_path: Optional[str] = None,
+        db_path: str | None = None,
     ) -> None:
         self._worker_id = worker_id
         self._max_retries = max_retries
         self._poll_interval = poll_interval
         self.db_path = db_path
-        self._queue: "queue.Queue[Optional[str]]" = queue.Queue()
+        self._queue: queue.Queue[Optional[str]] = queue.Queue()
         self._lock = threading.Lock()
         self._running = False
         if db_path is not None:
@@ -64,13 +86,15 @@ class TaskQueue:
         self,
         payload: dict[str, Any],
         *,
-        max_retries: Optional[int] = None,
+        max_retries: int | None = None,
     ) -> dict[str, Any]:
         """Persist a new job to SQLite and signal the in-memory queue."""
         retries = max_retries if max_retries is not None else self._max_retries
         job = task_db.create_job(payload, max_retries=retries, db_path=self.db_path)
         self._queue.put(job["id"])
-        logger.info("Enqueued job %s (payload keys: %s)", job["id"], list(payload.keys()))
+        logger.info(
+            "Enqueued job %s (payload keys: %s)", job["id"], list(payload.keys())
+        )
         return job
 
     def submit_batch_scan(
@@ -89,13 +113,13 @@ class TaskQueue:
         job = self.enqueue(payload)
         return job["id"]
 
-    def get_job_status(self, job_id: str) -> Optional[dict[str, Any]]:
+    def get_job_status(self, job_id: str) -> dict[str, Any] | None:
         """Get the current status and details of a job."""
         return task_db.get_job(job_id, db_path=self.db_path)
 
     # ── Consumer ──────────────────────────────────────────────
 
-    def dequeue(self, timeout: float = 30.0) -> Optional[dict[str, Any]]:
+    def dequeue(self, timeout: float = 30.0) -> dict[str, Any] | None:
         """Block up to ``timeout`` seconds for the next job.
 
         Returns the job dict (status=PROCESSING) or ``None`` on timeout.
@@ -148,7 +172,11 @@ class TaskQueue:
         """
         stale = task_db.list_jobs(status="PROCESSING", limit=1000, db_path=self.db_path)
         for job in stale:
-            task_db.mark_failed(job["id"], "Re-queued: stale PROCESSING job (worker crash)", db_path=self.db_path)
+            task_db.mark_failed(
+                job["id"],
+                "Re-queued: stale PROCESSING job (worker crash)",
+                db_path=self.db_path,
+            )
         return len(stale)
 
     @property
@@ -165,7 +193,7 @@ class TaskQueue:
 
 # ── Module-level singleton ─────────────────────────────────────
 
-_default_queue: Optional[TaskQueue] = None
+_default_queue: TaskQueue | None = None
 _singleton_lock = threading.Lock()
 
 

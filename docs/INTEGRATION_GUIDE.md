@@ -5,6 +5,7 @@ This guide provides step-by-step instructions for integrating the Semantic Plagi
 ## Overview
 
 The Semantic Plagiarism Detector API allows LMS platforms to programmatically:
+
 - Upload student assignments for plagiarism checking
 - Compare submissions against a corpus of existing documents
 - Receive real-time webhook alerts for high-similarity matches
@@ -43,6 +44,7 @@ GET /health
 ```
 
 **Response:**
+
 ```json
 {
   "status": "healthy",
@@ -77,6 +79,7 @@ POST /api/v1/scan
 | `file` | multipart/form-data | Document file (.pdf, .docx, .txt) |
 
 **Response:**
+
 ```json
 {
   "filename": "student_essay.pdf",
@@ -190,6 +193,7 @@ The LMS makes the file available as bytes/stream.
 #### 3. Send to Plagiarism API
 
 **Python Example:**
+
 ```python
 import requests
 
@@ -214,6 +218,7 @@ print(f"Plagiarism flagged: {result['plagiarism_flagged']}")
 ```
 
 **JavaScript (Node.js) Example:**
+
 ```javascript
 const fs = require('fs');
 const FormData = require('form-data');
@@ -242,6 +247,7 @@ scanDocument('assignment1.pdf')
 ```
 
 **PHP Example:**
+
 ```php
 <?php
 $apiUrl = 'http://localhost:8000';
@@ -302,6 +308,7 @@ def scan_multiple_documents(file_paths: list, threshold: float = 0.59):
 ### Understanding the Response
 
 #### Low Severity (No Flag)
+
 ```json
 {
   "filename": "assignment1.pdf",
@@ -317,6 +324,7 @@ def scan_multiple_documents(file_paths: list, threshold: float = 0.59):
 ```
 
 #### High Severity (Flagged)
+
 ```json
 {
   "filename": "assignment2.pdf",
@@ -348,6 +356,7 @@ def scan_multiple_documents(file_paths: list, threshold: float = 0.59):
 ### Processing Logic
 
 #### Python
+
 ```python
 def process_scan_result(result: dict):
     """Process a scan result and return severity information."""
@@ -371,6 +380,7 @@ def process_scan_result(result: dict):
 ```
 
 #### JavaScript
+
 ```javascript
 function processScanResult(result) {
     if (!result.plagiarism_flagged) {
@@ -398,6 +408,7 @@ function processScanResult(result) {
 ```
 
 #### PHP
+
 ```php
 function processScanResult($result) {
     if (!$result['plagiarism_flagged']) {
@@ -458,6 +469,7 @@ export PLAGIARISM_WEBHOOK_URL="YOUR-WEBHOOK-URL-HERE"
 ```
 
 **Supported Webhook Types:**
+
 - **Slack Webhooks** - Standard Slack incoming webhooks
 - **Discord Webhooks** - Discord webhook URLs
 - **Custom Webhooks** - Any HTTP endpoint accepting JSON
@@ -498,16 +510,19 @@ payload = {
 Replace the placeholders with your actual webhook URL:
 
 **Slack:**
+
 ```
 https://hooks.slack.com/services/{YOUR-SUBDOMAIN}/{YOUR-ID}/{YOUR-TOKEN}
 ```
 
 **Discord:**
+
 ```
 https://discord.com/api/webhooks/{YOUR-WEBHOOK-ID}/{YOUR-TOKEN}
 ```
 
 **Custom HTTP Endpoint:**
+
 ```
 https://your-lms.com/api/plagiarism/alerts
 ```
@@ -519,27 +534,33 @@ https://your-lms.com/api/plagiarism/alerts
 ### Common Errors
 
 #### 400 Bad Request
+
 ```json
 {
   "detail": "Uploaded file is empty."
 }
 ```
+
 **Cause:** File upload contains no data.
 
 #### 422 Unprocessable Entity
+
 ```json
 {
   "detail": "Failed to extract readable text from the uploaded file."
 }
 ```
+
 **Cause:** File format is not supported or text extraction failed.
 
 #### 401/403 Unauthorized
+
 ```json
 {
   "detail": "Invalid or missing authentication token."
 }
 ```
+
 **Cause:** Missing or invalid API token.
 
 ### Retry Strategy
@@ -690,6 +711,7 @@ Moodle uses the Atto editor and submission plugins.
 1. **Configure Web Service Protocol**
 
 Enable Web Services in Moodle:
+
 - Site admin → Advanced features → Enable web services
 - Site admin → Plugins → Web services → Enable REST protocol
 
@@ -883,11 +905,13 @@ app.add_middleware(
 ### Manual Testing
 
 1. **Test Health Endpoint**
+
 ```bash
 curl http://localhost:8000/health
 ```
 
 2. **Test Document Upload**
+
 ```bash
 curl -X POST "http://localhost:8000/api/v1/scan" \
   -H "Authorization: Bearer your-token" \
@@ -948,6 +972,7 @@ def test_scan_document(api_token):
 ### Issue: Webhook not sending
 
 **Solution:**
+
 1. Verify `PLAGIARISM_WEBHOOK_URL` is set
 2. Check webhook URL is accessible
 3. Review server logs for request failures
@@ -955,6 +980,7 @@ def test_scan_document(api_token):
 ### Issue: High memory usage
 
 **Solution:**
+
 1. Limit `top_k` parameter
 2. Reduce `threshold` to scan fewer documents
 3. Restart server after large batches

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import json
 import logging
 import os
@@ -11,17 +33,18 @@ from src.db import auth as db_auth
 from src.security import jwt_utils
 from src.security.rate_limiter import get_token_bucket_limiter
 
-
 # Expected JWT verification exceptions
 _JWT_EXCEPTIONS = [ValueError]
 try:
     import jwt
+
     _JWT_EXCEPTIONS.append(jwt.PyJWTError)
 except ImportError:
     pass
 
 try:
     from jose import JWTError
+
     _JWT_EXCEPTIONS.append(JWTError)
 except ImportError:
     pass
@@ -56,8 +79,7 @@ def _is_public_path(path: str) -> bool:
     normalized_path = path.rstrip("/") or "/"
 
     return any(
-        normalized_path == prefix
-        or normalized_path.startswith(f"{prefix}/")
+        normalized_path == prefix or normalized_path.startswith(f"{prefix}/")
         for prefix in PUBLIC_PATH_PREFIXES
     )
 
@@ -151,6 +173,7 @@ def get_valid_tokens() -> dict[str, list[str]]:
         )
         return {}
 
+
 def validate_bearer_tokens_config() -> None:
     """Fail-fast validation of API_BEARER_TOKENS_MAPPING at startup (Issue #3015).
 
@@ -225,6 +248,7 @@ def validate_bearer_tokens_config() -> None:
         "API_BEARER_TOKENS_MAPPING validated successfully: %d static token(s) configured.",
         len(tokens_mapping),
     )
+
 
 async def verify_bearer_token(
     request: Request,
@@ -368,9 +392,7 @@ def _validate_scopes(
                 )
         elif "|" in scope_expr:
             or_parts = [
-                p.strip()
-                for p in scope_expr.replace("||", "|").split("|")
-                if p.strip()
+                p.strip() for p in scope_expr.replace("||", "|").split("|") if p.strip()
             ]
             if not any(p in token_scopes_set for p in or_parts):
                 raise HTTPException(
@@ -452,7 +474,9 @@ class RequireScopes:
 
     def __init__(
         self,
-        scopes: Optional[list[str] | set[str] | tuple[str, ...] | Sequence[str] | str] = None,
+        scopes: Optional[
+            list[str] | set[str] | tuple[str, ...] | Sequence[str] | str
+        ] = None,
         mode: str = "all",
     ):
         if isinstance(scopes, str):
@@ -503,4 +527,3 @@ def require_any_scopes(*scopes: str) -> RequireScopes:
 def require_all_scopes(*scopes: str) -> RequireScopes:
     """Convenience dependency requiring all of the specified scopes (AND logic)."""
     return RequireScopes(scopes=list(scopes), mode="all")
-

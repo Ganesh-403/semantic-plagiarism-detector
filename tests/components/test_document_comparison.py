@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Unit tests for the render_document_comparison component in app/components/document_comparison.py."""
 
 from unittest.mock import MagicMock, patch
@@ -68,10 +90,7 @@ def test_render_document_comparison_clear_popover_clicks():
         "streamlit.text_area"
     ) as mock_text_area, patch("streamlit.popover") as mock_popover, patch(
         "streamlit.button"
-    ) as mock_button, patch(
-        "streamlit.rerun"
-    ) as mock_rerun:
-
+    ) as mock_button, patch("streamlit.rerun") as mock_rerun:
         mock_col = MagicMock()
         mock_cols.return_value = [mock_col, mock_col]
         mock_text_area.side_effect = ["staged text a", "staged text b"]

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 jwt_utils.py
 ------------
@@ -63,7 +85,11 @@ def create_jwt_token(
     Raises:
         ValueError: If no secret key is available.
     """
-    resolved_secret = secret_key if secret_key is not None else os.getenv("JWT_SECRET_KEY", JWT_SECRET_KEY)
+    resolved_secret = (
+        secret_key
+        if secret_key is not None
+        else os.getenv("JWT_SECRET_KEY", JWT_SECRET_KEY)
+    )
     if not resolved_secret:
         raise ValueError(
             "JWT_SECRET_KEY environment variable must be set. "
@@ -139,7 +165,11 @@ def _verify_jwt_token(
 
     token = token.strip()
 
-    resolved_secret = secret_key if secret_key is not None else os.getenv("JWT_SECRET_KEY", JWT_SECRET_KEY)
+    resolved_secret = (
+        secret_key
+        if secret_key is not None
+        else os.getenv("JWT_SECRET_KEY", JWT_SECRET_KEY)
+    )
     if not resolved_secret:
         raise ValueError(
             "JWT_SECRET_KEY environment variable must be set. "
@@ -162,29 +192,39 @@ def _verify_jwt_token(
     try:
         actual_sig = base64url_decode(encoded_signature)
     except Exception as exc:
-        raise ValueError(f"Invalid {expected_type} token: invalid base64 signature encoding.") from exc
+        raise ValueError(
+            f"Invalid {expected_type} token: invalid base64 signature encoding."
+        ) from exc
 
     if not hmac.compare_digest(expected_sig, actual_sig):
-        raise ValueError(f"Invalid {expected_type} token: signature verification failed.")
+        raise ValueError(
+            f"Invalid {expected_type} token: signature verification failed."
+        )
 
     try:
         payload_bytes = base64url_decode(encoded_payload)
         payload = json.loads(payload_bytes.decode("utf-8"))
     except Exception as exc:
-        raise ValueError(f"Invalid {expected_type} token: malformed JSON payload.") from exc
+        raise ValueError(
+            f"Invalid {expected_type} token: malformed JSON payload."
+        ) from exc
 
     exp = payload.get("exp")
     if exp is not None:
         try:
             exp_int = int(exp)
         except (TypeError, ValueError) as exc:
-            raise ValueError(f"Invalid {expected_type} token: malformed exp claim.") from exc
+            raise ValueError(
+                f"Invalid {expected_type} token: malformed exp claim."
+            ) from exc
         if int(time.time()) >= exp_int:
             raise ValueError(f"{expected_type.capitalize()} token has expired.")
 
     token_type = payload.get("type")
     if token_type and token_type != expected_type:
-        raise ValueError(f"Invalid token type: expected '{expected_type}', got '{token_type}'.")
+        raise ValueError(
+            f"Invalid token type: expected '{expected_type}', got '{token_type}'."
+        )
 
     return payload
 

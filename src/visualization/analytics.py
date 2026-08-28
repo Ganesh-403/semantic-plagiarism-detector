@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 analytics.py
 -----------
@@ -48,21 +70,21 @@ def apply_plotly_theme(
 
 def get_chart_theme_colors(theme_mode: str) -> dict[str, str]:
     """Return a dictionary of Plotly-compatible theme colors based on the UI mode.
-    
+
     This helper synchronizes Plotly chart background and font colors with the
     current Streamlit UI theme mode (Light vs Dark). It ensures that charts
     rendered in the analytics dashboard remain legible and visually consistent
     regardless of the user's selected theme.
-    
+
     The returned dictionary is structured to be passed directly into the
     ``theme_colors`` parameter of :func:`apply_plotly_theme` or used manually
     in Plotly layout updates.
-    
+
     Args:
-        theme_mode: The current UI theme mode. Expected values are "Light" 
-                    or "Dark" (case-insensitive). Any other value defaults 
+        theme_mode: The current UI theme mode. Expected values are "Light"
+                    or "Dark" (case-insensitive). Any other value defaults
                     to the Light theme palette.
-                    
+
     Returns:
         A dictionary containing the following keys:
         - ``background``: The main paper/canvas background color.
@@ -72,24 +94,24 @@ def get_chart_theme_colors(theme_mode: str) -> dict[str, str]:
         - ``border``: Gridline and axis border color.
     """
     normalized_mode = (theme_mode or "light").strip().lower()
-    
+
     if normalized_mode == "dark":
         return {
             "background": "#1e293b",  # Slate 800
-            "surface": "#0f172a",     # Slate 900
-            "ink": "#f8fafc",         # Slate 50
-            "muted": "#94a3b8",       # Slate 400
-            "border": "#334155",      # Slate 700
-            "grid": "#475569",        # Slate 600
+            "surface": "#0f172a",  # Slate 900
+            "ink": "#f8fafc",  # Slate 50
+            "muted": "#94a3b8",  # Slate 400
+            "border": "#334155",  # Slate 700
+            "grid": "#475569",  # Slate 600
         }
     else:
         return {
             "background": "#ffffff",  # Pure white
-            "surface": "#f8fafc",     # Slate 50
-            "ink": "#0f172a",         # Slate 900
-            "muted": "#64748b",       # Slate 500
-            "border": "#e2e8f0",      # Slate 200
-            "grid": "#cbd5e1",        # Slate 300
+            "surface": "#f8fafc",  # Slate 50
+            "ink": "#0f172a",  # Slate 900
+            "muted": "#64748b",  # Slate 500
+            "border": "#e2e8f0",  # Slate 200
+            "grid": "#cbd5e1",  # Slate 300
         }
 
 
@@ -249,21 +271,21 @@ def get_top_similar_pairs(
 
     doc_names = list(similarity_df.index)
     n = len(doc_names)
-    
+
     row_indices, col_indices = np.triu_indices(n, k=1)
     sim_matrix = similarity_df.to_numpy(dtype=float)
     scores = sim_matrix[row_indices, col_indices]
-    
+
     sorted_indices = np.argsort(scores)[::-1]
     top_indices = sorted_indices[:top_n]
-    
+
     pairs: list[tuple[str, str, float]] = []
     for idx in top_indices:
         i = row_indices[idx]
         j = col_indices[idx]
         score = float(scores[idx])
         pairs.append((doc_names[i], doc_names[j], score))
-        
+
     return pairs
 
 
@@ -903,17 +925,17 @@ def plot_monthly_incident_trends(
 
     monthly_counts: dict[str, int] = {}
     valid_dates_found = False
-    
+
     for incident in incidents:
         date_str = (
-            incident.get("date_flagged") 
-            or incident.get("timestamp") 
+            incident.get("date_flagged")
+            or incident.get("timestamp")
             or incident.get("created_at")
         )
-        
+
         if not date_str:
             continue
-            
+
         try:
             if isinstance(date_str, str):
                 if "T" in date_str:
@@ -922,11 +944,11 @@ def plot_monthly_incident_trends(
                     dt = pd.to_datetime(date_str)
             else:
                 dt = pd.to_datetime(date_str)
-                
+
             month_key = dt.strftime("%Y-%m")
             monthly_counts[month_key] = monthly_counts.get(month_key, 0) + 1
             valid_dates_found = True
-            
+
         except (ValueError, TypeError, pd.errors.ParserError):
             continue
 
@@ -941,33 +963,35 @@ def plot_monthly_incident_trends(
         )
 
     sorted_months = sorted(monthly_counts.keys())
-    
+
     if len(sorted_months) > months_to_show:
         display_months = sorted_months[-months_to_show:]
     else:
         display_months = sorted_months
-        
+
     start_date = pd.to_datetime(display_months[0] + "-01")
     end_date = pd.to_datetime(display_months[-1] + "-01")
-    
+
     complete_range = pd.date_range(start=start_date, end=end_date, freq="MS")
-    
+
     chart_data = []
     for dt in complete_range:
         month_key = dt.strftime("%Y-%m")
         count = monthly_counts.get(month_key, 0)
-        chart_data.append({
-            "month": month_key,
-            "incident_count": count,
-            "display_label": dt.strftime("%b %Y"),
-        })
+        chart_data.append(
+            {
+                "month": month_key,
+                "incident_count": count,
+                "display_label": dt.strftime("%b %Y"),
+            }
+        )
 
     df = pd.DataFrame(chart_data)
-    
+
     bar_color = "#636efa"
     if theme_colors and isinstance(theme_colors, dict):
         bar_color = theme_colors.get("primary", "#636efa")
-    
+
     fig = px.bar(
         df,
         x="display_label",
@@ -992,7 +1016,7 @@ def plot_monthly_incident_trends(
             dtick=1,
         ),
     )
-    
+
     fig.update_xaxes(
         showgrid=show_grid,
         tickangle=-45,
@@ -1005,9 +1029,7 @@ def plot_monthly_incident_trends(
         marker_line_width=1.5,
         customdata=df["month"],
         hovertemplate=(
-            "<b>%{customdata}</b><br>"
-            "Incidents: %{y}<br>"
-            "<extra></extra>"
+            "<b>%{customdata}</b><br>" "Incidents: %{y}<br>" "<extra></extra>"
         ),
     )
 

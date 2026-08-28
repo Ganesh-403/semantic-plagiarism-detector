@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """src/api/routers/anomalies.py - Anomaly Detection API router."""
 
 from __future__ import annotations
@@ -9,13 +31,13 @@ from fastapi import APIRouter, HTTPException, Query, Request, Security, status
 
 from src.api.dependencies import get_current_user
 from src.api.schemas import (
-    AnomalyAlertResponse,
     AnomalyAlertListResponse,
-    AnomalyScanResponse,
-    AnomalyScanListResponse,
-    AnomalySummaryResponse,
-    AnomalySeverityDistResponse,
+    AnomalyAlertResponse,
     AnomalyConfigResponse,
+    AnomalyScanListResponse,
+    AnomalyScanResponse,
+    AnomalySeverityDistResponse,
+    AnomalySummaryResponse,
     ErrorResponse,
 )
 from src.db.anomaly_alerts_db import anomaly_repo, init_anomaly_alerts_db
@@ -33,6 +55,7 @@ except Exception:
 # ---------------------------------------------------------------------------
 # Scans
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/api/v1/anomalies/scans",
@@ -92,7 +115,10 @@ async def get_scan(
 
 @router.post(
     "/api/v1/anomalies/scans/{scan_id}/complete",
-    responses={200: {"description": "Scan completed"}, 404: {"description": "Not found"}},
+    responses={
+        200: {"description": "Scan completed"},
+        404: {"description": "Not found"},
+    },
 )
 async def complete_scan(
     scan_id: int,
@@ -129,6 +155,7 @@ async def fail_scan(
 # Alerts
 # ---------------------------------------------------------------------------
 
+
 @router.post(
     "/api/v1/anomalies/alerts",
     status_code=status.HTTP_201_CREATED,
@@ -154,7 +181,11 @@ async def create_alert(
             description=description,
             confidence=confidence,
         )
-        return {"alert_id": alert_id, "anomaly_type": anomaly_type, "severity": severity}
+        return {
+            "alert_id": alert_id,
+            "anomaly_type": anomaly_type,
+            "severity": severity,
+        }
     except Exception as e:
         logger.error("Failed to create alert: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -178,9 +209,12 @@ async def list_alerts(
     """List anomaly alerts with filtering."""
     try:
         return anomaly_repo.list_alerts(
-            page=page, per_page=per_page,
-            severity=severity, anomaly_type=anomaly_type,
-            acknowledged=acknowledged, resolved=resolved,
+            page=page,
+            per_page=per_page,
+            severity=severity,
+            anomaly_type=anomaly_type,
+            acknowledged=acknowledged,
+            resolved=resolved,
             scan_id=scan_id,
         )
     except Exception as e:
@@ -190,7 +224,10 @@ async def list_alerts(
 
 @router.get(
     "/api/v1/anomalies/alerts/{alert_id}",
-    responses={200: {"description": "Alert details"}, 404: {"description": "Not found"}},
+    responses={
+        200: {"description": "Alert details"},
+        404: {"description": "Not found"},
+    },
 )
 async def get_alert(
     alert_id: int,
@@ -214,7 +251,9 @@ async def acknowledge_alert(
     """Acknowledge an alert."""
     acked = anomaly_repo.acknowledge_alert(alert_id, by=_user.get("sub", "system"))
     if not acked:
-        raise HTTPException(status_code=404, detail="Alert not found or already acknowledged")
+        raise HTTPException(
+            status_code=404, detail="Alert not found or already acknowledged"
+        )
     return {"alert_id": alert_id, "acknowledged": True}
 
 
@@ -228,9 +267,13 @@ async def resolve_alert(
     _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
 ):
     """Resolve an alert."""
-    resolved = anomaly_repo.resolve_alert(alert_id, by=_user.get("sub", "system"), notes=notes)
+    resolved = anomaly_repo.resolve_alert(
+        alert_id, by=_user.get("sub", "system"), notes=notes
+    )
     if not resolved:
-        raise HTTPException(status_code=404, detail="Alert not found or already resolved")
+        raise HTTPException(
+            status_code=404, detail="Alert not found or already resolved"
+        )
     return {"alert_id": alert_id, "resolved": True}
 
 
@@ -264,6 +307,7 @@ async def delete_alert(
 # ---------------------------------------------------------------------------
 # Analytics
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/api/v1/anomalies/analytics/summary",
@@ -314,6 +358,7 @@ async def high_confidence_alerts(
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/api/v1/anomalies/config",

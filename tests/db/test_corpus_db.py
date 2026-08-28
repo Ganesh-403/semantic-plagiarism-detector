@@ -1,9 +1,32 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 from datetime import datetime, timedelta
 
 import numpy as np
 import pytest
 
 from src.db.corpus_db import (
+    CorpusRepository,
     _connect,
     add_chunks,
     add_document,
@@ -23,7 +46,6 @@ from src.db.corpus_db import (
     purge_stale_trash,
     restore_document,
     soft_delete_document,
-    CorpusRepository,
 )
 
 
@@ -718,7 +740,8 @@ def test_deleted_chunks_has_deleted_at_column():
     conn = sqlite3.connect(corpus_db._DB_PATH)
     try:
         columns = [
-            row[1] for row in conn.execute("PRAGMA table_info(deleted_chunks)").fetchall()
+            row[1]
+            for row in conn.execute("PRAGMA table_info(deleted_chunks)").fetchall()
         ]
         assert "deleted_at" in columns
     finally:
@@ -746,11 +769,11 @@ def test_get_embedding_storage_footprint_normal(mock_db):
 
     clear_all_data()
     add_document("doc1.pdf", "hash_footprint_1")
-    
+
     # Add dummy embeddings of a known size (e.g. 384 floats = 1536 bytes each)
     dummy_emb_1 = np.ones(384, dtype=np.float32)
     dummy_emb_2 = np.ones(384, dtype=np.float32)
-    
+
     chunks = [
         (0, "doc1.pdf", 0, "Paragraph 1 text", dummy_emb_1),
         (1, "doc1.pdf", 1, "Paragraph 2 text", dummy_emb_2),
@@ -767,8 +790,9 @@ def test_get_embedding_storage_footprint_normal(mock_db):
 
 def test_get_embedding_storage_footprint_missing_file(monkeypatch, mock_db):
     """Test storage footprint handles OSError when checking DB file size."""
-    from src.db.corpus_db import get_embedding_storage_footprint
     from pathlib import Path
+
+    from src.db.corpus_db import get_embedding_storage_footprint
 
     def mock_stat(*args, **kwargs):
         raise OSError("File not found mocked")
@@ -776,7 +800,7 @@ def test_get_embedding_storage_footprint_missing_file(monkeypatch, mock_db):
     monkeypatch.setattr(Path, "stat", mock_stat)
 
     res = get_embedding_storage_footprint()
-    
+
     # database_bytes should fallback to 0 when stat raises OSError
     assert res["database_bytes"] == 0
     assert res["embedding_percentage"] == 0.0
@@ -784,31 +808,34 @@ def test_get_embedding_storage_footprint_missing_file(monkeypatch, mock_db):
 
 def test_get_embedding_storage_footprint_null_values(mock_db):
     """Test storage footprint gracefully handles NULL returned from SUM() query."""
-    from src.db.corpus_db import get_embedding_storage_footprint, _connect
+    from src.db.corpus_db import _connect, get_embedding_storage_footprint
 
     clear_all_data()
 
     # Manually insert a chunk with a NULL embedding to force SUM() behavior.
-    # Note: the chunks table has a NOT NULL constraint on embedding, but 
+    # Note: the chunks table has a NOT NULL constraint on embedding, but
     # we can bypass it by temporarily dropping the table or just querying an empty table
     # Wait, if table is empty, SUM() returns NULL.
     # We already test empty table, let's explicitly mock the cursor to return (None, 0)
-    
+
     class MockCursor:
         def fetchone(self):
             return (None, 0)
-            
+
     class MockConn:
         def execute(self, query):
             return MockCursor()
+
         def __enter__(self):
             return self
+
         def __exit__(self, exc_type, exc_val, exc_tb):
             pass
 
     import src.db.corpus_db
+
     original_connect = src.db.corpus_db._connect
-    
+
     def mock_connect():
         return MockConn()
 
@@ -871,8 +898,10 @@ def test_corpus_repository_class_interface():
 
     assert repo.soft_delete_document("repo_doc.pdf") is True
     assert not any(d["filename"] == "repo_doc.pdf" for d in repo.get_all_documents())
-    assert any(d["filename"] == "repo_doc.pdf" for d in repo.get_all_documents(include_deleted=True))
+    assert any(
+        d["filename"] == "repo_doc.pdf"
+        for d in repo.get_all_documents(include_deleted=True)
+    )
 
     assert repo.restore_document("repo_doc.pdf") is True
     assert any(d["filename"] == "repo_doc.pdf" for d in repo.get_all_documents())
-

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/core/test_export_min_match_length.py
 ------------------------------------------
@@ -46,9 +68,7 @@ class TestExportMinMatchLength:
 
     def test_generate_incident_txt_with_min_match_length(self):
         """With min_match_length=20, only incidents with >= 20 matched words are exported."""
-        report = LMSExportEngine.generate_incident_txt(
-            INCIDENTS, min_match_length=20
-        )
+        report = LMSExportEngine.generate_incident_txt(INCIDENTS, min_match_length=20)
         assert report is not None
         assert "doc1.pdf" in report
         assert "doc3.pdf" not in report
@@ -56,9 +76,7 @@ class TestExportMinMatchLength:
 
     def test_generate_incident_txt_with_high_threshold(self):
         """With a threshold higher than all incidents, the report is None."""
-        report = LMSExportEngine.generate_incident_txt(
-            INCIDENTS, min_match_length=100
-        )
+        report = LMSExportEngine.generate_incident_txt(INCIDENTS, min_match_length=100)
         assert report is None
 
     def test_generate_html_report_without_filter(self):
@@ -82,9 +100,7 @@ class TestExportMinMatchLength:
 
     def test_generate_incident_html_via_export_engine(self):
         """The ExportEngine's HTML generator respects the filter."""
-        html = LMSExportEngine.generate_incident_html(
-            INCIDENTS, min_match_length=20
-        )
+        html = LMSExportEngine.generate_incident_html(INCIDENTS, min_match_length=20)
         assert html is not None
         assert "doc1.pdf" in html
         assert "doc3.pdf" not in html

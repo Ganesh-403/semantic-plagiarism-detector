@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """src/api/routers/admin.py - System metrics, health check, and status router."""
 
 import logging
@@ -10,11 +32,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, Security, status
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 
 from src.api.middleware import get_current_user
-from src.api.schemas import (
-    HealthCheckResponse,
-    HealthzResponse,
-    StatusResponse,
-)
+from src.api.schemas import HealthCheckResponse, HealthzResponse, StatusResponse
 from src.core.app_config import HEALTHZ_DB_PATHS
 from src.db.corpus_db import _connect
 from src.version import APP_VERSION
@@ -188,12 +206,14 @@ def get_version(request: Request):
 )
 def download_database_backup(
     db_name: str = Query(
-        default="corpus.db", description="Database file to download (corpus.db or users.db)"
+        default="corpus.db",
+        description="Database file to download (corpus.db or users.db)",
     ),
     _user: dict = Security(get_current_user, scopes=["admin"]),
 ):
     """Stream a transactionally consistent SQLite database snapshot directly from disk in chunks."""
     from pathlib import Path
+
     from src.core.app_config import AUTH_DB_PATH, CORPUS_DB_PATH
     from src.db.database_backup import iter_sqlite_snapshot_chunks
 

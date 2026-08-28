@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 from __future__ import annotations
 
 import sqlite3
@@ -116,15 +138,18 @@ def test_old_corpus_database_migrates_without_data_loss(tmp_path):
     path = tmp_path / "old-corpus.db"
 
     with connect(path) as connection:
-        connection.execute("""
+        connection.execute(
+            """
             CREATE TABLE documents (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 filename TEXT UNIQUE NOT NULL,
                 file_hash TEXT UNIQUE NOT NULL,
                 upload_date TEXT NOT NULL
             )
-            """)
-        connection.execute("""
+            """
+        )
+        connection.execute(
+            """
             CREATE TABLE chunks (
                 vector_id INTEGER PRIMARY KEY,
                 filename TEXT NOT NULL,
@@ -135,7 +160,8 @@ def test_old_corpus_database_migrates_without_data_loss(tmp_path):
                     REFERENCES documents(filename)
                     ON DELETE CASCADE
             )
-            """)
+            """
+        )
         connection.execute(
             """
             INSERT INTO documents (
@@ -157,11 +183,13 @@ def test_old_corpus_database_migrates_without_data_loss(tmp_path):
 
         migrate_corpus_database(connection)
 
-        row = connection.execute("""
+        row = connection.execute(
+            """
             SELECT filename, file_hash, class_section,
                    student_name, assignment_title
             FROM documents
-            """).fetchone()
+            """
+        ).fetchone()
         assert row == (
             "legacy.pdf",
             "legacy-hash",
@@ -179,14 +207,16 @@ def test_old_auth_database_migrates_without_data_loss(tmp_path):
     path = tmp_path / "old-users.db"
 
     with connect(path) as connection:
-        connection.execute("""
+        connection.execute(
+            """
             CREATE TABLE users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
                 role TEXT NOT NULL DEFAULT 'teacher'
             )
-            """)
+            """
+        )
         connection.execute(
             """
             INSERT INTO users (username, password, role)
@@ -222,20 +252,24 @@ def test_old_auth_database_migrates_without_data_loss(tmp_path):
 def test_migrations_are_idempotent(tmp_path):
     with connect(tmp_path / "idempotent.db") as connection:
         first = migrate_corpus_database(connection)
-        first_schema = connection.execute("""
+        first_schema = connection.execute(
+            """
             SELECT type, name, sql
             FROM sqlite_master
             WHERE name NOT LIKE 'sqlite_%'
             ORDER BY type, name
-            """).fetchall()
+            """
+        ).fetchall()
 
         second = migrate_corpus_database(connection)
-        second_schema = connection.execute("""
+        second_schema = connection.execute(
+            """
             SELECT type, name, sql
             FROM sqlite_master
             WHERE name NOT LIKE 'sqlite_%'
             ORDER BY type, name
-            """).fetchall()
+            """
+        ).fetchall()
 
         assert first == second == CORPUS_SCHEMA_VERSION
         assert first_schema == second_schema
@@ -335,9 +369,7 @@ def test_successful_migration_logs_info_message(tmp_path, caplog):
             "Database migration from version 0 to 1 completed successfully."
             in record.message
             for record in caplog.records
-        ), (
-            f"Expected migration log message not found in: {[r.message for r in caplog.records]}"
-        )
+        ), f"Expected migration log message not found in: {[r.message for r in caplog.records]}"
     finally:
         connection.close()
 
@@ -352,9 +384,7 @@ def test_corpus_migration_logs_info_message(tmp_path, caplog):
 
         assert any(
             "completed successfully" in record.message for record in caplog.records
-        ), (
-            f"Expected migration log message not found in: {[r.message for r in caplog.records]}"
-        )
+        ), f"Expected migration log message not found in: {[r.message for r in caplog.records]}"
 
 
 def test_auth_migration_logs_info_message(tmp_path, caplog):
@@ -367,9 +397,7 @@ def test_auth_migration_logs_info_message(tmp_path, caplog):
 
         assert any(
             "completed successfully" in record.message for record in caplog.records
-        ), (
-            f"Expected migration log message not found in: {[r.message for r in caplog.records]}"
-        )
+        ), f"Expected migration log message not found in: {[r.message for r in caplog.records]}"
 
 
 def test_no_log_when_already_at_target_version(tmp_path, caplog):
@@ -423,9 +451,7 @@ def test_migration_duration_logging(tmp_path, caplog):
         assert any(
             "Migration [migration_dummy_test_func] executed in" in record.message
             for record in caplog.records
-        ), (
-            f"Expected duration log message not found in: {[r.message for r in caplog.records]}"
-        )
+        ), f"Expected duration log message not found in: {[r.message for r in caplog.records]}"
     finally:
         connection.close()
 
@@ -463,7 +489,13 @@ def test_migration_005_still_creates_false_positives_table(tmp_path):
         migrate_corpus_database(connection)
 
         assert table_exists(connection, "false_positives")
-        for col in ("document_a", "document_b", "date_dismissed", "dismissed_by", "dismissal_reason"):
+        for col in (
+            "document_a",
+            "document_b",
+            "date_dismissed",
+            "dismissed_by",
+            "dismissal_reason",
+        ):
             assert column_exists(connection, "false_positives", col)
 
 
@@ -473,9 +505,14 @@ def test_migration_018_adds_false_positives_audit_columns(tmp_path):
         migrate_corpus_database(connection)
 
         assert table_exists(connection, "false_positives")
-        for col in ("document_a", "document_b", "date_dismissed", "dismissed_by", "dismissal_reason"):
+        for col in (
+            "document_a",
+            "document_b",
+            "date_dismissed",
+            "dismissed_by",
+            "dismissal_reason",
+        ):
             assert column_exists(connection, "false_positives", col)
-
 
 
 def test_check_table_exists():

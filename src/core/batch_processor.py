@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Batch Processing Optimization for Large Document Sets & Dashboard Engine.
 
@@ -12,9 +34,7 @@ import os
 import threading
 import time
 import uuid
-from concurrent.futures import (
-    ThreadPoolExecutor,
-)
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -31,8 +51,10 @@ logger = logging.getLogger(__name__)
 # ENUMS & DATA STRUCTURES
 # ============================================================================
 
+
 class BatchStatus(Enum):
     """Status of a batch processing job."""
+
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
@@ -43,6 +65,7 @@ class BatchStatus(Enum):
 
 class BatchPriority(Enum):
     """Priority levels for batch jobs."""
+
     LOW = "low"
     NORMAL = "normal"
     HIGH = "high"
@@ -52,6 +75,7 @@ class BatchPriority(Enum):
 @dataclass
 class BatchJob:
     """Represents a single batch processing job."""
+
     job_id: str
     name: str = ""
     file_paths: list[str] = field(default_factory=list)
@@ -78,13 +102,15 @@ class BatchJob:
             self.file_paths = self.document_paths
         elif not self.document_paths and self.file_paths:
             self.document_paths = self.file_paths
-        
+
         self.total_files = len(self.file_paths)
         self.total_documents = self.total_files
 
     def get_duration(self) -> Optional[float]:
         """Get job duration in seconds."""
-        if isinstance(self.started_at, (int, float)) and isinstance(self.completed_at, (int, float)):
+        if isinstance(self.started_at, (int, float)) and isinstance(
+            self.completed_at, (int, float)
+        ):
             return self.completed_at - self.started_at
         return None
 
@@ -98,22 +124,22 @@ class BatchJob:
         """Convert job to dictionary."""
         data = asdict(self)
         if isinstance(self.status, Enum):
-            data['status'] = self.status.value
+            data["status"] = self.status.value
         if isinstance(self.priority, Enum):
-            data['priority'] = self.priority.value
+            data["priority"] = self.priority.value
         return data
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> 'BatchJob':
+    def from_dict(cls, data: dict[str, Any]) -> "BatchJob":
         """Create job from dictionary."""
-        if 'status' in data and isinstance(data['status'], str):
+        if "status" in data and isinstance(data["status"], str):
             try:
-                data['status'] = BatchStatus(data['status'])
+                data["status"] = BatchStatus(data["status"])
             except ValueError:
                 pass
-        if 'priority' in data and isinstance(data['priority'], str):
+        if "priority" in data and isinstance(data["priority"], str):
             try:
-                data['priority'] = BatchPriority(data['priority'])
+                data["priority"] = BatchPriority(data["priority"])
             except ValueError:
                 pass
         return cls(**data)
@@ -131,6 +157,7 @@ class BatchJob:
 @dataclass
 class BatchConfig:
     """Configuration for batch processing."""
+
     batch_size: int = 10
     max_workers: int = 4
     use_parallel: bool = True
@@ -158,7 +185,7 @@ class BatchConfig:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> 'BatchConfig':
+    def from_dict(cls, data: dict[str, Any]) -> "BatchConfig":
         """Create config from dictionary."""
         return cls(**data)
 
@@ -166,6 +193,7 @@ class BatchConfig:
 # ============================================================================
 # BATCH PROCESSOR
 # ============================================================================
+
 
 class BatchProcessor:
     """Main batch processor with parallelization and progress tracking."""
@@ -186,11 +214,13 @@ class BatchProcessor:
             "avg_time_per_doc": 0.0,
             "successful": 0,
             "failed": 0,
-            "peak_memory_mb": 0
+            "peak_memory_mb": 0,
         }
 
         Path(".cache").mkdir(parents=True, exist_ok=True)
-        logger.info(f"BatchProcessor initialized with {self.config.max_workers} workers")
+        logger.info(
+            f"BatchProcessor initialized with {self.config.max_workers} workers"
+        )
 
     def register_callback(self, callback: Callable):
         """Register a callback for status updates."""
@@ -221,7 +251,7 @@ class BatchProcessor:
         name: str,
         document_paths: list[str],
         priority: BatchPriority = BatchPriority.NORMAL,
-        metadata: Optional[dict[str, Any]] = None
+        metadata: Optional[dict[str, Any]] = None,
     ) -> BatchJob:
         """Create a new batch processing job."""
         job_id = str(uuid.uuid4())[:12]
@@ -231,7 +261,7 @@ class BatchProcessor:
             file_paths=document_paths,
             document_paths=document_paths,
             priority=priority,
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
         with self._lock:
             self.jobs[job_id] = job
@@ -254,7 +284,7 @@ class BatchProcessor:
     def list_jobs(
         self,
         status: Optional[BatchStatus] = None,
-        priority: Optional[BatchPriority] = None
+        priority: Optional[BatchPriority] = None,
     ) -> list[BatchJob]:
         """List jobs with optional filtering."""
         with self._lock:
@@ -262,7 +292,11 @@ class BatchProcessor:
         if status:
             jobs = [j for j in jobs if j.status == status or j.status == status.value]
         if priority:
-            jobs = [j for j in jobs if j.priority == priority or j.priority == priority.value]
+            jobs = [
+                j
+                for j in jobs
+                if j.priority == priority or j.priority == priority.value
+            ]
         return sorted(jobs, key=lambda j: str(j.created_at), reverse=True)
 
     def cancel_job(self, job_id: str) -> bool:
@@ -271,7 +305,12 @@ class BatchProcessor:
             job = self.jobs.get(job_id)
             if not job:
                 return False
-            if job.status in (BatchStatus.COMPLETED, BatchStatus.CANCELLED, "completed", "cancelled"):
+            if job.status in (
+                BatchStatus.COMPLETED,
+                BatchStatus.CANCELLED,
+                "completed",
+                "cancelled",
+            ):
                 return False
             job.status = BatchStatus.CANCELLED
             job.completed_at = datetime.now().isoformat()
@@ -284,10 +323,7 @@ class BatchProcessor:
         self._stop_processing = True
 
     def _process_single_document(
-        self,
-        file_path: str,
-        file_bytes: bytes,
-        config: BatchConfig
+        self, file_path: str, file_bytes: bytes, config: BatchConfig
     ) -> dict[str, Any]:
         """Process a single document."""
         start_time = time.time()
@@ -298,7 +334,7 @@ class BatchProcessor:
             "processing_time": 0.0,
             "chunks": [],
             "embedding": None,
-            "word_count": 0
+            "word_count": 0,
         }
 
         try:
@@ -313,7 +349,7 @@ class BatchProcessor:
                 file_bytes,
                 filename=file_path,
                 language=config.ocr_language,
-                dpi=config.ocr_dpi
+                dpi=config.ocr_dpi,
             )
 
             if not extracted_text:
@@ -325,7 +361,7 @@ class BatchProcessor:
             chunks = chunk_documents(
                 [prepared],
                 chunk_size=config.chunk_size,
-                chunk_overlap=config.chunk_overlap
+                chunk_overlap=config.chunk_overlap,
             )
 
             if not chunks:
@@ -336,7 +372,11 @@ class BatchProcessor:
             embeddings = embed_chunks(chunks)
 
             result["chunks"] = chunks
-            result["embedding"] = embeddings.tolist() if isinstance(embeddings, np.ndarray) else embeddings
+            result["embedding"] = (
+                embeddings.tolist()
+                if isinstance(embeddings, np.ndarray)
+                else embeddings
+            )
             result["word_count"] = len(extracted_text.split())
             result["chunk_count"] = len(chunks)
 
@@ -349,9 +389,7 @@ class BatchProcessor:
         return result
 
     def _process_batch(
-        self,
-        batch_files: list[tuple[str, bytes]],
-        batch_index: int
+        self, batch_files: list[tuple[str, bytes]], batch_index: int
     ) -> list[dict[str, Any]]:
         """Process a batch of documents in parallel."""
         results = []
@@ -364,7 +402,7 @@ class BatchProcessor:
                         self._process_single_document,
                         file_path,
                         file_bytes,
-                        self.config
+                        self.config,
                     )
                     futures.append((file_path, future))
 
@@ -373,27 +411,25 @@ class BatchProcessor:
                         result = future.result(timeout=self.config.timeout_seconds)
                         results.append(result)
                     except Exception as e:
-                        results.append({
-                            "file_path": file_path,
-                            "status": "failed",
-                            "error": str(e),
-                            "processing_time": 0.0
-                        })
+                        results.append(
+                            {
+                                "file_path": file_path,
+                                "status": "failed",
+                                "error": str(e),
+                                "processing_time": 0.0,
+                            }
+                        )
         else:
             for file_path, file_bytes in batch_files:
                 result = self._process_single_document(
-                    file_path,
-                    file_bytes,
-                    self.config
+                    file_path, file_bytes, self.config
                 )
                 results.append(result)
 
         return results
 
     def process_documents(
-        self,
-        file_bytes_dict: dict[str, bytes],
-        job_id: Optional[str] = None
+        self, file_bytes_dict: dict[str, bytes], job_id: Optional[str] = None
     ) -> BatchJob:
         """Process a batch of documents."""
         if not file_bytes_dict:
@@ -409,7 +445,7 @@ class BatchProcessor:
             file_paths=files,
             document_paths=files,
             total_files=len(files),
-            total_documents=len(files)
+            total_documents=len(files),
         )
 
         with self._lock:
@@ -419,7 +455,7 @@ class BatchProcessor:
         batch_size = self.config.batch_size
         file_items = list(file_bytes_dict.items())
         batches = [
-            file_items[i:i + batch_size]
+            file_items[i : i + batch_size]
             for i in range(0, len(file_items), batch_size)
         ]
 
@@ -439,7 +475,7 @@ class BatchProcessor:
             self._notify_progress(
                 job_id,
                 job.progress,
-                f"Processing batch {batch_index + 1}/{len(batches)}"
+                f"Processing batch {batch_index + 1}/{len(batches)}",
             )
 
             batch_results = self._process_batch(batch, batch_index)
@@ -452,10 +488,12 @@ class BatchProcessor:
                         job.processed_files += 1
                         job.processed_documents += 1
                     else:
-                        job.errors.append({
-                            "file": result["file_path"],
-                            "error": result.get("error", "Unknown error")
-                        })
+                        job.errors.append(
+                            {
+                                "file": result["file_path"],
+                                "error": result.get("error", "Unknown error"),
+                            }
+                        )
 
             self.metrics["successful"] = job.processed_files
             self.metrics["failed"] = len(job.errors)
@@ -491,16 +529,22 @@ class BatchProcessor:
         try:
             data = {
                 "job_id": job.job_id,
-                "status": job.status if isinstance(job.status, str) else job.status.value,
+                "status": (
+                    job.status if isinstance(job.status, str) else job.status.value
+                ),
                 "processed_files": job.processed_files,
                 "total_files": job.total_files,
                 "errors": job.errors,
-                "results_count": len(job.results) if isinstance(job.results, list) else len(job.results.keys()),
+                "results_count": (
+                    len(job.results)
+                    if isinstance(job.results, list)
+                    else len(job.results.keys())
+                ),
                 "created_at": job.created_at,
                 "started_at": job.started_at,
-                "completed_at": job.completed_at
+                "completed_at": job.completed_at,
             }
-            with open(self.config.progress_file, 'w') as f:
+            with open(self.config.progress_file, "w") as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
             logger.error(f"Failed to save progress: {e}")
@@ -511,7 +555,7 @@ class BatchProcessor:
             **self.metrics,
             "active_job": self._active_job,
             "total_jobs": len(self.jobs),
-            "config": self.config.to_dict()
+            "config": self.config.to_dict(),
         }
 
     def get_recommended_batch_size(self) -> int:

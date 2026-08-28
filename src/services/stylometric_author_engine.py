@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Enterprise Stylometric Authorship Attribution & Write-Print Fingerprinting Engine
 Extracts fine-grained linguistic write-print features (burstiness, perplexity variance,
@@ -6,7 +28,7 @@ punctuation frequency, vocabulary richness, sentence-length entropy) to verify a
 
 import math
 import re
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 
 class StylometricWriteprintExtractor:
@@ -21,8 +43,8 @@ class StylometricWriteprintExtractor:
 
     def extract_author_writeprint(self, text: str) -> dict[str, Any]:
         """Extracts complete set of quantitative stylometric metrics from document text."""
-        words = re.findall(r'\b\w+\b', text.lower())
-        sentences = [s.strip() for s in re.split(r'[.!?]+', text) if s.strip()]
+        words = re.findall(r"\b\w+\b", text.lower())
+        sentences = [s.strip() for s in re.split(r"[.!?]+", text) if s.strip()]
 
         total_words = len(words) or 1
         total_sentences = len(sentences) or 1
@@ -34,11 +56,13 @@ class StylometricWriteprintExtractor:
         # Sentence length statistics & variance entropy
         sentence_lengths = [len(s.split()) for s in sentences]
         avg_sentence_len = sum(sentence_lengths) / total_sentences
-        variance_len = sum((l - avg_sentence_len) ** 2 for l in sentence_lengths) / total_sentences
+        variance_len = (
+            sum((l - avg_sentence_len) ** 2 for l in sentence_lengths) / total_sentences
+        )
         sentence_len_std_dev = math.sqrt(variance_len)
 
         # Punctuation mark distribution frequency
-        punctuation_marks = re.findall(r'[,;:\-\(\)\"\']', text)
+        punctuation_marks = re.findall(r"[,;:\-\(\)\"\']", text)
         punctuation_density = round(len(punctuation_marks) / total_words, 4)
 
         # Average word length
@@ -53,7 +77,9 @@ class StylometricWriteprintExtractor:
             "sentenceLengthStdDev": round(sentence_len_std_dev, 2),
             "punctuationDensity": punctuation_density,
             "avgWordLengthChars": avg_word_length,
-            "stylometricComplexityIndex": round(type_token_ratio * sentence_len_std_dev, 3),
+            "stylometricComplexityIndex": round(
+                type_token_ratio * sentence_len_std_dev, 3
+            ),
         }
 
         self.extracted_fingerprints[self.target_author_id or "CURRENT"] = writeprint
@@ -94,14 +120,22 @@ class AuthorshipAttributionClassifier:
             similarity_score = round(max(0.0, 1.0 - dist), 4)
 
             if similarity_score >= distance_threshold:
-                matches.append({
-                    "matchedAuthorId": author_id,
-                    "attributionConfidencePct": round(similarity_score * 100, 2),
-                    "confidenceGrade": "HIGH_PROBABILITY" if similarity_score > 0.90 else "MODERATE",
-                    "featureDistance": round(dist, 4),
-                })
+                matches.append(
+                    {
+                        "matchedAuthorId": author_id,
+                        "attributionConfidencePct": round(similarity_score * 100, 2),
+                        "confidenceGrade": (
+                            "HIGH_PROBABILITY"
+                            if similarity_score > 0.90
+                            else "MODERATE"
+                        ),
+                        "featureDistance": round(dist, 4),
+                    }
+                )
 
-        return sorted(matches, key=lambda x: x["attributionConfidencePct"], reverse=True)
+        return sorted(
+            matches, key=lambda x: x["attributionConfidencePct"], reverse=True
+        )
 
 
 # ==============================================================================

@@ -13,7 +13,7 @@ class SemanticAnalyticsEngine {
         this.documentCorpus = [];
         this.flaggedPairs = [];
         this.vectorDistribution = [15, 45, 78, 32, 18];
-        
+
         this.initDefaultDataset();
     }
 
@@ -120,7 +120,7 @@ class SemanticAnalyticsEngine {
     getFlaggedPairsFiltered(searchQuery = '') {
         if (!searchQuery) return this.flaggedPairs;
         const q = searchQuery.toLowerCase();
-        return this.flaggedPairs.filter(pair => 
+        return this.flaggedPairs.filter(pair =>
             pair.pairId.toLowerCase().includes(q) ||
             pair.sourceDoc.toLowerCase().includes(q) ||
             pair.targetDoc.toLowerCase().includes(q) ||
@@ -146,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTable(data) {
         if (!tableBody) return;
         tableBody.innerHTML = '';
-        
+
         data.forEach(item => {
             const riskEval = engine.evaluateRiskScore(item.cosineSim, item.jaccardIndex);
             const row = document.createElement('tr');

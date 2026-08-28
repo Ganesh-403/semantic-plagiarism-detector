@@ -36,6 +36,7 @@ Welcome to the **Semantic Plagiarism Detector REST API** documentation. This API
 ## Overview & Architecture
 
 The REST API is built on **FastAPI** and uses high-performance asynchronous request handling. Under the hood, document processing leverages:
+
 - **SentenceTransformers (`paraphrase-multilingual-MiniLM-L12-v2`)** for 384-dimensional dense semantic vector embeddings.
 - **FAISS (Facebook AI Similarity Search)** for high-speed vector index retrieval.
 - **SQLite Database (`corpus.db`)** for persistent document metadata, text chunk storage, and incident history.
@@ -154,6 +155,7 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
 ##### Error Responses
 
 - **`400 Bad Request`** (Invalid JSON or payload body):
+
 ```json
 {
   "detail": "Invalid JSON request payload body."
@@ -161,6 +163,7 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
 ```
 
 - **`401 Unauthorized`** (Invalid credentials):
+
 ```json
 {
   "detail": "Invalid credentials provided."
@@ -270,6 +273,7 @@ curl -X POST http://localhost:8000/api/v1/scan \
 ##### Error Responses
 
 - **`400 Bad Request`** (Empty file uploaded or missing filename):
+
 ```json
 {
   "detail": "Uploaded file is empty (0 bytes)"
@@ -277,6 +281,7 @@ curl -X POST http://localhost:8000/api/v1/scan \
 ```
 
 - **`401 Unauthorized`** (Missing or invalid Bearer token):
+
 ```json
 {
   "detail": "Invalid or missing authentication token."
@@ -284,6 +289,7 @@ curl -X POST http://localhost:8000/api/v1/scan \
 ```
 
 - **`415 Unsupported Media Type`** (Non-multipart form content type):
+
 ```json
 {
   "detail": "Unsupported Media Type: Request must be multipart/form-data"
@@ -291,6 +297,7 @@ curl -X POST http://localhost:8000/api/v1/scan \
 ```
 
 - **`422 Unprocessable Entity`** (Unextractable text or parameter error):
+
 ```json
 {
   "error": true,
@@ -363,6 +370,7 @@ curl -X GET "http://localhost:8000/api/v1/incidents?limit=10&offset=0" \
 ##### Error Responses
 
 - **`401 Unauthorized`**:
+
 ```json
 {
   "detail": "Invalid or missing authentication token."
@@ -370,6 +378,7 @@ curl -X GET "http://localhost:8000/api/v1/incidents?limit=10&offset=0" \
 ```
 
 - **`500 Internal Server Error`**:
+
 ```json
 {
   "detail": "Failed to fetch incidents: Database operational lock error."
@@ -581,6 +590,7 @@ curl -X POST "http://localhost:8000/api/v1/clear?username=admin_user" \
 ##### Error Responses
 
 - **`403 Forbidden`** (Non-administrator role):
+
 ```json
 {
   "detail": "Forbidden: Only administrators are authorized to clear all documents."

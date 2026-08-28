@@ -60,7 +60,9 @@ erDiagram
     }
 
 ```
+
 # Tables and Columns
+
 users
 Stores application user authentication information.
 
@@ -73,6 +75,7 @@ Stores application user authentication information.
 | created_at | TIMESTAMP | Account creation time |
 
 # security_audit_log
+
 Stores security-related user actions.
 
 | Column | Type | Description |
@@ -83,6 +86,7 @@ Stores security-related user actions.
 | timestamp | TIMESTAMP | Event time |
 
 # documents
+
 Stores uploaded document metadata.
 
 | Column | Type | Description |
@@ -93,6 +97,7 @@ Stores uploaded document metadata.
 | created_at | TIMESTAMP | Upload timestamp |
 
 # chunks
+
 Stores processed document text chunks and embeddings.
 
 | Column | Type | Description |
@@ -103,6 +108,7 @@ Stores processed document text chunks and embeddings.
 | embedding | BLOB | Vector embedding data |
 
 # plagiarism_incidents
+
 Stores detected plagiarism cases.
 
 | Column | Type | Description |
@@ -113,6 +119,7 @@ Stores detected plagiarism cases.
 | status | TEXT | Review status |
 
 # translation_cache
+
 Stores cached translation results.
 
 | Column | Type | Description |
@@ -122,15 +129,15 @@ Stores cached translation results.
 | translated_text | TEXT | Translated output |
 | language | TEXT | Target language |
 
-
 # Table Relationships
-Relationship	Description
-users → security_audit_log	One user can generate multiple audit records
-documents → chunks	One document contains multiple text chunks
-documents → plagiarism_incidents	One document can have multiple plagiarism records
 
+Relationship Description
+users → security_audit_log One user can generate multiple audit records
+documents → chunks One document contains multiple text chunks
+documents → plagiarism_incidents One document can have multiple plagiarism records
 
 # Foreign Keys
+
 | Table | Column | References |
 |---|---|---|
 | security_audit_log | user_id | users.id |

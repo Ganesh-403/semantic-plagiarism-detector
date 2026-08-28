@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """src/api/routers/batch_history.py - Batch analysis history API router."""
 
 from __future__ import annotations
@@ -81,10 +103,14 @@ async def create_batch_run(
 )
 async def list_batch_runs(
     request: Request,
-    status_filter: Optional[str] = Query(None, alias="status", description="Filter by status"),
-    trigger: Optional[str] = Query(None, alias="trigger_source", description="Filter by trigger"),
-    start_date: Optional[str] = Query(None, description="ISO start date"),
-    end_date: Optional[str] = Query(None, description="ISO end date"),
+    status_filter: str | None = Query(
+        None, alias="status", description="Filter by status"
+    ),
+    trigger: str | None = Query(
+        None, alias="trigger_source", description="Filter by trigger"
+    ),
+    start_date: str | None = Query(None, description="ISO start date"),
+    end_date: str | None = Query(None, description="ISO end date"),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
@@ -377,10 +403,10 @@ async def add_batch_document(
 )
 async def get_timeline(
     request: Request,
-    run_id: Optional[int] = Query(None, description="Filter by run ID"),
-    event_type: Optional[str] = Query(None, description="Filter by event type"),
-    severity: Optional[str] = Query(None, description="Filter by severity"),
-    start_date: Optional[str] = Query(None, description="ISO start date"),
+    run_id: int | None = Query(None, description="Filter by run ID"),
+    event_type: str | None = Query(None, description="Filter by event type"),
+    severity: str | None = Query(None, description="Filter by severity"),
+    start_date: str | None = Query(None, description="ISO start date"),
     limit: int = Query(50, ge=1, le=200),
     _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
 ):
@@ -417,7 +443,7 @@ async def get_timeline(
 )
 async def get_alerts(
     request: Request,
-    is_read: Optional[bool] = Query(None, description="Filter by read status"),
+    is_read: bool | None = Query(None, description="Filter by read status"),
     limit: int = Query(50, ge=1, le=200),
     _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
 ):
@@ -536,7 +562,7 @@ async def get_trends(
 )
 async def get_severity_distribution(
     request: Request,
-    run_id: Optional[int] = Query(None, description="Filter by specific run"),
+    run_id: int | None = Query(None, description="Filter by specific run"),
     _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
 ):
     """Get the severity distribution across document results."""

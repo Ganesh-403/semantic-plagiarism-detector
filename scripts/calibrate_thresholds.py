@@ -1,4 +1,26 @@
 #!/usr/bin/env python3
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 calibrate_thresholds.py
 -----------------------
@@ -308,12 +330,16 @@ def print_f1_table(
         f"  Recommended threshold       : {best_t:.4f} "
         f"({best_t * 100:.0f}%)  F1 = {float(best['f1']):.4f}"
     )
-    cm = best["confusion_matrix"] if "confusion_matrix" in best else {
-        "tp": best["tp"],
-        "fp": best["fp"],
-        "fn": best["fn"],
-        "tn": best["tn"],
-    }
+    cm = (
+        best["confusion_matrix"]
+        if "confusion_matrix" in best
+        else {
+            "tp": best["tp"],
+            "fp": best["fp"],
+            "fn": best["fn"],
+            "tn": best["tn"],
+        }
+    )
     print(f"  Confusion matrix @ {best_t:.4f}: {cm}")
     print("=" * 78)
     return best
@@ -374,8 +400,10 @@ def main() -> None:
     print("  THRESHOLD CALIBRATION & BACKTEST HARNESS (Issue #2267)")
     print("=" * 78)
     print(f"  Dataset : {args.csv}")
-    print(f"  Grid    : {args.grid_start:.2f} -> {args.grid_stop:.2f} "
-          f"step {args.grid_step:.2f} ({len(grid)} points)")
+    print(
+        f"  Grid    : {args.grid_start:.2f} -> {args.grid_stop:.2f} "
+        f"step {args.grid_step:.2f} ({len(grid)} points)"
+    )
     print(f"  Columns : {', '.join(score_columns)}")
 
     best_overall: Optional[dict] = None

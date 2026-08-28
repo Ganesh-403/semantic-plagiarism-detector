@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/db/version_repo.py
 ---------------------
@@ -32,8 +54,9 @@ DEFAULT_DB_PATH = Path("data/version_repo.db")
 # Connection management
 # ---------------------------------------------------------------------------
 
+
 @contextmanager
-def get_connection(db_path: Optional[Path] = None):
+def get_connection(db_path: Path | None = None):
     """Context manager for SQLite connections with WAL and FK enforcement."""
     path = db_path or DEFAULT_DB_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -61,10 +84,12 @@ def _db_path() -> Path:
 # Schema initialisation
 # ---------------------------------------------------------------------------
 
-def init_version_repo_db(db_path: Optional[Path] = None) -> None:
+
+def init_version_repo_db(db_path: Path | None = None) -> None:
     """Create all tables for the version repository."""
     with get_connection(db_path) as conn:
-        conn.executescript("""
+        conn.executescript(
+            """
             CREATE TABLE IF NOT EXISTS document_snapshots (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
                 document_hash   TEXT    UNIQUE NOT NULL,
@@ -118,7 +143,8 @@ def init_version_repo_db(db_path: Optional[Path] = None) -> None:
 
             CREATE INDEX IF NOT EXISTS idx_lineage_assignment
                 ON version_lineage(assignment_id, user_id);
-        """)
+        """
+        )
     logger.info("Version repo DB initialized at %s", db_path or DEFAULT_DB_PATH)
 
 
@@ -126,10 +152,11 @@ def init_version_repo_db(db_path: Optional[Path] = None) -> None:
 # DocumentSnapshotRepository
 # ---------------------------------------------------------------------------
 
+
 class DocumentSnapshotRepository:
     """CRUD + analytics for document version snapshots."""
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Path | None = None):
         self._db_path = db_path
 
     def _conn(self):
@@ -143,8 +170,8 @@ class DocumentSnapshotRepository:
         assignment_id: str,
         filename: str,
         content_text: str,
-        parent_hash: Optional[str] = None,
-        similarity_to_parent: Optional[float] = None,
+        parent_hash: str | None = None,
+        similarity_to_parent: float | None = None,
     ) -> dict[str, Any]:
         """Register a new document version and return the snapshot record."""
         content_hash = hashlib.sha256(content_text.encode("utf-8")).hexdigest()
@@ -168,15 +195,27 @@ class DocumentSnapshotRepository:
                     version_number, parent_hash, similarity_to_parent, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    content_hash, user_id, assignment_id, filename,
-                    content_text, len(content_text), word_count,
-                    next_ver, parent_hash, similarity_to_parent, now,
+                    content_hash,
+                    user_id,
+                    assignment_id,
+                    filename,
+                    content_text,
+                    len(content_text),
+                    word_count,
+                    next_ver,
+                    parent_hash,
+                    similarity_to_parent,
+                    now,
                 ),
             )
 
             # Update lineage
             self._upsert_lineage(
-                conn, assignment_id, user_id, content_hash, now,
+                conn,
+                assignment_id,
+                user_id,
+                content_hash,
+                now,
                 similarity_to_parent,
             )
 
@@ -202,7 +241,7 @@ class DocumentSnapshotRepository:
         removed_words: int,
         changed_words: int,
         jaccard_index: float,
-        diff_summary: Optional[dict] = None,
+        diff_summary: dict | None = None,
     ) -> int:
         """Store a pairwise diff record between two versions."""
         now = datetime.now(timezone.utc).isoformat()
@@ -214,16 +253,22 @@ class DocumentSnapshotRepository:
                     diff_summary, computed_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    parent_hash, child_hash, similarity,
-                    added_words, removed_words, changed_words,
-                    jaccard_index, json.dumps(diff_summary or {}), now,
+                    parent_hash,
+                    child_hash,
+                    similarity,
+                    added_words,
+                    removed_words,
+                    changed_words,
+                    jaccard_index,
+                    json.dumps(diff_summary or {}),
+                    now,
                 ),
             )
             return cursor.lastrowid
 
     # -- Read -----------------------------------------------------------------
 
-    def get_snapshot(self, doc_hash: str) -> Optional[dict[str, Any]]:
+    def get_snapshot(self, doc_hash: str) -> dict[str, Any] | None:
         """Retrieve a single snapshot by hash."""
         with self._conn() as conn:
             row = conn.execute(
@@ -234,8 +279,8 @@ class DocumentSnapshotRepository:
 
     def list_versions(
         self,
-        user_id: Optional[str] = None,
-        assignment_id: Optional[str] = None,
+        user_id: str | None = None,
+        assignment_id: str | None = None,
         page: int = 1,
         per_page: int = 20,
     ) -> dict[str, Any]:
@@ -253,7 +298,8 @@ class DocumentSnapshotRepository:
 
         with self._conn() as conn:
             count_row = conn.execute(
-                f"SELECT COUNT(*) FROM document_snapshots{where}", params  # nosec
+                f"SELECT COUNT(*) FROM document_snapshots{where}",
+                params,  # nosec
             ).fetchone()
             total = count_row[0] if count_row else 0
 
@@ -276,9 +322,7 @@ class DocumentSnapshotRepository:
             "has_previous": page > 1,
         }
 
-    def get_lineage(
-        self, user_id: str, assignment_id: str
-    ) -> list[dict[str, Any]]:
+    def get_lineage(self, user_id: str, assignment_id: str) -> list[dict[str, Any]]:
         """Get the full version lineage for a user + assignment."""
         with self._conn() as conn:
             cursor = conn.execute(
@@ -289,7 +333,7 @@ class DocumentSnapshotRepository:
             )
             return [dict(r) for r in cursor.fetchall()]
 
-    def get_diff(self, parent_hash: str, child_hash: str) -> Optional[dict[str, Any]]:
+    def get_diff(self, parent_hash: str, child_hash: str) -> dict[str, Any] | None:
         """Get the diff record between two specific versions."""
         with self._conn() as conn:
             row = conn.execute(
@@ -312,8 +356,8 @@ class DocumentSnapshotRepository:
 
     def list_lineages(
         self,
-        user_id: Optional[str] = None,
-        assignment_id: Optional[str] = None,
+        user_id: str | None = None,
+        assignment_id: str | None = None,
         page: int = 1,
         per_page: int = 20,
     ) -> dict[str, Any]:
@@ -331,7 +375,8 @@ class DocumentSnapshotRepository:
 
         with self._conn() as conn:
             count_row = conn.execute(
-                f"SELECT COUNT(*) FROM version_lineage{where}", params  # nosec
+                f"SELECT COUNT(*) FROM version_lineage{where}",
+                params,  # nosec
             ).fetchone()
             total = count_row[0] if count_row else 0
 
@@ -365,9 +410,9 @@ class DocumentSnapshotRepository:
             total_lineages = conn.execute(
                 "SELECT COUNT(*) FROM version_lineage"
             ).fetchone()[0]
-            total_diffs = conn.execute(
-                "SELECT COUNT(*) FROM version_diffs"
-            ).fetchone()[0]
+            total_diffs = conn.execute("SELECT COUNT(*) FROM version_diffs").fetchone()[
+                0
+            ]
 
             avg_sim_row = conn.execute(
                 "SELECT AVG(similarity) FROM version_diffs"
@@ -405,14 +450,16 @@ class DocumentSnapshotRepository:
             parent = lineage[i - 1]
             child = lineage[i]
             diff = self.get_diff(parent["document_hash"], child["document_hash"])
-            trend.append({
-                "from_version": parent["version_number"],
-                "to_version": child["version_number"],
-                "similarity": diff["similarity"] if diff else None,
-                "added_words": diff["added_words"] if diff else None,
-                "removed_words": diff["removed_words"] if diff else None,
-                "created_at": child["created_at"],
-            })
+            trend.append(
+                {
+                    "from_version": parent["version_number"],
+                    "to_version": child["version_number"],
+                    "similarity": diff["similarity"] if diff else None,
+                    "added_words": diff["added_words"] if diff else None,
+                    "removed_words": diff["removed_words"] if diff else None,
+                    "created_at": child["created_at"],
+                }
+            )
         return trend
 
     def most_revised_documents(self, limit: int = 10) -> list[dict[str, Any]]:
@@ -453,9 +500,7 @@ class DocumentSnapshotRepository:
             )
             return cursor.rowcount > 0
 
-    def delete_lineage(
-        self, user_id: str, assignment_id: str
-    ) -> bool:
+    def delete_lineage(self, user_id: str, assignment_id: str) -> bool:
         """Delete an entire lineage (all versions for a user + assignment)."""
         with self._conn() as conn:
             conn.execute(
@@ -491,7 +536,7 @@ class DocumentSnapshotRepository:
         user_id: str,
         head_hash: str,
         now: str,
-        similarity: Optional[float],
+        similarity: float | None,
     ) -> None:
         """Insert or update the lineage record for a user + assignment."""
         existing = conn.execute(
@@ -516,8 +561,14 @@ class DocumentSnapshotRepository:
                        max_similarity = ?, last_created = ?
                    WHERE user_id = ? AND assignment_id = ?""",
                 (
-                    head_hash, total, avg_sim, min_sim, max_sim, now,
-                    user_id, assignment_id,
+                    head_hash,
+                    total,
+                    avg_sim,
+                    min_sim,
+                    max_sim,
+                    now,
+                    user_id,
+                    assignment_id,
                 ),
             )
         else:
@@ -528,11 +579,14 @@ class DocumentSnapshotRepository:
                     first_created, last_created)
                    VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)""",
                 (
-                    assignment_id, user_id, head_hash,
+                    assignment_id,
+                    user_id,
+                    head_hash,
                     similarity or 0.0,
                     similarity or 1.0,
                     similarity or 0.0,
-                    now, now,
+                    now,
+                    now,
                 ),
             )
 

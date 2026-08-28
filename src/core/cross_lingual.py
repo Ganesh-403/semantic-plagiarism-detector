@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/core/cross_lingual.py
 -------------------------
@@ -127,7 +149,7 @@ def detect_chunk_language(text: str) -> str:
 
 def back_translate_chunk(
     text: str,
-    source_lang: Optional[str] = None,
+    source_lang: str | None = None,
     use_cache: bool = True,
 ) -> str:
     """Translate a text chunk back to the target language (English).
@@ -177,7 +199,7 @@ def back_translate_chunk(
             target_lang=TARGET_LANGUAGE,
             source_lang=source_lang,
         )
-        
+
         # Validate translation result
         if not translated_text or not isinstance(translated_text, str):
             logger.warning(
@@ -187,9 +209,9 @@ def back_translate_chunk(
                 TARGET_LANGUAGE,
             )
             return text
-            
+
         translated_text = translated_text.strip()
-        
+
         # Check if translation is suspiciously identical to source
         # (could indicate translation service failure)
         if translated_text == text.strip() and source_lang != TARGET_LANGUAGE:
@@ -199,7 +221,7 @@ def back_translate_chunk(
                 source_lang,
                 TARGET_LANGUAGE,
             )
-        
+
     except Exception as exc:
         # Graceful fallback: return original text if translation fails
         logger.error(
@@ -535,7 +557,9 @@ def prepare_chunks_for_embedding(
     metadata: list[dict[str, object]] = []
 
     for chunk in chunks:
-        prepared = prepare_text_for_embedding(chunk.text if hasattr(chunk, "text") else chunk)
+        prepared = prepare_text_for_embedding(
+            chunk.text if hasattr(chunk, "text") else chunk
+        )
         embedding_chunks.append(str(prepared["embedding_text"]))
         metadata.append(prepared)
 

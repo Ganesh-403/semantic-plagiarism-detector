@@ -1,12 +1,36 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import ast
 import hashlib
 import json
+
 
 class ASTHashingEngine(ast.NodeTransformer):
     """
     Traverses and normalizes Abstract Syntax Trees to eliminate identifier name variation profiles.
     Converts structural blocks into consistent, deterministic semantic tokens.
     """
+
     def __init__(self):
         self.structural_tokens = []
         self.variable_map = {}
@@ -49,26 +73,26 @@ class ASTHashingEngine(ast.NodeTransformer):
             self.structural_tokens = []
             self.variable_map = {}
             self.var_counter = 0
-            
+
             # Execute modification traversal loops
             self.visit(parsed_tree)
-            
+
             # Serialize token streams into deterministic signature strings
             token_string = ",".join(self.structural_tokens)
-            ast_sha256 = hashlib.sha256(token_string.encode('utf-8')).hexdigest()
-            
+            ast_sha256 = hashlib.sha256(token_string.encode("utf-8")).hexdigest()
+
             return {
                 "success": True,
                 "ast_hash": ast_sha256,
                 "tokens": self.structural_tokens,
-                "error": None
+                "error": None,
             }
         except SyntaxError as parse_error:
             return {
                 "success": False,
                 "ast_hash": "0" * 64,
                 "tokens": [],
-                "error": f"Syntax parsing exception at line {parse_error.lineno}: {parse_error.msg}"
+                "error": f"Syntax parsing exception at line {parse_error.lineno}: {parse_error.msg}",
             }
 
     @staticmethod
@@ -79,9 +103,9 @@ class ASTHashingEngine(ast.NodeTransformer):
         """
         if not tokens_a or not tokens_b:
             return 0.00
-            
+
         set_a, set_b = set(tokens_a), set(tokens_b)
         intersection = len(set_a.intersection(set_b))
         union = len(set_a.union(set_b))
-        
+
         return round((intersection / union) * 100, 2) if union > 0 else 0.00

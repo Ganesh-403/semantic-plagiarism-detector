@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/visualization/test_analytics.py
 -------------------------------------
@@ -16,10 +38,11 @@ def test_plot_similarity_distribution_xaxis_label():
     sim_df = pd.DataFrame(
         [[1.0, 0.4, 0.2], [0.4, 1.0, 0.5], [0.2, 0.5, 1.0]],
         index=["Doc1", "Doc2", "Doc3"],
-        columns=["Doc1", "Doc2", "Doc3"]
+        columns=["Doc1", "Doc2", "Doc3"],
     )
     fig = plot_similarity_distribution(sim_df)
     assert fig.layout.xaxis.title.text == "Similarity Score"
+
 
 from src.visualization.analytics import (
     calculate_severity_ratios,
@@ -519,13 +542,13 @@ class TestPlotMonthlyIncidentTrends:
     def test_aggregates_incidents_by_month(self, sample_incidents):
         """Verify incidents are correctly aggregated by YYYY-MM."""
         fig = plot_monthly_incident_trends(sample_incidents)
-        
+
         # Extract data from the first bar trace
         bar_trace = fig.data[0]
-        
+
         # Should have 3 months: Jan, Feb, Mar
         assert len(bar_trace.x) == 3
-        
+
         # Verify counts: Jan=2, Feb=1, Mar=3
         y_values = list(bar_trace.y)
         assert 2 in y_values  # January
@@ -535,7 +558,7 @@ class TestPlotMonthlyIncidentTrends:
     def test_handles_empty_incidents_list(self):
         """Verify empty list returns an empty-state chart."""
         fig = plot_monthly_incident_trends([])
-        
+
         # Should have an annotation instead of bar traces
         assert len(fig.data) == 0
         assert len(fig.layout.annotations) > 0
@@ -544,7 +567,7 @@ class TestPlotMonthlyIncidentTrends:
     def test_handles_none_input(self):
         """Verify None input returns an empty-state chart."""
         fig = plot_monthly_incident_trends(None)
-        
+
         assert len(fig.data) == 0
         assert len(fig.layout.annotations) > 0
 
@@ -555,13 +578,13 @@ class TestPlotMonthlyIncidentTrends:
             # February is missing
             {"date_flagged": "2024-03-10T11:00:00"},
         ]
-        
+
         fig = plot_monthly_incident_trends(incidents)
         bar_trace = fig.data[0]
-        
+
         # Should have 3 bars: Jan, Feb (0), Mar
         assert len(bar_trace.x) == 3
-        
+
         # Find the February bar (should have y=0)
         y_values = list(bar_trace.y)
         assert 0 in y_values
@@ -573,11 +596,11 @@ class TestPlotMonthlyIncidentTrends:
             {"date_flagged": f"2024-{str(m).zfill(2)}-15T10:00:00"}
             for m in range(1, 13)
         ]
-        
+
         # Request only last 3 months
         fig = plot_monthly_incident_trends(incidents, months_to_show=3)
         bar_trace = fig.data[0]
-        
+
         # Should only show Oct, Nov, Dec
         assert len(bar_trace.x) == 3
 
@@ -589,10 +612,10 @@ class TestPlotMonthlyIncidentTrends:
             {"date_flagged": None},
             {"date_flagged": "2024-02-05T09:15:00"},
         ]
-        
+
         fig = plot_monthly_incident_trends(incidents)
         bar_trace = fig.data[0]
-        
+
         # Should only process Jan and Feb
         assert len(bar_trace.x) == 2
 
@@ -600,9 +623,9 @@ class TestPlotMonthlyIncidentTrends:
         """Verify theme colors are applied to the chart."""
         incidents = [{"date_flagged": "2024-01-15T10:00:00"}]
         dark_colors = get_chart_theme_colors("Dark")
-        
+
         fig = plot_monthly_incident_trends(incidents, theme_colors=dark_colors)
-        
+
         # Verify dark background is applied
         assert fig.layout.paper_bgcolor == "#1e293b"
 
@@ -612,9 +635,9 @@ class TestPlotMonthlyIncidentTrends:
             {"date_flagged": "2024-01-15T10:00:00"},
             {"date_flagged": "2024-01-20T14:30:00"},
         ]
-        
+
         fig = plot_monthly_incident_trends(incidents)
-        
+
         # Check y-axis range mode
         assert fig.layout.yaxis.rangemode == "tozero"
 
@@ -624,10 +647,10 @@ class TestPlotMonthlyIncidentTrends:
             {"timestamp": "2024-01-15T10:00:00"},
             {"created_at": "2024-02-05T09:15:00"},
         ]
-        
+
         fig = plot_monthly_incident_trends(incidents)
         bar_trace = fig.data[0]
-        
+
         # Should process both incidents
         assert len(bar_trace.x) == 2
 
@@ -635,7 +658,7 @@ class TestPlotMonthlyIncidentTrends:
         """Verify chart has correct title and axis labels."""
         incidents = [{"date_flagged": "2024-01-15T10:00:00"}]
         fig = plot_monthly_incident_trends(incidents)
-        
+
         assert fig.layout.title.text == "Monthly Plagiarism Incident Trends"
         assert fig.layout.xaxis.title.text == "Month"
         assert fig.layout.yaxis.title.text == "Number of Incidents"
@@ -678,9 +701,9 @@ def test_calculate_severity_ratios_percentage_breakdown():
     from src.core.config import DEFAULT_THRESHOLDS
 
     incidents = [
-        {"similarity_score": DEFAULT_THRESHOLDS.high + 0.05},    # High
-        {"similarity_score": DEFAULT_THRESHOLDS.high},           # High
-        {"similarity_score": DEFAULT_THRESHOLDS.medium},         # Medium
+        {"similarity_score": DEFAULT_THRESHOLDS.high + 0.05},  # High
+        {"similarity_score": DEFAULT_THRESHOLDS.high},  # High
+        {"similarity_score": DEFAULT_THRESHOLDS.medium},  # Medium
         {"similarity_score": DEFAULT_THRESHOLDS.medium - 0.05},  # Low
     ]
     ratios = calculate_severity_ratios(incidents)
@@ -783,7 +806,7 @@ class TestGetChartThemeColors:
     def test_light_mode_returns_correct_palette(self):
         """Verify Light mode returns white background and dark ink."""
         colors = get_chart_theme_colors("Light")
-        
+
         assert colors["background"] == "#ffffff"
         assert colors["ink"] == "#0f172a"
         assert "surface" in colors
@@ -793,7 +816,7 @@ class TestGetChartThemeColors:
     def test_dark_mode_returns_correct_palette(self):
         """Verify Dark mode returns slate background and light ink."""
         colors = get_chart_theme_colors("Dark")
-        
+
         assert colors["background"] == "#1e293b"
         assert colors["ink"] == "#f8fafc"
         assert colors["surface"] == "#0f172a"
@@ -814,7 +837,7 @@ class TestGetChartThemeColors:
         """Verify unrecognized theme modes safely default to Light palette."""
         colors = get_chart_theme_colors("midnight")
         assert colors["background"] == "#ffffff"
-        
+
         colors = get_chart_theme_colors("")
         assert colors["background"] == "#ffffff"
 
@@ -826,19 +849,19 @@ class TestGetChartThemeColors:
 
     def test_color_contrast_ratios(self):
         """Verify ink and background colors have sufficient contrast for readability.
-        
+
         This is a basic sanity check to ensure we aren't returning white-on-white
         or black-on-black combinations that would render charts invisible.
         """
         light = get_chart_theme_colors("Light")
         dark = get_chart_theme_colors("Dark")
-        
+
         # Light mode: dark ink on white background
         assert light["ink"] != light["background"]
-        
+
         # Dark mode: light ink on dark background
         assert dark["ink"] != dark["background"]
-        
+
         # Ensure muted text is distinct from primary ink
         assert light["muted"] != light["ink"]
         assert dark["muted"] != dark["ink"]
@@ -850,31 +873,31 @@ class TestApplyPlotlyTheme:
     def test_applies_light_theme_to_figure(self):
         """Verify light theme colors are applied to Plotly figure layout."""
         import plotly.graph_objects as go
-        
+
         fig = go.Figure()
         colors = get_chart_theme_colors("Light")
-        
+
         updated_fig = apply_plotly_theme(fig, theme_colors=colors)
-        
+
         assert updated_fig.layout.paper_bgcolor == "#ffffff"
         assert updated_fig.layout.font.color == "#0f172a"
 
     def test_applies_dark_theme_to_figure(self):
         """Verify dark theme colors are applied to Plotly figure layout."""
         import plotly.graph_objects as go
-        
+
         fig = go.Figure()
         colors = get_chart_theme_colors("Dark")
-        
+
         updated_fig = apply_plotly_theme(fig, theme_colors=colors)
-        
+
         assert updated_fig.layout.paper_bgcolor == "#1e293b"
         assert updated_fig.layout.font.color == "#f8fafc"
 
     def test_handles_none_theme_colors_gracefully(self):
         """Verify function doesn't crash when theme_colors is None."""
         import plotly.graph_objects as go
-        
+
         fig = go.Figure()
         # Should not raise, just return the figure unchanged
         updated_fig = apply_plotly_theme(fig, theme_colors=None)
@@ -883,14 +906,14 @@ class TestApplyPlotlyTheme:
     def test_gridlines_toggle(self):
         """Verify show_grid parameter controls gridline visibility."""
         import plotly.graph_objects as go
-        
+
         fig = go.Figure()
         colors = get_chart_theme_colors("Light")
-        
+
         # With grid
         fig_grid = apply_plotly_theme(fig, theme_colors=colors, show_grid=True)
         assert fig_grid.layout.xaxis.gridcolor == colors["border"]
-        
+
         # Without grid
         apply_plotly_theme(go.Figure(), theme_colors=colors, show_grid=False)
         # When show_grid=False, gridcolor shouldn't be explicitly set by our function
@@ -908,12 +931,12 @@ class TestCalculateSeverityRatios:
             {"similarity_score": 0.60},  # Medium
             {"similarity_score": 0.30},  # Low
         ]
-        
+
         ratios = calculate_severity_ratios(incidents)
-        
-        assert ratios["High"] == 50.0   # 2/4
-        assert ratios["Medium"] == 25.0 # 1/4
-        assert ratios["Low"] == 25.0    # 1/4
+
+        assert ratios["High"] == 50.0  # 2/4
+        assert ratios["Medium"] == 25.0  # 1/4
+        assert ratios["Low"] == 25.0  # 1/4
 
     def test_handles_empty_incidents_list(self):
         """Verify empty list returns all zeros."""
@@ -927,7 +950,7 @@ class TestCalculateSeverityRatios:
             {"similarity_score": "invalid"},
             {"similarity_score": None},
         ]
-        
+
         ratios = calculate_severity_ratios(incidents)
         # Only 1 valid incident (High)
         assert ratios["High"] == 100.0
@@ -939,7 +962,7 @@ class TestCalculateSeverityRatios:
         incidents = [
             {"similarity": 0.55},  # Medium
         ]
-        
+
         ratios = calculate_severity_ratios(incidents)
         assert ratios["Medium"] == 100.0
 
@@ -952,11 +975,11 @@ class TestGetTopSimilarPairs:
         df = pd.DataFrame(
             [[1.0, 0.8, 0.2], [0.8, 1.0, 0.9], [0.2, 0.9, 1.0]],
             index=["A", "B", "C"],
-            columns=["A", "B", "C"]
+            columns=["A", "B", "C"],
         )
-        
+
         pairs = get_top_similar_pairs(df, top_n=2)
-        
+
         assert len(pairs) == 2
         # Top pair should be B-C (0.9)
         assert pairs[0] == ("B", "C", 0.9) or pairs[0] == ("C", "B", 0.9)
@@ -966,13 +989,11 @@ class TestGetTopSimilarPairs:
     def test_excludes_self_similarity(self):
         """Verify diagonal (self-similarity) is excluded."""
         df = pd.DataFrame(
-            [[1.0, 0.5], [0.5, 1.0]],
-            index=["A", "B"],
-            columns=["A", "B"]
+            [[1.0, 0.5], [0.5, 1.0]], index=["A", "B"], columns=["A", "B"]
         )
-        
+
         pairs = get_top_similar_pairs(df, top_n=5)
-        
+
         # Should only return A-B pair, not A-A or B-B
         assert len(pairs) == 1
         assert pairs[0][2] == 0.5
@@ -1156,5 +1177,3 @@ def test_plot_similarity_boxplot_by_group_applies_theme():
     assert fig.layout.paper_bgcolor == "#1e293b"
     assert fig.layout.plot_bgcolor == "#0f172a"
     assert fig.layout.font.color == "#f8fafc"
-
-

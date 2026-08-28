@@ -1,11 +1,34 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """tests/api/test_anomalies.py
 
 Unit tests for the Anomaly Detection API endpoints.
 Tests cover scan lifecycle, alert CRUD, analytics, and configuration.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 from src.api.app import app
@@ -17,6 +40,7 @@ client = TestClient(app)
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def _mock_auth(monkeypatch):
@@ -44,6 +68,7 @@ HEADERS = {"Authorization": "Bearer test-token"}
 # ---------------------------------------------------------------------------
 # Scan Lifecycle Tests
 # ---------------------------------------------------------------------------
+
 
 class TestScanLifecycle:
     """Tests for scan creation, completion, and failure."""
@@ -109,6 +134,7 @@ class TestScanLifecycle:
 # Alert CRUD Tests
 # ---------------------------------------------------------------------------
 
+
 class TestAlertCRUD:
     """Tests for alert creation, listing, and retrieval."""
 
@@ -135,7 +161,11 @@ class TestAlertCRUD:
         client.post(
             "/api/v1/anomalies/alerts",
             headers=HEADERS,
-            params={"anomaly_type": "outlier", "severity": "medium", "title": "Test alert"},
+            params={
+                "anomaly_type": "outlier",
+                "severity": "medium",
+                "title": "Test alert",
+            },
         )
         resp = client.get("/api/v1/anomalies/alerts", headers=HEADERS)
         assert resp.status_code == 200
@@ -146,7 +176,11 @@ class TestAlertCRUD:
         create = client.post(
             "/api/v1/anomalies/alerts",
             headers=HEADERS,
-            params={"anomaly_type": "template", "severity": "low", "title": "Template detected"},
+            params={
+                "anomaly_type": "template",
+                "severity": "low",
+                "title": "Template detected",
+            },
         )
         alert_id = create.json()["alert_id"]
         resp = client.get(f"/api/v1/anomalies/alerts/{alert_id}", headers=HEADERS)
@@ -158,10 +192,16 @@ class TestAlertCRUD:
         create = client.post(
             "/api/v1/anomalies/alerts",
             headers=HEADERS,
-            params={"anomaly_type": "pattern", "severity": "info", "title": "Pattern found"},
+            params={
+                "anomaly_type": "pattern",
+                "severity": "info",
+                "title": "Pattern found",
+            },
         )
         alert_id = create.json()["alert_id"]
-        resp = client.put(f"/api/v1/anomalies/alerts/{alert_id}/acknowledge", headers=HEADERS)
+        resp = client.put(
+            f"/api/v1/anomalies/alerts/{alert_id}/acknowledge", headers=HEADERS
+        )
         assert resp.status_code == 200
         assert resp.json()["acknowledged"] is True
 
@@ -170,7 +210,11 @@ class TestAlertCRUD:
         create = client.post(
             "/api/v1/anomalies/alerts",
             headers=HEADERS,
-            params={"anomaly_type": "statistical", "severity": "medium", "title": "Stat anomaly"},
+            params={
+                "anomaly_type": "statistical",
+                "severity": "medium",
+                "title": "Stat anomaly",
+            },
         )
         alert_id = create.json()["alert_id"]
         resp = client.put(
@@ -187,7 +231,11 @@ class TestAlertCRUD:
             client.post(
                 "/api/v1/anomalies/alerts",
                 headers=HEADERS,
-                params={"anomaly_type": "outlier", "severity": "low", "title": f"Alert {i}"},
+                params={
+                    "anomaly_type": "outlier",
+                    "severity": "low",
+                    "title": f"Alert {i}",
+                },
             )
         resp = client.put("/api/v1/anomalies/alerts/read-all", headers=HEADERS)
         assert resp.status_code == 200
@@ -198,7 +246,11 @@ class TestAlertCRUD:
         create = client.post(
             "/api/v1/anomalies/alerts",
             headers=HEADERS,
-            params={"anomaly_type": "cluster", "severity": "info", "title": "To delete"},
+            params={
+                "anomaly_type": "cluster",
+                "severity": "info",
+                "title": "To delete",
+            },
         )
         alert_id = create.json()["alert_id"]
         resp = client.delete(f"/api/v1/anomalies/alerts/{alert_id}", headers=HEADERS)
@@ -214,6 +266,7 @@ class TestAlertCRUD:
 # ---------------------------------------------------------------------------
 # Analytics Tests
 # ---------------------------------------------------------------------------
+
 
 class TestAnalytics:
     """Tests for analytics endpoints."""
@@ -243,7 +296,12 @@ class TestAnalytics:
         client.post(
             "/api/v1/anomalies/alerts",
             headers=HEADERS,
-            params={"anomaly_type": "collusion", "severity": "critical", "title": "Critical", "confidence": 0.95},
+            params={
+                "anomaly_type": "collusion",
+                "severity": "critical",
+                "title": "Critical",
+                "confidence": 0.95,
+            },
         )
         resp = client.get(
             "/api/v1/anomalies/analytics/high-confidence?min_confidence=0.8",
@@ -256,6 +314,7 @@ class TestAnalytics:
 # ---------------------------------------------------------------------------
 # Config Tests
 # ---------------------------------------------------------------------------
+
 
 class TestConfig:
     """Tests for anomaly detection configuration."""
@@ -283,6 +342,7 @@ class TestConfig:
 # Auth Tests
 # ---------------------------------------------------------------------------
 
+
 class TestAuth:
     """Tests for authentication requirements."""
 
@@ -294,7 +354,10 @@ class TestAuth:
     def test_wrong_token(self):
         """Requests with wrong token should be rejected."""
         h = {"Authorization": "Bearer wrong"}
-        assert client.get("/api/v1/anomalies/scans", headers=h).status_code in (401, 403)
+        assert client.get("/api/v1/anomalies/scans", headers=h).status_code in (
+            401,
+            403,
+        )
 
     def test_create_alert_no_auth(self):
         """POST without auth should be rejected."""
@@ -309,13 +372,15 @@ class TestAuth:
 # DB Repository Unit Tests
 # ---------------------------------------------------------------------------
 
+
 class TestAnomalyDB:
     """Unit tests for AnomalyAlertRepository."""
 
     def test_create_and_get_scan(self):
         """Should create and retrieve a scan."""
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "test.db"
             init_anomaly_alerts_db(db)
@@ -330,8 +395,9 @@ class TestAnomalyDB:
 
     def test_complete_scan(self):
         """Should mark scan as completed."""
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "test.db"
             init_anomaly_alerts_db(db)
@@ -345,8 +411,9 @@ class TestAnomalyDB:
 
     def test_create_and_acknowledge_alert(self):
         """Should create, acknowledge, and resolve alerts."""
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "test.db"
             init_anomaly_alerts_db(db)
@@ -373,8 +440,9 @@ class TestAnomalyDB:
 
     def test_list_alerts_with_filters(self):
         """Should filter alerts by severity and type."""
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "test.db"
             init_anomaly_alerts_db(db)
@@ -392,8 +460,9 @@ class TestAnomalyDB:
 
     def test_analytics_summary(self):
         """Should return correct analytics."""
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "test.db"
             init_anomaly_alerts_db(db)
@@ -407,8 +476,9 @@ class TestAnomalyDB:
 
     def test_severity_distribution(self):
         """Should return correct severity counts."""
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "test.db"
             init_anomaly_alerts_db(db)
@@ -424,8 +494,9 @@ class TestAnomalyDB:
 
     def test_acknowledge_all(self):
         """Should acknowledge all unacknowledged alerts."""
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "test.db"
             init_anomaly_alerts_db(db)
@@ -442,8 +513,9 @@ class TestAnomalyDB:
 
     def test_config_management(self):
         """Should get and update config."""
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "test.db"
             init_anomaly_alerts_db(db)
@@ -458,8 +530,9 @@ class TestAnomalyDB:
 
     def test_purge_old_scans(self):
         """Should keep only the most recent scans."""
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "test.db"
             init_anomaly_alerts_db(db)

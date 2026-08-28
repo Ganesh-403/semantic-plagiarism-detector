@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Unit tests for src/utils/storage_metrics.py."""
 
 import ast
@@ -77,10 +99,10 @@ class TestCalculateStorageUsageFileCounts:
     def test_returns_zero_counts_for_empty_paths(self, tmp_path):
         """Verify file counts are 0 when no files exist at provided paths."""
         from src.utils.storage_metrics import calculate_storage_usage
-        
+
         # Pass empty lists to simulate no files found
         result = calculate_storage_usage(db_paths=[], index_paths=[])
-        
+
         assert result["sqlite_file_count"] == 0
         assert result["faiss_file_count"] == 0
         assert result["formatted_total"] == "0.00 MB"
@@ -88,16 +110,16 @@ class TestCalculateStorageUsageFileCounts:
     def test_counts_sqlite_files_correctly(self, tmp_path):
         """Verify sqlite_file_count increments for each valid .db file."""
         from src.utils.storage_metrics import calculate_storage_usage
-        
+
         # Create 3 dummy SQLite files
         db_paths = []
         for i in range(3):
             db_file = tmp_path / f"test_{i}.db"
             db_file.write_bytes(b"x" * 1024)  # 1KB each
             db_paths.append(db_file)
-            
+
         result = calculate_storage_usage(db_paths=db_paths, index_paths=[])
-        
+
         assert result["sqlite_file_count"] == 3
         assert result["faiss_file_count"] == 0
         assert result["sqlite_bytes"] == 3072
@@ -105,16 +127,16 @@ class TestCalculateStorageUsageFileCounts:
     def test_counts_faiss_files_correctly(self, tmp_path):
         """Verify faiss_file_count increments for each valid .index file."""
         from src.utils.storage_metrics import calculate_storage_usage
-        
+
         # Create 2 dummy FAISS index files
         index_paths = []
         for i in range(2):
             idx_file = tmp_path / f"corpus_{i}.index"
             idx_file.write_bytes(b"y" * 2048)  # 2KB each
             index_paths.append(idx_file)
-            
+
         result = calculate_storage_usage(db_paths=[], index_paths=index_paths)
-        
+
         assert result["sqlite_file_count"] == 0
         assert result["faiss_file_count"] == 2
         assert result["faiss_bytes"] == 4096
@@ -122,28 +144,27 @@ class TestCalculateStorageUsageFileCounts:
     def test_ignores_nonexistent_paths_in_count(self, tmp_path):
         """Verify nonexistent paths don't increment the file count."""
         from src.utils.storage_metrics import calculate_storage_usage
-        
+
         existing_db = tmp_path / "real.db"
         existing_db.write_bytes(b"data")
-        
+
         nonexistent_db = tmp_path / "missing.db"
-        
+
         result = calculate_storage_usage(
-            db_paths=[existing_db, nonexistent_db],
-            index_paths=[]
+            db_paths=[existing_db, nonexistent_db], index_paths=[]
         )
-        
+
         # Should only count the existing file
         assert result["sqlite_file_count"] == 1
 
     def test_ignores_directories_in_count(self, tmp_path):
         """Verify directories ending in .db don't increment the file count."""
         from src.utils.storage_metrics import calculate_storage_usage
-        
+
         # Create a directory with .db extension
         db_dir = tmp_path / "fake.db"
         db_dir.mkdir()
-        
+
         result = calculate_storage_usage(db_paths=[db_dir], index_paths=[])
 
         assert result["sqlite_file_count"] == 0
@@ -168,8 +189,13 @@ class TestModuleParses:
 
     @pytest.mark.parametrize(
         "name",
-        ["_deduplicate_paths", "get_sqlite_db_paths", "get_faiss_index_paths",
-         "calculate_storage_usage", "get_directory_size_bytes"],
+        [
+            "_deduplicate_paths",
+            "get_sqlite_db_paths",
+            "get_faiss_index_paths",
+            "calculate_storage_usage",
+            "get_directory_size_bytes",
+        ],
     )
     def test_function_is_defined_exactly_once(self, name):
         """A second definition would silently shadow the first."""
@@ -280,9 +306,9 @@ class TestGetSqliteDbPaths:
         paths = get_sqlite_db_paths()
         resolved = [p.resolve() for p in paths]
 
-        assert len(resolved) == len(set(resolved)), (
-            f"duplicate database paths reported: {sorted(map(str, resolved))}"
-        )
+        assert len(resolved) == len(
+            set(resolved)
+        ), f"duplicate database paths reported: {sorted(map(str, resolved))}"
 
     def test_survives_every_configured_lookup_failing(self, caplog):
         """A partially installed environment must still return glob results."""
@@ -321,9 +347,9 @@ class TestGetFaissIndexPaths:
         paths = get_faiss_index_paths()
         resolved = [p.resolve() for p in paths]
 
-        assert len(resolved) == len(set(resolved)), (
-            f"duplicate index paths reported: {sorted(map(str, resolved))}"
-        )
+        assert len(resolved) == len(
+            set(resolved)
+        ), f"duplicate index paths reported: {sorted(map(str, resolved))}"
 
     def test_only_index_files_are_reported(self):
         offenders = [p for p in get_faiss_index_paths() if p.suffix != ".index"]
@@ -359,9 +385,7 @@ class TestCalculateStorageUsageContract:
         index_file = tmp_path / "corpus.index"
         index_file.write_bytes(b"b" * 5000)
 
-        result = calculate_storage_usage(
-            db_paths=[db_file], index_paths=[index_file]
-        )
+        result = calculate_storage_usage(db_paths=[db_file], index_paths=[index_file])
 
         assert result["sqlite_bytes"] == 3000
         assert result["faiss_bytes"] == 5000
@@ -402,12 +426,8 @@ class TestCalculateStorageUsageContract:
         db_file.write_bytes(b"x" * 100)
 
         with caplog.at_level(logging.DEBUG):
-            with patch.object(
-                Path, "stat", side_effect=OSError("permission denied")
-            ):
-                result = calculate_storage_usage(
-                    db_paths=[db_file], index_paths=[]
-                )
+            with patch.object(Path, "stat", side_effect=OSError("permission denied")):
+                result = calculate_storage_usage(db_paths=[db_file], index_paths=[])
 
         assert result["sqlite_bytes"] == 0
         assert result["sqlite_file_count"] == 0
@@ -537,7 +557,6 @@ class TestGetDirectorySizeBytes:
         # Verify get_directory_size_bytes accurately counts file1 (11 bytes) and ignores broken link
         size = get_directory_size_bytes(tmp_path)
         assert size == 11
-
 
     def test_returns_zero_for_nonexistent_directory(self, tmp_path: Path):
         """Verify nonexistent directory path returns 0 bytes."""

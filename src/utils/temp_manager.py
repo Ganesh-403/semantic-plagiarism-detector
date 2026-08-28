@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/utils/temp_manager.py
 -------------------------
@@ -14,15 +36,15 @@ Recent Additions (Issue #3179):
 """
 
 import atexit
-from contextlib import contextmanager
 import logging
 import os
 import shutil
 import tempfile
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import List, Optional, Generator
+from typing import Generator, List, Optional
 
 # Global list of registered temporary paths to clean up
 _REGISTERED_TEMP_PATHS: list[str] = []
@@ -159,7 +181,8 @@ def managed_temp_file(
             logger.warning("Failed to clean up temp file %s: %s", temp_path, exc)
 
 
-def create_managed_temp_dir(    suffix: Optional[str] = None, prefix: Optional[str] = None
+def create_managed_temp_dir(
+    suffix: Optional[str] = None, prefix: Optional[str] = None
 ) -> str:
     """Creates a temporary directory on disk and registers it for automatic deletion on exit."""
     temp_dir = tempfile.mkdtemp(suffix=suffix, prefix=prefix)
@@ -170,7 +193,7 @@ def create_managed_temp_dir(    suffix: Optional[str] = None, prefix: Optional[s
 def purge_expired_temp_files(max_age_seconds: int = 7200) -> int:
     """
     Scans the system temp directory and removes files whose last modification
-    time is older than max_age_seconds (default: 2 hours). Hardened against 
+    time is older than max_age_seconds (default: 2 hours). Hardened against
     symlink traversal attacks (Issue #3179).
 
     Returns:
@@ -197,7 +220,7 @@ def purge_expired_temp_files(max_age_seconds: int = 7200) -> int:
                     # Hardening: Pass follow_symlinks=False explicitly to stat()
                     file_stat = entry.stat(follow_symlinks=False)
                     age_seconds = now - file_stat.st_mtime
-                    
+
                     if age_seconds > max_age_seconds:
                         file_size = file_stat.st_size
                         os.remove(entry.path)
@@ -232,10 +255,16 @@ def get_temp_directory_size_bytes() -> int:
                     file_stat = os.stat(file_path, follow_symlinks=True)
                     total_size += file_stat.st_size
                 except (OSError, ValueError) as exc:
-                    logger.debug("get_temp_directory_size_bytes: skipping %s: %s", file_path, exc)
+                    logger.debug(
+                        "get_temp_directory_size_bytes: skipping %s: %s", file_path, exc
+                    )
                     continue
     except OSError as exc:
-        logger.warning("get_temp_directory_size_bytes: failed to walk temp directory %s: %s", temp_dir, exc)
+        logger.warning(
+            "get_temp_directory_size_bytes: failed to walk temp directory %s: %s",
+            temp_dir,
+            exc,
+        )
 
     return total_size
 
@@ -284,9 +313,15 @@ def rotate_backup_files(backup_dir: Path, keep_count: int = 5) -> int:
                         mtime = entry.stat(follow_symlinks=False).st_mtime
                         backup_files.append((entry.path, mtime))
                     except OSError as exc:
-                        logger.warning("rotate_backup_files: failed to stat file %s: %s", entry.path, exc)
+                        logger.warning(
+                            "rotate_backup_files: failed to stat file %s: %s",
+                            entry.path,
+                            exc,
+                        )
     except OSError as exc:
-        logger.error("rotate_backup_files: failed to scan directory %s: %s", resolved_dir, exc)
+        logger.error(
+            "rotate_backup_files: failed to scan directory %s: %s", resolved_dir, exc
+        )
         return 0
 
     if len(backup_files) <= keep_count:
@@ -305,7 +340,9 @@ def rotate_backup_files(backup_dir: Path, keep_count: int = 5) -> int:
             deleted_count += 1
             freed_bytes += file_size
         except OSError as exc:
-            logger.warning("rotate_backup_files: failed to delete %s: %s", file_path, exc)
+            logger.warning(
+                "rotate_backup_files: failed to delete %s: %s", file_path, exc
+            )
 
     return deleted_count
 

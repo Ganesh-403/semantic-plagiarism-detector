@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/api/test_middleware.py
 ----------------------------
@@ -342,7 +364,10 @@ class TestValidateScopes:
     def test_all_mode_passes_when_all_required_present(self):
         from src.api.middleware import validate_scopes
 
-        assert validate_scopes(["read", "write"], ["read", "write", "admin"], mode="all") is True
+        assert (
+            validate_scopes(["read", "write"], ["read", "write", "admin"], mode="all")
+            is True
+        )
 
     def test_all_mode_fails_when_any_required_missing(self):
         from src.api.middleware import validate_scopes
@@ -360,12 +385,17 @@ class TestValidateScopes:
 
         assert validate_scopes(["read", "write"], ["read"], mode="any") is True
         assert validate_scopes(["read", "write"], ["write"], mode="any") is True
-        assert validate_scopes(["admin", "operator"], ["operator", "user"], mode="any") is True
+        assert (
+            validate_scopes(["admin", "operator"], ["operator", "user"], mode="any")
+            is True
+        )
 
     def test_any_mode_fails_when_no_required_present(self):
         from src.api.middleware import validate_scopes
 
-        assert validate_scopes(["read", "write"], ["audit", "guest"], mode="any") is False
+        assert (
+            validate_scopes(["read", "write"], ["audit", "guest"], mode="any") is False
+        )
         assert validate_scopes(["read"], [], mode="any") is False
 
     def test_any_mode_empty_required_always_passes(self):
@@ -386,13 +416,17 @@ class TestGetCurrentUserScopes:
 
     def test_get_current_user_all_scopes_success(self):
         import asyncio
+
         from fastapi.security import SecurityScopes
+
         from src.api.middleware import get_current_user
 
         async def _test():
             security_scopes = SecurityScopes(scopes=["read", "write"])
             payload = {"sub": "user1", "scopes": ["read", "write", "admin"]}
-            with patch("src.security.jwt_utils.verify_access_token", return_value=payload):
+            with patch(
+                "src.security.jwt_utils.verify_access_token", return_value=payload
+            ):
                 with patch("src.api.middleware.get_valid_tokens", return_value={}):
                     res = await get_current_user(security_scopes, token="token_jwt")
                     assert res["scopes"] == ["read", "write", "admin"]
@@ -401,14 +435,18 @@ class TestGetCurrentUserScopes:
 
     def test_get_current_user_all_scopes_missing_raises_403(self):
         import asyncio
+
         from fastapi import HTTPException
         from fastapi.security import SecurityScopes
+
         from src.api.middleware import get_current_user
 
         async def _test():
             security_scopes = SecurityScopes(scopes=["read", "write"])
             payload = {"sub": "user1", "scopes": ["read"]}
-            with patch("src.security.jwt_utils.verify_access_token", return_value=payload):
+            with patch(
+                "src.security.jwt_utils.verify_access_token", return_value=payload
+            ):
                 with patch("src.api.middleware.get_valid_tokens", return_value={}):
                     with pytest.raises(HTTPException) as exc_info:
                         await get_current_user(security_scopes, token="token_jwt")
@@ -419,7 +457,9 @@ class TestGetCurrentUserScopes:
 
     def test_get_current_user_none_token_returns_empty(self):
         import asyncio
+
         from fastapi.security import SecurityScopes
+
         from src.api.middleware import get_current_user
 
         async def _test():
@@ -431,13 +471,17 @@ class TestGetCurrentUserScopes:
 
     def test_get_current_user_any_success(self):
         import asyncio
+
         from fastapi.security import SecurityScopes
+
         from src.api.middleware import get_current_user_any
 
         async def _test():
             security_scopes = SecurityScopes(scopes=["read", "write"])
             payload = {"sub": "user1", "scopes": ["write"]}
-            with patch("src.security.jwt_utils.verify_access_token", return_value=payload):
+            with patch(
+                "src.security.jwt_utils.verify_access_token", return_value=payload
+            ):
                 with patch("src.api.middleware.get_valid_tokens", return_value={}):
                     res = await get_current_user_any(security_scopes, token="token_jwt")
                     assert res["scopes"] == ["write"]
@@ -446,14 +490,18 @@ class TestGetCurrentUserScopes:
 
     def test_get_current_user_any_no_match_raises_403(self):
         import asyncio
+
         from fastapi import HTTPException
         from fastapi.security import SecurityScopes
+
         from src.api.middleware import get_current_user_any
 
         async def _test():
             security_scopes = SecurityScopes(scopes=["read", "write"])
             payload = {"sub": "user1", "scopes": ["analytics"]}
-            with patch("src.security.jwt_utils.verify_access_token", return_value=payload):
+            with patch(
+                "src.security.jwt_utils.verify_access_token", return_value=payload
+            ):
                 with patch("src.api.middleware.get_valid_tokens", return_value={}):
                     with pytest.raises(HTTPException) as exc_info:
                         await get_current_user_any(security_scopes, token="token_jwt")
@@ -464,14 +512,18 @@ class TestGetCurrentUserScopes:
 
     def test_require_scopes_dependencies(self):
         import asyncio
+
         from fastapi import HTTPException
+
         from src.api.middleware import require_all_scopes, require_any_scopes
 
         async def _test():
             any_dep = require_any_scopes("read", "write")
             all_dep = require_all_scopes("read", "write")
 
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok1": ["read"]}):
+            with patch(
+                "src.api.middleware.get_valid_tokens", return_value={"tok1": ["read"]}
+            ):
                 res_any = await any_dep(token="tok1")
                 assert res_any["scopes"] == ["read"]
 
@@ -528,32 +580,40 @@ def test_no_inline_imports_in_middleware_functions():
                     )
 
 
-
 class TestSecurityScopesAnyVsAll:
     """Test suite for ANY vs ALL security scope evaluation logic (Issue #3017)."""
 
     def test_get_current_user_pipe_syntax_any(self):
         """Verify pipe syntax in scopes provides OR (ANY) authorization logic."""
         import asyncio
+
         from fastapi import HTTPException
         from fastapi.security import SecurityScopes
+
         from src.api.middleware import get_current_user
 
         async def _test():
             security_scopes = SecurityScopes(scopes=["admin|manager"])
 
             # 1. User with 'admin' scope should be authorized
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok1": ["admin"]}):
+            with patch(
+                "src.api.middleware.get_valid_tokens", return_value={"tok1": ["admin"]}
+            ):
                 res = await get_current_user(security_scopes, token="tok1")
                 assert res["scopes"] == ["admin"]
 
             # 2. User with 'manager' scope should be authorized
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok2": ["manager"]}):
+            with patch(
+                "src.api.middleware.get_valid_tokens",
+                return_value={"tok2": ["manager"]},
+            ):
                 res = await get_current_user(security_scopes, token="tok2")
                 assert res["scopes"] == ["manager"]
 
             # 3. User with only 'viewer' scope should be rejected with 403 Forbidden
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok3": ["viewer"]}):
+            with patch(
+                "src.api.middleware.get_valid_tokens", return_value={"tok3": ["viewer"]}
+            ):
                 with pytest.raises(HTTPException) as exc_info:
                     await get_current_user(security_scopes, token="tok3")
                 assert exc_info.value.status_code == 403
@@ -563,21 +623,28 @@ class TestSecurityScopesAnyVsAll:
     def test_get_current_user_default_all_logic(self):
         """Verify multiple separate scopes require ALL (AND) by default."""
         import asyncio
+
         from fastapi import HTTPException
         from fastapi.security import SecurityScopes
+
         from src.api.middleware import get_current_user
 
         async def _test():
             security_scopes = SecurityScopes(scopes=["admin", "write"])
 
             # 1. User with only 'admin' should fail
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok1": ["admin"]}):
+            with patch(
+                "src.api.middleware.get_valid_tokens", return_value={"tok1": ["admin"]}
+            ):
                 with pytest.raises(HTTPException) as exc_info:
                     await get_current_user(security_scopes, token="tok1")
                 assert exc_info.value.status_code == 403
 
             # 2. User with both 'admin' and 'write' should succeed
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok2": ["admin", "write", "read"]}):
+            with patch(
+                "src.api.middleware.get_valid_tokens",
+                return_value={"tok2": ["admin", "write", "read"]},
+            ):
                 res = await get_current_user(security_scopes, token="tok2")
                 assert "admin" in res["scopes"]
                 assert "write" in res["scopes"]
@@ -587,19 +654,25 @@ class TestSecurityScopesAnyVsAll:
     def test_require_scopes_class_any_mode(self):
         """Verify RequireScopes dependency injection class with mode='any'."""
         import asyncio
+
         from fastapi import HTTPException
+
         from src.api.middleware import RequireScopes
 
         async def _test():
             checker = RequireScopes(scopes=["admin", "manager"], mode="any")
 
             # Possessing 'manager' is sufficient
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok": ["manager"]}):
+            with patch(
+                "src.api.middleware.get_valid_tokens", return_value={"tok": ["manager"]}
+            ):
                 res = await checker(token="tok")
                 assert res["scopes"] == ["manager"]
 
             # Possessing neither raises 403
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok": ["read"]}):
+            with patch(
+                "src.api.middleware.get_valid_tokens", return_value={"tok": ["read"]}
+            ):
                 with pytest.raises(HTTPException) as exc_info:
                     await checker(token="tok")
                 assert exc_info.value.status_code == 403
@@ -609,20 +682,27 @@ class TestSecurityScopesAnyVsAll:
     def test_require_scopes_class_all_mode(self):
         """Verify RequireScopes dependency injection class with mode='all'."""
         import asyncio
+
         from fastapi import HTTPException
+
         from src.api.middleware import RequireScopes
 
         async def _test():
             checker = RequireScopes(scopes=["admin", "write"], mode="all")
 
             # Possessing only 'admin' raises 403
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok": ["admin"]}):
+            with patch(
+                "src.api.middleware.get_valid_tokens", return_value={"tok": ["admin"]}
+            ):
                 with pytest.raises(HTTPException) as exc_info:
                     await checker(token="tok")
                 assert exc_info.value.status_code == 403
 
             # Possessing both succeeds
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok": ["admin", "write"]}):
+            with patch(
+                "src.api.middleware.get_valid_tokens",
+                return_value={"tok": ["admin", "write"]},
+            ):
                 res = await checker(token="tok")
                 assert res["scopes"] == ["admin", "write"]
 
@@ -631,6 +711,7 @@ class TestSecurityScopesAnyVsAll:
     def test_require_scope_helpers(self):
         """Verify require_any_scope and require_all_scopes convenience helper factories."""
         import asyncio
+
         from src.api.middleware import require_all_scopes, require_any_scope
 
         any_checker = require_any_scope("admin", "manager")
@@ -642,7 +723,9 @@ class TestSecurityScopesAnyVsAll:
         assert set(all_checker.scopes) == {"admin", "write"}
 
         async def _test():
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok": ["admin"]}):
+            with patch(
+                "src.api.middleware.get_valid_tokens", return_value={"tok": ["admin"]}
+            ):
                 res = await any_checker(token="tok")
                 assert res["scopes"] == ["admin"]
 
@@ -654,7 +737,3 @@ class TestSecurityScopesAnyVsAll:
 
         with pytest.raises(ValueError, match="Invalid scope evaluation mode"):
             RequireScopes(scopes=["admin"], mode="xor")
-
-
-
-

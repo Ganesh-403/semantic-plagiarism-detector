@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/api/test_validate_bearer_tokens_config_issue_3015.py
 ----------------------------------------------------------
@@ -21,7 +43,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.api.middleware import validate_bearer_tokens_config, get_valid_tokens
+from src.api.middleware import get_valid_tokens, validate_bearer_tokens_config
 
 
 class TestValidateBearerTokensConfig:
@@ -100,9 +122,7 @@ class TestValidateBearerTokensConfig:
 
     def test_empty_dict_passes(self):
         """Empty JSON object should pass (no tokens configured)."""
-        with patch.dict(
-            os.environ, {"API_BEARER_TOKENS_MAPPING": "{}"}, clear=True
-        ):
+        with patch.dict(os.environ, {"API_BEARER_TOKENS_MAPPING": "{}"}, clear=True):
             validate_bearer_tokens_config()  # should not raise
 
     def test_non_string_key_raises(self):
@@ -113,7 +133,9 @@ class TestValidateBearerTokensConfig:
         ):
             with patch.dict(
                 os.environ,
-                {"API_BEARER_TOKENS_MAPPING": "{}"},  # placeholder, json.loads is mocked
+                {
+                    "API_BEARER_TOKENS_MAPPING": "{}"
+                },  # placeholder, json.loads is mocked
                 clear=True,
             ):
                 with pytest.raises(RuntimeError, match="non-string token key"):
@@ -122,26 +144,20 @@ class TestValidateBearerTokensConfig:
     def test_non_list_scopes_raises(self):
         """Non-list scopes should raise RuntimeError."""
         invalid = json.dumps({"token1": "read"})
-        with patch.dict(
-            os.environ, {"API_BEARER_TOKENS_MAPPING": invalid}, clear=True
-        ):
+        with patch.dict(os.environ, {"API_BEARER_TOKENS_MAPPING": invalid}, clear=True):
             with pytest.raises(RuntimeError, match="non-list scopes"):
                 validate_bearer_tokens_config()
 
     def test_non_string_scope_raises(self):
         """Non-string scope entry should raise RuntimeError."""
         invalid = json.dumps({"token1": ["read", 123]})
-        with patch.dict(
-            os.environ, {"API_BEARER_TOKENS_MAPPING": invalid}, clear=True
-        ):
+        with patch.dict(os.environ, {"API_BEARER_TOKENS_MAPPING": invalid}, clear=True):
             with pytest.raises(RuntimeError, match="non-string scope"):
                 validate_bearer_tokens_config()
 
     def test_error_message_mentions_server_refusal(self):
         """Error message should mention the server is refusing to start."""
-        with patch.dict(
-            os.environ, {"API_BEARER_TOKENS_MAPPING": "{bad}"}, clear=True
-        ):
+        with patch.dict(os.environ, {"API_BEARER_TOKENS_MAPPING": "{bad}"}, clear=True):
             with pytest.raises(RuntimeError, match="refusing to start"):
                 validate_bearer_tokens_config()
 
@@ -156,11 +172,13 @@ class TestValidateBearerTokensConfig:
 
     def test_multiple_tokens_pass(self):
         """Multiple tokens with different scopes should pass."""
-        valid = json.dumps({
-            "token_a": ["read"],
-            "token_b": ["read", "write"],
-            "token_c": ["admin"],
-        })
+        valid = json.dumps(
+            {
+                "token_a": ["read"],
+                "token_b": ["read", "write"],
+                "token_c": ["admin"],
+            }
+        )
         with patch.dict(os.environ, {"API_BEARER_TOKENS_MAPPING": valid}, clear=True):
             validate_bearer_tokens_config()  # should not raise
 

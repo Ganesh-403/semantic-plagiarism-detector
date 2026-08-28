@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """src/api/routers/heatmap.py - Similarity heatmap and clustering API router."""
 
 from __future__ import annotations
@@ -9,13 +31,13 @@ from fastapi import APIRouter, HTTPException, Query, Request, Security, status
 
 from src.api.dependencies import get_current_user
 from src.api.schemas import (
-    HeatmapSnapshotResponse,
-    HeatmapSnapshotListResponse,
     ClusteringResultResponse,
-    HotspotResponse,
-    HotspotListResponse,
-    HotspotSummaryResponse,
     ErrorResponse,
+    HeatmapSnapshotListResponse,
+    HeatmapSnapshotResponse,
+    HotspotListResponse,
+    HotspotResponse,
+    HotspotSummaryResponse,
 )
 from src.db.heatmap_db import heatmap_repo
 
@@ -39,7 +61,7 @@ router = APIRouter(tags=["Similarity Heatmap & Clustering"])
 )
 async def compute_heatmap(
     request: Request,
-    notes: Optional[str] = Query(None, description="Optional notes for this snapshot"),
+    notes: str | None = Query(None, description="Optional notes for this snapshot"),
     _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
 ):
     """
@@ -47,8 +69,11 @@ async def compute_heatmap(
     and persist a snapshot.
     """
     try:
+        from src.core.similarity_heatmap import (
+            compute_heatmap,
+            detect_similarity_hotspots,
+        )
         from src.db.corpus_db import get_all_documents, get_all_embeddings
-        from src.core.similarity_heatmap import compute_heatmap, detect_similarity_hotspots
 
         docs = get_all_documents()
         if len(docs) < 2:
@@ -81,6 +106,7 @@ async def compute_heatmap(
 
         # Detect and save hotspots
         import numpy as np
+
         mat = np.array(heatmap.matrix, dtype=np.float32)
         hotspots = detect_similarity_hotspots(filenames, mat, threshold=0.7)
         if hotspots:
@@ -215,13 +241,13 @@ async def compute_clustering(
     request: Request,
     threshold: float = Query(0.5, ge=0.0, le=1.0, description="Distance threshold"),
     linkage: str = Query("single", description="Linkage method"),
-    snapshot_id: Optional[int] = Query(None, description="Link to a heatmap snapshot"),
+    snapshot_id: int | None = Query(None, description="Link to a heatmap snapshot"),
     _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
 ):
     """Compute document clustering from corpus embeddings."""
     try:
-        from src.db.corpus_db import get_all_documents, get_all_embeddings
         from src.core.similarity_heatmap import cluster_documents
+        from src.db.corpus_db import get_all_documents, get_all_embeddings
 
         docs = get_all_documents()
         if len(docs) < 2:
@@ -317,7 +343,7 @@ async def list_clustering_results(
 async def list_hotspots(
     request: Request,
     unresolved_only: bool = Query(False, description="Only unresolved"),
-    min_similarity: Optional[float] = Query(None, description="Min similarity"),
+    min_similarity: float | None = Query(None, description="Min similarity"),
     limit: int = Query(50, ge=1, le=200),
     _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
 ):

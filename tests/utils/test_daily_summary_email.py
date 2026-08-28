@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 test_daily_summary_email.py
 ---------------------------
@@ -121,7 +143,12 @@ def test_get_admin_emails_valid_db_email(mock_get_users):
     """Test 1: Valid DB email returns valid emails from DB."""
     mock_get_users.return_value = [
         {"id": 1, "username": "admin1", "role": "admin", "email": "admin1@example.com"},
-        {"id": 2, "username": "teacher1", "role": "teacher", "email": "teacher1@example.com"},
+        {
+            "id": 2,
+            "username": "teacher1",
+            "role": "teacher",
+            "email": "teacher1@example.com",
+        },
         {"id": 3, "username": "admin2", "role": "admin", "email": "admin2@example.com"},
     ]
 
@@ -257,7 +284,6 @@ def test_send_email_success(mock_smtp):
         "FROM_EMAIL": "test@example.com",
     },
 )
-
 def test_send_email_includes_anti_spam_headers(mock_smtp):
     """Issue #3447: automated summary emails must carry Auto-Submitted and
     X-Auto-Response-Suppress headers so Outlook/Gmail spam filters and
@@ -284,7 +310,6 @@ def test_send_email_includes_anti_spam_headers(mock_smtp):
         "FROM_EMAIL": "test@example.com",
     },
 )
-
 def test_send_email_custom_attachment_filename(mock_smtp):
     """Test custom CSV attachment filename."""
     mock_server = MagicMock()
@@ -1094,17 +1119,22 @@ class TestEmailStructureAndAccessibility:
 
         head_content = html.split("<head>")[1].split("</head>")[0]
         viewport_idx = head_content.find('<meta name="viewport"')
-        charset_idx = head_content.find('<meta charset=')
+        charset_idx = head_content.find("<meta charset=")
         assert viewport_idx != -1, "Viewport meta tag must be in <head>"
-        assert viewport_idx < charset_idx, "Viewport meta tag must be prepended before charset in <head>"
+        assert (
+            viewport_idx < charset_idx
+        ), "Viewport meta tag must be prepended before charset in <head>"
 
     def test_build_email_html_body_meta_viewport_prepended(self):
         """Verify viewport meta tag is present and prepended in build_email_html_body <head>."""
         html = build_email_html_body(incidents_data=[], total_scans=10)
-        assert '<meta name="viewport" content="width=device-width, initial-scale=1.0">' in html
+        assert (
+            '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+            in html
+        )
         head_content = html.split("<head>")[1].split("</head>")[0]
         viewport_idx = head_content.find('<meta name="viewport"')
-        charset_idx = head_content.find('<meta charset=')
+        charset_idx = head_content.find("<meta charset=")
         assert viewport_idx != -1
         assert viewport_idx < charset_idx
 
@@ -1137,7 +1167,10 @@ class TestDynamicSubjectFormatting:
 
     def test_default_subject_template_constant(self):
         """Verify DEFAULT_EMAIL_SUBJECT_TEMPLATE constant has expected format."""
-        assert DEFAULT_EMAIL_SUBJECT_TEMPLATE == "Daily Plagiarism Summary - {date} ({count} incidents)"
+        assert (
+            DEFAULT_EMAIL_SUBJECT_TEMPLATE
+            == "Daily Plagiarism Summary - {date} ({count} incidents)"
+        )
 
     @patch.dict("os.environ", {}, clear=True)
     def test_default_subject_formatting(self):
@@ -1151,7 +1184,10 @@ class TestDynamicSubjectFormatting:
         subject = format_subject_line(
             date="2026-08-25", count=4, subject_prefix="[Plagiarism Alert]"
         )
-        assert subject == "[Plagiarism Alert] Daily Plagiarism Summary - 2026-08-25 (4 incidents)"
+        assert (
+            subject
+            == "[Plagiarism Alert] Daily Plagiarism Summary - 2026-08-25 (4 incidents)"
+        )
 
     @patch.dict(
         "os.environ",
@@ -1433,14 +1469,18 @@ class TestHtmlEntityEscapingDailySummaryEmail:
 
         assert "<script>" not in row_html
         assert "</script>" not in row_html
-        assert "&lt;script&gt;alert(&#x27;XSS&#x27;)&lt;/script&gt;.pdf" in row_html or "&lt;script&gt;alert(&#39;XSS&#39;)&lt;/script&gt;.pdf" in row_html or "&lt;script&gt;alert('XSS')&lt;/script&gt;.pdf" in row_html
+        assert (
+            "&lt;script&gt;alert(&#x27;XSS&#x27;)&lt;/script&gt;.pdf" in row_html
+            or "&lt;script&gt;alert(&#39;XSS&#39;)&lt;/script&gt;.pdf" in row_html
+            or "&lt;script&gt;alert('XSS')&lt;/script&gt;.pdf" in row_html
+        )
         assert "<img src=x" not in row_html
         assert "&lt;img src=x onerror=alert(1)&gt;.docx" in row_html
 
     def test_build_incident_row_html_escapes_special_html_characters(self):
         """Verify &, <, >, \", ' in filenames are escaped."""
         inc = {
-            "document_a": "Physics & Math <Calculus> \"Final\".pdf",
+            "document_a": 'Physics & Math <Calculus> "Final".pdf',
             "document_b": "Literature 'Draft' & Notes.docx",
             "similarity_score": 0.72,
             "date_flagged": "2026-08-25 12:00 <UTC>",
@@ -1463,7 +1503,10 @@ class TestHtmlEntityEscapingDailySummaryEmail:
         }
         row_html = build_incident_row_html(inc)
 
-        assert '42&quot; onclick=&quot;alert(1)' in row_html or '42" onclick="alert(1)' not in row_html
+        assert (
+            "42&quot; onclick=&quot;alert(1)" in row_html
+            or '42" onclick="alert(1)' not in row_html
+        )
         assert "<b>" not in row_html
         assert "&lt;b&gt;Important_Paper.pdf&lt;/b&gt;" in row_html
 
@@ -1490,7 +1533,11 @@ class TestHtmlEntityEscapingDailySummaryEmail:
         assert "<iframe" not in html_body
         assert "<svg" not in html_body
         assert "<style>body" not in html_body
-        assert "&lt;iframe src=&#x27;http://evil.com&#x27;&gt;&lt;/iframe&gt;" in html_body or "&lt;iframe src='http://evil.com'&gt;&lt;/iframe&gt;" in html_body or "&lt;iframe" in html_body
+        assert (
+            "&lt;iframe src=&#x27;http://evil.com&#x27;&gt;&lt;/iframe&gt;" in html_body
+            or "&lt;iframe src='http://evil.com'&gt;&lt;/iframe&gt;" in html_body
+            or "&lt;iframe" in html_body
+        )
         assert "&lt;svg/onload=alert(1)&gt;" in html_body
         assert "&lt;style&gt;body{display:none}&lt;/style&gt;" in html_body
 
@@ -1518,7 +1565,11 @@ class TestHtmlEntityEscapingDailySummaryEmail:
         assert "<script>evil()</script>" not in summary_html
         assert "&lt;script&gt;evil()&lt;/script&gt;.docx" in summary_html
         assert "<a href='javascript:steal()'>" not in summary_html
-        assert "&lt;a href=&#x27;javascript:steal()&#x27;&gt;Click&lt;/a&gt;" in summary_html or "&lt;a href='javascript:steal()' style=" not in summary_html
+        assert (
+            "&lt;a href=&#x27;javascript:steal()&#x27;&gt;Click&lt;/a&gt;"
+            in summary_html
+            or "&lt;a href='javascript:steal()' style=" not in summary_html
+        )
 
     @pytest.mark.parametrize(
         "unsafe_filename,expected_fragment",
@@ -1526,14 +1577,26 @@ class TestHtmlEntityEscapingDailySummaryEmail:
             ("<script>alert(1)</script>", "&lt;script&gt;alert(1)&lt;/script&gt;"),
             ("doc<tag>.pdf", "doc&lt;tag&gt;.pdf"),
             ("item & entity", "item &amp; entity"),
-            ("quote\"test\".docx", "quote&quot;test&quot;.docx"),
+            ('quote"test".docx', "quote&quot;test&quot;.docx"),
             ("<h1>Big Title</h1>", "&lt;h1&gt;Big Title&lt;/h1&gt;"),
-            ("<style>.hide{display:none}</style>", "&lt;style&gt;.hide{display:none}&lt;/style&gt;"),
+            (
+                "<style>.hide{display:none}</style>",
+                "&lt;style&gt;.hide{display:none}&lt;/style&gt;",
+            ),
             ("<body onload=calc()>", "&lt;body onload=calc()&gt;"),
-            ("<input type='text'>", "&lt;input type=&#x27;text&#x27;&gt;" if "&#x27;" in html.escape("<input type='text'>") else "&lt;input type='text'&gt;"),
+            (
+                "<input type='text'>",
+                (
+                    "&lt;input type=&#x27;text&#x27;&gt;"
+                    if "&#x27;" in html.escape("<input type='text'>")
+                    else "&lt;input type='text'&gt;"
+                ),
+            ),
         ],
     )
-    def test_build_incident_row_html_parametrized_xss_payloads(self, unsafe_filename, expected_fragment):
+    def test_build_incident_row_html_parametrized_xss_payloads(
+        self, unsafe_filename, expected_fragment
+    ):
         """Verify a variety of XSS vectors are neutralized in build_incident_row_html."""
         inc = {
             "document_a": unsafe_filename,
@@ -1577,11 +1640,16 @@ class TestHtmlEntityEscapingDailySummaryEmail:
         section_html = build_severity_section_html("High", incidents)
         assert "<img src=x" not in section_html
         assert "<svg" not in section_html
-        assert "&lt;img src=x onerror=alert(&#x27;A&#x27;)&gt;.pdf" in section_html or "&lt;img src=x" in section_html
+        assert (
+            "&lt;img src=x onerror=alert(&#x27;A&#x27;)&gt;.pdf" in section_html
+            or "&lt;img src=x" in section_html
+        )
         assert "Doc &amp; Ampersand.txt" in section_html
         assert "Doc &lt; LessThan.txt" in section_html
 
-    def test_build_email_html_body_with_malicious_footer_note_is_preserved_or_controlled(self):
+    def test_build_email_html_body_with_malicious_footer_note_is_preserved_or_controlled(
+        self,
+    ):
         """Verify that footer note and incident data render together safely."""
         incidents = [
             {
@@ -1592,12 +1660,20 @@ class TestHtmlEntityEscapingDailySummaryEmail:
                 "date_flagged": "2026-08-25",
             }
         ]
-        html_body = build_email_html_body(incidents, total_scans=10, footer_note="Review carefully.")
+        html_body = build_email_html_body(
+            incidents, total_scans=10, footer_note="Review carefully."
+        )
         assert "<script>alert('doc_a')</script>" not in html_body
-        assert "&lt;script&gt;alert(&#x27;doc_a&#x27;)&lt;/script&gt;" in html_body or "&lt;script&gt;alert('doc_a')&lt;/script&gt;" in html_body or "&lt;script&gt;" in html_body
+        assert (
+            "&lt;script&gt;alert(&#x27;doc_a&#x27;)&lt;/script&gt;" in html_body
+            or "&lt;script&gt;alert('doc_a')&lt;/script&gt;" in html_body
+            or "&lt;script&gt;" in html_body
+        )
         assert "Review carefully." in html_body
 
-    def test_build_incident_row_html_preserves_anchor_tag_markup_while_escaping_text(self):
+    def test_build_incident_row_html_preserves_anchor_tag_markup_while_escaping_text(
+        self,
+    ):
         """Verify the <a> anchor tag structure itself is preserved while document_a content inside is escaped."""
         inc = {
             "incident_id": "1001",
@@ -1618,24 +1694,24 @@ class TestHtmlEntityEscapingDailySummaryEmail:
         [
             '"><script>alert(document.cookie)</script>',
             "';alert(1);//",
-            '<b onmouseover="alert(\'hover\')">hover me</b>',
+            "<b onmouseover=\"alert('hover')\">hover me</b>",
             '<a href="javascript:alert(1)">click</a>',
             '<iframe src="javascript:alert(1)"></iframe>',
             '<object data="javascript:alert(1)"></object>',
             '<embed src="javascript:alert(1)"></embed>',
             '<meta http-equiv="refresh" content="0;url=http://evil.com">',
             '<link rel="stylesheet" href="http://evil.com/evil.css">',
-            '<style>body{background:red}</style>',
+            "<style>body{background:red}</style>",
             '<<SCRIPT>alert("XSS");//<</SCRIPT>',
             '<script src="http://evil.com/xss.js"></script>',
             '<body onload="alert(1)">',
             '<img src="javascript:alert(1)">',
-            '<svg/onload=alert(1)>',
-            '<details open ontoggle=alert(1)>',
-            '<audio src onloadstart=alert(1)>',
-            '<video src onerror=alert(1)>',
-            '<textarea autofocus onfocus=alert(1)>',
-            '<keygen autofocus onfocus=alert(1)>',
+            "<svg/onload=alert(1)>",
+            "<details open ontoggle=alert(1)>",
+            "<audio src onloadstart=alert(1)>",
+            "<video src onerror=alert(1)>",
+            "<textarea autofocus onfocus=alert(1)>",
+            "<keygen autofocus onfocus=alert(1)>",
         ],
     )
     def test_build_incident_row_html_comprehensive_xss_vectors(self, doc_name):
@@ -1664,9 +1740,11 @@ class TestHtmlEntityEscapingDailySummaryEmail:
 
     def test_send_daily_summary_with_xss_incidents_escapes_in_email(self):
         """Verify full send_daily_summary pipeline generates and delivers escaped HTML body."""
-        with patch("src.utils.daily_summary_email.send_email") as mock_send, \
-             patch("src.utils.daily_summary_email.get_admin_emails") as mock_admins, \
-             patch("src.utils.daily_summary_email.get_incidents_last_24h") as mock_incidents:
+        with patch("src.utils.daily_summary_email.send_email") as mock_send, patch(
+            "src.utils.daily_summary_email.get_admin_emails"
+        ) as mock_admins, patch(
+            "src.utils.daily_summary_email.get_incidents_last_24h"
+        ) as mock_incidents:
             mock_admins.return_value = ["admin@example.com"]
             mock_incidents.return_value = [
                 {
@@ -1700,7 +1778,11 @@ class TestHtmlEntityEscapingDailySummaryEmail:
         }
         row = build_incident_row_html(inc)
         assert "Essay_1 &lt;v2&gt; &amp; notes [final].pdf" in row
-        assert "Essay_2 &quot;quoted&quot; &amp; &#x27;single&#x27;.docx" in row or "Essay_2 &quot;quoted&quot; &amp; 'single'.docx" in row or "&#39;single&#39;" in row
+        assert (
+            "Essay_2 &quot;quoted&quot; &amp; &#x27;single&#x27;.docx" in row
+            or "Essay_2 &quot;quoted&quot; &amp; 'single'.docx" in row
+            or "&#39;single&#39;" in row
+        )
 
     def test_build_incident_row_html_numeric_similarity_precision_formatting(self):
         """Verify similarity percentage format retains clean numeric output alongside escaped names."""
@@ -1737,7 +1819,10 @@ class TestHtmlEntityEscapingDailySummaryEmail:
         assert "<svg onload" not in rendered
         assert "<iframe" not in rendered
         assert "&lt;svg onload=alert(1)&gt;" in rendered
-        assert "&lt;iframe src=&#x27;http://evil.com&#x27;&gt;" in rendered or "&lt;iframe src='http://evil.com'&gt;" in rendered
+        assert (
+            "&lt;iframe src=&#x27;http://evil.com&#x27;&gt;" in rendered
+            or "&lt;iframe src='http://evil.com'&gt;" in rendered
+        )
         assert "Clean_Doc_1.txt" in rendered
         assert "Clean_Doc_2.txt" in rendered
 
@@ -1750,7 +1835,10 @@ class TestHtmlEntityEscapingDailySummaryEmail:
             "date_flagged": "",
         }
         row = build_incident_row_html(inc)
-        assert '<td style="padding: 12px; border-bottom: 1px solid #eeeeee; color: #333333;"></td>' in row
+        assert (
+            '<td style="padding: 12px; border-bottom: 1px solid #eeeeee; color: #333333;"></td>'
+            in row
+        )
         assert "0.00%" in row
 
     def test_build_incident_row_html_unicode_cjk_characters(self):
@@ -1764,9 +1852,3 @@ class TestHtmlEntityEscapingDailySummaryEmail:
         row = build_incident_row_html(inc)
         assert "論文_提出_2026.pdf" in row
         assert "Научная_работа_Финал.docx" in row
-
-
-
-
-
-

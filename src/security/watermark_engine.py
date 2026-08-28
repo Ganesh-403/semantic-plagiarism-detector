@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/security/watermark_engine.py
 --------------------------------
@@ -14,8 +36,8 @@ but can be extracted by the watermark_extractor module.
 """
 
 import hashlib
-import uuid
 import logging
+import uuid
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -25,26 +47,26 @@ logger = logging.getLogger(__name__)
 # U+200C: Zero Width Non-Joiner (represents '1')
 # U+200D: Zero Width Joiner (used as a delimiter/start marker)
 # U+FEFF: Zero Width No-Break Space (used as an end marker)
-ZWC_ZERO = '\u200B'
-ZWC_ONE = '\u200C'
-ZWC_START = '\u200D'
-ZWC_END = '\uFEFF'
+ZWC_ZERO = "\u200B"
+ZWC_ONE = "\u200C"
+ZWC_START = "\u200D"
+ZWC_END = "\uFEFF"
 
 
 def generate_watermark_id(user_id: str, document_hash: str) -> str:
     """Generate a deterministic, unique watermark ID for a user-document pair.
-    
+
     Args:
         user_id: The ID of the user receiving the document.
         document_hash: The SHA-256 hash of the original document content.
-        
+
     Returns:
         A 32-character hexadecimal string serving as the watermark payload.
     """
     # Combine user_id and document_hash to create a unique seed
     seed = f"{user_id}:{document_hash}"
     # Use SHA-256 and take the first 16 bytes (32 hex chars) for a compact payload
-    hash_obj = hashlib.sha256(seed.encode('utf-8'))
+    hash_obj = hashlib.sha256(seed.encode("utf-8"))
     return hash_obj.hexdigest()[:32]
 
 
@@ -61,21 +83,18 @@ def _binary_to_zwc(binary_str: str) -> str:
     """Map a binary string to Zero-Width Characters."""
     zwc_chars = []
     for bit in binary_str:
-        if bit == '0':
+        if bit == "0":
             zwc_chars.append(ZWC_ZERO)
-        elif bit == '1':
+        elif bit == "1":
             zwc_chars.append(ZWC_ONE)
     return "".join(zwc_chars)
 
 
 def embed_watermark(
-    text: str, 
-    user_id: str, 
-    document_hash: str,
-    strategy: str = "append"
+    text: str, user_id: str, document_hash: str, strategy: str = "append"
 ) -> tuple[str, str]:
     """Embed an invisible watermark into the provided text.
-    
+
     Args:
         text: The original text content to watermark.
         user_id: The ID of the recipient.
@@ -84,7 +103,7 @@ def embed_watermark(
                   'append' adds the watermark to the end of the text.
                   'prepend' adds it to the beginning.
                   'distribute' spreads it across paragraph breaks.
-                  
+
     Returns:
         A tuple containing (watermarked_text, watermark_id).
     """
@@ -108,6 +127,8 @@ def embed_watermark(
 
     logger.info(
         "Embedded watermark %s for user %s using strategy '%s'.",
-        watermark_id, user_id, strategy
+        watermark_id,
+        user_id,
+        strategy,
     )
     return watermarked_text, watermark_id

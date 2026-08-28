@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/api/websockets.py
 ---------------------
@@ -10,22 +32,23 @@ same review session.
 
 import json
 import logging
-from typing import Dict, Set, List, Any
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status, Depends
+from typing import Any, Dict, List, Set
+
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
 from pydantic import ValidationError
 
+from src.db.annotations_db import (
+    create_annotation,
+    delete_annotation,
+    get_annotations_for_document,
+    resolve_annotation,
+)
 from src.models.annotations import (
-    WebSocketMessage,
-    WebSocketMessageType,
     AnnotationCreate,
     AnnotationRecord,
     AnnotationType,
-)
-from src.db.annotations_db import (
-    create_annotation,
-    get_annotations_for_document,
-    resolve_annotation,
-    delete_annotation,
+    WebSocketMessage,
+    WebSocketMessageType,
 )
 
 logger = logging.getLogger(__name__)

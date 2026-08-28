@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Corpus Overview & Sidebar View Component.
 
@@ -33,10 +55,7 @@ from src.db.auth import (
     get_user_last_login,
     set_tour_completed,
 )
-from src.db.corpus_db import (
-    get_document_char_counts,
-    get_document_word_counts,
-)
+from src.db.corpus_db import get_document_char_counts, get_document_word_counts
 from src.i18n.translator import _SUPPORTED_LANGUAGES
 from src.utils.bulk_export import create_documents_bulk_zip_archive
 from src.utils.storage_metrics import calculate_storage_usage
@@ -294,8 +313,14 @@ def render_sidebar(user_role: str, root_dir: str, faiss_index=None):
                     for code, display_name in SUPPORTED_OCR_LANGUAGES.items()
                 }
                 language_names = list(ocr_language_labels)
-                default_language_name = SUPPORTED_OCR_LANGUAGES.get(DEFAULT_OCR_LANGUAGE, "English")
-                default_index = language_names.index(default_language_name) if default_language_name in language_names else 0
+                default_language_name = SUPPORTED_OCR_LANGUAGES.get(
+                    DEFAULT_OCR_LANGUAGE, "English"
+                )
+                default_index = (
+                    language_names.index(default_language_name)
+                    if default_language_name in language_names
+                    else 0
+                )
                 st.selectbox(
                     "OCR Language",
                     options=language_names,

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Streamlit Dashboard Page for Stylometric Author Attribution Engine Suite."""
 
 import streamlit as st
@@ -9,7 +31,9 @@ from src.services.stylometric_author_engine import StylometricAuthorEngine
 
 def render_stylometric_author_dashboard():
     """Main rendering function for Streamlit Stylometric Author dashboard tab."""
-    st.set_page_config(page_title="Stylometric Author Attribution Engine", layout="wide")
+    st.set_page_config(
+        page_title="Stylometric Author Attribution Engine", layout="wide"
+    )
 
     st.markdown(
         """
@@ -63,7 +87,9 @@ def render_stylometric_author_dashboard():
             value="Furthermore, empirical results indicate that deep learning architectures are highly data-dependent. Therefore, hardware acceleration is necessary to mitigate the computational latency observed during gradient optimization.",
             height=160,
         )
-        candidate_alias = st.text_input("Candidate Author Alias", value="Prof. Alex Mercer")
+        candidate_alias = st.text_input(
+            "Candidate Author Alias", value="Prof. Alex Mercer"
+        )
 
     if st.button("Run Stylometric Authorship Verification", use_container_width=True):
         fp_query = StylometricAuthorEngine.extract_fingerprint(

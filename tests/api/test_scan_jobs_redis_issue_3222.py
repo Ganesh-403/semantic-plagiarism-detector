@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 test_scan_jobs_redis_issue_3222.py
 ------------------------------------
@@ -7,12 +29,13 @@ allowing status checks across multiple Uvicorn workers, with fallback to in-memo
 """
 
 from unittest.mock import MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
 
 from src.api.app import app
-from src.api.routers.analysis import scan_jobs, _get_scan_job, _set_scan_job
-from src.utils.redis_cache import CacheNamespace, SCAN_JOBS_TTL
+from src.api.routers.analysis import _get_scan_job, _set_scan_job, scan_jobs
+from src.utils.redis_cache import SCAN_JOBS_TTL, CacheNamespace
 
 
 @pytest.fixture(autouse=True)
@@ -133,9 +156,12 @@ def test_get_async_scan_status_endpoint_from_redis():
     mock_cache.is_available.return_value = True
     mock_cache.get_json.return_value = job_data
 
-    with patch("src.api.routers.analysis.get_cache", return_value=mock_cache), \
-         patch("src.api.middleware.verify_bearer_token", return_value="token123"), \
-         patch("src.api.middleware.get_valid_tokens", return_value={"token123": ["read", "write"]}):
+    with patch("src.api.routers.analysis.get_cache", return_value=mock_cache), patch(
+        "src.api.middleware.verify_bearer_token", return_value="token123"
+    ), patch(
+        "src.api.middleware.get_valid_tokens",
+        return_value={"token123": ["read", "write"]},
+    ):
         response = client.get(
             f"/api/v1/scan/status/{job_id}",
             headers={"Authorization": "Bearer token123"},
@@ -155,9 +181,12 @@ def test_get_async_scan_status_not_found():
     mock_cache.is_available.return_value = True
     mock_cache.get_json.return_value = None
 
-    with patch("src.api.routers.analysis.get_cache", return_value=mock_cache), \
-         patch("src.api.middleware.verify_bearer_token", return_value="token123"), \
-         patch("src.api.middleware.get_valid_tokens", return_value={"token123": ["read", "write"]}):
+    with patch("src.api.routers.analysis.get_cache", return_value=mock_cache), patch(
+        "src.api.middleware.verify_bearer_token", return_value="token123"
+    ), patch(
+        "src.api.middleware.get_valid_tokens",
+        return_value={"token123": ["read", "write"]},
+    ):
         response = client.get(
             "/api/v1/scan/status/non_existent_job",
             headers={"Authorization": "Bearer token123"},

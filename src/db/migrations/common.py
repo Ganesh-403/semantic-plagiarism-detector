@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Shared SQLite schema migration helpers.
 
@@ -164,13 +186,15 @@ from datetime import datetime, timezone
 
 def ensure_migration_history_table(connection: sqlite3.Connection) -> None:
     """Ensure that the migration_history table exists."""
-    connection.execute("""
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS migration_history (
             version INTEGER PRIMARY KEY,
             applied_at TEXT NOT NULL,
             description TEXT
         )
-    """)
+    """
+    )
 
 
 def record_migration_applied(
@@ -188,9 +212,7 @@ def record_migration_applied(
     )
 
 
-def record_migration_rolled_back(
-    connection: sqlite3.Connection, version: int
-) -> None:
+def record_migration_rolled_back(connection: sqlite3.Connection, version: int) -> None:
     """Remove a rolled-back migration from migration_history table."""
     ensure_migration_history_table(connection)
     connection.execute(
@@ -477,13 +499,15 @@ def verify_schema_integrity(db_path: Path, expected_tables: list[str]) -> bool:
         with sqlite3.connect(uri, uri=True, check_same_thread=False) as conn:
             # Query sqlite_master for all user-defined tables
             # Exclude internal SQLite tables (sqlite_sequence, etc.) and views
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT name
                 FROM sqlite_master
                 WHERE type='table'
                   AND name NOT LIKE 'sqlite_%'
                 ORDER BY name
-                """)
+                """
+            )
 
             for row in cursor.fetchall():
                 table_name = row[0].lower().strip()

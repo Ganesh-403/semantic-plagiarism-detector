@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Versioned migrations for corpus.db."""
 
 from __future__ import annotations
@@ -13,15 +35,18 @@ def migration_001_create_base_schema(
     connection: sqlite3.Connection,
 ) -> None:
     """Create the original documents and chunks tables."""
-    connection.execute("""
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS documents (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             filename    TEXT UNIQUE NOT NULL,
             file_hash   TEXT UNIQUE NOT NULL,
             upload_date TEXT NOT NULL
         )
-        """)
-    connection.execute("""
+        """
+    )
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS chunks (
             vector_id   INTEGER PRIMARY KEY,
             filename    TEXT NOT NULL,
@@ -32,7 +57,8 @@ def migration_001_create_base_schema(
                 REFERENCES documents(filename)
                 ON DELETE CASCADE
         )
-        """)
+        """
+    )
 
 
 def migration_002_add_document_metadata(
@@ -52,25 +78,32 @@ def migration_003_add_required_indexes(
     connection: sqlite3.Connection,
 ) -> None:
     """Add indexes used by corpus filtering and chunk lookups."""
-    connection.execute("""
+    connection.execute(
+        """
         CREATE INDEX IF NOT EXISTS idx_documents_upload_date
         ON documents(upload_date)
-        """)
-    connection.execute("""
+        """
+    )
+    connection.execute(
+        """
         CREATE INDEX IF NOT EXISTS idx_documents_class_section
         ON documents(class_section)
-        """)
-    connection.execute("""
+        """
+    )
+    connection.execute(
+        """
         CREATE INDEX IF NOT EXISTS idx_chunks_filename
         ON chunks(filename)
-        """)
+        """
+    )
 
 
 def migration_004_add_plagiarism_incidents(
     connection: sqlite3.Connection,
 ) -> None:
     """Create the incident-review schema stored in corpus.db."""
-    connection.execute("""
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS plagiarism_incidents (
             incident_id TEXT PRIMARY KEY,
             document_a TEXT NOT NULL,
@@ -82,23 +115,28 @@ def migration_004_add_plagiarism_incidents(
             date_flagged TEXT NOT NULL,
             last_seen TEXT NOT NULL
         )
-        """)
-    connection.execute("""
+        """
+    )
+    connection.execute(
+        """
         CREATE INDEX IF NOT EXISTS idx_incidents_status
         ON plagiarism_incidents(review_status)
-        """)
+        """
+    )
 
 
 def migration_005_add_false_positives(cursor):
     """Adds a table to track dismissed false-positive plagiarism pairs."""
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS false_positives (
             document_a TEXT,
             document_b TEXT,
             date_dismissed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (document_a, document_b)
         )
-    """)
+    """
+    )
 
 
 def migration_006_add_incident_threshold_snapshot(
@@ -138,10 +176,12 @@ def migration_009_add_file_hash_index(
     connection: sqlite3.Connection,
 ) -> None:
     """Add index on the file_hash column in documents table."""
-    connection.execute("""
+    connection.execute(
+        """
         CREATE INDEX IF NOT EXISTS idx_documents_file_hash
         ON documents(file_hash)
-        """)
+        """
+    )
 
 
 def migration_010_add_document_owner(
@@ -174,10 +214,12 @@ def migration_010_add_document_owner(
             "ALTER TABLE documents ADD COLUMN owner TEXT DEFAULT 'system'"
         )
     # Index for fast per-user COUNT queries
-    connection.execute("""
+    connection.execute(
+        """
         CREATE INDEX IF NOT EXISTS idx_documents_owner
         ON documents(owner)
-        """)
+        """
+    )
 
 
 def migration_011_add_documents_created_at_index(
@@ -186,10 +228,12 @@ def migration_011_add_documents_created_at_index(
     """Add created_at column and its index to documents table to optimize query performance."""
     if not column_exists(connection, "documents", "created_at"):
         connection.execute("ALTER TABLE documents ADD COLUMN created_at TEXT")
-    connection.execute("""
+    connection.execute(
+        """
         CREATE INDEX IF NOT EXISTS idx_documents_created_at
         ON documents(created_at)
-        """)
+        """
+    )
 
 
 def migration_012_add_fts5_index(
@@ -208,7 +252,8 @@ def migration_012_add_fts5_index(
       - ``documents_au`` — after UPDATE, delete+insert in FTS
     """
     # Create the FTS5 virtual table (external content table pointing at documents)
-    connection.execute("""
+    connection.execute(
+        """
         CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
             filename,
             student_name,
@@ -216,40 +261,49 @@ def migration_012_add_fts5_index(
             content='documents',
             content_rowid='id'
         )
-        """)
+        """
+    )
 
     # Trigger: after INSERT into documents, insert into FTS
-    connection.execute("""
+    connection.execute(
+        """
         CREATE TRIGGER IF NOT EXISTS documents_ai AFTER INSERT ON documents BEGIN
             INSERT INTO documents_fts(rowid, filename, student_name, assignment_title)
             VALUES (new.id, new.filename, new.student_name, new.assignment_title);
         END
-        """)
+        """
+    )
 
     # Trigger: after DELETE from documents, delete from FTS
-    connection.execute("""
+    connection.execute(
+        """
         CREATE TRIGGER IF NOT EXISTS documents_ad AFTER DELETE ON documents BEGIN
             INSERT INTO documents_fts(documents_fts, rowid, filename, student_name, assignment_title)
             VALUES ('delete', old.id, old.filename, old.student_name, old.assignment_title);
         END
-        """)
+        """
+    )
 
     # Trigger: after UPDATE on documents, update FTS (delete old + insert new)
-    connection.execute("""
+    connection.execute(
+        """
         CREATE TRIGGER IF NOT EXISTS documents_au AFTER UPDATE ON documents BEGIN
             INSERT INTO documents_fts(documents_fts, rowid, filename, student_name, assignment_title)
             VALUES ('delete', old.id, old.filename, old.student_name, old.assignment_title);
             INSERT INTO documents_fts(rowid, filename, student_name, assignment_title)
             VALUES (new.id, new.filename, new.student_name, new.assignment_title);
         END
-        """)
+        """
+    )
 
     # Backfill existing rows into the FTS index (for databases that already
     # have documents before this migration runs).
-    connection.execute("""
+    connection.execute(
+        """
         INSERT INTO documents_fts(documents_fts)
         VALUES ('rebuild')
-        """)
+        """
+    )
 
 
 def migration_013_add_incident_severity_idx(
@@ -257,10 +311,12 @@ def migration_013_add_incident_severity_idx(
 ) -> None:
     """Add index on severity_rank and date_flagged to speed up
     severity-filtered incident analytics queries (issue #1487)."""
-    connection.execute("""
+    connection.execute(
+        """
         CREATE INDEX IF NOT EXISTS idx_incidents_severity_time
         ON plagiarism_incidents(severity_rank, date_flagged DESC)
-        """)
+        """
+    )
 
 
 def migration_013_add_incident_archive_table(
@@ -268,7 +324,8 @@ def migration_013_add_incident_archive_table(
 ) -> None:
     """Create incidents_archive table for archived plagiarism incidents
     (issue #1492)."""
-    connection.execute("""
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS incidents_archive (
             incident_id TEXT PRIMARY KEY,
             document_a TEXT NOT NULL,
@@ -281,14 +338,16 @@ def migration_013_add_incident_archive_table(
             threshold_at_time_of_flag REAL NOT NULL DEFAULT 0.0,
             archived_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
-        """)
+        """
+    )
 
 
 def migration_015_pattern_recognition(
     connection: sqlite3.Connection,
 ) -> None:
     """Create pattern recognition tables for the intelligent detection system (issue #2840)."""
-    connection.execute("""
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS plagiarism_patterns (
             pattern_id TEXT PRIMARY KEY,
             pattern_type TEXT NOT NULL,
@@ -305,7 +364,8 @@ def migration_015_pattern_recognition(
             last_seen TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'active'
         )
-    """)
+    """
+    )
     connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_patterns_type ON plagiarism_patterns(pattern_type)"
     )
@@ -316,7 +376,8 @@ def migration_015_pattern_recognition(
         "CREATE INDEX IF NOT EXISTS idx_patterns_severity ON plagiarism_patterns(severity)"
     )
 
-    connection.execute("""
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS pattern_evolution (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             pattern_id TEXT NOT NULL,
@@ -327,7 +388,8 @@ def migration_015_pattern_recognition(
             drift_score REAL DEFAULT 0.0,
             FOREIGN KEY (pattern_id) REFERENCES plagiarism_patterns(pattern_id) ON DELETE CASCADE
         )
-    """)
+    """
+    )
     connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_evolution_pattern ON pattern_evolution(pattern_id)"
     )
@@ -336,7 +398,8 @@ def migration_015_pattern_recognition(
     )
 
     if not table_exists(connection, "document_risk_scores"):
-        connection.execute("""
+        connection.execute(
+            """
             CREATE TABLE IF NOT EXISTS document_risk_scores (
                 document_name TEXT PRIMARY KEY,
                 risk_score REAL NOT NULL,
@@ -345,12 +408,14 @@ def migration_015_pattern_recognition(
                 model_version TEXT,
                 scored_at TEXT NOT NULL
             )
-        """)
+        """
+        )
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_risk_level ON document_risk_scores(risk_level)"
         )
 
-    connection.execute("""
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS proactive_recommendations (
             recommendation_id TEXT PRIMARY KEY,
             pattern_id TEXT,
@@ -363,7 +428,8 @@ def migration_015_pattern_recognition(
             created_at TEXT NOT NULL,
             FOREIGN KEY (pattern_id) REFERENCES plagiarism_patterns(pattern_id) ON DELETE SET NULL
         )
-    """)
+    """
+    )
     connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_recommendations_status ON proactive_recommendations(status)"
     )
@@ -381,14 +447,16 @@ def migration_016_add_scheduler_runs(
     scheduled plagiarism rescan job) so a process restart does not lose track
     of when a job last ran. Keyed by job_name.
     """
-    connection.execute("""
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS scheduler_runs (
             job_name           TEXT PRIMARY KEY,
             last_run_at        TEXT NOT NULL,
             documents_scanned  INTEGER NOT NULL DEFAULT 0,
             new_incidents      INTEGER NOT NULL DEFAULT 0
         )
-        """)
+        """
+    )
 
 
 def migration_017_add_incident_date_flagged_index(

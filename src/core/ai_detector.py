@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 # pylint: disable=streamlit-global-mutation
 
 import logging
@@ -40,10 +62,7 @@ def _get_model_and_tokenizer():
         logger.info(f"[ai_detector] Loading model: {model_name} …")
 
         try:
-            from transformers import (
-                AutoModelForSequenceClassification,
-                AutoTokenizer,
-            )
+            from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
             _tokenizer = AutoTokenizer.from_pretrained(model_name)  # nosec
             _model = AutoModelForSequenceClassification.from_pretrained(model_name)  # nosec
@@ -333,7 +352,9 @@ def detect_document_ai_probability(chunks: list[str]) -> dict[str, Any]:
             "chunk_scores": [],
         }
 
-    chunk_scores = detect_ai_probability_batch([chunk.text if hasattr(chunk, "text") else chunk for chunk in chunks])
+    chunk_scores = detect_ai_probability_batch(
+        [chunk.text if hasattr(chunk, "text") else chunk for chunk in chunks]
+    )
 
     return {
         "overall": (float(np.mean(chunk_scores)) if chunk_scores else 0.0),
@@ -474,7 +495,7 @@ def extract_stylometric_features(text: str) -> dict[str, float]:
 
     # Tokenize words using regex to extract alphanumeric sequences
     # This handles punctuation and contractions reasonably well for stylometry
-    words = re.findall(r'\b\w+\b', text.lower())
+    words = re.findall(r"\b\w+\b", text.lower())
 
     words = re.findall(r"\b\w+\b", text.lower())
 
@@ -529,7 +550,7 @@ def extract_stylometric_features(text: str) -> dict[str, float]:
         freq_of_freqs = Counter(word_freqs.values())
 
         # Compute the sum of (f_i * i^2)
-        sum_fi_i2 = sum(freq * (i ** 2) for i, freq in freq_of_freqs.items())
+        sum_fi_i2 = sum(freq * (i**2) for i, freq in freq_of_freqs.items())
         sum_fi_i2 = sum(freq * (i**2) for i, freq in freq_of_freqs.items())
 
         # Apply Yule's K formula
@@ -635,7 +656,6 @@ def categorize_ai_probability(score: float) -> str:
         return "Moderate Probability"
     else:
         return "Low Probability"
-
 
 
 def categorize_perplexity_score(score: float) -> str:

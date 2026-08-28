@@ -1,11 +1,34 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """tests/api/test_health_score.py
 
 Unit tests for the Document Health Scoring API endpoints and scoring engine.
 Tests cover scoring, listing, quality gate, analytics, and the scorer logic.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 from src.api.app import app
@@ -19,10 +42,12 @@ client = TestClient(app)
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(autouse=True)
 def _init_db(tmp_path):
     """Initialise an in-memory test database for each test."""
     import src.db.health_score_db as mod
+
     mod.configure_db_path(str(tmp_path / "test_health.db"))
     init_health_score_db()
     yield
@@ -58,7 +83,9 @@ class TestScoringEngine:
         }
         report = score_document(
             doc=doc,
-            chunk_texts=["This is a test chunk with enough words to pass quality checks. " * 10],
+            chunk_texts=[
+                "This is a test chunk with enough words to pass quality checks. " * 10
+            ],
             chunk_word_counts=[100],
             total_chunks=1,
             chunks_with_embeddings=1,
@@ -111,7 +138,9 @@ class TestScoringEngine:
         )
 
         # Fingerprint dimension should be 0
-        fp_dim = next(d for d in report.dimensions if d.name == "fingerprint_uniqueness")
+        fp_dim = next(
+            d for d in report.dimensions if d.name == "fingerprint_uniqueness"
+        )
         assert fp_dim.score == 0.0
 
     def test_quality_gate_pass(self):

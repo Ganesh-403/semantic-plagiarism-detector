@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Tests for Batch Processing Engine.
 
@@ -11,12 +33,7 @@ import tempfile
 from datetime import datetime
 
 from src.core.batch_history import BatchHistory
-from src.core.batch_processor import (
-    BatchConfig,
-    BatchJob,
-    BatchProcessor,
-    BatchStatus,
-)
+from src.core.batch_processor import BatchConfig, BatchJob, BatchProcessor, BatchStatus
 from src.utils.batch_export import BatchExporter, ExportConfig, ReportFormatter
 
 
@@ -29,7 +46,7 @@ class TestBatchJob:
             job_id="test-001",
             name="Test Job",
             document_paths=["doc1.pdf", "doc2.pdf"],
-            total_documents=2
+            total_documents=2,
         )
         assert job.job_id == "test-001"
         assert job.name == "Test Job"
@@ -47,7 +64,9 @@ class TestBatchJob:
 
     def test_update_progress(self):
         """Test progress update."""
-        job = BatchJob(job_id="t-002", name="Test", document_paths=[], total_documents=10)
+        job = BatchJob(
+            job_id="t-002", name="Test", document_paths=[], total_documents=10
+        )
         job.update_progress(5, flagged=2, high=1)
         assert job.progress == 50.0
         assert job.processed_documents == 5
@@ -145,16 +164,23 @@ class TestBatchHistory:
     def test_record_job(self):
         """Test recording a job."""
         data = {
-            "job_id": "h-001", "name": "Test", "status": "completed",
-            "document_count": 5, "flagged_count": 2, "created_at": datetime.now().isoformat()
+            "job_id": "h-001",
+            "name": "Test",
+            "status": "completed",
+            "document_count": 5,
+            "flagged_count": 2,
+            "created_at": datetime.now().isoformat(),
         }
         assert self.history.record_job(data) is True
 
     def test_get_job(self):
         """Test retrieving a job."""
         data = {
-            "job_id": "h-002", "name": "Test2", "status": "completed",
-            "document_count": 3, "created_at": datetime.now().isoformat()
+            "job_id": "h-002",
+            "name": "Test2",
+            "status": "completed",
+            "document_count": 3,
+            "created_at": datetime.now().isoformat(),
         }
         self.history.record_job(data)
         record = self.history.get_job("h-002")
@@ -164,30 +190,43 @@ class TestBatchHistory:
     def test_get_recent(self):
         """Test recent jobs."""
         for i in range(5):
-            self.history.record_job({
-                "job_id": f"h-{i}", "name": f"Job {i}",
-                "status": "completed", "created_at": datetime.now().isoformat()
-            })
+            self.history.record_job(
+                {
+                    "job_id": f"h-{i}",
+                    "name": f"Job {i}",
+                    "status": "completed",
+                    "created_at": datetime.now().isoformat(),
+                }
+            )
         recent = self.history.get_recent_jobs(limit=3)
         assert len(recent) == 3
 
     def test_search(self):
         """Test search functionality."""
-        self.history.record_job({
-            "job_id": "s-001", "name": "Assignment Check",
-            "status": "completed", "document_count": 10,
-            "created_at": datetime.now().isoformat()
-        })
+        self.history.record_job(
+            {
+                "job_id": "s-001",
+                "name": "Assignment Check",
+                "status": "completed",
+                "document_count": 10,
+                "created_at": datetime.now().isoformat(),
+            }
+        )
         results = self.history.search_jobs(query="Assignment")
         assert len(results) == 1
 
     def test_statistics(self):
         """Test statistics."""
-        self.history.record_job({
-            "job_id": "st-001", "name": "Test",
-            "status": "completed", "document_count": 10,
-            "flagged_count": 3, "created_at": datetime.now().isoformat()
-        })
+        self.history.record_job(
+            {
+                "job_id": "st-001",
+                "name": "Test",
+                "status": "completed",
+                "document_count": 10,
+                "flagged_count": 3,
+                "created_at": datetime.now().isoformat(),
+            }
+        )
         stats = self.history.get_statistics()
         assert stats["total_jobs"] == 1
         assert stats["total_documents"] == 10

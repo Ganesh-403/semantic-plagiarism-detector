@@ -9,6 +9,7 @@
 | `.txt` | Native Python | No | Max 10 MB; plain text only |
 | `.rtf` | striprtf / native | No | Max 10 MB |
 | `.epub` | ebooklib | No | Max 10 MB |
+
 ## Extraction Options
 
 * **Text Parsing:** Extract raw text from standard documents.

@@ -1,71 +1,69 @@
-# ── Vector Search ─────────────────────────────────────────────────────────────
-faiss-cpu>=1.8.0                 # FAISS ANN search (use faiss-gpu if CUDA available)
-
-# ── Core NLP ──────────────────────────────────────────────────────────────────
-langdetect>=1.0.9                # Language detection for cross-lingual NLP
-nltk>=3.8.0                      # Stop-word filtering for lexical fallback (#222)
-thefuzz>=0.22.1                  # Fuzzy string matching for warnings
-
-# ── PDF & Document Parsing ────────────────────────────────────────────────────
-pymupdf>=1.24.0                  # PyMuPDF for rendering & highlighting PDF matches
-pypdf>=5.0.0                     # Extract text from PDF files
-pdfplumber>=0.11.0               # Robust PDF text extraction
-python-docx>=1.1.0               # Extract text from Word documents
-defusedxml>=0.7.1                # Protect against XML External Entity (XXE) attacks
-
-reportlab>=5.0.0                 # PDF document generation
-pytesseract>=0.3.13              # OCR text extraction from scanned images
-Pillow>=10.0.0                   # Image processing library
-python-magic>=0.4.27             # File magic bytes verification
-striprtf>=0.0.32                 # Extract text from RTF documents
-EbookLib>=0.18                   # Extract text from EPUB documents
-# ── Web UI ────────────────────────────────────────────────────────────────────
-streamlit>=1.61.1                # Dashboard framework
-bcrypt>=4.0.0                    # Password hashing for auth
 argon2-cffi>=23.1.0              # Argon2 password hashing support
-pyotp>=2.10.0                     # TOTP generator/verifier for 2FA
-qrcode>=7.4.2                    # Local QR code generator for 2FA setup
-python-dotenv>=1.0.0             # Load credentials from .env
-plotly>=5.20.0                   # Interactive heatmap with hover values
-deep-translator>=1.11.4          # Translation alignment for cross-lingual support
-streamlit-tour>=1.1.0            # Interactive guided tour component
-streamlit-plotly-events>=0.0.6
-
-# ── Data & ML ─────────────────────────────────────────────────────────────────
-numpy>=2.0.0
-pandas>=2.2.0
-scikit-learn>=1.4.0              # cosine_similarity utility
-openpyxl>=3.1.5                  # Engine for exporting DataFrames to Excel
-
-# ── Visualisation ─────────────────────────────────────────────────────────────
-matplotlib>=3.8.0
-seaborn>=0.13.0
-networkx>=3.0                    # Graph visualisations for document relationships
-
-# ── Code Quality ──────────────────────────────────────────────────────────────
-typing-extensions>=4.8.0         # Type hint compatibility extensions
-
-# ── Development & Testing ─────────────────────────────────────────────────────
-faker>=20.0.0                   # Fake data generation for mock essay utility (#255)
-packaging>=26.2                  # Version parsing and comparison
-
-# ── Caching & Session Management ───────────────────────────────────────────────
-
-redis>=5.0.0                    # Redis client for session state and caching
-psutil>=5.9.0                   # System memory monitoring
+bcrypt>=4.0.0                    # Password hashing for auth
 
 # ── Web Scraping ───────────────────────────────────────────────────────────────
 beautifulsoup4>=4.15.0          # HTML parsing for URL content extraction
-requests>=2.31.0                # HTTP library for fetching web content
-responses>=0.25.0               # Deterministic HTTP mocks for outbound-request tests
+deep-translator>=1.11.4          # Translation alignment for cross-lingual support
+defusedxml>=0.7.1                # Protect against XML External Entity (XXE) attacks
+EbookLib>=0.18                   # Extract text from EPUB documents
+# ── Vector Search ─────────────────────────────────────────────────────────────
+faiss-cpu>=1.8.0                 # FAISS ANN search (use faiss-gpu if CUDA available)
+
+# ── Development & Testing ─────────────────────────────────────────────────────
+faker>=20.0.0                   # Fake data generation for mock essay utility (#255)
 # ── REST API & LMS Integration ────────────────────────────────────────────────
 fastapi>=0.109.0                # REST API framework for LMS integrations
-uvicorn>=0.27.0                 # ASGI server implementation
-python-multipart>=0.0.6         # Multipart form parsing for file uploads
-httpx>=0.26.0                   # Async HTTP client for API testing
 
 # ── Google Integration ─────────────────────────────────────────────────────────
 google-api-python-client>=2.198.0
 google-auth>=2.56.2
+httpx>=0.26.0                   # Async HTTP client for API testing
 
+# ── Core NLP ──────────────────────────────────────────────────────────────────
+langdetect>=1.0.9                # Language detection for cross-lingual NLP
 
+# ── Visualisation ─────────────────────────────────────────────────────────────
+matplotlib>=3.8.0
+networkx>=3.0                    # Graph visualisations for document relationships
+nltk>=3.8.0                      # Stop-word filtering for lexical fallback (#222)
+
+# ── Data & ML ─────────────────────────────────────────────────────────────────
+numpy>=2.0.0
+openpyxl>=3.1.5                  # Engine for exporting DataFrames to Excel
+packaging>=26.2                  # Version parsing and comparison
+pandas>=2.2.0
+pdfplumber>=0.11.0               # Robust PDF text extraction
+Pillow>=10.0.0                   # Image processing library
+plotly>=5.20.0                   # Interactive heatmap with hover values
+psutil>=5.9.0                   # System memory monitoring
+
+# ── PDF & Document Parsing ────────────────────────────────────────────────────
+pymupdf>=1.24.0                  # PyMuPDF for rendering & highlighting PDF matches
+pyotp>=2.10.0                     # TOTP generator/verifier for 2FA
+pypdf>=5.0.0                     # Extract text from PDF files
+pytesseract>=0.3.13              # OCR text extraction from scanned images
+python-docx>=1.1.0               # Extract text from Word documents
+python-dotenv>=1.0.0             # Load credentials from .env
+python-magic>=0.4.27             # File magic bytes verification
+python-multipart>=0.0.6         # Multipart form parsing for file uploads
+qrcode>=7.4.2                    # Local QR code generator for 2FA setup
+
+# ── Caching & Session Management ───────────────────────────────────────────────
+
+redis>=5.0.0                    # Redis client for session state and caching
+
+reportlab>=5.0.0                 # PDF document generation
+requests>=2.31.0                # HTTP library for fetching web content
+responses>=0.25.0               # Deterministic HTTP mocks for outbound-request tests
+scikit-learn>=1.4.0              # cosine_similarity utility
+seaborn>=0.13.0
+# ── Web UI ────────────────────────────────────────────────────────────────────
+streamlit>=1.61.1                # Dashboard framework
+streamlit-plotly-events>=0.0.6
+streamlit-tour>=1.1.0            # Interactive guided tour component
+striprtf>=0.0.32                 # Extract text from RTF documents
+thefuzz>=0.22.1                  # Fuzzy string matching for warnings
+
+# ── Code Quality ──────────────────────────────────────────────────────────────
+typing-extensions>=4.8.0         # Type hint compatibility extensions
+uvicorn>=0.27.0                 # ASGI server implementation

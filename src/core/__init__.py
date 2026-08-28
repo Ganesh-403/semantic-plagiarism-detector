@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 from typing import TYPE_CHECKING
 
 from .config import (
@@ -27,11 +49,7 @@ from .faiss_index import (
     save_index,
     search_similar_chunks,
 )
-from .pipeline import (
-    PipelineChunkRecord,
-    run_extraction_pipeline,
-    run_pipeline,
-)
+from .pipeline import PipelineChunkRecord, run_extraction_pipeline, run_pipeline
 from .similarity import (
     PLAGIARISM_THRESHOLD,
     calculate_paragraph_similarity_breakdown,
@@ -51,11 +69,7 @@ from .similarity_engines import (
 from .tag_manager import TagManager, sanitize_tag_name
 from .text_chunking import chunk_by_sentences, chunk_document, chunk_documents
 from .translator import translate_text
-from .webhook import (
-    EventDispatcher,
-    dispatch_plagiarism_alert,
-    send_plagiarism_alert,
-)
+from .webhook import EventDispatcher, dispatch_plagiarism_alert, send_plagiarism_alert
 
 # TYPE_CHECKING block for lazy imports (Issue #2363)
 # This satisfies static analysis tools (mypy, pylance) that would otherwise

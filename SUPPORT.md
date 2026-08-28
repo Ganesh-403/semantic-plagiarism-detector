@@ -13,6 +13,7 @@ Before opening a new issue, please check the following resources:
 ## 🐛 Found a Bug?
 
 If you have encountered a bug or unexpected behavior:
+
 - Check existing issues first.
 - Open a new issue using the **[Bug Report Template](.github/ISSUE_TEMPLATE/bug_report.md)**.
 - Provide step-by-step reproduction steps, error logs, and environment details (Python version, OS, Streamlit version).
@@ -20,6 +21,7 @@ If you have encountered a bug or unexpected behavior:
 ## ✨ Requesting Features
 
 Have an idea to improve the application?
+
 - Open a new issue using the **[Feature Request Template](.github/ISSUE_TEMPLATE/feature_request.md)**.
 - Describe the problem your feature solves and your proposed user experience.
 
@@ -28,6 +30,7 @@ Have an idea to improve the application?
 If you discover a security flaw or vulnerability (such as SSRF, SQL Injection, remote code execution, or authentication bypasses), **please do NOT open a public GitHub issue**. Publicly disclosing security flaws can expose application instances to risk before a patch is available.
 
 Instead, please report security vulnerabilities privately:
+
 - **Email Alias:** [security@domain.com](mailto:security@domain.com)
 - **Detailed Policy:** Refer to our **[Security Policy (SECURITY.md)](SECURITY.md)** for our full vulnerability disclosure guidelines, response timelines, and security best practices.
 
@@ -40,10 +43,13 @@ When processing large batches of PDF/DOCX assignments or generating high-dimensi
 ### ❓ Frequently Asked Questions (FAQs)
 
 #### 1. Why does memory consumption spike during PDF batch uploads?
+
 PDF extraction (especially with OCR via Tesseract or PyMuPDF) loads raw page buffers and uncompressed image streams into memory. When multiple multi-page PDFs are ingested simultaneously, memory usage accumulates in PyTorch/Transformer model buffers and un-Garbage-Collected file descriptors.
 
 #### 2. How can I optimize vector index generation for thousands of documents?
+
 Vector embedding models convert document text chunks into dense vector embeddings. To prevent memory exhaustion:
+
 - Process document embeddings in fixed mini-batches rather than holding full corpus tensors in RAM.
 - Use `FAISS` index types tailored for memory efficiency (`IndexFlatIP` for small-to-medium corpora, or `IndexIVFFlat` for large scale corpora).
 - Trigger manual Python `gc.collect()` calls after batch vector generation.
@@ -72,6 +78,7 @@ To optimize performance and memory footprint in production or Docker environment
 | `STREAMLIT_SERVER_MAX_UPLOAD_SIZE` | `200` | Sets maximum upload file size (in MB) per request in Streamlit. |
 
 #### Example `.env` Configuration for High-Volume Deployments
+
 ```env
 # Thread & Memory Controls
 OMP_NUM_THREADS=4

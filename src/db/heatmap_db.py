@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 heatmap_db.py
 -------------
@@ -115,6 +137,7 @@ def configure_db_path(db_path: str | os.PathLike) -> None:
 # Schema
 # ---------------------------------------------------------------------------
 
+
 def init_heatmap_db() -> None:
     """Create the heatmap and clustering tables if they do not exist."""
     with _connect() as conn:
@@ -191,6 +214,7 @@ def init_heatmap_db() -> None:
 # ---------------------------------------------------------------------------
 # Repository
 # ---------------------------------------------------------------------------
+
 
 class HeatmapRepository(BaseRepository):
     """Data access object for heatmap and clustering tables."""
@@ -376,10 +400,16 @@ class HeatmapRepository(BaseRepository):
         for h in hotspots:
             sim = h.get("similarity", 0)
             severity = "critical" if sim >= 0.9 else "warning" if sim >= 0.7 else "info"
-            rows.append((
-                snapshot_id, h.get("doc_a", ""), h.get("doc_b", ""),
-                sim, severity, now,
-            ))
+            rows.append(
+                (
+                    snapshot_id,
+                    h.get("doc_a", ""),
+                    h.get("doc_b", ""),
+                    sim,
+                    severity,
+                    now,
+                )
+            )
 
         with self.transaction() as conn:
             conn.executemany(
@@ -433,9 +463,9 @@ class HeatmapRepository(BaseRepository):
 
     def get_hotspot_summary(self) -> dict[str, Any]:
         with _connect() as conn:
-            total = conn.execute(
-                "SELECT COUNT(1) FROM similarity_hotspots"
-            ).fetchone()[0]
+            total = conn.execute("SELECT COUNT(1) FROM similarity_hotspots").fetchone()[
+                0
+            ]
             unresolved = conn.execute(
                 "SELECT COUNT(1) FROM similarity_hotspots WHERE is_resolved = 0"
             ).fetchone()[0]
@@ -467,7 +497,11 @@ class HeatmapRepository(BaseRepository):
                 "DELETE FROM similarity_hotspots WHERE created_at < ? AND is_resolved = 1",
                 (threshold,),
             ).rowcount
-        return {"snapshots_deleted": hs, "clusterings_deleted": cr, "hotspots_deleted": sh}
+        return {
+            "snapshots_deleted": hs,
+            "clusterings_deleted": cr,
+            "hotspots_deleted": sh,
+        }
 
     # -- Hydrators ----------------------------------------------------------
 

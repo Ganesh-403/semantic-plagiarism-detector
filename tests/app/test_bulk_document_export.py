@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Unit tests for Bulk Document Export Zip Builder in app/streamlit_app.py (#1507)."""
 
 import io
@@ -7,12 +29,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.db.corpus_db import (
-    add_chunks,
-    add_document,
-    configure_db_path,
-    init_corpus_db,
-)
+from src.db.corpus_db import add_chunks, add_document, configure_db_path, init_corpus_db
 from src.utils.bulk_export import (
     create_bulk_export_zip,
     create_documents_bulk_zip_archive,
@@ -126,7 +143,9 @@ def test_create_documents_bulk_zip_empty(temp_corpus_db):
 
 def test_create_documents_bulk_zip_single_file(temp_corpus_db):
     """Verify zip archive creation with a single document."""
-    zip_bytes = create_documents_bulk_zip_archive(["essay_01.pdf"], preserve_hierarchy=False)
+    zip_bytes = create_documents_bulk_zip_archive(
+        ["essay_01.pdf"], preserve_hierarchy=False
+    )
     with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
         namelist = zf.namelist()
         assert "essay_01.pdf" in namelist

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import re
 import sqlite3
 from contextlib import closing
@@ -183,6 +205,7 @@ def test_get_database_file_size_bytes_rejects_path_traversal(tmp_path):
 
 def test_create_database_backup_sets_restrictive_permissions(tmp_path, monkeypatch):
     import os
+
     from src.db.database_backup import create_database_backup
 
     source = tmp_path / "source.db"
@@ -202,24 +225,31 @@ def test_create_database_backup_sets_restrictive_permissions(tmp_path, monkeypat
     monkeypatch.setattr(os, "chmod", mock_chmod)
 
     # Test compressed backup (.db.gz)
-    gz_backup = create_database_backup(source, backup_dir=backup_dir, compress_backup=True)
+    gz_backup = create_database_backup(
+        source, backup_dir=backup_dir, compress_backup=True
+    )
     assert gz_backup.exists()
     assert len(chmod_calls) >= 1
     assert chmod_calls[-1][0] == gz_backup
     assert chmod_calls[-1][1] == 0o600
 
     # Test uncompressed backup (.db)
-    db_backup = create_database_backup(source, backup_dir=backup_dir, compress_backup=False)
+    db_backup = create_database_backup(
+        source, backup_dir=backup_dir, compress_backup=False
+    )
     assert db_backup.exists()
     assert len(chmod_calls) >= 2
     assert chmod_calls[-1][0] == db_backup
     assert chmod_calls[-1][1] == 0o600
 
 
-def test_create_database_backup_respects_gzip_compression_level_env(tmp_path, monkeypatch):
+def test_create_database_backup_respects_gzip_compression_level_env(
+    tmp_path, monkeypatch
+):
     """Verify that create_database_backup reads BACKUP_GZIP_COMPRESSION_LEVEL from the env and passes it to GzipFile."""
     import gzip
     from unittest.mock import patch
+
     from src.db.database_backup import create_database_backup
 
     source = tmp_path / "source.db"
@@ -252,14 +282,9 @@ def test_create_database_backup_respects_gzip_compression_level_env(tmp_path, mo
         assert passed_compresslevel[0] == 3
 
 
-
-
-
-
-
-
 def test_verify_backup_file_valid_gzip(tmp_path):
     import gzip
+
     source = tmp_path / "source.db"
     create_test_database(source)
 
@@ -286,9 +311,12 @@ def test_verify_backup_file_corrupted_gzip(tmp_path):
 
 def test_verify_backup_file_invalid_header(tmp_path):
     import gzip
+
     backup = tmp_path / "invalid_header.db.gz"
     with gzip.open(backup, "wb") as f:
-        f.write(b"not a sqlite database file header but it has 100 bytes of content so it is read without issues")
+        f.write(
+            b"not a sqlite database file header but it has 100 bytes of content so it is read without issues"
+        )
     assert verify_backup_file(backup) is False
 
 
@@ -343,29 +371,35 @@ def test_create_database_backup_uses_utc_timestamp(tmp_path):
     backup_dir = tmp_path / "backups"
 
     # Test compressed backup (.db.gz) UTC Zulu timestamp pattern
-    gz_backup = create_database_backup(source, backup_dir=backup_dir, compress_backup=True)
+    gz_backup = create_database_backup(
+        source, backup_dir=backup_dir, compress_backup=True
+    )
     assert gz_backup.exists()
     assert re.search(r"\.\d{8}_\d{6}Z\.db\.gz$", gz_backup.name) is not None
 
     # Test uncompressed backup (.db) UTC Zulu timestamp pattern
-    db_backup = create_database_backup(source, backup_dir=backup_dir, compress_backup=False)
+    db_backup = create_database_backup(
+        source, backup_dir=backup_dir, compress_backup=False
+    )
     assert db_backup.exists()
     assert re.search(r"\.\d{8}_\d{6}Z\.db$", db_backup.name) is not None
 
 
 def test_create_database_backup_cleans_up_on_failure(tmp_path, monkeypatch):
-    from src.db.database_backup import create_database_backup
     import src.db.database_backup
+    from src.db.database_backup import create_database_backup
 
     source = tmp_path / "source.db"
     create_test_database(source)
     backup_dir = tmp_path / "backups"
 
-    def mock_iter_chunks(db_path, chunk_size=64*1024):
+    def mock_iter_chunks(db_path, chunk_size=64 * 1024):
         yield b"partial header..."
-        raise IOError("Disk full or connection lost")
+        raise OSError("Disk full or connection lost")
 
-    monkeypatch.setattr(src.db.database_backup, "iter_sqlite_snapshot_chunks", mock_iter_chunks)
+    monkeypatch.setattr(
+        src.db.database_backup, "iter_sqlite_snapshot_chunks", mock_iter_chunks
+    )
 
     # 1. Test compressed backup cleanup
     with pytest.raises(IOError, match="Disk full or connection lost"):
@@ -381,11 +415,3 @@ def test_create_database_backup_cleans_up_on_failure(tmp_path, monkeypatch):
 
     files = list(backup_dir.glob("*"))
     assert len(files) == 0
-
-
-
-
-
-
-
-

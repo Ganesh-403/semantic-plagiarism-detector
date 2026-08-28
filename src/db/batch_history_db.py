@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 batch_history_db.py
 -------------------
@@ -121,6 +143,7 @@ def configure_db_path(db_path: str | os.PathLike) -> None:
 # Schema initialisation
 # ---------------------------------------------------------------------------
 
+
 def init_batch_history_db() -> None:
     """Create the batch analysis history tables if they do not exist."""
     with _connect() as conn:
@@ -226,6 +249,7 @@ def init_batch_history_db() -> None:
 # ---------------------------------------------------------------------------
 # Repository class
 # ---------------------------------------------------------------------------
+
 
 class BatchHistoryRepository(BaseRepository):
     """Data access object for batch analysis history tables."""
@@ -387,9 +411,7 @@ class BatchHistoryRepository(BaseRepository):
     def delete_batch_run(self, run_id: int) -> bool:
         """Delete a batch run and cascade to child records."""
         with self.transaction() as conn:
-            cursor = conn.execute(
-                "DELETE FROM batch_runs WHERE run_id = ?", (run_id,)
-            )
+            cursor = conn.execute("DELETE FROM batch_runs WHERE run_id = ?", (run_id,))
             return cursor.rowcount > 0
 
     # -- Batch run documents ------------------------------------------------
@@ -623,9 +645,7 @@ class BatchHistoryRepository(BaseRepository):
     def get_summary_stats(self) -> dict[str, Any]:
         """Return high-level summary statistics across all batch runs."""
         with _connect() as conn:
-            total_runs = conn.execute(
-                "SELECT COUNT(1) FROM batch_runs"
-            ).fetchone()[0]
+            total_runs = conn.execute("SELECT COUNT(1) FROM batch_runs").fetchone()[0]
 
             completed_runs = conn.execute(
                 "SELECT COUNT(1) FROM batch_runs WHERE status = 'completed'"
@@ -646,7 +666,9 @@ class BatchHistoryRepository(BaseRepository):
             avg_similarity_row = conn.execute(
                 "SELECT AVG(avg_similarity) FROM batch_runs WHERE status = 'completed'"
             ).fetchone()
-            avg_similarity = float(avg_similarity_row[0]) if avg_similarity_row[0] else 0.0
+            avg_similarity = (
+                float(avg_similarity_row[0]) if avg_similarity_row[0] else 0.0
+            )
 
             avg_duration_row = conn.execute(
                 "SELECT AVG(duration_ms) FROM batch_runs WHERE status = 'completed'"
@@ -662,7 +684,11 @@ class BatchHistoryRepository(BaseRepository):
                 "total_runs": total_runs,
                 "completed_runs": completed_runs,
                 "failed_runs": failed_runs,
-                "success_rate": round(completed_runs / total_runs * 100, 1) if total_runs > 0 else 0.0,
+                "success_rate": (
+                    round(completed_runs / total_runs * 100, 1)
+                    if total_runs > 0
+                    else 0.0
+                ),
                 "total_documents_scanned": total_docs_scanned,
                 "total_documents_flagged": total_docs_flagged,
                 "avg_similarity": round(avg_similarity, 4),

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Integration test suite for SQLite database migration flows.
 
 Verifies that migrate_corpus_database() and migrate_auth_database()
@@ -438,7 +460,9 @@ class TestAuthMigrationFlow:
             ):
                 assert column_exists(conn, "users", col), f"Missing column: {col}"
 
-            assert not column_exists(conn, "users", "is_active"), "is_active column should be dropped"
+            assert not column_exists(
+                conn, "users", "is_active"
+            ), "is_active column should be dropped"
 
             assert index_exists(conn, "idx_users_role")
             assert index_exists(conn, "idx_audit_log_username")
@@ -599,6 +623,7 @@ class TestMigrationColumnDefaults:
 def test_auth_migrations_auto_discovered():
     """Verify that AUTH_MIGRATIONS is dynamically discovered and sorted by numeric prefix (Issue #2999)."""
     import inspect
+
     from src.db.migrations import auth
 
     funcs = [
@@ -613,4 +638,3 @@ def test_auth_migrations_auto_discovered():
         assert i in auth.AUTH_MIGRATIONS
         assert callable(auth.AUTH_MIGRATIONS[i])
         assert auth.AUTH_MIGRATIONS[i].__name__.startswith(f"migration_{i:03d}")
-

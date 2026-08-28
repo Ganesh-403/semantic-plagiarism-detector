@@ -95,7 +95,7 @@ class CrossLingualEngine {
     getPairsFiltered(query = '') {
         if (!query) return this.crossLingualPairs;
         const q = query.toLowerCase();
-        return this.crossLingualPairs.filter(p => 
+        return this.crossLingualPairs.filter(p =>
             p.pairId.toLowerCase().includes(q) ||
             p.sourceText.toLowerCase().includes(q) ||
             p.targetText.toLowerCase().includes(q) ||

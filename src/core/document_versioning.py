@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/core/document_versioning.py
 -------------------------------
@@ -10,14 +32,15 @@ and patchwriting) between draft versions.
 """
 
 import logging
-from typing import List, Tuple, Dict, Any, NamedTuple
 from enum import Enum
+from typing import Any, Dict, List, NamedTuple, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 class DiffOp(str, Enum):
     """Enumeration of diff operations."""
+
     EQUAL = "equal"
     INSERT = "insert"
     DELETE = "delete"
@@ -26,6 +49,7 @@ class DiffOp(str, Enum):
 
 class DiffBlock(NamedTuple):
     """Represents a contiguous block of identical diff operations."""
+
     op: DiffOp
     start_v1: int
     end_v1: int
@@ -37,27 +61,30 @@ class DiffBlock(NamedTuple):
 
 def tokenize_by_words(text: str) -> list[str]:
     """Tokenize text into words, preserving whitespace as distinct tokens.
-    
+
     This ensures that changes in spacing are captured in the diff,
     which is important for detecting patchwriting and formatting changes.
     """
     import re
+
     # Split on word boundaries but keep the delimiters
-    tokens = re.findall(r'\w+|\s+|[^\w\s]', text)
+    tokens = re.findall(r"\w+|\s+|[^\w\s]", text)
     return tokens
 
 
-def compute_myers_diff(tokens_v1: list[str], tokens_v2: list[str]) -> list[tuple[DiffOp, str, str]]:
+def compute_myers_diff(
+    tokens_v1: list[str], tokens_v2: list[str]
+) -> list[tuple[DiffOp, str, str]]:
     """Compute the shortest edit script between two token lists using Myers' algorithm.
-    
+
     This is a simplified implementation of the Myers diff algorithm that
     operates in O(ND) time, where N is the sum of the lengths and D is
     the size of the minimum edit script.
-    
+
     Args:
         tokens_v1: Token list from the older version.
         tokens_v2: Token list from the newer version.
-        
+
     Returns:
         A list of tuples: (Operation, token_from_v1, token_from_v2).
         For INSERT, token_from_v1 is empty. For DELETE, token_from_v2 is empty.
@@ -65,12 +92,12 @@ def compute_myers_diff(tokens_v1: list[str], tokens_v2: list[str]) -> list[tuple
     n = len(tokens_v1)
     m = len(tokens_v2)
     max_d = n + m
-    
+
     # V array stores the furthest reaching x for a given diagonal k
     # We use a dictionary to handle negative indices easily
     v = {1: 0}
     trace = []
-    
+
     # Forward pass to find the shortest edit script
     for d in range(max_d + 1):
         trace.append(v.copy())
@@ -80,30 +107,27 @@ def compute_myers_diff(tokens_v1: list[str], tokens_v2: list[str]) -> list[tuple
                 x = v.get(k + 1, -1)
             else:
                 x = v.get(k - 1, -1) + 1
-                
+
             y = x - k
-            
+
             # Extend along the diagonal (equal tokens)
             while x < n and y < m and tokens_v1[x] == tokens_v2[y]:
                 x += 1
                 y += 1
-                
+
             v[k] = x
-            
+
             # Check if we've reached the end
             if x >= n and y >= m:
                 # Backtrack to build the edit script
                 return _backtrack_myers(trace, tokens_v1, tokens_v2, d)
-                
+
     # Fallback if max_d is reached (should not happen for valid inputs)
     return _backtrack_myers(trace, tokens_v1, tokens_v2, max_d)
 
 
 def _backtrack_myers(
-    trace: list[dict[int, int]], 
-    tokens_v1: list[str], 
-    tokens_v2: list[str],
-    d: int
+    trace: list[dict[int, int]], tokens_v1: list[str], tokens_v2: list[str], d: int
 ) -> list[tuple[DiffOp, str, str]]:
     """Backtrack through the Myers trace to build the edit script.
 
@@ -183,69 +207,70 @@ def _backtrack_myers(
     return edits
 
 
-def generate_diff_blocks(
-    text_v1: str, 
-    text_v2: str
-) -> list[DiffBlock]:
+def generate_diff_blocks(text_v1: str, text_v2: str) -> list[DiffBlock]:
     """Generate high-level diff blocks from two text strings.
-    
+
     Groups consecutive identical operations into DiffBlock objects
     for easier visualization and analysis.
-    
+
     Args:
         text_v1: The older version of the text.
         text_v2: The newer version of the text.
-        
+
     Returns:
         A list of DiffBlock objects representing the changes.
     """
     tokens_v1 = tokenize_by_words(text_v1)
     tokens_v2 = tokenize_by_words(text_v2)
-    
+
     edits = compute_myers_diff(tokens_v1, tokens_v2)
-    
+
     blocks = []
     current_op = None
     start_v1, start_v2 = 0, 0
     current_text_v1, current_text_v2 = [], []
-    
+
     idx_v1, idx_v2 = 0, 0
-    
+
     for op, t1, t2 in edits:
         if op != current_op:
             if current_op is not None:
-                blocks.append(DiffBlock(
-                    op=current_op,
-                    start_v1=start_v1,
-                    end_v1=idx_v1,
-                    start_v2=start_v2,
-                    end_v2=idx_v2,
-                    text_v1="".join(current_text_v1),
-                    text_v2="".join(current_text_v2)
-                ))
+                blocks.append(
+                    DiffBlock(
+                        op=current_op,
+                        start_v1=start_v1,
+                        end_v1=idx_v1,
+                        start_v2=start_v2,
+                        end_v2=idx_v2,
+                        text_v1="".join(current_text_v1),
+                        text_v2="".join(current_text_v2),
+                    )
+                )
             current_op = op
             start_v1, start_v2 = idx_v1, idx_v2
             current_text_v1, current_text_v2 = [], []
-            
+
         if t1:
             current_text_v1.append(t1)
             idx_v1 += len(t1)
         if t2:
             current_text_v2.append(t2)
             idx_v2 += len(t2)
-            
+
     # Append the final block
     if current_op is not None:
-        blocks.append(DiffBlock(
-            op=current_op,
-            start_v1=start_v1,
-            end_v1=idx_v1,
-            start_v2=start_v2,
-            end_v2=idx_v2,
-            text_v1="".join(current_text_v1),
-            text_v2="".join(current_text_v2)
-        ))
-        
+        blocks.append(
+            DiffBlock(
+                op=current_op,
+                start_v1=start_v1,
+                end_v1=idx_v1,
+                start_v2=start_v2,
+                end_v2=idx_v2,
+                text_v1="".join(current_text_v1),
+                text_v2="".join(current_text_v2),
+            )
+        )
+
     return blocks
 
 
@@ -269,7 +294,9 @@ def calculate_retention_score(blocks: list[DiffBlock]) -> float:
 
     return round(equal_len / total_v1_len, 4)
 
+
 import difflib
+
 
 class DocumentDiffEngine:
     @staticmethod
@@ -280,26 +307,26 @@ class DocumentDiffEngine:
         """
         parent_words = parent_text.split()
         child_words = child_text.split()
-        
+
         matcher = difflib.SequenceMatcher(None, parent_words, child_words)
         diff_tokens = []
-        
+
         for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-            if tag == 'equal':
+            if tag == "equal":
                 for word in parent_words[i1:i2]:
                     diff_tokens.append({"text": word, "action": "unchanged"})
-            elif tag == 'delete':
+            elif tag == "delete":
                 for word in parent_words[i1:i2]:
                     diff_tokens.append({"text": word, "action": "deleted"})
-            elif tag == 'insert':
+            elif tag == "insert":
                 for word in child_words[j1:j2]:
                     diff_tokens.append({"text": word, "action": "added"})
-            elif tag == 'replace':
+            elif tag == "replace":
                 for word in parent_words[i1:i2]:
                     diff_tokens.append({"text": word, "action": "deleted"})
                 for word in child_words[j1:j2]:
                     diff_tokens.append({"text": word, "action": "added"})
-                    
+
         return diff_tokens
 
     @staticmethod
@@ -308,13 +335,17 @@ class DocumentDiffEngine:
         total = len(diff_tokens)
         if total == 0:
             return {"retention_rate": 100.0, "addition_rate": 0.0, "deletion_rate": 0.0}
-            
+
         unchanged = sum(1 for t in diff_tokens if t["action"] == "unchanged")
         added = sum(1 for t in diff_tokens if t["action"] == "added")
         deleted = sum(1 for t in diff_tokens if t["action"] == "deleted")
-        
+
         return {
-            "retention_rate": round((unchanged / (unchanged + deleted if (unchanged + deleted) > 0 else 1)) * 100, 2),
+            "retention_rate": round(
+                (unchanged / (unchanged + deleted if (unchanged + deleted) > 0 else 1))
+                * 100,
+                2,
+            ),
             "addition_rate": round((added / total) * 100, 2),
-            "deletion_rate": round((deleted / total) * 100, 2)
+            "deletion_rate": round((deleted / total) * 100, 2),
         }

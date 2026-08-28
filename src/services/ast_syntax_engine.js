@@ -93,7 +93,7 @@ class ASTSyntaxEngine {
     getMatchesFiltered(query = '') {
         if (!query) return this.astMatches;
         const q = query.toLowerCase();
-        return this.astMatches.filter(m => 
+        return this.astMatches.filter(m =>
             m.matchId.toLowerCase().includes(q) ||
             m.primaryFile.toLowerCase().includes(q) ||
             m.compareFile.toLowerCase().includes(q) ||

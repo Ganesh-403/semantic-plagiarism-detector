@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/utils/diff_highlighter.py
 -----------------------------
@@ -159,7 +181,7 @@ def _covered_word_ranges(
 def _apply_marks(
     text: str,
     word_ranges: list[tuple[int, int]],
-    css_class: Optional[str] = None,
+    css_class: str | None = None,
 ) -> str:
     """Wrap the given word ranges of *text* in ``<mark>`` tags.
 
@@ -182,7 +204,9 @@ def _apply_marks(
     if not word_positions:
         return html.escape(text)
 
-    open_tag = f'<mark class="{html.escape(css_class)}">' if css_class else MARK_OPEN_TAG
+    open_tag = (
+        f'<mark class="{html.escape(css_class)}">' if css_class else MARK_OPEN_TAG
+    )
 
     result: list[str] = []
     last_end = 0
@@ -210,7 +234,7 @@ def highlight_overlap(
     text_b: str,
     min_match_length: int = DEFAULT_DIFF_MIN_MATCH_LENGTH,
     use_stemming: bool = False,
-    css_class: Optional[str] = None,
+    css_class: str | None = None,
 ) -> tuple[str, str]:
     """Highlight overlapping sequences between two text strings.
 

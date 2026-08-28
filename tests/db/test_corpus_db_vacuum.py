@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Tests for corpus database VACUUM maintenance (Issue #3417)."""
 
 import sqlite3
@@ -21,9 +43,9 @@ class TestVacuumCorpusDatabase(unittest.TestCase):
             conn.commit()
             conn.close()
 
-            with patch("src.db.corpus_db.get_corpus_db_path", return_value=db_path), patch(
-                "src.db.corpus_db.close_connections"
-            ) as close_connections:
+            with patch(
+                "src.db.corpus_db.get_corpus_db_path", return_value=db_path
+            ), patch("src.db.corpus_db.close_connections") as close_connections:
                 vacuum_corpus_database()
 
             close_connections.assert_called_once_with(all_threads=True)
@@ -48,9 +70,11 @@ class TestVacuumCorpusDatabase(unittest.TestCase):
                 connections.append(conn)
                 return conn
 
-            with patch("src.db.corpus_db.get_corpus_db_path", return_value=db_path), patch(
-                "src.db.corpus_db.close_connections"
-            ), patch("src.db.corpus_db.sqlite3.connect", side_effect=connect):
+            with patch(
+                "src.db.corpus_db.get_corpus_db_path", return_value=db_path
+            ), patch("src.db.corpus_db.close_connections"), patch(
+                "src.db.corpus_db.sqlite3.connect", side_effect=connect
+            ):
                 vacuum_corpus_database()
 
             self.assertEqual(len(connections), 1)
@@ -60,6 +84,7 @@ class TestVacuumCorpusDatabase(unittest.TestCase):
 
     def test_vacuum_closes_connection_when_execution_fails(self):
         """The maintenance connection is closed even when VACUUM raises."""
+
         class FakeConnection:
             def __init__(self):
                 self.isolation_level = ""
@@ -73,9 +98,11 @@ class TestVacuumCorpusDatabase(unittest.TestCase):
                 self.closed = True
 
         fake = FakeConnection()
-        with patch("src.db.corpus_db.get_corpus_db_path", return_value=Path("/tmp/corpus.db")), patch(
-            "src.db.corpus_db.close_connections"
-        ), patch("src.db.corpus_db.sqlite3.connect", return_value=fake):
+        with patch(
+            "src.db.corpus_db.get_corpus_db_path", return_value=Path("/tmp/corpus.db")
+        ), patch("src.db.corpus_db.close_connections"), patch(
+            "src.db.corpus_db.sqlite3.connect", return_value=fake
+        ):
             with self.assertRaises(sqlite3.DatabaseError):
                 vacuum_corpus_database()
 

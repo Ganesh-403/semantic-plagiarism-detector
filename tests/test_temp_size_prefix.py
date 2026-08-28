@@ -1,18 +1,41 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Comprehensive Unit Tests for get_temp_directory_size_bytes (Issue #3184)
 Tests prefix filtering, recursive directory traversal, file sizes, and edge cases.
 """
 
 import os
-import tempfile
 import stat
-import pytest
+import tempfile
 from pathlib import Path
 
+import pytest
 
 # ==============================================================================
 # SECTION 1: Defining the Function Under Test
 # ==============================================================================
+
 
 def get_temp_directory_size_bytes(target_dir: str = None, prefix: str = "") -> int:
     """
@@ -42,6 +65,7 @@ def get_temp_directory_size_bytes(target_dir: str = None, prefix: str = "") -> i
 # SECTION 2: Basic Functionality and Data Types
 # ==============================================================================
 
+
 class TestGetTempDirectorySizeBytesBasics:
     def test_returns_integer(self):
         """Function should always return an integer."""
@@ -62,6 +86,7 @@ class TestGetTempDirectorySizeBytesBasics:
 # ==============================================================================
 # SECTION 3: Edge Cases with Directories
 # ==============================================================================
+
 
 class TestGetTempDirectorySizeBytesEdgeCases:
     def test_returns_zero_for_nonexistent_dir(self):
@@ -91,6 +116,7 @@ class TestGetTempDirectorySizeBytesEdgeCases:
 # SECTION 4: File Counting and Sizes
 # ==============================================================================
 
+
 class TestGetTempDirectorySizeBytesFileCounting:
     def test_counts_all_files_without_prefix(self, tmp_path):
         """Should count all files when no prefix is given."""
@@ -117,6 +143,7 @@ class TestGetTempDirectorySizeBytesFileCounting:
 # ==============================================================================
 # SECTION 5: Prefix Filtering Logic
 # ==============================================================================
+
 
 class TestGetTempDirectorySizeBytesPrefix:
     def test_filters_by_prefix(self, tmp_path):
@@ -150,6 +177,7 @@ class TestGetTempDirectorySizeBytesPrefix:
 # ==============================================================================
 # SECTION 6: Recursive Directory Traversal
 # ==============================================================================
+
 
 class TestGetTempDirectorySizeBytesRecursive:
     def test_counts_files_in_subdirectories(self, tmp_path):
@@ -185,10 +213,11 @@ class TestGetTempDirectorySizeBytesRecursive:
 # SECTION 7: Robustness and Error Handling
 # ==============================================================================
 
+
 class TestGetTempDirectorySizeBytesRobustness:
     def test_skips_permission_errors(self, tmp_path):
         """Should not crash on permission errors."""
-        if os.name == 'nt':
+        if os.name == "nt":
             pytest.skip("Permission tests are platform-specific")
         (tmp_path / "file.txt").write_text("123")
         # Set to read-only to test skipping

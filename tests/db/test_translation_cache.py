@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/db/test_translation_cache.py
 -----------------------------------
@@ -126,11 +148,13 @@ class TestTranslationCacheTTL:
         """Test purging with 0 days (should purge nothing inserted 'now')."""
         conn = sqlite3.connect(temp_db_path)
         translation_cache.get_cached_translation("init")
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO translation_cache
             (text_hash, foreign_text, translated_text, source_lang, target_lang)
             VALUES ('hash_now', 'foreign', 'translated', 'auto', 'en')
-            """)
+            """
+        )
         conn.commit()
 
         deleted_count = translation_cache.purge_expired_translation_cache(days_old=0)
@@ -372,6 +396,7 @@ def test_get_cached_translation_handles_non_corruption_database_error(tmp_path, 
 def test_translation_cache_uses_lock_for_get_and_save():
     """Verify that get_cached_translation and save_translation acquire the global _lock."""
     from unittest.mock import MagicMock
+
     from src.db.translation_cache import _lock, save_translation
 
     mock_lock = MagicMock()
@@ -389,6 +414,7 @@ def test_translation_cache_uses_lock_for_get_and_save():
 def test_translation_cache_uses_provided_connection():
     """Verify that get_cached_translation and save_translation use the provided connection and do not open a new one."""
     from unittest.mock import MagicMock
+
     from src.db.translation_cache import get_cached_translation, save_translation
 
     mock_conn = MagicMock()
@@ -396,9 +422,9 @@ def test_translation_cache_uses_provided_connection():
     mock_cursor.fetchone.return_value = {"translated_text": "cached_val"}
     mock_conn.execute.return_value = mock_cursor
 
-    with patch("src.db.translation_cache._connect") as mock_connect, \
-         patch("src.db.translation_cache._get_connection") as mock_get_conn:
-
+    with patch("src.db.translation_cache._connect") as mock_connect, patch(
+        "src.db.translation_cache._get_connection"
+    ) as mock_get_conn:
         # Call get_cached_translation with provided connection
         result = get_cached_translation("source", "fr", "en", conn=mock_conn)
         assert result == "cached_val"
@@ -413,8 +439,6 @@ def test_translation_cache_uses_provided_connection():
 
         # Assert that the provided connection was used
         assert mock_conn.execute.call_count >= 2
-
-
 
 
 def test_migrate_legacy_cache_rehashes_and_inserts(tmp_path):

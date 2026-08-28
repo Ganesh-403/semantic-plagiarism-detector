@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/security/obfuscation_detector.py
 ------------------------------------
@@ -10,11 +32,11 @@ control characters. This module provides pattern matching and scoring
 logic to identify these anomalies before the main similarity pipeline runs.
 """
 
-import re
 import logging
+import re
 import unicodedata
-from typing import List, Tuple, Dict, Any
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -242,15 +264,20 @@ def analyze_text_obfuscation(text: str, threshold: float = 0.15) -> ObfuscationR
         )
 
     return report
+
+
 import re
 import unicodedata
+
 
 class ObfuscationDetector:
     def __init__(self):
         # 1. Zero-width and invisible control character tracking filters
         # Matches ZWSP, ZWNJ, ZWJ, BOM, and general format control characters (\p{Cf})
-        self.invisible_chars_regex = re.compile(r'[\u200b-\u200d\ufeff\u200e\u200f\u202a-\u202e]')
-        
+        self.invisible_chars_regex = re.compile(
+            r"[\u200b-\u200d\ufeff\u200e\u200f\u202a-\u202e]"
+        )
+
         # 2. Cyrillic Homoglyphs frequently substituted into English text
         # Example: Cyrillic 'а' (U+0430) vs Latin 'a' (U+0061)
         self.cyrillic_homoglyphs = set(range(0x0400, 0x04FF))
@@ -262,8 +289,10 @@ class ObfuscationDetector:
     def detect_homoglyphs(self, text: str) -> list[int]:
         """Pins down mixed-script homoglyph character substitutions."""
         flagged_indices = []
-        has_latin = any(unicodedata.name(c).startswith('LATIN') for c in text if c.isalpha())
-        
+        has_latin = any(
+            unicodedata.name(c).startswith("LATIN") for c in text if c.isalpha()
+        )
+
         if has_latin:
             for idx, char in enumerate(text):
                 if ord(char) in self.cyrillic_homoglyphs:
@@ -273,17 +302,24 @@ class ObfuscationDetector:
     def analyze_text(self, text: str) -> dict:
         """Runs the complete suite of text analysis sub-checks."""
         if not text:
-            return {"obfuscation_score": 0.0, "invisible_indices": [], "homoglyph_indices": [], "is_flagged": False}
+            return {
+                "obfuscation_score": 0.0,
+                "invisible_indices": [],
+                "homoglyph_indices": [],
+                "is_flagged": False,
+            }
 
         invisible_indices = self.detect_invisible_characters(text)
         homoglyph_indices = self.detect_homoglyphs(text)
-        
+
         total_violations = len(invisible_indices) + len(homoglyph_indices)
         total_chars = len(text)
-        
+
         # Calculate percentage footprint density score
-        obfuscation_score = round((total_violations / total_chars) * 100, 2) if total_chars > 0 else 0.0
-        
+        obfuscation_score = (
+            round((total_violations / total_chars) * 100, 2) if total_chars > 0 else 0.0
+        )
+
         # Flag automatically if more than 1% of the document uses suspicious formatting
         is_flagged = obfuscation_score >= 1.0 or total_violations > 10
 
@@ -291,5 +327,5 @@ class ObfuscationDetector:
             "obfuscation_score": obfuscation_score,
             "invisible_indices": invisible_indices,
             "homoglyph_indices": homoglyph_indices,
-            "is_flagged": is_flagged
+            "is_flagged": is_flagged,
         }

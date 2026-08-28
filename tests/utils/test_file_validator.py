@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/utils/test_file_validator.py
 ----------------------------------
@@ -7,11 +29,7 @@ Verifies that file size limits, extension checks, and magic byte validation
 work correctly to prevent RAM spikes and malicious file processing.
 """
 
-from src.utils.file_validator import (
-    MAX_FILE_SIZE_BYTES,
-    FileValidator,
-    validate_upload,
-)
+from src.utils.file_validator import MAX_FILE_SIZE_BYTES, FileValidator, validate_upload
 
 
 class TestFileValidatorSize:
@@ -33,7 +51,7 @@ class TestFileValidatorSize:
         """Verify files over the size limit fail with FILE_TOO_LARGE."""
         validator = FileValidator(max_size_bytes=1024)
         result = validator.validate(b"x" * 1025, "large.pdf")
-        
+
         assert result.is_valid is False
         assert result.error_code == "FILE_TOO_LARGE"
         assert "too large" in result.error_message.lower()
@@ -42,7 +60,7 @@ class TestFileValidatorSize:
         """Verify empty files (0 bytes) fail with FILE_EMPTY."""
         validator = FileValidator()
         result = validator.validate(b"", "empty.txt")
-        
+
         assert result.is_valid is False
         assert result.error_code == "FILE_EMPTY"
 
@@ -65,7 +83,7 @@ class TestFileValidatorExtension:
         """Verify unsupported extensions fail with UNSUPPORTED_EXTENSION."""
         validator = FileValidator()
         result = validator.validate(b"content", "malware.exe")
-        
+
         assert result.is_valid is False
         assert result.error_code == "UNSUPPORTED_EXTENSION"
 
@@ -73,7 +91,7 @@ class TestFileValidatorExtension:
         """Verify files with no extension fail with MISSING_EXTENSION."""
         validator = FileValidator()
         result = validator.validate(b"content", "noextension")
-        
+
         assert result.is_valid is False
         assert result.error_code == "MISSING_EXTENSION"
 
@@ -86,7 +104,7 @@ class TestFileValidatorExtension:
     def test_custom_allowed_extensions(self):
         """Verify custom allowed_extensions set is respected."""
         validator = FileValidator(allowed_extensions={".custom"})
-        
+
         assert validator.validate(b"data", "file.custom").is_valid is True
         assert validator.validate(b"data", "file.txt").is_valid is False
 
@@ -211,12 +229,13 @@ class TestFileValidatorMagicBytes:
     def test_mismatched_magic_bytes_logs_warning(self, caplog):
         """Verify mismatched magic bytes log a warning but don't fail hard."""
         import logging
+
         validator = FileValidator()
-        
+
         # Pass a text file disguised as a PDF
         with caplog.at_level(logging.WARNING):
             result = validator.validate(b"This is plain text", "fake.pdf")
-            
+
         # Currently configured to pass but log warning
         assert result.is_valid is True
         assert any("Magic byte mismatch" in record.message for record in caplog.records)
@@ -258,6 +277,7 @@ class TestStrictModeMagicByteEnforcement:
 
     def test_permissive_default_still_tolerates_a_mismatch(self, caplog):
         import logging
+
         validator = FileValidator()
 
         with caplog.at_level(logging.WARNING):
@@ -269,9 +289,7 @@ class TestStrictModeMagicByteEnforcement:
     def test_strict_mode_does_not_break_signatureless_extensions(self):
         validator = FileValidator(strict_mode=True)
 
-        assert (
-            validator.validate(b"# Just markdown", "notes.md").is_valid is True
-        )
+        assert validator.validate(b"# Just markdown", "notes.md").is_valid is True
         assert validator.validate(b"plain,text", "table.csv").is_valid is True
 
     def test_strict_mode_still_enforces_size_and_extension_first(self):
@@ -298,7 +316,7 @@ class TestValidateUploadConvenience:
         # Valid file
         result = validate_upload(b"%PDF-1.4", "test.pdf")
         assert result.is_valid is True
-        
+
         # Invalid file (too large)
         large_data = b"x" * (MAX_FILE_SIZE_BYTES + 1)
         result = validate_upload(large_data, "huge.pdf")
@@ -326,7 +344,9 @@ class TestEpubAndCsvValidation:
     def test_epub_missing_mimetype_fails(self):
         validator = FileValidator(strict_mode=True)
         # Header matches PK\x03\x04 but missing mimetype
-        result = validator.validate(b"PK\x03\x04" + b"random zip contents without mimetype", "book.epub")
+        result = validator.validate(
+            b"PK\x03\x04" + b"random zip contents without mimetype", "book.epub"
+        )
         assert result.is_valid is False
         assert result.error_code == "MAGIC_BYTE_MISMATCH"
 
@@ -355,6 +375,7 @@ class TestEpubAndCsvValidation:
 def test_max_file_size_from_env(monkeypatch):
     """Verify that MAX_FILE_SIZE_BYTES respects MAX_UPLOAD_SIZE_MB env variable on reload."""
     import importlib
+
     import src.utils.file_validator as fv
 
     monkeypatch.setenv("MAX_UPLOAD_SIZE_MB", "10")
@@ -365,6 +386,3 @@ def test_max_file_size_from_env(monkeypatch):
         # Reset back to default
         monkeypatch.delenv("MAX_UPLOAD_SIZE_MB", raising=False)
         importlib.reload(fv)
-
-
-

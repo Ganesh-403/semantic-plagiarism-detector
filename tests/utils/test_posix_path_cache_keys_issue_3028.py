@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 test_posix_path_cache_keys_issue_3028.py
 -----------------------------------------
@@ -8,13 +30,14 @@ whenever creating cache keys based on file paths to guarantee cross-platform Red
 
 import os
 from pathlib import Path
+
 from src.utils.redis_cache import (
     CacheNamespace,
+    clear_all_large_data,
+    clear_large_data,
+    get_large_data,
     normalize_cache_key_path,
     store_large_data,
-    get_large_data,
-    clear_large_data,
-    clear_all_large_data,
 )
 from src.utils.similarity_cache import build_similarity_cache_key
 
@@ -30,7 +53,9 @@ def test_normalize_cache_key_path_converts_windows_backslashes_to_posix():
 def test_normalize_cache_key_path_handles_path_objects_and_drive_letters():
     """Verify pathlib.Path and Windows drive paths are properly converted."""
     drive_path = r"C:\Users\developer\data\corpus.index"
-    assert normalize_cache_key_path(drive_path) == "C:/Users/developer/data/corpus.index"
+    assert (
+        normalize_cache_key_path(drive_path) == "C:/Users/developer/data/corpus.index"
+    )
 
     path_obj = Path("folder") / "subfolder" / "file.txt"
     assert normalize_cache_key_path(path_obj) == path_obj.as_posix()
@@ -49,7 +74,10 @@ def test_cache_namespace_build_key_produces_consistent_posix_keys():
     key_from_linux = CacheNamespace.ANALYSIS.build_key(linux_path)
 
     assert key_from_win == key_from_linux
-    assert key_from_win == f"spd:v1:analysis:{APP_VERSION}:documents/incident_001/scan.docx"
+    assert (
+        key_from_win
+        == f"spd:v1:analysis:{APP_VERSION}:documents/incident_001/scan.docx"
+    )
     assert "\\" not in key_from_win
 
 

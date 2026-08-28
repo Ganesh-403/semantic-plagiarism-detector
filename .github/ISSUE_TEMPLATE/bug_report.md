@@ -2,6 +2,7 @@ name: Bug Report
 about: Report a bug
 title: '[BUG] '
 body:
-  - type: textarea
+
+- type: textarea
     attributes:
       label: Describe the bug

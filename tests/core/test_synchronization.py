@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import os
 from unittest.mock import MagicMock, patch
 
@@ -17,10 +39,7 @@ def test_verify_and_repair_index_perfect_match():
         "src.core.synchronization.load_index"
     ) as mock_load, patch(
         "src.core.synchronization.get_embedding_count", return_value=500
-    ), patch(
-        "src.core.synchronization._rebuild_index"
-    ) as mock_rebuild:
-
+    ), patch("src.core.synchronization._rebuild_index") as mock_rebuild:
         mock_index = MagicMock()
         mock_index.ntotal = 500
         mock_load.return_value = mock_index
@@ -38,7 +57,6 @@ def test_verify_and_repair_index_missing_faiss():
     with patch("os.path.exists", return_value=False), patch(
         "src.core.synchronization._rebuild_index"
     ) as mock_rebuild:
-
         verify_and_repair_index("/fake/path.index")
 
         # Rebuild MUST be called
@@ -54,12 +72,9 @@ def test_verify_and_repair_index_desync():
         "src.core.synchronization.load_index"
     ) as mock_load, patch(
         "src.core.synchronization.get_embedding_count", return_value=1200
-    ), patch(
-        "src.core.synchronization._backup_corrupted_index"
-    ) as mock_backup, patch(
+    ), patch("src.core.synchronization._backup_corrupted_index") as mock_backup, patch(
         "src.core.synchronization._rebuild_index"
     ) as mock_rebuild:
-
         mock_index = MagicMock()
         mock_index.ntotal = 1150  # 50 vectors lost during crash
         mock_load.return_value = mock_index
@@ -81,7 +96,6 @@ def test_verify_and_repair_index_load_failure():
     ), patch("src.core.synchronization._backup_corrupted_index") as mock_backup, patch(
         "src.core.synchronization._rebuild_index"
     ) as mock_rebuild:
-
         verify_and_repair_index("/fake/path.index")
 
         # Backup and Rebuild MUST be called due to exception
@@ -103,7 +117,6 @@ def test_rebuild_index_process():
     with patch("src.core.synchronization.get_all_embeddings") as mock_get_embs, patch(
         "src.core.synchronization.build_index_from_matrix"
     ) as mock_build, patch("src.core.synchronization.save_index") as mock_save:
-
         mock_matrix = MagicMock()
         mock_get_embs.return_value = mock_matrix
 
@@ -126,10 +139,7 @@ def test_backup_corrupted_index_mechanics():
         "os.makedirs"
     ) as mock_makedirs, patch("shutil.copy2") as mock_copy, patch(
         "os.listdir", return_value=[]
-    ), patch(
-        "src.core.synchronization.datetime"
-    ) as mock_dt:
-
+    ), patch("src.core.synchronization.datetime") as mock_dt:
         # Mock datetime so we get a consistent timestamp
         mock_dt.now.return_value.strftime.return_value = "20240101_120000"
 
@@ -170,7 +180,7 @@ def test_atexit_graceful_shutdown_registered():
     import atexit
 
     from src.core.synchronization import background_tasks
-    
+
     found = False
     for handler in atexit._exithandlers:
         # atexit handlers are tuples of (func, args, kwargs)
@@ -179,6 +189,5 @@ def test_atexit_graceful_shutdown_registered():
             assert kwargs.get("wait") is True
             found = True
             break
-            
-    assert found, "Graceful shutdown callback was not registered with atexit"
 
+    assert found, "Graceful shutdown callback was not registered with atexit"

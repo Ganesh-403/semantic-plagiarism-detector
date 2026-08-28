@@ -1,11 +1,34 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """tests/api/test_batch_history.py
 
 Unit tests for the Batch Analysis History API endpoints.
 Tests cover CRUD operations for batch runs, timeline events, alerts, and analytics.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 from src.api.app import app
@@ -19,10 +42,12 @@ client = TestClient(app)
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(autouse=True)
 def _init_db(tmp_path):
     """Initialise an in-memory test database for each test."""
     import src.db.batch_history_db as mod
+
     mod.configure_db_path(str(tmp_path / "test_batch.db"))
     init_batch_history_db()
     yield
@@ -188,7 +213,9 @@ class TestBatchRunCRUD:
         mock_repo.complete_batch_run.assert_called_once()
 
     @patch("src.api.routers.batch_history.batch_repo")
-    def test_complete_batch_run_creates_alert_for_high_plagiarism(self, mock_repo, auth_headers):
+    def test_complete_batch_run_creates_alert_for_high_plagiarism(
+        self, mock_repo, auth_headers
+    ):
         mock_repo.get_batch_run.return_value = {"run_id": 1, "status": "running"}
         mock_repo.add_timeline_event.return_value = 1
         mock_repo.create_alert.return_value = 1

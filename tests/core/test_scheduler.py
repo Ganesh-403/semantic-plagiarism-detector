@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/core/test_scheduler.py
 ------------------------------
@@ -102,9 +124,7 @@ def test_scheduler_survives_a_failed_pass():
 def test_scheduler_double_start_is_idempotent():
     async def _run():
         scheduler = RescanScheduler(interval_minutes=60)
-        with patch.object(
-            RescanScheduler, "run_once", new_callable=AsyncMock
-        ):
+        with patch.object(RescanScheduler, "run_once", new_callable=AsyncMock):
             await scheduler.start()
             first_task = scheduler._task
             await scheduler.start()  # should not replace the running task
@@ -128,9 +148,7 @@ def test_scheduler_run_once_dispatches_to_thread():
         scheduler = RescanScheduler(
             interval_minutes=60, grace_period_minutes=45, threshold=0.8
         )
-        with patch(
-            "src.core.processing.rescan_recent_documents"
-        ) as mock_rescan:
+        with patch("src.core.processing.rescan_recent_documents") as mock_rescan:
             mock_rescan.return_value = "sentinel-result"
             result = await scheduler.run_once()
 

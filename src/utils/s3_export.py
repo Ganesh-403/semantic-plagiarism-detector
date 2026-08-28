@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """src/utils/s3_export.py - Export plagiarism reports to AWS S3 for institutional archival (Issue #3464).
 
 Provides ``upload_to_s3()`` so generated reports can be pushed straight to a
@@ -25,7 +47,7 @@ ENV_SECRET_ACCESS_KEY = "AWS_SECRET_ACCESS_KEY"
 ENV_S3_BUCKET = "AWS_S3_BUCKET"
 
 
-def get_s3_config() -> Dict[str, Optional[str]]:
+def get_s3_config() -> dict[str, str | None]:
     """Read AWS S3 export settings from the environment.
 
     Returns:
@@ -95,10 +117,10 @@ def _build_client(region: str):
 
 def upload_to_s3(
     file_bytes: bytes,
-    bucket_name: Optional[str] = None,
+    bucket_name: str | None = None,
     object_key: str = "",
     region: str = DEFAULT_REGION,
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Upload report bytes to an AWS S3 bucket for institutional archival.
 
     Args:
@@ -140,7 +162,7 @@ def upload_to_s3(
         object_key,
         region,
     )
-    response: Dict[str, Any] = client.put_object(
+    response: dict[str, Any] = client.put_object(
         Bucket=resolved_bucket,
         Key=object_key,
         Body=bytes(file_bytes),

@@ -46,7 +46,7 @@ body.dark-theme {
     line-height: 1.5;
     min-height: 100vh;
     overflow-x: hidden;
-    background-image: 
+    background-image:
         radial-gradient(circle at 15% 25%, rgba(236, 72, 153, 0.12) 0%, transparent 45%),
         radial-gradient(circle at 85% 75%, rgba(168, 85, 247, 0.12) 0%, transparent 45%);
 }

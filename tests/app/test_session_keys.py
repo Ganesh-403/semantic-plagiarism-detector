@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Unit tests for ``app/session_keys.py`` (Issue #2554).
 
 ``SessionKeys`` is the single source of truth for every key the Streamlit UI
@@ -51,9 +73,9 @@ def test_module_defines_exactly_one_top_level_class():
     """Guard against a merge leaving a second, shadowing class behind."""
     tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
     classes = [n.name for n in tree.body if isinstance(n, ast.ClassDef)]
-    assert classes == ["SessionKeys"], (
-        f"expected a single SessionKeys class at module level, found {classes}"
-    )
+    assert classes == [
+        "SessionKeys"
+    ], f"expected a single SessionKeys class at module level, found {classes}"
 
 
 def test_no_stray_module_level_key_assignments():
@@ -243,9 +265,9 @@ STATE_MANAGER_KEYS = (
 
 @pytest.mark.parametrize("name", STATE_MANAGER_KEYS)
 def test_state_manager_keys_exist(name: str):
-    assert hasattr(SessionKeys, name), (
-        f"app/state_manager.py references SessionKeys.{name}, which is missing"
-    )
+    assert hasattr(
+        SessionKeys, name
+    ), f"app/state_manager.py references SessionKeys.{name}, which is missing"
 
 
 def test_every_referenced_member_exists():

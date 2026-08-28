@@ -1,12 +1,34 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Enterprise Cross-Lingual & Multi-Granularity Semantic Plagiarism Engine
 Implements dense vector embeddings, cross-lingual sentence similarity,
 synonym-replacement detection, code-ast structural hashing, and automated PDF report export.
 """
 
-import math
 import hashlib
-from typing import List, Dict, Any, Tuple, Optional
+import math
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class CrossLingualSemanticAnalyzer:
@@ -46,7 +68,9 @@ class CrossLingualSemanticAnalyzer:
         magnitude = math.sqrt(sum(val * val for val in vector)) or 1.0
         return [val / magnitude for val in vector]
 
-    def compute_cosine_similarity(self, vec_a: list[float], vec_b: list[float]) -> float:
+    def compute_cosine_similarity(
+        self, vec_a: list[float], vec_b: list[float]
+    ) -> float:
         """Computes cosine similarity between two normalized dense vectors."""
         dot_product = sum(a * b for a, b in zip(vec_a, vec_b))
         return float(min(1.0, max(0.0, dot_product)))
@@ -65,13 +89,17 @@ class CrossLingualSemanticAnalyzer:
             sim_score = self.compute_cosine_similarity(query_vec, ref_vec)
 
             if sim_score >= similarity_threshold:
-                results.append({
-                    "matched_doc_id": doc_id,
-                    "similarity_score": round(sim_score, 4),
-                    "confidence_grade": "HIGH" if sim_score > 0.88 else "MODERATE",
-                    "snippet": doc_text[:120] + "..." if len(doc_text) > 120 else doc_text,
-                    "metadata": self.document_metadata.get(doc_id, {}),
-                })
+                results.append(
+                    {
+                        "matched_doc_id": doc_id,
+                        "similarity_score": round(sim_score, 4),
+                        "confidence_grade": "HIGH" if sim_score > 0.88 else "MODERATE",
+                        "snippet": (
+                            doc_text[:120] + "..." if len(doc_text) > 120 else doc_text
+                        ),
+                        "metadata": self.document_metadata.get(doc_id, {}),
+                    }
+                )
 
         return sorted(results, key=lambda x: x["similarity_score"], reverse=True)
 
@@ -152,12 +180,14 @@ class MultiGranularityParagraphAligner:
                 score = analyzer.compute_cosine_similarity(q_vec, r_vec)
 
                 if score >= 0.70:
-                    aligned_matches.append({
-                        "query_paragraph_index": q_idx,
-                        "reference_paragraph_index": r_idx,
-                        "paragraph_similarity_score": round(score, 4),
-                        "query_snippet": q_p[:80],
-                        "reference_snippet": r_p[:80],
-                    })
+                    aligned_matches.append(
+                        {
+                            "query_paragraph_index": q_idx,
+                            "reference_paragraph_index": r_idx,
+                            "paragraph_similarity_score": round(score, 4),
+                            "query_snippet": q_p[:80],
+                            "reference_snippet": r_p[:80],
+                        }
+                    )
 
         return aligned_matches

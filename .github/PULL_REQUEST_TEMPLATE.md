@@ -76,6 +76,7 @@ Please confirm the following before submitting your pull request:
 - [ ] This pull request is ready for review.
 
 ---
+
 ## 🔒 Security Assessment
 
 Please confirm the following:

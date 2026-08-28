@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 test_ai_detector.py
 -------------------
@@ -99,11 +121,14 @@ def test_ai_probability_categorization_consistency():
     for score in test_scores:
         # Mock detect_ai_probability to return the score
         with patch("src.core.ai_detector.detect_ai_probability", return_value=score):
-            res = detect_ai_generated_text("Some text for the classifier pipeline analysis.")
+            res = detect_ai_generated_text(
+                "Some text for the classifier pipeline analysis."
+            )
             tier = res["confidence_tier"]
             category = categorize_ai_probability(score)
-            assert mapping[tier] == category, f"Inconsistent categorization for score {score}: tier={tier}, category={category}"
-
+            assert (
+                mapping[tier] == category
+            ), f"Inconsistent categorization for score {score}: tier={tier}, category={category}"
 
 
 @pytest.fixture(autouse=True)
@@ -213,7 +238,6 @@ def test_detect_ai_generated_text_tiers():
     ) as mock_burst, patch(
         "src.core.ai_detector._calculate_ngram_repetitiveness"
     ) as mock_ngram:
-
         mock_perp.return_value = 50.0
         mock_burst.return_value = 0.3
         mock_ngram.return_value = 0.2
@@ -413,7 +437,10 @@ def test_calculate_text_perplexity_returns_float():
 def test_calculate_text_perplexity_with_fallback_model():
     """When model is in fallback mode, return default perplexity score."""
     with patch("src.core.ai_detector._get_model_and_tokenizer") as mock_loader:
-        mock_loader.return_value = (_FALLBACK_SENTINEL, _FALLBACK_SENTINEL)  # noqa: F821
+        mock_loader.return_value = (
+            _FALLBACK_SENTINEL,
+            _FALLBACK_SENTINEL,
+        )  # noqa: F821
         result = calculate_text_perplexity("Some text to evaluate.")
         assert result == 0.0
 
@@ -729,13 +756,19 @@ def test_split_sentences_simple():
     from src.core.ai_detector import _split_sentences_simple
 
     # Basic splitting
-    assert _split_sentences_simple("Hello! World? How are you.") == ["Hello", "World", "How are you"]
+    assert _split_sentences_simple("Hello! World? How are you.") == [
+        "Hello",
+        "World",
+        "How are you",
+    ]
 
     # Trailing punctuation empty strings filtered
-    assert _split_sentences_simple("One sentence... Two sentences!!!") == ["One sentence", "Two sentences"]
+    assert _split_sentences_simple("One sentence... Two sentences!!!") == [
+        "One sentence",
+        "Two sentences",
+    ]
 
     # Empty inputs and invalid types handled gracefully
     assert _split_sentences_simple("") == []
     assert _split_sentences_simple(None) == []
     assert _split_sentences_simple(123) == []  # type: ignore
-    

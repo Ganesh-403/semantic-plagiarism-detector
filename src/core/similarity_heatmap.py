@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 similarity_heatmap.py
 ---------------------
@@ -26,6 +48,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class HeatmapCell:
@@ -108,6 +131,7 @@ class ClusteringResult:
 # Similarity Matrix Computation
 # ---------------------------------------------------------------------------
 
+
 def _cosine_similarity_matrix(embeddings: np.ndarray) -> np.ndarray:
     """
     Compute the pairwise cosine similarity matrix for a set of embeddings.
@@ -180,6 +204,7 @@ def compute_heatmap(
 # ---------------------------------------------------------------------------
 # Agglomerative Clustering (single-linkage)
 # ---------------------------------------------------------------------------
+
 
 def _pairwise_distance(sim_matrix: np.ndarray) -> np.ndarray:
     """Convert similarity matrix to distance matrix: d = 1 - s."""
@@ -272,7 +297,8 @@ def _compute_silhouette(
 
         # a(i) = mean distance to same-cluster members
         same_cluster = [
-            j for j, label_j in enumerate(labels)
+            j
+            for j, label_j in enumerate(labels)
             if assignments.get(label_j) == ci and j != i
         ]
         if not same_cluster:
@@ -286,18 +312,23 @@ def _compute_silhouette(
             if other_cluster == ci:
                 continue
             other_members = [
-                j for j, label_j in enumerate(labels)
+                j
+                for j, label_j in enumerate(labels)
                 if assignments.get(label_j) == other_cluster
             ]
             if not other_members:
                 continue
-            mean_dist = sum(float(dist_matrix[i, j]) for j in other_members) / len(other_members)
+            mean_dist = sum(float(dist_matrix[i, j]) for j in other_members) / len(
+                other_members
+            )
             b_i = min(b_i, mean_dist)
 
         if b_i == float("inf"):
             silhouettes.append(0.0)
         else:
-            silhouettes.append((b_i - a_i) / max(a_i, b_i) if max(a_i, b_i) > 0 else 0.0)
+            silhouettes.append(
+                (b_i - a_i) / max(a_i, b_i) if max(a_i, b_i) > 0 else 0.0
+            )
 
     return sum(silhouettes) / len(silhouettes) if silhouettes else 0.0
 
@@ -353,12 +384,14 @@ def cluster_documents(
         else:
             centroid = 1.0
 
-        clusters.append(Cluster(
-            cluster_id=cid,
-            documents=members,
-            centroid_score=centroid,
-            size=len(members),
-        ))
+        clusters.append(
+            Cluster(
+                cluster_id=cid,
+                documents=members,
+                centroid_score=centroid,
+                size=len(members),
+            )
+        )
 
     silhouette = _compute_silhouette(dist, filenames, assignments)
 
@@ -377,6 +410,7 @@ def cluster_documents(
 # Hotspot Detection
 # ---------------------------------------------------------------------------
 
+
 def detect_similarity_hotspots(
     filenames: list[str],
     sim_matrix: np.ndarray,
@@ -394,11 +428,13 @@ def detect_similarity_hotspots(
         for j in range(i + 1, n):
             s = float(sim_matrix[i, j])
             if s >= threshold:
-                hotspots.append({
-                    "doc_a": filenames[i],
-                    "doc_b": filenames[j],
-                    "similarity": round(s, 4),
-                })
+                hotspots.append(
+                    {
+                        "doc_a": filenames[i],
+                        "doc_b": filenames[j],
+                        "similarity": round(s, 4),
+                    }
+                )
     hotspots.sort(key=lambda h: h["similarity"], reverse=True)
     return hotspots
 
@@ -406,6 +442,7 @@ def detect_similarity_hotspots(
 # ---------------------------------------------------------------------------
 # Export helpers
 # ---------------------------------------------------------------------------
+
 
 def heatmap_to_svg_data(
     heatmap: HeatmapMatrix,
@@ -439,14 +476,16 @@ def heatmap_to_svg_data(
                 b = int(145 - (val - 0.5) * 2 * 100)
             color = f"rgb({r},{g},{b})"
 
-            cells.append({
-                "x": j * cell_size + 120,
-                "y": i * cell_size + 120,
-                "color": color,
-                "row_label": short_labels[i],
-                "col_label": short_labels[j],
-                "value": round(val, 4),
-            })
+            cells.append(
+                {
+                    "x": j * cell_size + 120,
+                    "y": i * cell_size + 120,
+                    "color": color,
+                    "row_label": short_labels[i],
+                    "col_label": short_labels[j],
+                    "value": round(val, 4),
+                }
+            )
 
     return {
         "cell_size": cell_size,

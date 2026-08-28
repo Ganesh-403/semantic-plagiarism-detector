@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/db/test_incidents_core.py
 -------------------------------
@@ -24,7 +46,7 @@ class TestIncidentCreation:
 
         db_connection.execute(
             """
-            INSERT INTO plagiarism_incidents 
+            INSERT INTO plagiarism_incidents
             (incident_id, document_a, document_b, similarity, severity, timestamp, threshold_at_time_of_flag, review_status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -58,7 +80,7 @@ class TestIncidentCreation:
         """Verify incident creation handles NULL threshold gracefully."""
         db_connection.execute(
             """
-            INSERT INTO plagiarism_incidents 
+            INSERT INTO plagiarism_incidents
             (incident_id, document_a, document_b, similarity, severity, timestamp, threshold_at_time_of_flag, review_status)
             VALUES ('NULL-001', 'a.pdf', 'b.pdf', 0.80, 'High', '2024-01-01', NULL, 'Pending')
             """
@@ -85,7 +107,7 @@ class TestIncidentRetrieval:
         # Insert a specific incident to query
         conn.execute(
             """
-            INSERT INTO plagiarism_incidents 
+            INSERT INTO plagiarism_incidents
             (incident_id, document_a, document_b, similarity, severity, timestamp, threshold_at_time_of_flag, review_status)
             VALUES ('QUERY-001', 'target_doc.pdf', 'other.pdf', 0.99, 'High', '2024-02-01', 0.59, 'Pending')
             """
@@ -94,7 +116,7 @@ class TestIncidentRetrieval:
 
         cursor = conn.execute(
             """
-            SELECT * FROM plagiarism_incidents 
+            SELECT * FROM plagiarism_incidents
             WHERE document_a = ? OR document_b = ?
             """,
             ("target-doc.pdf", "target-doc.pdf"),

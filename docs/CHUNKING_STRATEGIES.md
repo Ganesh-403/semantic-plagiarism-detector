@@ -19,6 +19,7 @@ boundary out to the nearest sentence terminator so chunks don't cut off
 mid-sentence.
 
 **Signature:**
+
 ```python
 chunk_text(
     text: str,
@@ -32,6 +33,7 @@ chunk_text(
 ```
 
 **Key parameters:**
+
 - `chunk_size` - target character length per chunk. Enforced minimum of 50
   characters (`MIN_CHUNK_SIZE`); smaller values are clamped up with a warning.
 - `chunk_overlap` - number of characters shared between consecutive chunks,
@@ -57,6 +59,7 @@ predictable chunk size (for consistent embedding batch shapes) and semantic
 coherence via sentence padding.
 
 **Pros:**
+
 - Predictable, tunable chunk size - useful when you need consistent memory/
   compute per chunk.
 - Sentence padding avoids truncating mid-sentence, improving embedding quality.
@@ -64,6 +67,7 @@ coherence via sentence padding.
 - Robust fallback path for non-space-delimited or degenerate text.
 
 **Cons:**
+
 - Chunk size is only a soft target once sentence padding is enabled - actual
   chunk length can grow up to `2 × chunk_size` in the worst case (hard-capped).
 - More parameters to tune than the other two strategies.
@@ -77,6 +81,7 @@ is ever split across two chunks. Uses NLTK's `sent_tokenize` when available,
 falling back to a regex-based sentence splitter otherwise.
 
 **Signature:**
+
 ```python
 chunk_by_sentences(
     text: str,
@@ -87,6 +92,7 @@ chunk_by_sentences(
 ```
 
 **Key parameters:**
+
 - `max_chunk_size` - soft character limit per chunk. It's a *soft* limit: a
   single sentence longer than `max_chunk_size` is still emitted as its own
   chunk rather than being truncated or dropped.
@@ -103,11 +109,13 @@ highly variable sentence lengths that would be awkwardly split by a
 fixed-size window.
 
 **Pros:**
+
 - Never splits a sentence mid-clause.
 - Simple mental model - one or more complete sentences per chunk.
 - No overlap logic to tune.
 
 **Cons:**
+
 - No overlap between chunks, so context that spans a chunk boundary can be
   lost.
 - Chunk sizes are less uniform - a chunk containing several short sentences
@@ -124,6 +132,7 @@ the actual boundary to the nearest sentence-ending punctuation within a
 tolerance margin, balancing uniform chunk size against sentence integrity.
 
 **Signature:**
+
 ```python
 chunk_text_dynamic(
     text: str,
@@ -133,6 +142,7 @@ chunk_text_dynamic(
 ```
 
 **Key parameters:**
+
 - `target_size` - target character length per chunk.
 - `min_overlap` - minimum character overlap enforced between consecutive
   chunks.
@@ -149,6 +159,7 @@ Well suited to large documents where you need consistent chunk counts for
 batching or progress estimation.
 
 **Pros:**
+
 - More size-uniform than `chunk_by_sentences`, since it always tries to land
   near `target_size`.
 - Still prefers sentence boundaries over arbitrary character cuts, unlike
@@ -156,6 +167,7 @@ batching or progress estimation.
 - Simple two-parameter interface.
 
 **Cons:**
+
 - Boundary search only looks for punctuation, not full NLTK sentence
   tokenization - less robust than `chunk_by_sentences` on abbreviations
   (e.g. "Dr.", "U.S.") since any `.`/`!`/`?` character counts as a candidate

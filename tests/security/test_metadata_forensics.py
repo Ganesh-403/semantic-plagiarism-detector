@@ -1,18 +1,42 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/security/test_metadata_forensics.py
 -----------------------------------------
 Unit tests for Document Provenance and Metadata Forensics.
 """
 
-import pytest
-import zipfile
 import io
-from src.security.metadata_forensics import extract_docx_metadata, extract_pdf_metadata
+import zipfile
+
+import pytest
+
 from src.core.edit_history_analyzer import (
-    analyze_edit_velocity,
     analyze_author_mismatch,
+    analyze_edit_velocity,
     compute_provenance_risk_score,
 )
+from src.security.metadata_forensics import extract_docx_metadata, extract_pdf_metadata
 
 
 class TestDocxMetadataExtraction:
@@ -24,8 +48,8 @@ class TestDocxMetadataExtraction:
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w") as zf:
             core_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-            <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" 
-                               xmlns:dc="http://purl.org/dc/elements/1.1/" 
+            <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+                               xmlns:dc="http://purl.org/dc/elements/1.1/"
                                xmlns:dcterms="http://purl.org/dc/terms/">
                 <dc:creator>John Doe</dc:creator>
                 <cp:lastModifiedBy>Jane Smith</cp:lastModifiedBy>
@@ -80,7 +104,7 @@ class TestEditHistoryAnalyzer:
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w") as zf:
             core_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-            <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" 
+            <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
                                xmlns:dc="http://purl.org/dc/elements/1.1/">
                 <dc:creator>EssayMill</dc:creator>
                 <cp:lastModifiedBy>Student</cp:lastModifiedBy>

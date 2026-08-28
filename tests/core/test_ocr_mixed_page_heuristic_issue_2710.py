@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 test_ocr_mixed_page_heuristic_issue_2710.py
 --------------------------------------------
@@ -16,19 +38,16 @@ import pytest
 from src.core.document_parser import (
     _calculate_document_image_coverage as _calculate_document_image_coverage_doc,
 )
-from src.core.document_parser import (
-    _has_meaningful_text as _has_meaningful_text_doc,
-)
+from src.core.document_parser import _has_meaningful_text as _has_meaningful_text_doc
 from src.core.parsers.pdf_parser import (
     _calculate_image_area_coverage as _calculate_image_area_coverage_pdf,
 )
-from src.core.parsers.pdf_parser import (
-    _has_meaningful_text as _has_meaningful_text_pdf,
-)
+from src.core.parsers.pdf_parser import _has_meaningful_text as _has_meaningful_text_pdf
 
 # ---------------------------------------------------------------------------
 # Section 1: Core Heuristic Base Rules & Text Density Checks
 # ---------------------------------------------------------------------------
+
 
 def test_has_meaningful_text_normal_sufficient_text():
     """Verify that pure text with >= 15 native words and >= 30 alphanumeric chars evaluates to True."""
@@ -65,6 +84,7 @@ def test_has_meaningful_text_special_characters_only():
 # ---------------------------------------------------------------------------
 # Section 2: Mixed-Media Pages with Large Scanned Images (Issue #2710 Core)
 # ---------------------------------------------------------------------------
+
 
 def test_has_meaningful_text_mixed_page_with_large_scanned_image_dict():
     """Issue #2710: Native header (>15 words) + massive scanned image (dict format).
@@ -116,6 +136,7 @@ def test_has_meaningful_text_mixed_page_with_get_images_method():
 # Section 3: Small Icons & Logotype Exclusion Matrix
 # ---------------------------------------------------------------------------
 
+
 def test_has_meaningful_text_mixed_page_small_logo_icon():
     """Verify that a tiny header logo (30x30px) does NOT trigger OCR bypass when native text is abundant."""
     header_text = (
@@ -154,11 +175,10 @@ def test_has_meaningful_text_multiple_tiny_bullet_icons():
 # Section 4: Boundary Threshold & Coverage Ratio Edge Cases
 # ---------------------------------------------------------------------------
 
+
 def test_has_meaningful_text_exact_20_percent_coverage_threshold():
     """Verify threshold boundary: 20% area coverage exactly triggers OCR evaluation."""
-    text = (
-        "Comprehensive analysis of semantic similarity algorithms in automated plagiarism detection pipelines."
-    )
+    text = "Comprehensive analysis of semantic similarity algorithms in automated plagiarism detection pipelines."
     mock_page = MagicMock()
     mock_page.width = 1000
     mock_page.height = 1000  # Total area = 1,000,000
@@ -170,9 +190,7 @@ def test_has_meaningful_text_exact_20_percent_coverage_threshold():
 
 def test_has_meaningful_text_19_percent_coverage_small_dimensions():
     """Verify threshold boundary: 19% area coverage with dimensions < 200px allows native text."""
-    text = (
-        "Comprehensive analysis of semantic similarity algorithms in automated plagiarism detection pipelines."
-    )
+    text = "Comprehensive analysis of semantic similarity algorithms in automated plagiarism detection pipelines."
     mock_page = MagicMock()
     mock_page.width = 1000
     mock_page.height = 1000  # Total area = 1,000,000
@@ -184,9 +202,7 @@ def test_has_meaningful_text_19_percent_coverage_small_dimensions():
 
 def test_has_meaningful_text_exact_200px_dimension_threshold():
     """Verify dimension threshold: Image with 200x200px forces OCR even if coverage < 20%."""
-    text = (
-        "Comprehensive analysis of semantic similarity algorithms in automated plagiarism detection pipelines."
-    )
+    text = "Comprehensive analysis of semantic similarity algorithms in automated plagiarism detection pipelines."
     mock_page = MagicMock()
     mock_page.width = 2000
     mock_page.height = 2000  # Total area = 4,000,000
@@ -200,13 +216,16 @@ def test_has_meaningful_text_exact_200px_dimension_threshold():
 # Section 5: Area Coverage Helper Direct Functions
 # ---------------------------------------------------------------------------
 
+
 def test_calculate_image_area_coverage_empty_or_invalid():
     """Test _calculate_image_area_coverage directly with empty/invalid arguments."""
     ratio, has_large = _calculate_image_area_coverage_pdf([], 600, 800)
     assert ratio == 0.0
     assert has_large is False
 
-    ratio, has_large = _calculate_image_area_coverage_pdf([{"width": 100, "height": 100}], 0, 800)
+    ratio, has_large = _calculate_image_area_coverage_pdf(
+        [{"width": 100, "height": 100}], 0, 800
+    )
     assert ratio == 0.0
     assert has_large is False
 
@@ -231,11 +250,10 @@ def test_calculate_image_area_coverage_multiple_images():
 # Section 6: Robustness & Exception Handling
 # ---------------------------------------------------------------------------
 
+
 def test_has_meaningful_text_malformed_page_object_fallback():
     """Verify that broken or malformed page objects do not raise exceptions and fall back cleanly."""
-    text = (
-        "Standard native document text containing sufficient words to pass the default native word count check."
-    )
+    text = "Standard native document text containing sufficient words to pass the default native word count check."
     broken_page = MagicMock()
     broken_page.width = "invalid_string_width"
     broken_page.images = [None]
@@ -246,9 +264,7 @@ def test_has_meaningful_text_malformed_page_object_fallback():
 
 def test_has_meaningful_text_zero_area_page_fallback():
     """Verify page with width=0 or height=0 handles division by zero safely."""
-    text = (
-        "Standard native document text containing sufficient words to pass the default native word count check."
-    )
+    text = "Standard native document text containing sufficient words to pass the default native word count check."
     zero_page = MagicMock()
     zero_page.width = 0
     zero_page.height = 0
@@ -261,6 +277,7 @@ def test_has_meaningful_text_zero_area_page_fallback():
 # ---------------------------------------------------------------------------
 # Section 7: Comprehensive Page Layout Matrix Simulations
 # ---------------------------------------------------------------------------
+
 
 def test_simulation_academic_paper_with_header_and_scanned_diagram():
     """Simulation: Academic paper page with title, abstract, and scanned equation block."""

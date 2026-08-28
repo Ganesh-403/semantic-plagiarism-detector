@@ -1,8 +1,32 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import sqlite3
-import pytest
 from unittest.mock import patch
 
+import pytest
+
 # --- Pytest Fixtures Layer ---
+
 
 @pytest.fixture(scope="function")
 def isolated_test_db():
@@ -13,56 +37,57 @@ def isolated_test_db():
     connection = sqlite3.connect(":memory:")
     # Initialize basic schema prerequisites required for the bulk worker test
     cursor = connection.cursor()
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS incidents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
             severity TEXT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         );
-    """)
+    """
+    )
     connection.commit()
-    
+
     yield connection
-    
+
     # Teardown hook: Close out connection securely
     connection.close()
 
 
 # --- Refactored Test Suite ---
 
+
 def test_incidents_bulk_insertion_pipeline(isolated_test_db):
     """
-    Scenario: Validate bulk record operations execute completely inside 
+    Scenario: Validate bulk record operations execute completely inside
               the isolated mock database context hook.
     """
     conn = isolated_test_db
     cursor = conn.cursor()
-    
+
     # Mock dataset payload matching operational structures
     bulk_payload = [
         ("Network Outage East", "CRITICAL"),
         ("Database Replica Delay", "WARNING"),
-        ("Expired SSL Alert", "INFO")
+        ("Expired SSL Alert", "INFO"),
     ]
-    
+
     # Execute batch insertion execution steps
     cursor.executemany(
-        "INSERT INTO incidents (title, severity) VALUES (?, ?);", 
-        bulk_payload
+        "INSERT INTO incidents (title, severity) VALUES (?, ?);", bulk_payload
     )
     conn.commit()
-    
+
     # Verify count metrics match the injected parameters
     cursor.execute("SELECT COUNT(*) FROM incidents;")
     record_count = cursor.fetchone()[0]
     assert record_count == 3
-    
+
     # Validate structural content properties
     cursor.execute("SELECT title FROM incidents ORDER BY id ASC;")
     inserted_titles = [row[0] for row in cursor.fetchall()]
     assert inserted_titles[0] == "Network Outage East"
-
 
 
 class TestBulkIncidentInsertion:
@@ -86,7 +111,7 @@ class TestBulkIncidentInsertion:
 
         db_connection.executemany(
             """
-            INSERT INTO plagiarism_incidents 
+            INSERT INTO plagiarism_incidents
             (incident_id, document_a, document_b, similarity, severity, timestamp, threshold_at_time_of_flag, review_status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -104,7 +129,7 @@ class TestBulkIncidentInsertion:
         # Insert first incident
         db_connection.execute(
             """
-            INSERT INTO plagiarism_incidents 
+            INSERT INTO plagiarism_incidents
             (incident_id, document_a, document_b, similarity, severity, timestamp, threshold_at_time_of_flag, review_status)
             VALUES ('DUP-001', 'a.pdf', 'b.pdf', 0.90, 'High', '2024-01-01', 0.59, 'Pending')
             """
@@ -130,7 +155,7 @@ class TestBulkIncidentInsertion:
             try:
                 db_connection.executemany(
                     """
-                    INSERT INTO plagiarism_incidents 
+                    INSERT INTO plagiarism_incidents
                     (incident_id, document_a, document_b, similarity, severity, timestamp, threshold_at_time_of_flag, review_status)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
@@ -154,8 +179,8 @@ class TestBulkIncidentInsertion:
         # Update all pending to reviewed
         cursor = conn.execute(
             """
-            UPDATE plagiarism_incidents 
-            SET review_status = 'Reviewed' 
+            UPDATE plagiarism_incidents
+            SET review_status = 'Reviewed'
             WHERE review_status = 'Pending'
             """
         )

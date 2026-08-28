@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Stylometric Author Attribution Domain Model.
 
 Defines data structures for sentence length variance, vocabulary richness metrics,
@@ -35,7 +57,9 @@ class StylometricAuthorMatch:
     stylometric_distance: float  # Euclidean distance between feature vectors
     attribution_confidence_percentage: float  # Range: 0.0 - 100.0%
     is_same_author: bool
-    dominant_stylometric_trait: str  # e.g., 'Function Word Overlap', 'Sentence Structure'
+    dominant_stylometric_trait: (
+        str  # e.g., 'Function Word Overlap', 'Sentence Structure'
+    )
     compared_at: datetime = field(default_factory=datetime.utcnow)
 
 

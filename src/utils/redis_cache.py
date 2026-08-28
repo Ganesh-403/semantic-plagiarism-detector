@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 redis_cache.py
 --------------
@@ -101,14 +123,30 @@ REDIS_TIMEOUT_SECONDS = float(os.getenv("REDIS_TIMEOUT_SECONDS", "2.0"))
 
 # TTL settings (in seconds) - Configurable via environment variables (Issue #2323)
 # Defaults are preserved for backward compatibility when env vars are not set
-SESSION_TTL = int(os.getenv("SESSION_TTL", str(15 * 60)))  # 15 minutes for session state
-FAISS_INDEX_TTL = int(os.getenv("FAISS_INDEX_TTL", str(24 * 60 * 60)))  # 24 hours for FAISS index cache
-ANALYSIS_RESULTS_TTL = int(os.getenv("ANALYSIS_RESULTS_TTL", str(2 * 60 * 60)))  # 2 hours for analysis results
-LOGIN_LOCKOUT_TTL = int(os.getenv("LOGIN_LOCKOUT_TTL", str(15 * 60)))  # 15 minutes for login lockout
-UPLOAD_RATE_TTL = int(os.getenv("UPLOAD_RATE_TTL", str(60 * 60)))  # 1 hour for upload rate limiting
-BADGE_TTL = int(os.getenv("BADGE_TTL", str(24 * 60 * 60)))  # 24 hours for badge buffer cache
-SCAN_JOBS_TTL = int(os.getenv("SCAN_JOBS_TTL", str(24 * 60 * 60)))  # 24 hours for scan jobs
-DEFAULT_TTL = int(os.getenv("DEFAULT_TTL", str(24 * 60 * 60)))  # 24 hours fallback for keys without explicit TTL
+SESSION_TTL = int(
+    os.getenv("SESSION_TTL", str(15 * 60))
+)  # 15 minutes for session state
+FAISS_INDEX_TTL = int(
+    os.getenv("FAISS_INDEX_TTL", str(24 * 60 * 60))
+)  # 24 hours for FAISS index cache
+ANALYSIS_RESULTS_TTL = int(
+    os.getenv("ANALYSIS_RESULTS_TTL", str(2 * 60 * 60))
+)  # 2 hours for analysis results
+LOGIN_LOCKOUT_TTL = int(
+    os.getenv("LOGIN_LOCKOUT_TTL", str(15 * 60))
+)  # 15 minutes for login lockout
+UPLOAD_RATE_TTL = int(
+    os.getenv("UPLOAD_RATE_TTL", str(60 * 60))
+)  # 1 hour for upload rate limiting
+BADGE_TTL = int(
+    os.getenv("BADGE_TTL", str(24 * 60 * 60))
+)  # 24 hours for badge buffer cache
+SCAN_JOBS_TTL = int(
+    os.getenv("SCAN_JOBS_TTL", str(24 * 60 * 60))
+)  # 24 hours for scan jobs
+DEFAULT_TTL = int(
+    os.getenv("DEFAULT_TTL", str(24 * 60 * 60))
+)  # 24 hours fallback for keys without explicit TTL
 
 
 # ============================================================================
@@ -188,21 +226,21 @@ class PayloadCompressor:
                     f"Time: {(time.perf_counter()-start_time)*1000:.2f}ms"
                 )
                 return decompressed_data
-                
+
             except zlib.error as e:
                 logger.critical(
                     "[CacheCompression] CRITICAL: zlib decompression failed due to "
                     "corrupted payload. Treating as cache miss. Error: %s",
                     e,
-                    exc_info=True
+                    exc_info=True,
                 )
                 return None
-                
+
             except Exception as e:
                 logger.critical(
                     "[CacheCompression] CRITICAL: Unexpected error during decompression: %s",
                     e,
-                    exc_info=True
+                    exc_info=True,
                 )
                 return None
 
@@ -403,9 +441,7 @@ class RedisCache:
             return []
         try:
             raw_keys = list(self._client.scan_iter(match=match))
-            return [
-                k.decode("utf-8") if isinstance(k, bytes) else k for k in raw_keys
-            ]
+            return [k.decode("utf-8") if isinstance(k, bytes) else k for k in raw_keys]
         except Exception as e:
             logger.error(f"[RedisCache] Error scanning keys for pattern {match}: {e}")
             return []
@@ -455,6 +491,7 @@ class RedisCache:
             self._hits += 1
         try:
             from src.core.metrics import cache_hits_total
+
             cache_hits_total.labels(cache_type="redis").inc()
         except Exception:
             pass
@@ -464,6 +501,7 @@ class RedisCache:
             self._misses += 1
         try:
             from src.core.metrics import cache_misses_total
+
             cache_misses_total.labels(cache_type="redis").inc()
         except Exception:
             pass
@@ -492,11 +530,11 @@ class RedisCache:
                 data = self._client.get(key)
                 if data is not None:
                     decompressed = PayloadCompressor.decompress(data)
-                    
+
                     if decompressed is None:
                         logger.warning(
                             "[RedisCache] Corrupted payload detected for key '%s'. Deleting.",
-                            key
+                            key,
                         )
                         try:
                             self._client.delete(key)
@@ -505,9 +543,11 @@ class RedisCache:
                     else:
                         self._inc_hits()
                         return pickle.loads(decompressed)  # nosec
-                        
+
             except Exception as e:
-                logger.error(f"[RedisCache] Error getting key {key}: {e}. Falling back.")
+                logger.error(
+                    f"[RedisCache] Error getting key {key}: {e}. Falling back."
+                )
 
         val = self._fallback_get(key)
         if val is not None:
@@ -550,11 +590,11 @@ class RedisCache:
                 data = self._client.get(key)
                 if data is not None:
                     decompressed = PayloadCompressor.decompress(data)
-                    
+
                     if decompressed is None:
                         logger.warning(
                             "[RedisCache] Corrupted JSON payload for key '%s'. Deleting.",
-                            key
+                            key,
                         )
                         try:
                             self._client.delete(key)
@@ -562,8 +602,8 @@ class RedisCache:
                             pass
                     else:
                         self._inc_hits()
-                        return json.loads(decompressed.decode('utf-8'))
-                        
+                        return json.loads(decompressed.decode("utf-8"))
+
             except Exception as e:
                 logger.error(f"[RedisCache] Error getting JSON key {key}: {e}.")
 
@@ -601,9 +641,7 @@ class RedisCache:
                         chunk = keys[i : i + chunk_size]
                         pipeline.delete(*chunk)
                     results = pipeline.execute()
-                    redis_count = sum(
-                        r for r in results if isinstance(r, (int, float))
-                    )
+                    redis_count = sum(r for r in results if isinstance(r, (int, float)))
             except Exception as e:
                 logger.error(
                     f"[RedisCache] Error clearing pattern {pattern}: {e}. Falling back to in-memory."
@@ -785,15 +823,17 @@ def store_large_data(key: str | Path, data: Any, ttl: int = 1800) -> None:
     try:
         cache = get_cache()
         compressed = zlib.compress(pickle.dumps(data))
-        
+
         if cache.is_available():
             cache._client.setex(f"spd:v1:large:{key_str}", ttl, compressed)
         else:
             cache.fallback_cache[f"spd:v1:large:{key_str}"] = {
                 "data": compressed,
-                "expiry": time.time() + ttl
+                "expiry": time.time() + ttl,
             }
-        logger.debug(f"Stored large data for key: {key_str} ({len(compressed)} bytes compressed)")
+        logger.debug(
+            f"Stored large data for key: {key_str} ({len(compressed)} bytes compressed)"
+        )
     except Exception as e:
         logger.error(f"Failed to store large data for key {key_str}: {e}")
 
@@ -804,7 +844,7 @@ def get_large_data(key: str | Path) -> Optional[Any]:
     try:
         cache = get_cache()
         data = None
-        
+
         if cache.is_available():
             data = cache._client.get(f"spd:v1:large:{key_str}")
         else:
@@ -813,7 +853,7 @@ def get_large_data(key: str | Path) -> Optional[Any]:
                 data = entry["data"]
             elif entry:
                 del cache.fallback_cache[f"spd:v1:large:{key_str}"]
-        
+
         if data:
             return pickle.loads(zlib.decompress(data))  # nosec
         return None
@@ -847,7 +887,9 @@ def clear_all_large_data(session_id: str | Path) -> None:
             keys = []
             for pattern in patterns:
                 if hasattr(cache._client, "scan_iter"):
-                    keys.extend(list(cache._client.scan_iter(match=pattern, count=1000)))
+                    keys.extend(
+                        list(cache._client.scan_iter(match=pattern, count=1000))
+                    )
                 else:
                     keys.extend(cache._client.keys(pattern))
             keys = list(set(keys))
@@ -861,7 +903,8 @@ def clear_all_large_data(session_id: str | Path) -> None:
         else:
             prefixes = (f"spd:v1:large:{sid_str}:", f"spd:v1:large:{sid_str}/")
             keys_to_remove = [
-                k for k in cache.fallback_cache.keys()
+                k
+                for k in cache.fallback_cache.keys()
                 if any(k.startswith(p) for p in prefixes)
             ]
             for key in keys_to_remove:

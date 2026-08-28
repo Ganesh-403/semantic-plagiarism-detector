@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/core/test_release_large_batch_memory_issue_3479.py
 --------------------------------------------------------
@@ -24,7 +46,9 @@ from src.core.embedding_model import (
 def _patch_cuda(available: bool):
     """Patch torch.cuda availability checks inside embedding_model."""
     return (
-        patch("src.core.embedding_model.torch.cuda.is_available", return_value=available),
+        patch(
+            "src.core.embedding_model.torch.cuda.is_available", return_value=available
+        ),
         patch("src.core.embedding_model.torch.cuda.empty_cache"),
     )
 
@@ -102,17 +126,13 @@ def test_process_scan_job_releases_memory_for_large_batches():
 
     with patch(
         "src.api.routers.analysis.extract_text", return_value="sample document text"
-    ), patch(
-        "src.api.routers.analysis.chunk_document", return_value=chunks
-    ), patch(
+    ), patch("src.api.routers.analysis.chunk_document", return_value=chunks), patch(
         "src.api.routers.analysis.embed_chunks",
         return_value=np.ones((25, 384), dtype=np.float32),
     ), patch(
         "src.api.routers.analysis.get_corpus_documents_with_embeddings",
         return_value={},
-    ), patch(
-        "src.api.routers.analysis.release_large_batch_memory"
-    ) as release_mock:
+    ), patch("src.api.routers.analysis.release_large_batch_memory") as release_mock:
         _process_scan_job(
             job_id=job_id,
             file_input="fake_path",
@@ -146,17 +166,13 @@ def test_process_scan_job_skips_release_for_small_batches():
 
     with patch(
         "src.api.routers.analysis.extract_text", return_value="sample document text"
-    ), patch(
-        "src.api.routers.analysis.chunk_document", return_value=chunks
-    ), patch(
+    ), patch("src.api.routers.analysis.chunk_document", return_value=chunks), patch(
         "src.api.routers.analysis.embed_chunks",
         return_value=np.ones((5, 384), dtype=np.float32),
     ), patch(
         "src.api.routers.analysis.get_corpus_documents_with_embeddings",
         return_value={},
-    ), patch(
-        "src.api.routers.analysis.release_large_batch_memory"
-    ) as release_mock:
+    ), patch("src.api.routers.analysis.release_large_batch_memory") as release_mock:
         _process_scan_job(
             job_id=job_id,
             file_input="fake_path",

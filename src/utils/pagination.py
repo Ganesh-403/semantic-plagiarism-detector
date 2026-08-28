@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/utils/pagination.py
 -----------------------
@@ -36,7 +58,7 @@ Recent Additions (Issue #3215):
   slow once a table (e.g. the incidents table) reaches tens of thousands of
   rows. Cursor pagination instead resumes from an opaque token derived from
   the last row of the previous page, so a query can use ``WHERE (sort_key)
-  > (cursor)`` instead of ``OFFSET n``.  
+  > (cursor)`` instead of ``OFFSET n``.
 
 Recent Additions (Issue #3218):
 - ``PaginationPage.was_clamped`` records whether ``paginate_items`` had to
@@ -455,6 +477,7 @@ def paginate_items(
         was_clamped=was_clamped,
     )
 
+
 def encode_cursor(value: Any) -> str:
     """Encode a sort-key value into an opaque cursor string.
 
@@ -588,9 +611,7 @@ def paginate_by_cursor(
     page_items = list(items[:safe_limit])
 
     next_cursor = (
-        encode_cursor(cursor_key(page_items[-1]))
-        if has_more and page_items
-        else None
+        encode_cursor(cursor_key(page_items[-1])) if has_more and page_items else None
     )
 
     return CursorPaginationPage(

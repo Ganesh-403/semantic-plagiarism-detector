@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/core/test_events.py
 --------------------------
@@ -27,7 +49,11 @@ FIXED_TIMESTAMP = "2026-01-15T09:30:00+00:00"
 def make_event(**overrides) -> WebhookEvent:
     kwargs = dict(
         event_type=WebhookEventType.PLAGIARISM_DETECTED,
-        payload={"document_a": "essay_a.pdf", "document_b": "essay_b.pdf", "similarity_score": 0.93},
+        payload={
+            "document_a": "essay_a.pdf",
+            "document_b": "essay_b.pdf",
+            "similarity_score": 0.93,
+        },
         workspace_id="workspace-1",
         event_id=FIXED_EVENT_ID,
         occurred_at=FIXED_TIMESTAMP,
@@ -96,10 +122,18 @@ class TestSerializeEventDeterminism:
     def test_payload_key_order_does_not_affect_output(self):
         """Callers may build the payload dict in any key order; output must match."""
         event_a = make_event(
-            payload={"similarity_score": 0.93, "document_b": "essay_b.pdf", "document_a": "essay_a.pdf"}
+            payload={
+                "similarity_score": 0.93,
+                "document_b": "essay_b.pdf",
+                "document_a": "essay_a.pdf",
+            }
         )
         event_b = make_event(
-            payload={"document_a": "essay_a.pdf", "document_b": "essay_b.pdf", "similarity_score": 0.93}
+            payload={
+                "document_a": "essay_a.pdf",
+                "document_b": "essay_b.pdf",
+                "similarity_score": 0.93,
+            }
         )
         assert serialize_event(event_a) == serialize_event(event_b)
 

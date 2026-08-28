@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """similarity_engines.py
 ----------------------
 Implements concrete similarity engines and the SimilarityEngineFactory.
@@ -68,6 +90,7 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
 
             # Lazy load fallback model to avoid circular import issues
             from src.core.embedding_model import get_document_embedding
+
             return get_document_embedding(doc)
 
         raise TypeError("Document must be a string or a numpy array of embeddings.")
@@ -161,6 +184,7 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
             emb = query
 
         from src.core.faiss_index import search_similar_chunks
+
         return search_similar_chunks(
             emb,
             self.faiss_index,
@@ -211,19 +235,13 @@ class LexicalSimilarityEngine(BaseSimilarityEngine):
 
         if self.algorithm == "tfidf":
             if self.corpus:
-                from src.core.lexical_similarity import (
-                    compute_tfidf_lexical_similarity,
-                )
+                from src.core.lexical_similarity import compute_tfidf_lexical_similarity
 
                 return compute_tfidf_lexical_similarity(doc1, doc2, self.corpus)
             else:
-                from src.core.lexical_similarity import (
-                    calculate_lexical_similarity,
-                )
+                from src.core.lexical_similarity import calculate_lexical_similarity
 
-                return calculate_lexical_similarity(
-                    doc1, doc2, self.custom_stopwords
-                )
+                return calculate_lexical_similarity(doc1, doc2, self.custom_stopwords)
 
         elif self.algorithm == "jaccard":
             from src.core.lexical_similarity import jaccard_similarity
@@ -246,9 +264,7 @@ class LexicalSimilarityEngine(BaseSimilarityEngine):
             return n_gram_overlap(doc1, doc2, self.ngram_size, self.stopwords)
 
         elif self.algorithm == "char_ngram":
-            from src.core.lexical_similarity import (
-                compute_char_ngram_similarity,
-            )
+            from src.core.lexical_similarity import compute_char_ngram_similarity
 
             return compute_char_ngram_similarity(doc1, doc2, self.ngram_size)
 
@@ -308,9 +324,7 @@ class LexicalSimilarityEngine(BaseSimilarityEngine):
                     if i == j:
                         matrix[i][j] = 1.0
                     else:
-                        sim = self.compute_pairwise_similarity(
-                            doc_list[i], doc_list[j]
-                        )
+                        sim = self.compute_pairwise_similarity(doc_list[i], doc_list[j])
                         matrix[i][j] = sim
                         matrix[j][i] = sim
             return matrix
@@ -355,9 +369,7 @@ class HybridSimilarityEngine(BaseSimilarityEngine):
     ) -> float:
         # Check if lexical computation is possible (e.g. requires string inputs)
         try:
-            lex_sim = self.lexical_engine.compute_pairwise_similarity(
-                doc1, doc2
-            )
+            lex_sim = self.lexical_engine.compute_pairwise_similarity(doc1, doc2)
             has_lex = True
         except (TypeError, ValueError):
             lex_sim = 0.0

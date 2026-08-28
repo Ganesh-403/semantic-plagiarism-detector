@@ -1,4 +1,26 @@
 #!/usr/bin/env python3
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 scripts/benchmark_similarity.py
 --------------------------------
@@ -48,6 +70,7 @@ try:
         jaccard_similarity,
     )
 except ImportError:
+
     def jaccard_similarity(text_a: str, text_b: str, **kwargs) -> float:
         set_a = set(text_a.lower().split())
         set_b = set(text_b.lower().split())
@@ -60,20 +83,24 @@ except ImportError:
     def calculate_lexical_similarity(text_a: str, text_b: str, **kwargs) -> float:
         from sklearn.feature_extraction.text import TfidfVectorizer
         from sklearn.metrics.pairwise import cosine_similarity
+
         try:
             vec = TfidfVectorizer().fit_transform([text_a, text_b])
             return float(cosine_similarity(vec[0:1], vec[1:2])[0][0])
         except Exception:
             return 0.0
 
+
 try:
     from src.core.similarity import manhattan_similarity
 except ImportError:
+
     def manhattan_similarity(vec_a: np.ndarray, vec_b: np.ndarray) -> float:
         a = np.asarray(vec_a, dtype=np.float64)
         b = np.asarray(vec_b, dtype=np.float64)
         dist = float(np.sum(np.abs(a - b)))
         return float(np.clip(1.0 / (1.0 + dist), 0.0, 1.0))
+
 
 # Configure logging
 logging.basicConfig(
@@ -86,19 +113,81 @@ logger = logging.getLogger(__name__)
 # ── Synthetic Vocabulary & Data Generation ──────────────────────────────────────
 
 _SYNTHETIC_VOCABULARY: list[str] = [
-    "algorithm", "database", "system", "network", "security", "analysis",
-    "detection", "plagiarism", "semantic", "vector", "embedding", "model",
-    "performance", "latency", "throughput", "benchmark", "evaluation",
-    "machine", "learning", "artificial", "intelligence", "natural", "language",
-    "processing", "similarity", "cosine", "distance", "metric", "threshold",
-    "document", "chunk", "text", "paragraph", "sentence", "word", "token",
-    "optimization", "retrieval", "indexing", "clustering", "classification",
-    "corpus", "pipeline", "architecture", "distributed", "scalability",
-    "inference", "transformer", "attention", "representation", "dimension",
-    "precision", "recall", "accuracy", "manhattan", "jaccard", "tfidf",
-    "lexical", "hybrid", "scoring", "verification", "analytics", "engine",
-    "framework", "compiler", "runtime", "parallel", "concurrency", "matrix",
-    "normalized", "tensor", "gradient", "computation", "regression", "anomaly",
+    "algorithm",
+    "database",
+    "system",
+    "network",
+    "security",
+    "analysis",
+    "detection",
+    "plagiarism",
+    "semantic",
+    "vector",
+    "embedding",
+    "model",
+    "performance",
+    "latency",
+    "throughput",
+    "benchmark",
+    "evaluation",
+    "machine",
+    "learning",
+    "artificial",
+    "intelligence",
+    "natural",
+    "language",
+    "processing",
+    "similarity",
+    "cosine",
+    "distance",
+    "metric",
+    "threshold",
+    "document",
+    "chunk",
+    "text",
+    "paragraph",
+    "sentence",
+    "word",
+    "token",
+    "optimization",
+    "retrieval",
+    "indexing",
+    "clustering",
+    "classification",
+    "corpus",
+    "pipeline",
+    "architecture",
+    "distributed",
+    "scalability",
+    "inference",
+    "transformer",
+    "attention",
+    "representation",
+    "dimension",
+    "precision",
+    "recall",
+    "accuracy",
+    "manhattan",
+    "jaccard",
+    "tfidf",
+    "lexical",
+    "hybrid",
+    "scoring",
+    "verification",
+    "analytics",
+    "engine",
+    "framework",
+    "compiler",
+    "runtime",
+    "parallel",
+    "concurrency",
+    "matrix",
+    "normalized",
+    "tensor",
+    "gradient",
+    "computation",
+    "regression",
+    "anomaly",
 ]
 
 
@@ -164,7 +253,10 @@ def generate_synthetic_documents(
 ) -> list[str]:
     """Generate a list of synthetic documents."""
     rng = random.Random(seed)
-    return [generate_synthetic_document(num_words=num_words, rng=rng) for _ in range(num_docs)]
+    return [
+        generate_synthetic_document(num_words=num_words, rng=rng)
+        for _ in range(num_docs)
+    ]
 
 
 def generate_synthetic_embeddings(
@@ -185,6 +277,7 @@ def generate_synthetic_embeddings(
 
 
 # ── Similarity Functions ────────────────────────────────────────────────────────
+
 
 def compute_cosine_similarity(vec_a: np.ndarray, vec_b: np.ndarray) -> float:
     """Compute cosine similarity between two 1D or 2D vector arrays."""
@@ -214,6 +307,7 @@ def compute_manhattan_similarity(vec_a: np.ndarray, vec_b: np.ndarray) -> float:
 
 
 # ── Benchmark Engine ────────────────────────────────────────────────────────────
+
 
 def create_comparison_pairs(
     items: list[Any],
@@ -309,7 +403,9 @@ def run_similarity_benchmarks(
     docs = generate_synthetic_documents(
         num_docs=num_docs, num_words=word_count, seed=seed
     )
-    doc_pairs = create_comparison_pairs(docs, num_comparisons=num_comparisons, seed=seed)
+    doc_pairs = create_comparison_pairs(
+        docs, num_comparisons=num_comparisons, seed=seed
+    )
 
     logger.info(
         f"Generating {num_docs} synthetic {embedding_dim}-D embedding vectors..."
@@ -338,6 +434,7 @@ def run_similarity_benchmarks(
 
 
 # ── Reporting & Output ──────────────────────────────────────────────────────────
+
 
 def format_summary_table(results: list[dict[str, Any]], word_count: int = 500) -> str:
     """Format benchmark results into a clear summary table."""
@@ -380,6 +477,7 @@ def print_summary_table(results: list[dict[str, Any]], word_count: int = 500) ->
 
 
 # ── CLI Interface ───────────────────────────────────────────────────────────────
+
 
 def parse_arguments(args: Optional[list[str]] = None) -> argparse.Namespace:
     """Parse command-line arguments."""

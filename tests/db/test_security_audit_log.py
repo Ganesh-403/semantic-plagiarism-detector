@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Tests for security audit log — password change event recording (Issue #620)."""
 
 from __future__ import annotations
@@ -7,13 +29,7 @@ import uuid
 
 import pytest
 
-from src.db.auth import (
-    _connect,
-    add_user,
-    auth_repo,
-    init_db,
-    update_password,
-)
+from src.db.auth import _connect, add_user, auth_repo, init_db, update_password
 
 
 @pytest.fixture(autouse=True)
@@ -182,6 +198,7 @@ def test_update_password_logs_multiple_changes():
 def test_log_security_event_lowercases_username():
     """log_security_event should convert mixed-case usernames to lowercase."""
     from src.db.security_audit import log_security_event as sec_log_security_event
+
     raw_username = "AdminUser_Test"
     expected_username = "adminuser_test"
     sec_log_security_event(event_type="case_test_event", username=raw_username)
@@ -202,8 +219,8 @@ def test_log_security_event_failure_emits_alert():
     with patch("sqlite3.connect") as mock_connect, patch(
         "src.db.security_audit._emit_audit_log_failure_alert"
     ) as mock_alert:
-        mock_connect.side_effect = sqlite3.OperationalError("disk I/O error or full partition")
+        mock_connect.side_effect = sqlite3.OperationalError(
+            "disk I/O error or full partition"
+        )
         sec_log_security_event(event_type="test_failure_event", username="test_user")
         mock_alert.assert_called_once()
-
-

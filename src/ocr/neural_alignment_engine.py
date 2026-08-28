@@ -1,11 +1,34 @@
-import re
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import json
+import re
 import unicodedata
+
 
 class NeuralAlignmentEngine:
     def __init__(self):
         # Identify hidden characters, formatting control characters, and zero-width spaces
-        self.invisible_chars_regex = re.compile(r'[\u200b-\u200d\ufeff\u200e\u200f]')
+        self.invisible_chars_regex = re.compile(r"[\u200b-\u200d\ufeff\u200e\u200f]")
         # Track Cyrillic characters substituted into English text
         self.cyrillic_homoglyphs = set(range(0x0400, 0x04FF))
 
@@ -15,8 +38,8 @@ class NeuralAlignmentEngine:
         Returns the sanitized text string along with the modification count.
         """
         # 1. Clear out hidden or invisible character codes
-        cleaned_text, invisible_count = self.invisible_chars_regex.subn('', raw_text)
-        
+        cleaned_text, invisible_count = self.invisible_chars_regex.subn("", raw_text)
+
         # 2. Rectify mixed-script homoglyphs back to standard Latin characters
         homoglyph_count = 0
         final_chars = []
@@ -25,29 +48,31 @@ class NeuralAlignmentEngine:
                 homoglyph_count += 1
                 try:
                     # Normalize character variance patterns
-                    normalized = unicodedata.normalize('NFKD', char)
+                    normalized = unicodedata.normalize("NFKD", char)
                     final_chars.append(normalized if normalized.isalnum() else char)
                 except Exception:
                     final_chars.append(char)
             else:
                 final_chars.append(char)
-                
+
         return "".join(final_chars), (invisible_count + homoglyph_count)
 
-    def compute_alignment_vectors(self, source_text: str, target_comparison_text: str) -> float:
+    def compute_alignment_vectors(
+        self, source_text: str, target_comparison_text: str
+    ) -> float:
         """
         Calculates a structural paraphrase alignment score between blocks.
         Returns a normalized confidence value ranging from 0.00 to 100.00.
         """
         source_words = set(source_text.lower().split())
         target_words = set(target_comparison_text.lower().split())
-        
+
         if not source_words or not target_words:
             return 0.00
-            
+
         intersection_count = len(source_words.intersection(target_words))
         union_count = len(source_words.union(target_words))
-        
+
         # Jaccard index similarity mapping metrics
         alignment_ratio = (intersection_count / union_count) * 100
         return round(alignment_ratio, 2)

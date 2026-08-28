@@ -1,16 +1,39 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Comprehensive Unit Tests for Bulk Export with Empty Document Dataset
 Issue: #3471
 Tests edge cases, data integrity, and robustness of the export function.
 """
 
-import pytest
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
+import pytest
 
 # ==============================================================================
 # SECTION 1: Defining the Local Export Logic (For testing)
 # ==============================================================================
+
 
 def bulk_export(documents: List[Any]) -> List[Dict[str, Any]]:
     """
@@ -32,6 +55,7 @@ def bulk_export(documents: List[Any]) -> List[Dict[str, Any]]:
 # ==============================================================================
 # SECTION 2: Testing the Basic Empty Dataset Cases
 # ==============================================================================
+
 
 class TestBulkExportBasicEmpty:
     def test_empty_list_returns_empty(self):
@@ -60,6 +84,7 @@ class TestBulkExportBasicEmpty:
 # ==============================================================================
 # SECTION 3: Testing Mixed and Filtered Data
 # ==============================================================================
+
 
 class TestBulkExportFilteredData:
     def test_filters_out_none_values(self):
@@ -93,6 +118,7 @@ class TestBulkExportFilteredData:
 # ==============================================================================
 # SECTION 4: Testing Data Integrity and Output
 # ==============================================================================
+
 
 class TestBulkExportDataIntegrity:
     def test_valid_strings_converted_to_dicts(self):
@@ -134,6 +160,7 @@ class TestBulkExportDataIntegrity:
 # SECTION 5: Testing Robustness and Error Handling
 # ==============================================================================
 
+
 class TestBulkExportRobustness:
     def test_no_crash_on_clean_input(self):
         """Should handle a normal list without crashing."""
@@ -148,7 +175,7 @@ class TestBulkExportRobustness:
 
     def test_no_crash_on_nested_empty_list(self):
         """Should handle a list containing an empty list."""
-        result = bulk_export([[ ], "valid"])
+        result = bulk_export([[], "valid"])
         # Nested empty list is invalid, so only 'valid' is returned
         assert len(result) == 1
 

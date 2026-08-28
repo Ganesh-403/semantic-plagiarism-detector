@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Tests for ZIP extraction functionality with fault injection."""
 
 import io
@@ -174,7 +196,10 @@ def test_process_zip_empty():
 
 def test_process_zip_corrupted():
     """Verify that a corrupted ZIP raises a ValueError."""
-    with pytest.raises(ValueError, match="Invalid or corrupted ZIP archive: missing ZIP header signature."):
+    with pytest.raises(
+        ValueError,
+        match="Invalid or corrupted ZIP archive: missing ZIP header signature.",
+    ):
         process_zip_file(b"this is not a zip file content")
 
 
@@ -425,15 +450,19 @@ def test_process_zip_skip_corrupted_on_read_failure():
     from unittest.mock import patch
 
     # 1. Create a zip with one valid file and one corrupted/malformed file.
-    zip_data = create_in_memory_zip({
-        "valid.pdf": b"Valid PDF contents",
-        "corrupted.pdf": b"Corrupted contents"
-    })
+    zip_data = create_in_memory_zip(
+        {"valid.pdf": b"Valid PDF contents", "corrupted.pdf": b"Corrupted contents"}
+    )
 
     # Mock ZipFile.read to raise BadZipFile for "corrupted.pdf"
     original_read = zipfile.ZipFile.read
+
     def mock_read(self, name_or_info):
-        name = name_or_info.filename if isinstance(name_or_info, zipfile.ZipInfo) else name_or_info
+        name = (
+            name_or_info.filename
+            if isinstance(name_or_info, zipfile.ZipInfo)
+            else name_or_info
+        )
         if "corrupted" in name:
             raise zipfile.BadZipFile("CRC check failed")
         return original_read(self, name_or_info)
@@ -460,23 +489,29 @@ def test_process_zip_skip_encrypted_entries():
     info_valid = zipfile.ZipInfo("valid.pdf")
     info_valid.flag_bits = 0x0
 
-    zip_data = create_in_memory_zip({
-        "secret.pdf": b"secret contents",
-        "valid.pdf": b"valid contents"
-    })
+    zip_data = create_in_memory_zip(
+        {"secret.pdf": b"secret contents", "valid.pdf": b"valid contents"}
+    )
 
     # Mock infolist to return both entries, and mock read to return contents
     def mock_read(self, name_or_info):
-        name = name_or_info.filename if isinstance(name_or_info, zipfile.ZipInfo) else name_or_info
+        name = (
+            name_or_info.filename
+            if isinstance(name_or_info, zipfile.ZipInfo)
+            else name_or_info
+        )
         if "secret" in name:
             return b"secret contents"
         return b"valid contents"
 
-    with patch("zipfile.ZipFile.infolist", return_value=[info_encrypted, info_valid]), patch(
-        "zipfile.ZipFile.read", mock_read
-    ):
+    with patch(
+        "zipfile.ZipFile.infolist", return_value=[info_encrypted, info_valid]
+    ), patch("zipfile.ZipFile.read", mock_read):
         # With skip_corrupted=False, it should raise ValueError
-        with pytest.raises(ValueError, match="Password-protected or encrypted ZIP files are not supported."):
+        with pytest.raises(
+            ValueError,
+            match="Password-protected or encrypted ZIP files are not supported.",
+        ):
             process_zip_file(zip_data, skip_corrupted=False)
 
         # With skip_corrupted=True, it should skip the encrypted file and successfully return the valid one
@@ -484,4 +519,3 @@ def test_process_zip_skip_encrypted_entries():
         assert "valid.pdf" in result
         assert result["valid.pdf"] == b"valid contents"
         assert "secret.pdf" not in result
-

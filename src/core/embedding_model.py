@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 embedding_model.py
 ------------------
@@ -115,11 +137,7 @@ def _detect_device(model: SentenceTransformer | None = None) -> str:
     # is not shadowed by another backend exposed by the same PyTorch build.
     try:
         xpu = getattr(torch, "xpu", None)
-        if (
-            xpu is not None
-            and hasattr(xpu, "is_available")
-            and xpu.is_available()
-        ):
+        if xpu is not None and hasattr(xpu, "is_available") and xpu.is_available():
             return "xpu"
     except Exception:
         pass
@@ -131,9 +149,7 @@ def _detect_device(model: SentenceTransformer | None = None) -> str:
     try:
         cuda = getattr(torch, "cuda", None)
         cuda_available = (
-            cuda is not None
-            and hasattr(cuda, "is_available")
-            and cuda.is_available()
+            cuda is not None and hasattr(cuda, "is_available") and cuda.is_available()
         )
         cuda_backend = getattr(getattr(torch, "backends", None), "cuda", None)
         cuda_built = bool(
@@ -290,6 +306,7 @@ def _get_model() -> SentenceTransformer:
 # breaking when HuggingFace ships new weight formats (e.g. GGUF, ONNX)
 # under different filenames.
 _MODEL_WEIGHT_EXTENSIONS = (".bin", ".safetensors", ".onnx", ".gguf")
+
 
 def _resolve_cache_root() -> Path:
     """Resolve the HuggingFace hub cache root used for model downloads."""
@@ -459,7 +476,9 @@ def embed_chunks(
     # Process in explicit mini-batches to optimize memory utilization
     for i in range(0, total_chunks, batch_size):
         if cancel_callback and cancel_callback():
-            logger.info("[embedding_model] Embedding forward pass cancelled by callback.")
+            logger.info(
+                "[embedding_model] Embedding forward pass cancelled by callback."
+            )
             raise RuntimeError("Scan job cancelled")
 
         batch = [

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/db/task_db.py
 -----------------
@@ -12,7 +34,6 @@ queue works out-of-the-box without a separate migration step.
 from __future__ import annotations
 
 import atexit
-from enum import Enum
 import json
 import logging
 import os
@@ -21,6 +42,7 @@ import threading
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional
 
@@ -30,10 +52,12 @@ logger = logging.getLogger(__name__)
 
 VALID_STATUSES = ("PENDING", "PROCESSING", "COMPLETED", "FAILED", "DEAD_LETTER")
 
-DEFAULT_DB_PATH = Path(os.environ.get(
-    "TASK_QUEUE_DB_PATH",
-    str(Path(__file__).resolve().parents[2] / "data" / "task_queue.db"),
-))
+DEFAULT_DB_PATH = Path(
+    os.environ.get(
+        "TASK_QUEUE_DB_PATH",
+        str(Path(__file__).resolve().parents[2] / "data" / "task_queue.db"),
+    )
+)
 
 _connection_pool = threading.local()
 _pool_lock = threading.Lock()
@@ -63,20 +87,23 @@ CREATE INDEX IF NOT EXISTS idx_task_jobs_status
 
 # ── Connection management ──────────────────────────────────────
 
+
 def _utcnow_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _resolve_db_path(db_path: Optional[Union[Path, str]] = None) -> Path:
+def _resolve_db_path(db_path: Union[Path, str] | None = None) -> Path:
     if db_path is not None:
         return Path(db_path)
-    return Path(os.environ.get(
-        "TASK_QUEUE_DB_PATH",
-        str(Path(__file__).resolve().parents[2] / "data" / "task_queue.db"),
-    ))
+    return Path(
+        os.environ.get(
+            "TASK_QUEUE_DB_PATH",
+            str(Path(__file__).resolve().parents[2] / "data" / "task_queue.db"),
+        )
+    )
 
 
-def _get_connection(db_path: Optional[Union[Path, str]] = None) -> sqlite3.Connection:
+def _get_connection(db_path: Union[Path, str] | None = None) -> sqlite3.Connection:
     """Return a thread-local connection, creating one if needed."""
     resolved_path = _resolve_db_path(db_path)
     conn_key = f"conn_{resolved_path.resolve()}"
@@ -118,7 +145,9 @@ atexit.register(_cleanup_all_connections)
 
 
 @contextmanager
-def get_conn(db_path: Optional[Union[Path, str]] = None) -> Generator[sqlite3.Connection, None, None]:
+def get_conn(
+    db_path: Union[Path, str] | None = None,
+) -> Generator[sqlite3.Connection, None, None]:
     """Yield the thread-local connection (no auto-commit)."""
     conn = _get_connection(db_path)
     try:
@@ -205,8 +234,8 @@ def create_job(
     payload: Union[str, dict[str, Any]],
     *,
     max_retries: int = 3,
-    max_attempts: Optional[int] = None,
-    db_path: Optional[Union[Path, str]] = None,
+    max_attempts: int | None = None,
+    db_path: Union[Path, str] | None = None,
 ) -> JobRecord:
     """Insert a new PENDING job and return its row as a dict."""
     if max_attempts is not None:
@@ -233,8 +262,8 @@ def create_job(
 def get_job(
     job_id: Union[str, dict[str, Any]],
     *,
-    db_path: Optional[Union[Path, str]] = None,
-) -> Optional[JobRecord]:
+    db_path: Union[Path, str] | None = None,
+) -> JobRecord | None:
     """Return one job row as a dict, or None."""
     actual_id = job_id.get("id") if isinstance(job_id, dict) else str(job_id)
     with get_conn(db_path) as conn:
@@ -248,9 +277,9 @@ def get_job(
 
 def list_jobs(
     *,
-    status: Optional[str] = None,
+    status: str | None = None,
     limit: int = 100,
-    db_path: Optional[Union[Path, str]] = None,
+    db_path: Union[Path, str] | None = None,
 ) -> list[dict[str, Any]]:
     """List jobs, optionally filtered by status, newest first."""
     with get_conn(db_path) as conn:
@@ -270,8 +299,8 @@ def list_jobs(
 def claim_next_job(
     worker_id: str = "worker",
     *,
-    db_path: Optional[Union[Path, str]] = None,
-) -> Optional[dict[str, Any]]:
+    db_path: Union[Path, str] | None = None,
+) -> dict[str, Any] | None:
     """Atomically claim the oldest PENDING job for a worker."""
     now = _utcnow_iso()
     with get_conn(db_path) as conn:
@@ -325,7 +354,7 @@ def mark_completed(
     job_id: str,
     result: dict[str, Any],
     *,
-    db_path: Optional[Union[Path, str]] = None,
+    db_path: Union[Path, str] | None = None,
 ) -> bool:
     """Mark a job as COMPLETED and store its result dict."""
     now = _utcnow_iso()
@@ -348,7 +377,7 @@ def mark_failed(
     job_id: str,
     error: str,
     *,
-    db_path: Optional[Union[Path, str]] = None,
+    db_path: Union[Path, str] | None = None,
 ) -> bool:
     """Mark a job as FAILED. If retries remain, re-queue it as PENDING."""
     now = _utcnow_iso()
@@ -391,7 +420,7 @@ def mark_dead_letter(
     job_id: str,
     error: str,
     *,
-    db_path: Optional[Union[Path, str]] = None,
+    db_path: Union[Path, str] | None = None,
 ) -> None:
     """Immediately move a job to DEAD_LETTER, bypassing retries."""
     now = _utcnow_iso()
@@ -411,12 +440,12 @@ def mark_dead_letter(
 def get_dead_letter_jobs(
     *,
     limit: int = 50,
-    db_path: Optional[Union[Path, str]] = None,
+    db_path: Union[Path, str] | None = None,
 ) -> list[dict[str, Any]]:
     return list_jobs(status="DEAD_LETTER", limit=limit, db_path=db_path)
 
 
-def reset_db(db_path: Optional[Union[Path, str]] = None) -> None:
+def reset_db(db_path: Union[Path, str] | None = None) -> None:
     """Drop and recreate the task_jobs table (for tests)."""
     with get_conn(db_path) as conn:
         conn.execute("DROP TABLE IF EXISTS task_jobs")
@@ -426,8 +455,10 @@ def reset_db(db_path: Optional[Union[Path, str]] = None) -> None:
 
 # ── Compatibility & Enums ──────────────────────────────────────
 
+
 class JobStatus(str, Enum):
     """Enumeration of valid job states."""
+
     PENDING = "PENDING"
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
@@ -435,15 +466,15 @@ class JobStatus(str, Enum):
     DEAD_LETTER = "DEAD_LETTER"
 
 
-def initialize_task_db(db_path: Optional[Union[Path, str]] = None) -> None:
+def initialize_task_db(db_path: Union[Path, str] | None = None) -> None:
     """Initialize schema for the task queue database."""
     _get_connection(db_path)
 
 
 def claim_job(
-    db_path: Optional[Union[Path, str]] = None,
+    db_path: Union[Path, str] | None = None,
     worker_id: str = "worker",
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Compatibility wrapper around claim_next_job."""
     return claim_next_job(worker_id=worker_id, db_path=db_path)
 
@@ -451,7 +482,7 @@ def claim_job(
 def complete_job(
     job_id: str,
     result: dict[str, Any],
-    db_path: Optional[Union[Path, str]] = None,
+    db_path: Union[Path, str] | None = None,
 ) -> bool:
     """Compatibility wrapper around mark_completed."""
     return mark_completed(job_id, result, db_path=db_path)
@@ -460,13 +491,14 @@ def complete_job(
 def fail_job(
     job_id: str,
     error_message: str,
-    db_path: Optional[Union[Path, str]] = None,
+    db_path: Union[Path, str] | None = None,
 ) -> bool:
     """Compatibility wrapper around mark_failed."""
     return mark_failed(job_id, error_message, db_path=db_path)
 
 
 # ── Helpers ────────────────────────────────────────────────────
+
 
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     d = dict(row)
@@ -479,4 +511,3 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
             except (json.JSONDecodeError, TypeError):
                 pass
     return d
-

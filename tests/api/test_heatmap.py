@@ -1,11 +1,34 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """tests/api/test_heatmap.py
 
 Unit tests for the Similarity Heatmap & Clustering API endpoints.
 Tests cover snapshot CRUD, clustering, hotspot management, and analytics.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 from src.api.app import app
@@ -17,6 +40,7 @@ client = TestClient(app)
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def _mock_auth(monkeypatch):
@@ -48,6 +72,7 @@ HEADERS = {"Authorization": "Bearer test-token"}
 # ---------------------------------------------------------------------------
 # Snapshot CRUD Tests
 # ---------------------------------------------------------------------------
+
 
 class TestSnapshotCRUD:
     """Tests for heatmap snapshot creation, listing, and retrieval."""
@@ -100,6 +125,7 @@ class TestSnapshotCRUD:
 # Clustering Tests
 # ---------------------------------------------------------------------------
 
+
 class TestClustering:
     """Tests for document clustering endpoints."""
 
@@ -142,6 +168,7 @@ class TestClustering:
 # Hotspot Tests
 # ---------------------------------------------------------------------------
 
+
 class TestHotspots:
     """Tests for similarity hotspot endpoints."""
 
@@ -182,6 +209,7 @@ class TestHotspots:
 # Analytics Tests
 # ---------------------------------------------------------------------------
 
+
 class TestAnalytics:
     """Tests for heatmap analytics endpoints."""
 
@@ -214,6 +242,7 @@ class TestAnalytics:
 # Auth Tests
 # ---------------------------------------------------------------------------
 
+
 class TestAuth:
     """Tests for authentication requirements."""
 
@@ -243,17 +272,20 @@ class TestAuth:
 # Core Engine Unit Tests
 # ---------------------------------------------------------------------------
 
+
 class TestSimilarityEngine:
     """Unit tests for the similarity_heatmap core module."""
 
     def test_import(self):
         """Module should be importable."""
         from src.core.similarity_heatmap import SimilarityEngine
+
         assert SimilarityEngine is not None
 
     def test_heatmap_matrix_dataclass(self):
         """HeatmapMatrix dataclass should instantiate correctly."""
         from src.core.similarity_heatmap import HeatmapMatrix
+
         m = HeatmapMatrix(
             labels=["a", "b"],
             matrix=[[1.0, 0.5], [0.5, 1.0]],
@@ -268,6 +300,7 @@ class TestSimilarityEngine:
     def test_heatmap_cell_dataclass(self):
         """HeatmapCell dataclass should instantiate correctly."""
         from src.core.similarity_heatmap import HeatmapCell
+
         c = HeatmapCell(
             row_label="doc1",
             col_label="doc2",
@@ -280,6 +313,7 @@ class TestSimilarityEngine:
     def test_cluster_info_dataclass(self):
         """ClusterInfo dataclass should instantiate correctly."""
         from src.core.similarity_heatmap import ClusterInfo
+
         ci = ClusterInfo(
             cluster_id=1,
             documents=["a.pdf", "b.pdf"],
@@ -291,6 +325,7 @@ class TestSimilarityEngine:
     def test_empty_similarity_matrix(self):
         """Engine should handle empty document lists."""
         from src.core.similarity_heatmap import SimilarityEngine
+
         engine = SimilarityEngine()
         result = engine.compute_similarity_matrix([])
         assert result.document_count == 0
@@ -298,6 +333,7 @@ class TestSimilarityEngine:
     def test_single_document_matrix(self):
         """Engine should handle single-document input."""
         from src.core.similarity_heatmap import SimilarityEngine
+
         engine = SimilarityEngine()
         result = engine.compute_similarity_matrix(["doc1"])
         assert result.document_count == 1
@@ -306,6 +342,7 @@ class TestSimilarityEngine:
     def test_two_document_matrix(self):
         """Engine should produce a 2x2 matrix for two documents."""
         from src.core.similarity_heatmap import SimilarityEngine
+
         engine = SimilarityEngine()
         result = engine.compute_similarity_matrix(["doc1", "doc2"])
         assert result.document_count == 2
@@ -315,6 +352,7 @@ class TestSimilarityEngine:
     def test_cluster_empty(self):
         """Clustering empty input should return zero clusters."""
         from src.core.similarity_heatmap import SimilarityEngine
+
         engine = SimilarityEngine()
         result = engine.cluster_documents([])
         assert result.num_clusters == 0
@@ -322,6 +360,7 @@ class TestSimilarityEngine:
     def test_cluster_single_doc(self):
         """Clustering one document should produce one cluster."""
         from src.core.similarity_heatmap import SimilarityEngine
+
         engine = SimilarityEngine()
         result = engine.cluster_documents(["doc1"])
         assert result.num_clusters == 1
@@ -329,6 +368,7 @@ class TestSimilarityEngine:
     def test_hotspot_detection_empty(self):
         """Hotspot detection on empty matrix should return empty list."""
         from src.core.similarity_heatmap import SimilarityEngine
+
         engine = SimilarityEngine()
         hotspots = engine.detect_hotspots([], threshold=0.8)
         assert hotspots == []
@@ -336,28 +376,27 @@ class TestSimilarityEngine:
     def test_hotspot_detection_below_threshold(self):
         """Pairs below threshold should not be flagged as hotspots."""
         from src.core.similarity_heatmap import SimilarityEngine
+
         engine = SimilarityEngine()
         matrix = [[1.0, 0.3], [0.3, 1.0]]
         labels = ["a", "b"]
-        hotspots = engine.detect_hotspots(
-            labels, matrix=matrix, threshold=0.8
-        )
+        hotspots = engine.detect_hotspots(labels, matrix=matrix, threshold=0.8)
         assert len(hotspots) == 0
 
     def test_hotspot_detection_above_threshold(self):
         """Pairs above threshold should be flagged as hotspots."""
         from src.core.similarity_heatmap import SimilarityEngine
+
         engine = SimilarityEngine()
         matrix = [[1.0, 0.95], [0.95, 1.0]]
         labels = ["a", "b"]
-        hotspots = engine.detect_hotspots(
-            labels, matrix=matrix, threshold=0.8
-        )
+        hotspots = engine.detect_hotspots(labels, matrix=matrix, threshold=0.8)
         assert len(hotspots) == 1
 
     def test_silhouette_score_range(self):
         """Silhouette score should be between -1 and 1."""
         from src.core.similarity_heatmap import SimilarityEngine
+
         engine = SimilarityEngine()
         result = engine.cluster_documents(
             ["doc1", "doc2", "doc3", "doc4"],
@@ -369,6 +408,7 @@ class TestSimilarityEngine:
 # ---------------------------------------------------------------------------
 # DB Repository Tests
 # ---------------------------------------------------------------------------
+
 
 class TestHeatmapDB:
     """Unit tests for HeatmapRepository."""
@@ -391,12 +431,20 @@ class TestHeatmapDB:
         """Should list snapshots in reverse chronological order."""
         repo = HeatmapRepository()
         repo.create_snapshot(
-            labels=["a"], matrix=[[1.0]], document_count=1,
-            min_sim=1.0, max_sim=1.0, mean_sim=1.0,
+            labels=["a"],
+            matrix=[[1.0]],
+            document_count=1,
+            min_sim=1.0,
+            max_sim=1.0,
+            mean_sim=1.0,
         )
         repo.create_snapshot(
-            labels=["b"], matrix=[[1.0]], document_count=1,
-            min_sim=1.0, max_sim=1.0, mean_sim=1.0,
+            labels=["b"],
+            matrix=[[1.0]],
+            document_count=1,
+            min_sim=1.0,
+            max_sim=1.0,
+            mean_sim=1.0,
         )
         snaps = repo.list_snapshots(page=1, per_page=10)
         assert len(snaps["items"]) == 2
@@ -406,8 +454,12 @@ class TestHeatmapDB:
         """Should retrieve a snapshot by ID."""
         repo = HeatmapRepository()
         snap_id = repo.create_snapshot(
-            labels=["x"], matrix=[[1.0]], document_count=1,
-            min_sim=1.0, max_sim=1.0, mean_sim=1.0,
+            labels=["x"],
+            matrix=[[1.0]],
+            document_count=1,
+            min_sim=1.0,
+            max_sim=1.0,
+            mean_sim=1.0,
         )
         snap = repo.get_snapshot(snap_id)
         assert snap is not None
@@ -417,8 +469,12 @@ class TestHeatmapDB:
         """Should delete a snapshot by ID."""
         repo = HeatmapRepository()
         snap_id = repo.create_snapshot(
-            labels=["y"], matrix=[[1.0]], document_count=1,
-            min_sim=1.0, max_sim=1.0, mean_sim=1.0,
+            labels=["y"],
+            matrix=[[1.0]],
+            document_count=1,
+            min_sim=1.0,
+            max_sim=1.0,
+            mean_sim=1.0,
         )
         deleted = repo.delete_snapshot(snap_id)
         assert deleted is True
@@ -480,9 +536,12 @@ class TestHeatmapDB:
         """Should list clustering results."""
         repo = HeatmapRepository()
         repo.create_clustering_result(
-            num_clusters=2, silhouette_score=0.3,
-            linkage_method="complete", distance_threshold=0.6,
-            clusters=[], assignments={},
+            num_clusters=2,
+            silhouette_score=0.3,
+            linkage_method="complete",
+            distance_threshold=0.6,
+            clusters=[],
+            assignments={},
         )
         results = repo.list_clustering_results(page=1, per_page=10)
         assert results["total"] >= 1
@@ -491,8 +550,10 @@ class TestHeatmapDB:
         """Should retrieve clustering result by ID."""
         repo = HeatmapRepository()
         r_id = repo.create_clustering_result(
-            num_clusters=2, silhouette_score=0.5,
-            linkage_method="average", distance_threshold=0.4,
+            num_clusters=2,
+            silhouette_score=0.5,
+            linkage_method="average",
+            distance_threshold=0.4,
             clusters=[{"id": 0, "docs": ["a.pdf"], "score": 0.9, "size": 1}],
             assignments={"a.pdf": 0},
         )
@@ -507,7 +568,9 @@ class TestHeatmapDB:
             labels=["a", "b"],
             matrix=[[1.0, 0.6], [0.6, 1.0]],
             document_count=2,
-            min_sim=0.6, max_sim=1.0, mean_sim=0.8,
+            min_sim=0.6,
+            max_sim=1.0,
+            mean_sim=0.8,
         )
         summary = repo.analytics_summary()
         assert "total_snapshots" in summary

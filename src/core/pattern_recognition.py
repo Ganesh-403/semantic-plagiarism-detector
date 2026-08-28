@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Intelligent plagiarism pattern recognition and prediction engine.
 
 Uses ML classifiers (RandomForest, GradientBoosting) trained on historical
@@ -123,23 +145,27 @@ class PatternDetectionEngine:
             ptype = self._classify_pair_type(avg_sim, group)
 
             pattern_id = _make_pattern_id([doc_a, doc_b])
-            patterns.append({
-                "pattern_id": pattern_id,
-                "pattern_type": ptype,
-                "description": f"Recurring similarity between '{doc_a}' and '{doc_b}' "
-                               f"detected {len(group)} times",
-                "document_group": [doc_a, doc_b],
-                "author_group": self._extract_authors(group),
-                "assignment_title": self._most_common_field(group, "assignment_title"),
-                "class_section": self._most_common_field(group, "class_section"),
-                "avg_similarity": avg_sim,
-                "occurrence_count": len(group),
-                "confidence_score": confidence,
-                "severity": severity,
-                "first_seen": first_seen,
-                "last_seen": last_seen,
-                "status": "active",
-            })
+            patterns.append(
+                {
+                    "pattern_id": pattern_id,
+                    "pattern_type": ptype,
+                    "description": f"Recurring similarity between '{doc_a}' and '{doc_b}' "
+                    f"detected {len(group)} times",
+                    "document_group": [doc_a, doc_b],
+                    "author_group": self._extract_authors(group),
+                    "assignment_title": self._most_common_field(
+                        group, "assignment_title"
+                    ),
+                    "class_section": self._most_common_field(group, "class_section"),
+                    "avg_similarity": avg_sim,
+                    "occurrence_count": len(group),
+                    "confidence_score": confidence,
+                    "severity": severity,
+                    "first_seen": first_seen,
+                    "last_seen": last_seen,
+                    "status": "active",
+                }
+            )
 
         # ── 2. Author repeat-offender clusters ────────────────────────────
         author_incidents: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -159,7 +185,10 @@ class PatternDetectionEngine:
             involved_docs.discard("")
             scores = [float(inc.get("similarity_score", 0)) for inc in author_incs]
             avg_sim = float(np.mean(scores))
-            dates = [inc.get("date_flagged", "") or inc.get("last_seen", "") for inc in author_incs]
+            dates = [
+                inc.get("date_flagged", "") or inc.get("last_seen", "")
+                for inc in author_incs
+            ]
             first_seen = min(d for d in dates if d) or _utc_now_iso()
             last_seen = max(d for d in dates if d) or _utc_now_iso()
 
@@ -170,27 +199,33 @@ class PatternDetectionEngine:
             )
 
             pattern_id = _make_pattern_id([author] + sorted(involved_docs))
-            patterns.append({
-                "pattern_id": pattern_id,
-                "pattern_type": "collaborative",
-                "description": f"Author '{author}' involved in {len(author_incs)} plagiarism incidents",
-                "document_group": sorted(involved_docs),
-                "author_group": [author],
-                "assignment_title": None,
-                "class_section": None,
-                "avg_similarity": avg_sim,
-                "occurrence_count": len(author_incs),
-                "confidence_score": confidence,
-                "severity": self._severity_from_score(avg_sim),
-                "first_seen": first_seen,
-                "last_seen": last_seen,
-                "status": "active",
-            })
+            patterns.append(
+                {
+                    "pattern_id": pattern_id,
+                    "pattern_type": "collaborative",
+                    "description": f"Author '{author}' involved in {len(author_incs)} plagiarism incidents",
+                    "document_group": sorted(involved_docs),
+                    "author_group": [author],
+                    "assignment_title": None,
+                    "class_section": None,
+                    "avg_similarity": avg_sim,
+                    "occurrence_count": len(author_incs),
+                    "confidence_score": confidence,
+                    "severity": self._severity_from_score(avg_sim),
+                    "first_seen": first_seen,
+                    "last_seen": last_seen,
+                    "status": "active",
+                }
+            )
 
         # ── 3. Assignment hotspots ────────────────────────────────────────
         assignment_incidents: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for inc in incidents:
-            for field in ("assignment_title_a", "assignment_title_b", "assignment_title"):
+            for field in (
+                "assignment_title_a",
+                "assignment_title_b",
+                "assignment_title",
+            ):
                 title = str(inc.get(field, "")).strip()
                 if title:
                     assignment_incidents[title].append(inc)
@@ -206,7 +241,10 @@ class PatternDetectionEngine:
             involved_docs.discard("")
             scores = [float(inc.get("similarity_score", 0)) for inc in assign_incs]
             avg_sim = float(np.mean(scores))
-            dates = [inc.get("date_flagged", "") or inc.get("last_seen", "") for inc in assign_incs]
+            dates = [
+                inc.get("date_flagged", "") or inc.get("last_seen", "")
+                for inc in assign_incs
+            ]
             first_seen = min(d for d in dates if d) or _utc_now_iso()
             last_seen = max(d for d in dates if d) or _utc_now_iso()
 
@@ -217,22 +255,26 @@ class PatternDetectionEngine:
             )
 
             pattern_id = _make_pattern_id([assignment] + sorted(involved_docs))
-            patterns.append({
-                "pattern_id": pattern_id,
-                "pattern_type": "source_sharing",
-                "description": f"Assignment '{assignment}' has {len(assign_incs)} plagiarism incidents",
-                "document_group": sorted(involved_docs),
-                "author_group": self._extract_authors(assign_incs),
-                "assignment_title": assignment,
-                "class_section": self._most_common_field(assign_incs, "class_section"),
-                "avg_similarity": avg_sim,
-                "occurrence_count": len(assign_incs),
-                "confidence_score": confidence,
-                "severity": self._severity_from_score(avg_sim),
-                "first_seen": first_seen,
-                "last_seen": last_seen,
-                "status": "active",
-            })
+            patterns.append(
+                {
+                    "pattern_id": pattern_id,
+                    "pattern_type": "source_sharing",
+                    "description": f"Assignment '{assignment}' has {len(assign_incs)} plagiarism incidents",
+                    "document_group": sorted(involved_docs),
+                    "author_group": self._extract_authors(assign_incs),
+                    "assignment_title": assignment,
+                    "class_section": self._most_common_field(
+                        assign_incs, "class_section"
+                    ),
+                    "avg_similarity": avg_sim,
+                    "occurrence_count": len(assign_incs),
+                    "confidence_score": confidence,
+                    "severity": self._severity_from_score(avg_sim),
+                    "first_seen": first_seen,
+                    "last_seen": last_seen,
+                    "status": "active",
+                }
+            )
 
         # Persist if repository is available
         if self._repo:
@@ -240,7 +282,9 @@ class PatternDetectionEngine:
                 try:
                     self._repo.upsert_pattern(**pattern)
                 except Exception as exc:
-                    logger.warning("Failed to persist pattern %s: %s", pattern["pattern_id"], exc)
+                    logger.warning(
+                        "Failed to persist pattern %s: %s", pattern["pattern_id"], exc
+                    )
 
         return patterns
 
@@ -259,19 +303,19 @@ class PatternDetectionEngine:
         """
         now = datetime.now(timezone.utc)
         current_cutoff = now.isoformat()
-        previous_cutoff = now.replace(
-            day=max(1, now.day - window_days)
-        ).isoformat()
+        previous_cutoff = now.replace(day=max(1, now.day - window_days)).isoformat()
 
         current_window = [
-            inc for inc in incidents
+            inc
+            for inc in incidents
             if self._parse_date(inc.get("date_flagged", "")) >= previous_cutoff
         ]
         previous_window = [
-            inc for inc in incidents
-            if previous_cutoff > self._parse_date(inc.get("date_flagged", "")) >= (
-                now.replace(day=max(1, now.day - 2 * window_days)).isoformat()
-            )
+            inc
+            for inc in incidents
+            if previous_cutoff
+            > self._parse_date(inc.get("date_flagged", ""))
+            >= (now.replace(day=max(1, now.day - 2 * window_days)).isoformat())
         ]
 
         if not current_window and not previous_window:
@@ -287,16 +331,16 @@ class PatternDetectionEngine:
         current_dist = self._technique_distribution(current_window)
         previous_dist = self._technique_distribution(previous_window)
 
-        drift_score = self._jensen_shannon_divergence(
-            current_dist, previous_dist
-        )
+        drift_score = self._jensen_shannon_divergence(current_dist, previous_dist)
 
         emerging = [
-            t for t, curr in current_dist.items()
+            t
+            for t, curr in current_dist.items()
             if curr > previous_dist.get(t, 0) * 1.2 and curr > 0.05
         ]
         declining = [
-            t for t, prev in previous_dist.items()
+            t
+            for t, prev in previous_dist.items()
             if prev > current_dist.get(t, 0) * 1.2 and prev > 0.05
         ]
 
@@ -355,7 +399,9 @@ class PatternDetectionEngine:
                     model_version=self._model_version,
                 )
             except Exception as exc:
-                logger.warning("Failed to persist risk score for %s: %s", document_name, exc)
+                logger.warning(
+                    "Failed to persist risk score for %s: %s", document_name, exc
+                )
 
         return {
             "document_name": document_name,
@@ -389,7 +435,11 @@ class PatternDetectionEngine:
 
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
         recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+        f1 = (
+            2 * precision * recall / (precision + recall)
+            if (precision + recall) > 0
+            else 0.0
+        )
         accuracy = tp / len(gt_ids) if gt_ids else 0.0
 
         return {
@@ -454,8 +504,13 @@ class PatternDetectionEngine:
         """Confidence = f(occurrence, similarity, recency)."""
         occurrence_factor = min(1.0, occurrence_count / 10)
         similarity_factor = avg_similarity
-        recency_factor = 1.0 / (1.0 + time_span_days / 30) if time_span_days > 0 else 1.0
-        return min(1.0, (0.4 * occurrence_factor + 0.4 * similarity_factor + 0.2 * recency_factor))
+        recency_factor = (
+            1.0 / (1.0 + time_span_days / 30) if time_span_days > 0 else 1.0
+        )
+        return min(
+            1.0,
+            (0.4 * occurrence_factor + 0.4 * similarity_factor + 0.2 * recency_factor),
+        )
 
     @staticmethod
     def _severity_from_score(score: float) -> str:
@@ -505,22 +560,16 @@ class PatternDetectionEngine:
         return sorted(authors)
 
     @staticmethod
-    def _most_common_field(
-        incidents: list[dict[str, Any]], field: str
-    ) -> str | None:
+    def _most_common_field(incidents: list[dict[str, Any]], field: str) -> str | None:
         values = [
-            str(inc.get(field, "")).strip()
-            for inc in incidents
-            if inc.get(field)
+            str(inc.get(field, "")).strip() for inc in incidents if inc.get(field)
         ]
         if not values:
             return None
         return Counter(values).most_common(1)[0][0]
 
     @staticmethod
-    def _classify_pair_type(
-        avg_similarity: float, group: list[dict[str, Any]]
-    ) -> str:
+    def _classify_pair_type(avg_similarity: float, group: list[dict[str, Any]]) -> str:
         """Heuristic classification when ML model is unavailable."""
         if avg_similarity >= 0.90:
             return "copy_paste"
@@ -552,9 +601,7 @@ class PatternDetectionEngine:
         return {t: type_counts.get(t, 0) / total for t in PATTERN_TYPES}
 
     @staticmethod
-    def _jensen_shannon_divergence(
-        p: dict[str, float], q: dict[str, float]
-    ) -> float:
+    def _jensen_shannon_divergence(p: dict[str, float], q: dict[str, float]) -> float:
         """Symmetric divergence between two probability distributions."""
         all_keys = set(p.keys()) | set(q.keys())
         if not all_keys:
@@ -588,17 +635,19 @@ class PatternDetectionEngine:
     @staticmethod
     def _extract_risk_features(features: dict[str, Any]) -> np.ndarray:
         """Convert feature dict to numpy array for ML model."""
-        return np.array([
-            features.get("max_similarity", 0.0),
-            features.get("avg_similarity", 0.0),
-            min(1.0, features.get("author_incident_count", 0) / 10),
-            features.get("author_avg_similarity", 0.0),
-            features.get("assignment_incident_rate", 0.0),
-            min(1.0, features.get("document_length", 0) / 50000),
-            features.get("submission_hour", 12) / 23,
-            (features.get("days_until_deadline", 30) or 30) / 30,
-            features.get("class_section_risk", 0.0),
-        ])
+        return np.array(
+            [
+                features.get("max_similarity", 0.0),
+                features.get("avg_similarity", 0.0),
+                min(1.0, features.get("author_incident_count", 0) / 10),
+                features.get("author_avg_similarity", 0.0),
+                features.get("assignment_incident_rate", 0.0),
+                min(1.0, features.get("document_length", 0) / 50000),
+                features.get("submission_hour", 12) / 23,
+                (features.get("days_until_deadline", 30) or 30) / 30,
+                features.get("class_section_risk", 0.0),
+            ]
+        )
 
     @staticmethod
     def _heuristic_risk_score(features: dict[str, Any]) -> float:
@@ -618,8 +667,10 @@ class PatternDetectionEngine:
         score = (
             weights["max_similarity"] * features.get("max_similarity", 0)
             + weights["author_incident_rate"] * author_inc_rate
-            + weights["assignment_incident_rate"] * features.get("assignment_incident_rate", 0)
-            + weights["author_avg_similarity"] * features.get("author_avg_similarity", 0)
+            + weights["assignment_incident_rate"]
+            * features.get("assignment_incident_rate", 0)
+            + weights["author_avg_similarity"]
+            * features.get("author_avg_similarity", 0)
             + weights["class_section_risk"] * features.get("class_section_risk", 0)
             + weights["recency_bonus"] * recency_bonus
         )
@@ -633,12 +684,17 @@ class PatternDetectionEngine:
         if features.get("max_similarity", 0) >= 0.85:
             factors.append("High similarity to existing document")
         if features.get("author_incident_count", 0) >= 3:
-            factors.append(f"Author has {features['author_incident_count']} prior incidents")
+            factors.append(
+                f"Author has {features['author_incident_count']} prior incidents"
+            )
         if features.get("assignment_incident_rate", 0) >= 0.2:
             factors.append("High incident rate for this assignment")
         if features.get("submission_hour", 12) >= 22:
             factors.append("Late-night submission")
-        if features.get("days_until_deadline") is not None and features["days_until_deadline"] <= 1:
+        if (
+            features.get("days_until_deadline") is not None
+            and features["days_until_deadline"] <= 1
+        ):
             factors.append("Submitted near deadline")
         if features.get("class_section_risk", 0) >= 0.3:
             factors.append("High-risk class section")

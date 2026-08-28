@@ -1,17 +1,40 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Comprehensive Property-Based Tests for Text Chunking Boundaries
 Issue: #3496
 Tests that the chunking logic preserves text, maintains boundaries, and handles edge cases.
 """
 
-import pytest
 import random
 import string
 
+import pytest
 
 # ==============================================================================
 # SECTION 1: Defining the Chunking Logic (Under Test)
 # ==============================================================================
+
 
 def chunk_text(text: str, max_chunk_size: int = 50) -> list:
     """
@@ -22,16 +45,17 @@ def chunk_text(text: str, max_chunk_size: int = 50) -> list:
         raise ValueError("max_chunk_size must be greater than 0")
     if not text:
         return []
-    
+
     chunks = []
     for i in range(0, len(text), max_chunk_size):
-        chunks.append(text[i:i + max_chunk_size])
+        chunks.append(text[i : i + max_chunk_size])
     return chunks
 
 
 # ==============================================================================
 # SECTION 2: Property-Based Core Tests (The Rules!)
 # ==============================================================================
+
 
 class TestPropertyBasedChunking:
     def test_property_chunks_are_not_empty(self):
@@ -76,6 +100,7 @@ class TestPropertyBasedChunking:
 # SECTION 3: Edge Cases
 # ==============================================================================
 
+
 class TestChunkingEdgeCases:
     def test_empty_string_returns_empty_list(self):
         """Edge Case: Empty string should return an empty list."""
@@ -115,14 +140,17 @@ class TestChunkingEdgeCases:
 # SECTION 4: Random Fuzz Testing (The "Property" Part)
 # ==============================================================================
 
+
 class TestRandomizedFuzz:
     def test_fuzz_random_strings_preserved(self):
         """Fuzz: Random strings should always be preserved when joined."""
         random.seed(42)
         for _ in range(100):
             length = random.randint(1, 500)
-            random_string = ''.join(random.choices(string.ascii_letters + string.digits + " ", k=length))
-            
+            random_string = "".join(
+                random.choices(string.ascii_letters + string.digits + " ", k=length)
+            )
+
             chunks = chunk_text(random_string, max_chunk_size=25)
             assert "".join(chunks) == random_string
 
@@ -140,6 +168,8 @@ class TestRandomizedFuzz:
         random.seed(10)
         for _ in range(50):
             length = random.randint(10, 200)
-            random_string = ''.join(random.choices(["a", "b", "c", "\n", "\t"], k=length))
+            random_string = "".join(
+                random.choices(["a", "b", "c", "\n", "\t"], k=length)
+            )
             chunks = chunk_text(random_string, max_chunk_size=15)
             assert "".join(chunks) == random_string

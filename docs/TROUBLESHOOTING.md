@@ -26,10 +26,13 @@ No executable found: tesseract
 
 - **Windows:** Download and install Tesseract, then add the installation directory (e.g. `C:\Program Files\Tesseract-OCR`) to your system `PATH`.
 - **macOS:**
+
   ```bash
   brew install tesseract
   ```
+
 - **Ubuntu/Debian:**
+
   ```bash
   sudo apt update
   sudo apt install tesseract-ocr
@@ -61,7 +64,7 @@ Install the CUDA-enabled version recommended on the official PyTorch website.
 
 Visit:
 
-https://pytorch.org/get-started/locally/
+<https://pytorch.org/get-started/locally/>
 
 Verify your installation:
 
@@ -118,8 +121,8 @@ ModuleNotFoundError: No module named '<package>'
 - The virtual environment is not activated.
 - The dependency installation was interrupted or failed.
 
-
 ### Solution
+
 - Make sure your virtual environment is activated and install the required dependencies:
 
 ```bash
@@ -135,11 +138,13 @@ venv\Scripts\activate
 # macOS / Linux
 source venv/bin/activate
 ```
+
 Then install the dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
+
 If the missing module is related to OCR support, install the additional OCR dependencies:
 
 ```bash
@@ -150,12 +155,14 @@ python -m pip install pytesseract pymupdf pillow
 
 The application may fail while loading paraphrase-multilingual-MiniLM-L12-v2, or the first startup may appear to hang while downloading the model.
 
-### Possible causes:
+### Possible causes
+
 - The model has not been downloaded before.
 - The machine has limited or unstable internet connectivity.
 - There is not enough disk space for the model cache.
 
-### Solution:
+### Solution
+
 - Make sure you have an active internet connection during the first run. The application downloads the paraphrase-multilingual-MiniLM-L12-v2 model (approximately 420 MB) and caches it locally.
 - After the initial download, subsequent runs should use the cached model. If the model download fails, restart the application and try again. Also verify that sufficient disk space is available.
 
@@ -165,21 +172,22 @@ The application may fail while loading paraphrase-multilingual-MiniLM-L12-v2, or
 
 The application may become slow, crash, or report memory allocation errors when processing a large number of documents or building FAISS indexes.
 
-### Possible causes:
+### Possible causes
+
 - A large number of documents or text chunks are being processed at once.
 - Embedding generation requires more RAM than is currently available.
 - FAISS is indexing a large collection of vectors.
 - The embedding batch size is too high for the available hardware.
 
-### Solutions:
+### Solutions
 
 Try the following:
+
 - Close other applications to free system memory.
 - Process fewer documents at a time.
 - Reduce the embedding batch size in src/core/embedding_model.py.
 - If using a GPU, make sure sufficient GPU memory is available.
 - Restart the application to clear unused memory. For larger collections, the application automatically switches from IndexFlatIP to IndexIVFFlat when the number of vectors reaches 5,000 or more. If the problem persists, reduce the batch size and try processing the documents again.
-
 
 ## Still Having Issues?
 

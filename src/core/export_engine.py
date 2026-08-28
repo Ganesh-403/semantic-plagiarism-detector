@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """LMS-compatible incident export generation and safe file writing."""
 
 from __future__ import annotations
@@ -17,10 +39,7 @@ import logging
 from pathlib import Path
 
 from src.core.config import severity_from_score
-from src.errors import (
-    EXPORT_GENERATION_IO_FAILED,
-    EXPORT_WRITE_FAILED,
-)
+from src.errors import EXPORT_GENERATION_IO_FAILED, EXPORT_WRITE_FAILED
 from src.exceptions import ExportFailedError
 
 logger = logging.getLogger(__name__)
@@ -55,9 +74,7 @@ class LMSExportEngine:
             return None
 
         try:
-            return generate_html_report(
-                incidents, min_match_length=min_match_length
-            )
+            return generate_html_report(incidents, min_match_length=min_match_length)
         except Exception as exception:
             logger.error("Failed to format incident data as HTML: %s", exception)
             return None
@@ -165,7 +182,8 @@ class LMSExportEngine:
         """
         if min_match_length > 0:
             incidents = [
-                i for i in incidents
+                i
+                for i in incidents
                 if int(i.get("matched_length", 0) or 0) >= min_match_length
             ]
 

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 test_standalone_image_ocr_issue_2720.py
 ----------------------------------------
@@ -21,16 +43,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
-from src.core.document_parser import (
-    ALLOWED_EXTENSIONS as DOC_PARSER_ALLOWED_EXTENSIONS,
-)
-from src.core.parsers.dispatch import (
-    ALLOWED_EXTENSIONS as DISPATCH_ALLOWED_EXTENSIONS,
-)
-from src.core.parsers.dispatch import (
-    extract_text,
-    get_supported_file_extensions,
-)
+from src.core.document_parser import ALLOWED_EXTENSIONS as DOC_PARSER_ALLOWED_EXTENSIONS
+from src.core.parsers.dispatch import ALLOWED_EXTENSIONS as DISPATCH_ALLOWED_EXTENSIONS
+from src.core.parsers.dispatch import extract_text, get_supported_file_extensions
 from src.core.parsers.ocr_parser import (
     _configure_tesseract,
     extract_text_from_image,
@@ -40,7 +55,9 @@ from src.errors import OCRDependencyError
 
 
 # Helper to generate dummy PNG/JPG image bytes containing simple shapes/text
-def _generate_test_image_bytes(format_name: str = "PNG", mode: str = "RGB", color=(255, 255, 255)) -> bytes:
+def _generate_test_image_bytes(
+    format_name: str = "PNG", mode: str = "RGB", color=(255, 255, 255)
+) -> bytes:
     img = Image.new(mode, (300, 100), color=color)
     buf = io.BytesIO()
     img.save(buf, format=format_name)
@@ -50,6 +67,7 @@ def _generate_test_image_bytes(format_name: str = "PNG", mode: str = "RGB", colo
 # ---------------------------------------------------------------------------
 # Section 1: Extension Registration & Dispatch Routing Assertions
 # ---------------------------------------------------------------------------
+
 
 def test_image_extensions_registered_in_dispatch_and_document_parser():
     """Assert that .png, .jpg, and .jpeg are properly registered in ALLOWED_EXTENSIONS."""
@@ -69,9 +87,13 @@ def test_get_supported_file_extensions_includes_images():
 
 @patch("src.core.parsers.ocr_parser.check_ocr_dependencies")
 @patch("pytesseract.image_to_string")
-def test_dispatch_routes_standalone_png_image_directly_to_ocr(mock_tesseract, mock_check_ocr):
+def test_dispatch_routes_standalone_png_image_directly_to_ocr(
+    mock_tesseract, mock_check_ocr
+):
     """Verify dispatch.extract_text() routes PNG files directly to image OCR engine."""
-    mock_tesseract.return_value = "Extracted OCR text from standalone PNG essay screenshot."
+    mock_tesseract.return_value = (
+        "Extracted OCR text from standalone PNG essay screenshot."
+    )
     img_bytes = _generate_test_image_bytes("PNG")
 
     extracted = extract_text(img_bytes, "sample_essay_screenshot.png")
@@ -81,7 +103,9 @@ def test_dispatch_routes_standalone_png_image_directly_to_ocr(mock_tesseract, mo
 
 @patch("src.core.parsers.ocr_parser.check_ocr_dependencies")
 @patch("pytesseract.image_to_string")
-def test_dispatch_routes_standalone_jpg_image_directly_to_ocr(mock_tesseract, mock_check_ocr):
+def test_dispatch_routes_standalone_jpg_image_directly_to_ocr(
+    mock_tesseract, mock_check_ocr
+):
     """Verify dispatch.extract_text() routes JPG/JPEG files directly to image OCR engine."""
     mock_tesseract.return_value = "Extracted OCR text from JPG photo."
     img_bytes = _generate_test_image_bytes("JPEG")
@@ -96,6 +120,7 @@ def test_dispatch_routes_standalone_jpg_image_directly_to_ocr(mock_tesseract, mo
 # ---------------------------------------------------------------------------
 # Section 2: Standalone Image Preprocessing Suite
 # ---------------------------------------------------------------------------
+
 
 def test_preprocess_image_for_ocr_rgb_mode():
     """Test preprocessing on standard RGB image."""
@@ -147,6 +172,7 @@ def test_preprocess_image_exception_fallback():
 # Section 3: Error Handling & Resilience Matrix
 # ---------------------------------------------------------------------------
 
+
 def test_extract_text_from_image_invalid_file_bytes():
     """Verify extract_text_from_image handles corrupted file bytes cleanly."""
     corrupted_bytes = b"NOT_AN_IMAGE_FILE_DATA_BYTES"
@@ -155,7 +181,9 @@ def test_extract_text_from_image_invalid_file_bytes():
 
 
 @patch("src.core.parsers.ocr_parser.check_ocr_dependencies")
-@patch("pytesseract.image_to_string", side_effect=MemoryError("Out of memory during OCR"))
+@patch(
+    "pytesseract.image_to_string", side_effect=MemoryError("Out of memory during OCR")
+)
 def test_extract_text_from_image_memory_error_fallback(mock_tesseract, mock_check_ocr):
     """Verify memory exhaustion during pytesseract execution returns fallback string."""
     img_bytes = _generate_test_image_bytes("PNG")
@@ -164,8 +192,12 @@ def test_extract_text_from_image_memory_error_fallback(mock_tesseract, mock_chec
 
 
 @patch("src.core.parsers.ocr_parser.check_ocr_dependencies")
-@patch("pytesseract.image_to_string", side_effect=Exception("Generic pytesseract failure"))
-def test_extract_text_from_image_generic_exception_fallback(mock_tesseract, mock_check_ocr):
+@patch(
+    "pytesseract.image_to_string", side_effect=Exception("Generic pytesseract failure")
+)
+def test_extract_text_from_image_generic_exception_fallback(
+    mock_tesseract, mock_check_ocr
+):
     """Verify generic pytesseract exception returns fallback string."""
     img_bytes = _generate_test_image_bytes("PNG")
     result = extract_text_from_image(img_bytes)
@@ -174,7 +206,10 @@ def test_extract_text_from_image_generic_exception_fallback(mock_tesseract, mock
 
 def test_extract_text_from_image_missing_tesseract_dependency():
     """Verify missing tesseract dependency raises OCRDependencyError."""
-    with patch("src.core.parsers.ocr_parser.check_ocr_dependencies", side_effect=OCRDependencyError("Tesseract not installed")):
+    with patch(
+        "src.core.parsers.ocr_parser.check_ocr_dependencies",
+        side_effect=OCRDependencyError("Tesseract not installed"),
+    ):
         img_bytes = _generate_test_image_bytes("PNG")
         with pytest.raises(OCRDependencyError):
             extract_text_from_image(img_bytes)
@@ -183,6 +218,7 @@ def test_extract_text_from_image_missing_tesseract_dependency():
 # ---------------------------------------------------------------------------
 # Section 4: End-to-End Extraction Pipeline Verification
 # ---------------------------------------------------------------------------
+
 
 @patch("src.core.parsers.ocr_parser.check_ocr_dependencies")
 @patch("pytesseract.image_to_string")

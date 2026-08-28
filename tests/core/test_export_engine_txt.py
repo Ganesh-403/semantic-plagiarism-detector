@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import builtins
 import textwrap
 
@@ -269,9 +291,7 @@ def test_every_incident_gets_its_own_complete_block():
     second["matched_text"] = "A second matching passage."
     second["date_flagged"] = "2026-03-15T11:00:00"
 
-    report = LMSExportEngine.generate_incident_txt(
-        [FULLY_POPULATED_INCIDENT, second]
-    )
+    report = LMSExportEngine.generate_incident_txt([FULLY_POPULATED_INCIDENT, second])
 
     assert report is not None
     assert "Total flagged pairs: 2" in report
@@ -338,8 +358,7 @@ def test_generate_incident_txt_body_references_no_undefined_names():
         if isinstance(node, ast.ExceptHandler) and node.name
     }
     arguments = {
-        argument.arg
-        for argument in function.args.args + function.args.kwonlyargs
+        argument.arg for argument in function.args.args + function.args.kwonlyargs
     }
     loaded = {
         node.id

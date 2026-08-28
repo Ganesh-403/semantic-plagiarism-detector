@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/core/test_text_chunking.py
 ---------------------------------
@@ -126,14 +148,14 @@ def test_chunk_text_emoji_byte_length_enforced():
         assert len(chunk.text.encode("utf-8")) <= 50
 
 
-
-
 def test_character_fallback_does_not_split_surrogate_pairs():
     """Fallback chunking keeps explicit UTF-16 surrogate pairs intact."""
     from src.core.text_chunking import _character_fallback_chunking
 
     emoji = "\ud83d\ude80" * 20  # U+1F680 represented as a surrogate pair
-    chunks = _character_fallback_chunking(emoji, chunk_size=5, chunk_overlap=1, count_bytes=True)
+    chunks = _character_fallback_chunking(
+        emoji, chunk_size=5, chunk_overlap=1, count_bytes=True
+    )
 
     assert chunks
     for chunk in chunks:
@@ -145,10 +167,13 @@ def test_character_fallback_handles_surrogate_pair_larger_than_byte_limit():
     """A surrogate pair remains intact even when it exceeds the byte limit."""
     from src.core.text_chunking import _character_fallback_chunking
 
-    chunks = _character_fallback_chunking("\ud83d\ude80", chunk_size=1, chunk_overlap=0, count_bytes=True)
+    chunks = _character_fallback_chunking(
+        "\ud83d\ude80", chunk_size=1, chunk_overlap=0, count_bytes=True
+    )
 
     assert len(chunks) == 1
     assert chunks[0].text == "\ud83d\ude80"
+
 
 def test_chunk_overlap_boundaries():
     """Verify consecutive chunks share the exact configured overlap substring."""
@@ -169,7 +194,9 @@ def test_chunk_overlap_boundaries():
 def test_chunk_by_sentences_cjk_boundaries():
     """Verify Chinese, Japanese, and Korean sentence boundaries are recognized."""
     text = "这是第一句。这是第二句！这是第三句？"
-    chunks = chunk_by_sentences(text, max_chunk_size=10, min_chunk_length=1, min_words=1)
+    chunks = chunk_by_sentences(
+        text, max_chunk_size=10, min_chunk_length=1, min_words=1
+    )
 
     assert len(chunks) == 3
     assert chunks[0] == "这是第一句。"

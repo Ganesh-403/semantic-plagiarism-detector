@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import pytest
 
 opentelemetry = pytest.importorskip("opentelemetry")
@@ -15,15 +37,15 @@ def memory_exporter():
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    
+
     # Store the original provider
     original_provider = trace.get_tracer_provider()
-    
+
     # Set the new test provider
     trace.set_tracer_provider(provider)
-    
+
     yield exporter
-    
+
     # Restore the original provider
     trace.set_tracer_provider(original_provider)
 
@@ -34,7 +56,7 @@ def test_otel_middleware_records_exception(memory_exporter):
     records it in the span, sets http.status_code to 500, and re-raises.
     """
     client = TestClient(app, raise_server_exceptions=True)
-    
+
     @app.get("/_test_error")
     async def test_error():
         raise ValueError("Intentional error for testing")
@@ -45,11 +67,13 @@ def test_otel_middleware_records_exception(memory_exporter):
 
     spans = memory_exporter.get_finished_spans()
     assert len(spans) > 0, "No spans were exported"
-    
+
     # Find our HTTP span
-    http_span = next((span for span in spans if span.name == "HTTP GET /_test_error"), None)
+    http_span = next(
+        (span for span in spans if span.name == "HTTP GET /_test_error"), None
+    )
     assert http_span is not None, "Could not find HTTP span for the route"
-    
+
     # Check that status code is 500
     attributes = http_span.attributes
     assert attributes.get("http.status_code") == 500
@@ -57,12 +81,14 @@ def test_otel_middleware_records_exception(memory_exporter):
     # Check exception events
     events = http_span.events
     assert len(events) > 0, "No events recorded on the span"
-    
+
     exception_event = next((e for e in events if e.name == "exception"), None)
     assert exception_event is not None, "No exception event recorded"
-    
+
     assert exception_event.attributes.get("exception.type") == "ValueError"
-    assert "Intentional error for testing" in exception_event.attributes.get("exception.message", "")
+    assert "Intentional error for testing" in exception_event.attributes.get(
+        "exception.message", ""
+    )
 
 
 def test_otel_middleware_extracts_user_id_from_bearer_token(memory_exporter):
@@ -112,14 +138,18 @@ def test_otel_middleware_groups_by_route_template(memory_exporter):
     client.get("/_test_users/456")
 
     spans = memory_exporter.get_finished_spans()
-    user_spans = [s for s in spans if "/_test_users/" in s.name or "/_test_users/{" in s.name]
+    user_spans = [
+        s for s in spans if "/_test_users/" in s.name or "/_test_users/{" in s.name
+    ]
     assert len(user_spans) == 2, "Should have 2 user spans recorded"
     for span in user_spans:
         assert span.name == "HTTP GET /_test_users/{user_id}"
         assert span.attributes.get("http.route") == "/_test_users/{user_id}"
 
 
-def test_otel_middleware_injects_trace_id_in_global_exception_handler(memory_exporter, monkeypatch):
+def test_otel_middleware_injects_trace_id_in_global_exception_handler(
+    memory_exporter, monkeypatch
+):
     """Test that global_exception_handler injects the OpenTelemetry Trace ID into the error response payload when a trace is active."""
     monkeypatch.setenv("APP_ENVIRONMENT", "production")
     client = TestClient(app, raise_server_exceptions=False)
@@ -141,6 +171,3 @@ def test_otel_middleware_injects_trace_id_in_global_exception_handler(memory_exp
     assert span is not None
     span_trace_id = trace.format_trace_id(span.get_span_context().trace_id)
     assert body["trace_id"] == span_trace_id
-
-
-

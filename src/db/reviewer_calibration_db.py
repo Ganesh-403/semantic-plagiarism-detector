@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/db/reviewer_calibration_db.py
 ---------------------------------
@@ -7,13 +29,13 @@ Persists historical review overrides, computes reviewer bias metrics,
 and stores Inter-Rater Reliability scores for review committees.
 """
 
-import sqlite3
 import json
 import logging
-from pathlib import Path
-from typing import Optional, Dict, Any, List
+import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +47,7 @@ def get_connection(db_path: Optional[Path] = None):
     """Context manager for acquiring and releasing SQLite connections."""
     path = db_path or DEFAULT_DB_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
@@ -42,7 +64,8 @@ def get_connection(db_path: Optional[Path] = None):
 def initialize_calibration_db(db_path: Optional[Path] = None) -> None:
     """Create the reviewer calibration database schema."""
     with get_connection(db_path) as conn:
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS review_overrides (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 reviewer_id TEXT NOT NULL,
@@ -51,9 +74,11 @@ def initialize_calibration_db(db_path: Optional[Path] = None) -> None:
                 manual_score REAL NOT NULL,
                 created_at TEXT NOT NULL
             )
-        """)
-        
-        conn.execute("""
+        """
+        )
+
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS reviewer_metrics (
                 reviewer_id TEXT PRIMARY KEY,
                 mean_error REAL,
@@ -62,14 +87,19 @@ def initialize_calibration_db(db_path: Optional[Path] = None) -> None:
                 calibration_weight REAL,
                 updated_at TEXT NOT NULL
             )
-        """)
-        
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_overrides_reviewer 
+        """
+        )
+
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_overrides_reviewer
             ON review_overrides(reviewer_id)
-        """)
-        
-    logger.info("Reviewer calibration database initialized at %s", db_path or DEFAULT_DB_PATH)
+        """
+        )
+
+    logger.info(
+        "Reviewer calibration database initialized at %s", db_path or DEFAULT_DB_PATH
+    )
 
 
 def log_review_override(
@@ -77,18 +107,24 @@ def log_review_override(
     document_id: str,
     automated_score: float,
     manual_score: float,
-    db_path: Optional[Path] = None
+    db_path: Optional[Path] = None,
 ) -> bool:
     """Log a manual review override against an automated score."""
     try:
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO review_overrides 
+                INSERT INTO review_overrides
                 (reviewer_id, document_id, automated_score, manual_score, created_at)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                (reviewer_id, document_id, automated_score, manual_score, datetime.utcnow().isoformat())
+                (
+                    reviewer_id,
+                    document_id,
+                    automated_score,
+                    manual_score,
+                    datetime.utcnow().isoformat(),
+                ),
             )
         return True
     except sqlite3.Error as e:
@@ -100,14 +136,14 @@ def update_reviewer_metrics(
     reviewer_id: str,
     metrics: dict[str, float],
     weight: float,
-    db_path: Optional[Path] = None
+    db_path: Optional[Path] = None,
 ) -> bool:
     """Update the aggregated calibration metrics for a reviewer."""
     try:
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO reviewer_metrics 
+                INSERT OR REPLACE INTO reviewer_metrics
                 (reviewer_id, mean_error, mean_absolute_error, variance, calibration_weight, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
@@ -117,8 +153,8 @@ def update_reviewer_metrics(
                     metrics["mean_absolute_error"],
                     metrics["variance"],
                     weight,
-                    datetime.utcnow().isoformat()
-                )
+                    datetime.utcnow().isoformat(),
+                ),
             )
         return True
     except sqlite3.Error as e:
@@ -132,7 +168,7 @@ def get_reviewer_weight(reviewer_id: str, db_path: Optional[Path] = None) -> flo
         with get_connection(db_path) as conn:
             cursor = conn.execute(
                 "SELECT calibration_weight FROM reviewer_metrics WHERE reviewer_id = ?",
-                (reviewer_id,)
+                (reviewer_id,),
             )
             row = cursor.fetchone()
             return row["calibration_weight"] if row else 1.0
@@ -143,17 +179,25 @@ def get_reviewer_weight(reviewer_id: str, db_path: Optional[Path] = None) -> flo
 
 # semantic-plagiarism-detector/src/db/reviewer_calibration_db.py
 
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 
 class ReviewerCalibrationDB:
     """
     Persists historical review overrides and computes reviewer bias metrics.
     """
+
     def __init__(self):
         # In-memory storage mock for demonstration (replace with SQL/ORM in production)
         self.overrides_store: list[dict[str, Any]] = []
 
-    def save_review_override(self, submission_id: str, reviewer_id: str, assigned_score: float, consensus_score: float) -> None:
+    def save_review_override(
+        self,
+        submission_id: str,
+        reviewer_id: str,
+        assigned_score: float,
+        consensus_score: float,
+    ) -> None:
         """Persists a reviewer override event along with its deviation from consensus."""
         deviation = assigned_score - consensus_score
         record = {
@@ -161,7 +205,7 @@ class ReviewerCalibrationDB:
             "reviewer_id": reviewer_id,
             "assigned_score": assigned_score,
             "consensus_score": consensus_score,
-            "consensus_deviation": deviation
+            "consensus_deviation": deviation,
         }
         self.overrides_store.append(record)
 

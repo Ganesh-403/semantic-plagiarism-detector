@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/api/test_async_scan_progress.py
 -------------------------------------
@@ -57,21 +79,44 @@ def test_process_scan_job_progress_progression():
     observed_stages = []
 
     def mock_extract(file_input, filename):
-        observed_stages.append(("during_extract", scan_jobs[job_id]["progress_percent"], scan_jobs[job_id]["stage"]))
-        return "This is a sample document for testing progress reporting in the pipeline."
+        observed_stages.append(
+            (
+                "during_extract",
+                scan_jobs[job_id]["progress_percent"],
+                scan_jobs[job_id]["stage"],
+            )
+        )
+        return (
+            "This is a sample document for testing progress reporting in the pipeline."
+        )
 
     def mock_chunk(text):
-        observed_stages.append(("during_chunk", scan_jobs[job_id]["progress_percent"], scan_jobs[job_id]["stage"]))
+        observed_stages.append(
+            (
+                "during_chunk",
+                scan_jobs[job_id]["progress_percent"],
+                scan_jobs[job_id]["stage"],
+            )
+        )
         return [text]
 
     def mock_embed(chunks):
-        observed_stages.append(("during_embed", scan_jobs[job_id]["progress_percent"], scan_jobs[job_id]["stage"]))
+        observed_stages.append(
+            (
+                "during_embed",
+                scan_jobs[job_id]["progress_percent"],
+                scan_jobs[job_id]["stage"],
+            )
+        )
         return np.ones((1, 384), dtype=np.float32)
 
-    with patch("src.api.routers.analysis.extract_text", side_effect=mock_extract), \
-         patch("src.api.routers.analysis.chunk_document", side_effect=mock_chunk), \
-         patch("src.api.routers.analysis.embed_chunks", side_effect=mock_embed), \
-         patch("src.api.routers.analysis.get_corpus_documents_with_embeddings", return_value={}):
+    with patch(
+        "src.api.routers.analysis.extract_text", side_effect=mock_extract
+    ), patch("src.api.routers.analysis.chunk_document", side_effect=mock_chunk), patch(
+        "src.api.routers.analysis.embed_chunks", side_effect=mock_embed
+    ), patch(
+        "src.api.routers.analysis.get_corpus_documents_with_embeddings", return_value={}
+    ):
         _process_scan_job(
             job_id=job_id,
             file_input="fake_path",
@@ -94,7 +139,10 @@ def test_process_scan_job_progress_progression():
 
 def test_get_async_scan_status_endpoint_returns_progress():
     """Verify that GET /api/v1/scan/status/{job_id} returns progress_percent and stage."""
-    app.dependency_overrides[get_current_user] = lambda: {"sub": "tester", "scopes": ["read"]}
+    app.dependency_overrides[get_current_user] = lambda: {
+        "sub": "tester",
+        "scopes": ["read"],
+    }
     app.dependency_overrides[verify_bearer_token] = lambda: "valid_token"
 
     try:
@@ -111,7 +159,9 @@ def test_get_async_scan_status_endpoint_returns_progress():
             "error": None,
         }
 
-        response = client.get(f"/api/v1/scan/status/{job_id}", headers={"Authorization": "Bearer token"})
+        response = client.get(
+            f"/api/v1/scan/status/{job_id}", headers={"Authorization": "Bearer token"}
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["job_id"] == job_id

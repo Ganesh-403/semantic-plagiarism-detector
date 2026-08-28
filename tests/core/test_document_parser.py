@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import io
 import shutil
 import time
@@ -300,7 +322,6 @@ def test_extract_from_txt_bytes():
 
 
 class TestCorruptedZipHandling:
-
     def test_extract_text_from_valid_zip(self):
         zip_bytes = _make_valid_zip_bytes(
             {
@@ -390,7 +411,6 @@ def test_parallel_extract_texts_matches_sequential(tmp_path):
 
 
 class TestStripBibliography:
-
     def test_strips_references_header(self):
         text = "Some body text.\n\nReferences\n[1] Smith, 2020.\n[2] Jones, 2021."
         result = strip_bibliography(text)
@@ -473,7 +493,6 @@ class TestStripBibliography:
 
 
 class TestRemoveIgnorePhrases:
-
     def test_removes_single_phrase(self):
         text = (
             "Q1: Explain the theory of relativity. This is my answer about relativity."
@@ -553,7 +572,6 @@ class TestRemoveIgnorePhrases:
 
 
 class TestCleanText:
-
     def test_collapses_multiple_blank_lines(self):
         text = "Line 1\n\n\n\nLine 2"
         result = clean_text(text)
@@ -969,10 +987,7 @@ class TestNormalizeUnicodeNFC:
             "src.core.document_parser.detect_text_language", return_value="en"
         ), patch(
             "src.core.document_parser._read_pdf_bytes", side_effect=lambda x: x
-        ), patch(
-            "src.security.mime_validator.validate_mime_type", return_value=True
-        ):
-
+        ), patch("src.security.mime_validator.validate_mime_type", return_value=True):
             result = extract_text(b"dummy", "test.txt")
 
         # Result should be NFC normalized
@@ -998,9 +1013,7 @@ class TestNormalizeUnicodeNFC:
             "src.core.document_parser.detect_text_language", return_value="en"
         ), patch(
             "src.core.document_parser._read_pdf_bytes", side_effect=lambda x: x
-        ), patch(
-            "src.security.mime_validator.validate_mime_type", return_value=True
-        ):
+        ), patch("src.security.mime_validator.validate_mime_type", return_value=True):
             # Without lowercase
             result_default = extract_text(b"dummy", "test.txt")
             assert result_default == "HELLO World!"
@@ -1115,6 +1128,7 @@ def test_resolve_process_pool_workers():
     assert _resolve_process_pool_workers(2, 10) == min(2, cpus)
     assert _resolve_process_pool_workers(100, 10) == min(100, cpus, 10)
 
+
 def test_extract_pptx_text_mocked(tmp_path):
     """Test that .pptx files are successfully parsed when using python-pptx."""
     from pptx import Presentation  # type: ignore
@@ -1124,7 +1138,7 @@ def test_extract_pptx_text_mocked(tmp_path):
         _allowed_file,
         _extract_pptx_text,
     )
-    
+
     assert ".pptx" in ALLOWED_EXTENSIONS
     assert _allowed_file("presentation.pptx") is True
 
@@ -1137,7 +1151,7 @@ def test_extract_pptx_text_mocked(tmp_path):
 
     with open(pptx_path, "rb") as f:
         extracted = _extract_pptx_text(f)
-    
+
     assert "Hello PowerPoint" in extracted
 
 
@@ -1157,12 +1171,15 @@ def test_markdown_extension_routing_consolidation():
 # Timeout Safety & Circuit Breaker Tests (#3778)
 # ---------------------------------------------------------------------------
 
+
 class TestExtractionTimeoutCircuitBreaker:
     """Enterprise safety suite for catastrophic parser hangs and infinite loops."""
-    
-    @patch('src.core.document_parser._has_meaningful_text', return_value=False)
-    @patch('fitz.open')
-    def test_extract_text_aborts_on_fitz_hang(self, mock_fitz_open, mock_has_meaningful_text):
+
+    @patch("src.core.document_parser._has_meaningful_text", return_value=False)
+    @patch("fitz.open")
+    def test_extract_text_aborts_on_fitz_hang(
+        self, mock_fitz_open, mock_has_meaningful_text
+    ):
         """
         Mock fitz.open to sleep indefinitely (simulating a C-extension deadlock).
         Assert that the EnterpriseTimeoutCircuitBreaker intercepts and aborts
@@ -1170,44 +1187,40 @@ class TestExtractionTimeoutCircuitBreaker:
         """
         import time
         from unittest.mock import MagicMock
-        
+
         # Simulate a process hang that would normally block the main thread indefinitely
         def hanging_open(*args, **kwargs):
             time.sleep(5.0)
             return MagicMock()
-            
+
         mock_fitz_open.side_effect = hanging_open
-        
+
         pdf_bytes = _make_pdf_bytes(
             "This is a document designed to trigger OCR due to image parsing."
         )
-        
+
         start_time = time.perf_counter()
-        
+
         with pytest.raises(TimeoutError) as exc_info:
             # We enforce a strict 1-second timeout for the test to ensure
             # the circuit breaker is working without stalling the CI pipeline.
-            extract_text(
-                pdf_bytes, 
-                "hanging_submission.pdf", 
-                timeout_seconds=1.0
-            )
-            
+            extract_text(pdf_bytes, "hanging_submission.pdf", timeout_seconds=1.0)
+
         duration = time.perf_counter() - start_time
-        
+
         # The duration should be extremely close to the 1.0s timeout limit,
         # verifying the circuit breaker interrupted the 5.0s mock hang.
         assert duration < 2.0, f"Circuit breaker failed! Duration: {duration}s"
         assert "exceeded time limit" in str(exc_info.value).lower()
-        
+
     def test_circuit_breaker_allows_normal_execution(self):
         """Ensure the circuit breaker does not interfere with normal rapid extraction."""
         pdf_bytes = _make_pdf_bytes("Normal rapid extraction document.")
-        
+
         start_time = time.perf_counter()
         # Generous timeout for normal execution
         result = extract_text(pdf_bytes, "normal.pdf", timeout_seconds=10.0)
         duration = time.perf_counter() - start_time
-        
+
         assert len(result) > 0
         assert duration < 10.0

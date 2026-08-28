@@ -3,6 +3,7 @@
 This guide provides comprehensive instructions and best practices for configuring, optimizing, and maintaining Redis as a high-performance caching layer in a production environment.
 
 In the **Semantic Plagiarism Detector**, Redis acts as a critical speed-up mechanism and state manager. It handles:
+
 * **Session Caching**: Serialized user session states (`spd:v1:session:<id>:<key>`) with a short Time-To-Live (TTL) of 15 minutes.
 * **FAISS Index Caching**: Heavy binary representations of vector similarity search indexes (`spd:v1:faiss:index:<key>`) cached for 24 hours.
 * **Analysis Results Caching**: Document analysis results and embeddings (`spd:v1:analysis:<key>`) cached for 2 hours.
@@ -17,21 +18,25 @@ Proper Redis tuning ensures system responsiveness, prevents Out-Of-Memory (OOM) 
 Redis holds its entire dataset in RAM to deliver sub-millisecond response times. Therefore, precise memory allocation is crucial to prevent system instability, memory fragmentation, and swapping to disk.
 
 ### 1.1 Memory Limit (`maxmemory`)
+
 By default, on 64-bit systems, Redis has no memory limit and will continue consuming RAM until the host system runs out of memory. This triggers the operating system's OOM Killer to terminate processes (often Redis itself).
 
 In production, you should set a strict upper bound using the `maxmemory` setting.
 
-#### Recommended Allocation Rules:
+#### Recommended Allocation Rules
+
 * **Dedicated Redis Host**: Allocate **60% to 70%** of total system RAM to Redis, leaving the rest for the operating system, network buffers, and persistence overhead (such as process forking).
 * **Shared Host (e.g., App + Redis on same VM)**: Limit Redis to **25% to 30%** of total system RAM or a fixed value (e.g., `2GB`), ensuring it does not starve CPU-intensive vector/embedding operations.
 
-#### Setting `maxmemory` in `redis.conf`:
+#### Setting `maxmemory` in `redis.conf`
+
 ```ini
 # Limit Redis memory consumption to 2 Gigabytes
 maxmemory 2gb
 ```
 
-#### Setting `maxmemory` dynamically (without restarting Redis):
+#### Setting `maxmemory` dynamically (without restarting Redis)
+
 ```bash
 redis-cli CONFIG SET maxmemory 2gb
 ```
@@ -43,6 +48,7 @@ redis-cli CONFIG SET maxmemory 2gb
 When the memory usage reaches the defined `maxmemory` threshold, Redis must decide how to handle new write requests. This is governed by the `maxmemory-policy`.
 
 ### 2.1 Why `allkeys-lru` is Highly Recommended
+
 For the Semantic Plagiarism Detector, the **`allkeys-lru`** eviction policy is the recommended default.
 
 * **Reclaims Space Automatically**: If memory becomes full due to large FAISS vector indexes or active sessions, `allkeys-lru` will evict the **Least Recently Used (LRU)** keys across the entire database, regardless of whether they have a set expiration (TTL).
@@ -69,6 +75,7 @@ For the Semantic Plagiarism Detector, the **`allkeys-lru`** eviction policy is t
 Redis offers two main persistence mechanisms to save data to disk: **RDB (Redis Database snapshots)** and **AOF (Append Only File)**. Understanding their differences is key to optimizing performance.
 
 ### 3.1 RDB (Redis Database Snapshotting)
+
 RDB persistence performs point-in-time snapshots of the dataset at specified intervals.
 
 * **How it works**: Redis forks a child process. The child writes the memory snapshot to a temporary RDB file (`dump.rdb`) and replaces the old file when done.
@@ -76,6 +83,7 @@ RDB persistence performs point-in-time snapshots of the dataset at specified int
 * **Cons**: Potential data loss. If Redis crashes between snapshots, all writes since the last snapshot are lost. Forking can cause minor latency spikes if the dataset is large (e.g., several gigabytes of FAISS indexes).
 
 ### 3.2 AOF (Append Only File)
+
 AOF logs every write operation received by the server to a disk-based log file (`appendonly.aof`).
 
 * **How it works**: The write operations are appended to the log. An background thread fsyncs the log to disk based on the policy (usually every second).
@@ -83,6 +91,7 @@ AOF logs every write operation received by the server to a disk-based log file (
 * **Cons**: Log files are significantly larger than RDB snapshots. Restarting Redis and reconstructing the DB from AOF takes longer. High disk I/O load.
 
 ### 3.3 Hybrid (RDB + AOF)
+
 You can enable both persistence methods simultaneously. When Redis restarts, it will load the AOF file because it is guaranteed to be the most complete.
 
 * **How it works**: RDB snapshots are taken regularly for backup/restores, while AOF logs modifications to provide durability.
@@ -168,32 +177,41 @@ activedefrag yes
 To ensure Redis remains healthy, you must track memory usage, throughput, and error rates using administrative commands.
 
 ### 5.1 Crucial Diagnostic Commands
+
 Run these commands using the `redis-cli`:
 
 * **Check Memory Usage Details**:
+
   ```bash
   redis-cli INFO memory
   ```
+
   *Key metric to monitor:* `used_memory_human` (actual data size) and `used_memory_peak_human` (highest memory usage recorded).
 
 * **Check Fragmentation Ratio**:
+
   ```bash
   redis-cli INFO memory | grep fragmentation
   ```
+
   *Key metric to monitor:* `mem_fragmentation_ratio`.
   * If the ratio is **> 1.5**, your system has significant memory fragmentation. Enabling `activedefrag yes` will clean this up online.
   * If the ratio is **< 1.0**, the host operating system has run out of physical memory and has started swapping to disk, causing severe latency spikes. Increase VM memory immediately.
 
 * **Find Slow Queries**:
+
   ```bash
   redis-cli SLOWLOG GET 10
   ```
+
   Logs commands that exceeded the execution limit (typically 10 milliseconds). Helpful for detecting expensive keyspace searches or operations on huge serialized pickles.
 
 * **Monitor Live Commands**:
+
   ```bash
   redis-cli MONITOR
   ```
+
   Outputs every command processed by the Redis server in real-time. Use sparingly in production as it increases CPU overhead.
 
 ### 5.2 Key Metrics to Watch
@@ -231,6 +249,7 @@ To maximize Redis efficiency in the **Semantic Plagiarism Detector** environment
 ## 7. Official References
 
 For deeper configuration details and troubleshooting, consult the official Redis documentation:
+
 * [Redis Memory Optimization](https://redis.io/docs/latest/develop/optimization/memory-optimization/)
 * [Redis Eviction Policies and Key Eviction](https://redis.io/docs/latest/develop/reference/eviction/)
 * [Redis Persistence Guide](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/)
@@ -241,8 +260,8 @@ For deeper configuration details and troubleshooting, consult the official Redis
 
 `PayloadCompressor` stores serialized cache payloads using the following wire format:
 
-- **Compressed payloads:** `MAGIC_HEADER + zlib_compressed_data`
-- **Uncompressed payloads:** raw serialized bytes
-- `MAGIC_HEADER` is `b"ZLIB_COMPRESSED_V1::"` and identifies compressed entries.
-- Compression is applied when the serialized payload size is at least `COMPRESSION_THRESHOLD_BYTES`, which is **64 KiB (`64 * 1024` bytes)**.
-- Consumers reading Redis entries directly should check for `MAGIC_HEADER` before attempting zlib decompression.
+* **Compressed payloads:** `MAGIC_HEADER + zlib_compressed_data`
+* **Uncompressed payloads:** raw serialized bytes
+* `MAGIC_HEADER` is `b"ZLIB_COMPRESSED_V1::"` and identifies compressed entries.
+* Compression is applied when the serialized payload size is at least `COMPRESSION_THRESHOLD_BYTES`, which is **64 KiB (`64 * 1024` bytes)**.
+* Consumers reading Redis entries directly should check for `MAGIC_HEADER` before attempting zlib decompression.

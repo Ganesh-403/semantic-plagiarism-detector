@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/utils/test_temp_manager.py
 --------------------------------
@@ -699,6 +721,7 @@ def test_managed_ocr_temp_dir_restores_environment_and_tempdir():
 def test_thread_safety_registered_temp_paths():
     """Verify concurrent register, unregister, and cleanup operations across multiple threads do not crash or corrupt state."""
     import threading
+
     from src.utils.temp_manager import _lock
 
     assert isinstance(_lock, type(threading.Lock()))
@@ -709,7 +732,9 @@ def test_thread_safety_registered_temp_paths():
     def worker(worker_id: int):
         try:
             for i in range(50):
-                path = os.path.join(tempfile.gettempdir(), f"fake_thread_test_{worker_id}_{i}.tmp")
+                path = os.path.join(
+                    tempfile.gettempdir(), f"fake_thread_test_{worker_id}_{i}.tmp"
+                )
                 register_temp_path(path)
                 if i % 2 == 0:
                     unregister_temp_path(path)
@@ -728,5 +753,3 @@ def test_thread_safety_registered_temp_paths():
 
     assert not errors, f"Errors encountered during concurrent access: {errors}"
     cleanup_registered_temp_paths()
-
-

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/core/processing.py
 ----------------------
@@ -51,9 +73,9 @@ def run_full_pipeline(
     chunk_size: int = 500,
     chunk_overlap: int = 50,
     threshold: float = PLAGIARISM_THRESHOLD,
-    ignore_phrases: Optional[str] = None,
-    url_text: Optional[str] = None,
-    url_filename: Optional[str] = None,
+    ignore_phrases: str | None = None,
+    url_text: str | None = None,
+    url_filename: str | None = None,
 ) -> PipelineResult:
     """Execute the full document upload pipeline outside of Streamlit.
 
@@ -85,7 +107,10 @@ def run_full_pipeline(
                     continue
                 try:
                     raw_texts[name] = extract_text(
-                        io.BytesIO(data), name, ocr_language=ocr_language, ocr_dpi=ocr_dpi
+                        io.BytesIO(data),
+                        name,
+                        ocr_language=ocr_language,
+                        ocr_dpi=ocr_dpi,
                     )
                 except Exception as exc:
                     failed_files.append(name)
@@ -118,7 +143,8 @@ def run_full_pipeline(
             embeddings = embed_documents(chunked_docs)
             first_emb = next(iter(embeddings.values()), None)
             embed_span.set_attribute(
-                "embedding.dims", first_emb.shape[1] if first_emb is not None and first_emb.size else 0
+                "embedding.dims",
+                first_emb.shape[1] if first_emb is not None and first_emb.size else 0,
             )
 
         with tracer.start_as_current_span("pipeline.similarity_scoring") as sim_span:
@@ -249,12 +275,12 @@ def _aggregate_chunk_matches_to_flags(
 
 
 def rescan_recent_documents(
-    grace_period: Optional[int] = None,
+    grace_period: int | None = None,
     threshold: float = PLAGIARISM_THRESHOLD,
     *,
     top_k: int = 10,
-    now: Optional[datetime] = None,
-    db_path: Optional[str] = None,
+    now: datetime | None = None,
+    db_path: str | None = None,
     dispatch_alerts: bool = True,
 ) -> RescanResult:
     """Re-check recently-added documents against the full corpus.

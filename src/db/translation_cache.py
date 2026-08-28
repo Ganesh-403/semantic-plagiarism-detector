@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/db/translation_cache.py
 ---------------------------
@@ -145,7 +167,9 @@ def init_translation_cache() -> None:
 
 def initialize_cache_db(db_path: Optional[Path] = None) -> None:
     """Initialize the modern cache schema at the requested database path."""
-    _ensure_translation_cache_schema(Path(db_path) if db_path is not None else _CACHE_DB_PATH)
+    _ensure_translation_cache_schema(
+        Path(db_path) if db_path is not None else _CACHE_DB_PATH
+    )
 
 
 # ── Hashing Helpers ──────────────────────────────────────────────────────────
@@ -207,9 +231,7 @@ def migrate_legacy_cache(
         counts.
     """
     source_path = Path(legacy_db_path) if legacy_db_path is not None else Path(DB_PATH)
-    target_path = (
-        Path(cache_db_path) if cache_db_path is not None else _CACHE_DB_PATH
-    )
+    target_path = Path(cache_db_path) if cache_db_path is not None else _CACHE_DB_PATH
 
     if not source_path.exists():
         logger.info("Legacy translation cache database does not exist: %s", source_path)
@@ -363,8 +385,8 @@ def get_cached_translation(
                     # Update last_accessed_at for potential LRU tracking
                     conn.execute(
                         """
-                        UPDATE translation_cache 
-                        SET last_accessed_at = ? 
+                        UPDATE translation_cache
+                        SET last_accessed_at = ?
                         WHERE source_hash = ?
                         """,
                         (datetime.utcnow().isoformat(), source_hash),
@@ -389,14 +411,16 @@ def get_cached_translation(
                         # Update last_accessed_at for potential LRU tracking
                         new_conn.execute(
                             """
-                            UPDATE translation_cache 
-                            SET last_accessed_at = ? 
+                            UPDATE translation_cache
+                            SET last_accessed_at = ?
                             WHERE source_hash = ?
                             """,
                             (datetime.utcnow().isoformat(), source_hash),
                         )
                         logger.debug(
-                            "Cache hit for translation: %s -> %s", source_lang, target_lang
+                            "Cache hit for translation: %s -> %s",
+                            source_lang,
+                            target_lang,
                         )
                         return row["translated_text"]
 
@@ -530,7 +554,7 @@ def purge_old_translations(
         with _get_connection(db_path) as conn:
             cursor = conn.execute(
                 """
-                DELETE FROM translation_cache 
+                DELETE FROM translation_cache
                 WHERE created_at < ?
                 """,
                 (cutoff_iso,),

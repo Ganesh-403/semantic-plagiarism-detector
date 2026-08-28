@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """src/api/routers/health_score.py - Document health scoring API router."""
 
 from __future__ import annotations
@@ -9,18 +31,15 @@ from fastapi import APIRouter, HTTPException, Query, Request, Security, status
 
 from src.api.dependencies import get_current_user
 from src.api.schemas import (
-    DocumentHealthScoreResponse,
     DocumentHealthListResponse,
-    HealthScoreSummaryResponse,
-    HealthGateConfigResponse,
-    HealthGateCheckResponse,
-    HealthDimensionAvgResponse,
+    DocumentHealthScoreResponse,
     ErrorResponse,
+    HealthDimensionAvgResponse,
+    HealthGateCheckResponse,
+    HealthGateConfigResponse,
+    HealthScoreSummaryResponse,
 )
-from src.core.document_health_scorer import (
-    compute_quality_gate,
-    aggregate_reports,
-)
+from src.core.document_health_scorer import aggregate_reports, compute_quality_gate
 from src.db.health_score_db import health_repo
 
 logger = logging.getLogger(__name__)
@@ -57,9 +76,9 @@ async def score_single_document(
     try:
         from src.db.corpus_db import (
             get_all_documents,
+            get_chunks_for_documents,
             get_document_chunks_count,
             get_document_word_counts,
-            get_chunks_for_documents,
         )
 
         docs = get_all_documents()
@@ -96,6 +115,7 @@ async def score_single_document(
         existing_hashes = {d.file_hash for d in docs if d.file_hash}
 
         from src.core.document_health_scorer import score_document
+
         report = score_document(
             doc=doc_dict,
             chunk_texts=chunk_texts,
@@ -155,10 +175,10 @@ async def score_single_document(
 )
 async def list_health_scores(
     request: Request,
-    min_score: Optional[float] = Query(None, description="Minimum score filter"),
-    max_score: Optional[float] = Query(None, description="Maximum score filter"),
-    grade: Optional[str] = Query(None, description="Filter by letter grade"),
-    gate_passed: Optional[bool] = Query(None, description="Filter by gate result"),
+    min_score: float | None = Query(None, description="Minimum score filter"),
+    max_score: float | None = Query(None, description="Maximum score filter"),
+    grade: str | None = Query(None, description="Filter by letter grade"),
+    gate_passed: bool | None = Query(None, description="Filter by gate result"),
     sort_by: str = Query("overall_score", description="Sort field"),
     sort_order: str = Query("DESC", description="Sort direction"),
     page: int = Query(1, ge=1),
@@ -297,9 +317,9 @@ async def get_gate_config(
 )
 async def update_gate_config(
     request: Request,
-    min_score: Optional[float] = Query(None, ge=0, le=100),
-    min_grade: Optional[str] = Query(None),
-    enabled: Optional[bool] = Query(None),
+    min_score: float | None = Query(None, ge=0, le=100),
+    min_grade: str | None = Query(None),
+    enabled: bool | None = Query(None),
     _user: dict = Security(get_current_user, scopes=["admin"]),
 ):
     """Update the quality gate configuration."""

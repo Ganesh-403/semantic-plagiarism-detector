@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/api/endpoints/code_execution.py
 -----------------------------------
@@ -7,19 +29,20 @@ Provides REST endpoints to submit code for sandboxed behavioral analysis
 and retrieve execution traces.
 """
 
+import hashlib
+import logging
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
-import logging
-import hashlib
 
-from src.security.code_sandbox import execute_code_sandbox
 from src.core.execution_trace_analyzer import generate_behavioral_hash
 from src.db.sandbox_logs_db import (
+    find_behavioral_clones,
     initialize_sandbox_db,
     log_execution_trace,
-    find_behavioral_clones,
 )
+from src.security.code_sandbox import execute_code_sandbox
 
 logger = logging.getLogger(__name__)
 

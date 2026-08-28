@@ -212,15 +212,15 @@ jobs:
 
               // Refined Multi-word / Strict matching arrays
               const explicitUiPhrases = [
-                "css style", 
-                "ui design", 
-                "user interface", 
+                "css style",
+                "ui design",
+                "user interface",
                 "frontend style",
                 "component color",
                 "theme color",
                 "dark mode"
               ];
-              
+
               const strictUiKeywords = [
                 "tailwind",
                 "css",
@@ -229,7 +229,7 @@ jobs:
               ];
 
               // Safety check: Explicitly skip if it matches backend style definitions
-              const isBackendStyleGuide = text.includes("coding style guide") || 
+              const isBackendStyleGuide = text.includes("coding style guide") ||
                                           text.includes("code style") ||
                                           text.includes("style guide");
 

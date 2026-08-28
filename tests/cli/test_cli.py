@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import json
 import sqlite3
 import subprocess
@@ -7,8 +29,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tests.conftest import MockDataFactory
 from src.core.similarity import PLAGIARISM_THRESHOLD
+from tests.conftest import MockDataFactory
 
 # Mock ML libraries to prevent pytest segmentation faults on Apple Silicon
 sys.modules["transformers"] = MagicMock()
@@ -102,14 +124,14 @@ def test_cli_scan_success_csv_format(
 
     # Filter out commented metadata lines for parsing validation, or inspect metadata explicitly
     lines = [line for line in captured.out.strip().split("\n") if line.strip()]
-    
+
     # Verify metadata header lines start with '#'
     assert lines[0].startswith("#")
     assert any("Threshold Used: 0.8" in line for line in lines)
 
     # Find the row index where standard CSV headers begin
     header_idx = next(i for i, line in enumerate(lines) if not line.startswith("#"))
-    
+
     assert lines[header_idx] == "doc_a,doc_b,similarity_score"
     assert lines[header_idx + 1] == "doc1.txt,doc2.txt,1.0"
 
@@ -135,7 +157,6 @@ def test_cli_scan_empty_folder(tmp_path, capsys):
     report = json.loads(captured.out)
     assert report["documents_processed"] == 0
     assert len(report["matches"]) == 0
-
 
 
 @patch(
@@ -197,7 +218,6 @@ def test_cli_prewarm_no_documents(mock_docs, capsys):
     assert "No documents found. Exiting.\n" in captured.out
 
 
-
 @patch(
     "src.core.embedding_model.get_embedding_model_info",
     return_value=("all-MiniLM-L6-v2", 384),
@@ -242,7 +262,6 @@ def test_cli_scan_default_threshold(temp_assignments_dir):
             )
 
 
-
 def test_cli_main_invalid_command():
     """Test main function with an invalid subcommand/command."""
     with patch("sys.argv", ["cli.py", "invalid_cmd", "./assignments"]):
@@ -285,13 +304,15 @@ def _database_schema_snapshot(db_path: Path) -> dict:
     with sqlite3.connect(db_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
 
-        table_rows = connection.execute("""
+        table_rows = connection.execute(
+            """
             SELECT name, sql
             FROM sqlite_master
             WHERE type = 'table'
               AND name NOT LIKE 'sqlite_%'
             ORDER BY name
-            """).fetchall()
+            """
+        ).fetchall()
 
         snapshot = {
             "user_version": connection.execute("PRAGMA user_version").fetchone()[0],
@@ -580,6 +601,7 @@ def test_cli_main_verify_schema_success(tmp_path, capsys):
     captured = capsys.readouterr()
     assert "PASSED" in captured.out
 
+
 @patch(
     "src.core.embedding_model.get_embedding_model_info",
     return_value=("all-MiniLM-L6-v2", 384),
@@ -588,9 +610,7 @@ def test_cli_main_verify_schema_success(tmp_path, capsys):
     "src.core.embedding_model.embed_chunks",
     side_effect=MockDataFactory.embed_chunks,
 )
-def test_cli_scan_recursive(
-    mock_embed, mock_model_info, temp_assignments_dir, capsys
-):
+def test_cli_scan_recursive(mock_embed, mock_model_info, temp_assignments_dir, capsys):
     """Test scanning documents in nested subdirectories."""
     nested_dir = temp_assignments_dir / "student_1" / "assignment"
     nested_dir.mkdir(parents=True)
@@ -650,6 +670,7 @@ def test_cli_main_verify_schema_cannot_combine_with_subcommand(tmp_path):
             main()
         # argparse exits with 2 for argument errors
         assert excinfo.value.code == 2
+
 
 def test_cli_main_scan_recursive(temp_assignments_dir):
     """Test the --recursive CLI flag."""

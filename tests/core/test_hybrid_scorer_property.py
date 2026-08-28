@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Property-based tests for ``HybridScorer.compute_hybrid_similarity``.
 
 Issue #3027
@@ -76,9 +98,7 @@ def massive_identical_text(draw):
     Produces strings of length 1..5000 by repeating a small alphabetic
     seed. Used to stress-test the upper bound and the lexical caches.
     """
-    seed = draw(
-        st.text(alphabet=string.ascii_letters, min_size=1, max_size=10)
-    )
+    seed = draw(st.text(alphabet=string.ascii_letters, min_size=1, max_size=10))
     repeats = draw(st.integers(min_value=1, max_value=500))
     return seed * repeats
 
@@ -169,9 +189,9 @@ class TestHybridScoreBoundInvariant:
         finally:
             scorer.clear_cache()
 
-        assert isinstance(score, float), (
-            f"expected float, got {type(score).__name__} for method={method}"
-        )
+        assert isinstance(
+            score, float
+        ), f"expected float, got {type(score).__name__} for method={method}"
         assert 0.0 <= score <= 1.0, (
             f"score={score!r} outside [0, 1] for method={method}, "
             f"text_a={text_a[:40]!r}, text_b={text_b[:40]!r}, "
@@ -211,9 +231,9 @@ class TestHybridScoreBoundInvariant:
         finally:
             scorer.clear_cache()
 
-        assert 0.0 <= score <= 1.0, (
-            f"unicode score={score!r} outside [0, 1] for method={method}"
-        )
+        assert (
+            0.0 <= score <= 1.0
+        ), f"unicode score={score!r} outside [0, 1] for method={method}"
 
     @pytest.mark.parametrize("method", _LEXICAL_METHODS)
     @given(
@@ -246,9 +266,9 @@ class TestHybridScoreBoundInvariant:
         finally:
             scorer.clear_cache()
 
-        assert 0.0 <= score <= 1.0, (
-            f"massive score={score!r} outside [0, 1] for method={method}"
-        )
+        assert (
+            0.0 <= score <= 1.0
+        ), f"massive score={score!r} outside [0, 1] for method={method}"
 
 
 # ── Property: explicit edge cases ────────────────────────────────────────────
@@ -263,9 +283,7 @@ class TestHybridScoreEdgeCases:
     @settings(max_examples=100, deadline=None)
     def test_empty_strings(self, method, semantic_score, alpha):
         scorer = HybridScorer(HybridConfig(alpha=alpha, lexical_method=method))
-        score = scorer.compute_hybrid_similarity(
-            "", "", semantic_score=semantic_score
-        )
+        score = scorer.compute_hybrid_similarity("", "", semantic_score=semantic_score)
         scorer.clear_cache()
         assert 0.0 <= score <= 1.0
 
@@ -338,8 +356,10 @@ class TestHybridScoreClamping:
         text_a=ascii_text,
         text_b=ascii_text,
         semantic_score=st.floats(
-            min_value=-1000.0, max_value=1000.0,
-            allow_nan=False, allow_infinity=False,
+            min_value=-1000.0,
+            max_value=1000.0,
+            allow_nan=False,
+            allow_infinity=False,
         ),
         alpha=unit_float,
     )
@@ -376,9 +396,7 @@ class TestHybridScoreBlendProperties:
         deadline=None,
         suppress_health_check=[HealthCheck.function_scoped_fixture],
     )
-    def test_alpha_zero_uses_lexical_only(
-        self, text_a, text_b, semantic_score, alpha
-    ):
+    def test_alpha_zero_uses_lexical_only(self, text_a, text_b, semantic_score, alpha):
         """With alpha=0, hybrid score must equal the (clamped) lexical score."""
         scorer = HybridScorer(HybridConfig(alpha=alpha, lexical_method="jaccard"))
         lexical = scorer._compute_lexical_score(text_a, text_b, "jaccard")
@@ -387,9 +405,9 @@ class TestHybridScoreBlendProperties:
         )
         scorer.clear_cache()
         expected = max(0.0, min(1.0, lexical))
-        assert math.isclose(hybrid, expected, abs_tol=1e-9), (
-            f"alpha=0 hybrid={hybrid!r} != lexical={expected!r}"
-        )
+        assert math.isclose(
+            hybrid, expected, abs_tol=1e-9
+        ), f"alpha=0 hybrid={hybrid!r} != lexical={expected!r}"
 
     @given(
         text_a=ascii_text,
@@ -402,9 +420,7 @@ class TestHybridScoreBlendProperties:
         deadline=None,
         suppress_health_check=[HealthCheck.function_scoped_fixture],
     )
-    def test_alpha_one_uses_semantic_only(
-        self, text_a, text_b, semantic_score, alpha
-    ):
+    def test_alpha_one_uses_semantic_only(self, text_a, text_b, semantic_score, alpha):
         """With alpha=1, hybrid score must equal the (clamped) semantic score."""
         scorer = HybridScorer(HybridConfig(alpha=alpha, lexical_method="jaccard"))
         hybrid = scorer.compute_hybrid_similarity(
@@ -412,9 +428,9 @@ class TestHybridScoreBlendProperties:
         )
         scorer.clear_cache()
         expected = max(0.0, min(1.0, semantic_score))
-        assert math.isclose(hybrid, expected, abs_tol=1e-9), (
-            f"alpha=1 hybrid={hybrid!r} != semantic={expected!r}"
-        )
+        assert math.isclose(
+            hybrid, expected, abs_tol=1e-9
+        ), f"alpha=1 hybrid={hybrid!r} != semantic={expected!r}"
 
     @given(
         text_a=ascii_text,

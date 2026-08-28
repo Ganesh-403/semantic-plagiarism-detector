@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import csv
 import io
 from datetime import datetime, timedelta, timezone
@@ -294,6 +316,7 @@ def test_update_review_status_dismissed(test_db):
 
 def test_bulk_update_incident_status_validation(test_db):
     from src.db.incidents import bulk_update_incident_status
+
     flags = [
         {
             "doc_a": "doc1.pdf",
@@ -305,7 +328,9 @@ def test_bulk_update_incident_status_validation(test_db):
     incident_id = incidents[0]["incident_id"]
 
     # 1. Invalid status check
-    with pytest.raises(ValueError, match="Invalid review status: InvalidState. Must be one of"):
+    with pytest.raises(
+        ValueError, match="Invalid review status: InvalidState. Must be one of"
+    ):
         bulk_update_incident_status([incident_id], "InvalidState", test_db)
 
     # 2. Valid status update to Resolved
@@ -818,14 +843,16 @@ def test_get_incidents_by_assignment_direct_table(tmp_path):
 
     db_file = tmp_path / "custom_incidents.db"
     with sqlite3.connect(db_file) as conn:
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE incidents (
                 id INTEGER PRIMARY KEY,
                 assignment_title TEXT,
                 timestamp TEXT,
                 details TEXT
             )
-            """)
+            """
+        )
         conn.execute(
             "INSERT INTO incidents (assignment_title, timestamp, details) VALUES (?, ?, ?)",
             ("Essay 1", "2026-05-01T10:00:00Z", "Incident A"),
@@ -1001,7 +1028,8 @@ def test_get_incidents_by_user_legacy_incidents_table(tmp_path):
 
     db_file = tmp_path / "legacy_incidents.db"
     with sqlite3.connect(db_file) as conn:
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE incidents (
                 id INTEGER PRIMARY KEY,
                 owner TEXT,
@@ -1011,7 +1039,8 @@ def test_get_incidents_by_user_legacy_incidents_table(tmp_path):
                 similarity_score REAL,
                 details TEXT
             )
-            """)
+            """
+        )
         conn.execute(
             "INSERT INTO incidents (owner, timestamp, document_a, document_b, similarity_score, details) "
             "VALUES (?, ?, ?, ?, ?, ?)",
@@ -1053,7 +1082,8 @@ def test_get_incidents_by_user_legacy_table_returns_all_columns(tmp_path):
 
     db_file = tmp_path / "legacy_full.db"
     with sqlite3.connect(db_file) as conn:
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE incidents (
                 id INTEGER PRIMARY KEY,
                 owner TEXT,
@@ -1065,7 +1095,8 @@ def test_get_incidents_by_user_legacy_table_returns_all_columns(tmp_path):
                 review_status TEXT,
                 details TEXT
             )
-            """)
+            """
+        )
         conn.execute(
             "INSERT INTO incidents (owner, timestamp, document_a, document_b, "
             "similarity_score, severity_rank, review_status, details) "
@@ -1320,7 +1351,8 @@ def test_get_incident_by_id_returns_dict_type(test_db):
 def test_self_plagiarism_exclusion(test_db):
     """Verify that sync_flagged_incidents skips self-plagiarism when allow_self_plagiarism_flags=False."""
     import sqlite3
-    from src.db.incidents import sync_flagged_incidents, get_all_incidents
+
+    from src.db.incidents import get_all_incidents, sync_flagged_incidents
 
     # 1. Insert documents with matching student_name into database
     with sqlite3.connect(test_db) as conn:
@@ -1329,14 +1361,28 @@ def test_self_plagiarism_exclusion(test_db):
             INSERT INTO documents (filename, file_hash, upload_date, class_section, student_name, assignment_title)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            ("student_draft1.pdf", "hash1", "2026-08-01", "CS101", "Alice Smith", "Assignment 1")
+            (
+                "student_draft1.pdf",
+                "hash1",
+                "2026-08-01",
+                "CS101",
+                "Alice Smith",
+                "Assignment 1",
+            ),
         )
         conn.execute(
             """
             INSERT INTO documents (filename, file_hash, upload_date, class_section, student_name, assignment_title)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            ("student_draft2.pdf", "hash2", "2026-08-02", "CS101", "Alice Smith", "Assignment 1")
+            (
+                "student_draft2.pdf",
+                "hash2",
+                "2026-08-02",
+                "CS101",
+                "Alice Smith",
+                "Assignment 1",
+            ),
         )
         conn.commit()
 
@@ -1345,13 +1391,11 @@ def test_self_plagiarism_exclusion(test_db):
         "doc_a": "student_draft1.pdf",
         "doc_b": "student_draft2.pdf",
         "similarity": 0.95,
-        "severity": "High"
+        "severity": "High",
     }
 
     results = sync_flagged_incidents(
-        [flag],
-        db_path=test_db,
-        allow_self_plagiarism_flags=False
+        [flag], db_path=test_db, allow_self_plagiarism_flags=False
     )
 
     # 3. Assert it did not return any match results and is not in the db
@@ -1361,9 +1405,7 @@ def test_self_plagiarism_exclusion(test_db):
 
     # 4. Call sync_flagged_incidents with allow_self_plagiarism_flags=True
     results_allow = sync_flagged_incidents(
-        [flag],
-        db_path=test_db,
-        allow_self_plagiarism_flags=True
+        [flag], db_path=test_db, allow_self_plagiarism_flags=True
     )
     # It should successfully log and return the MatchResult
     assert len(results_allow) == 1
@@ -1373,6 +1415,7 @@ def test_self_plagiarism_exclusion(test_db):
 def test_self_plagiarism_no_exclusion_when_names_differ(test_db):
     """Verify that sync_flagged_incidents does not skip when student names differ or are empty."""
     import sqlite3
+
     from src.db.incidents import sync_flagged_incidents
 
     # 1. Insert documents with different student names
@@ -1382,14 +1425,28 @@ def test_self_plagiarism_no_exclusion_when_names_differ(test_db):
             INSERT INTO documents (filename, file_hash, upload_date, class_section, student_name, assignment_title)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            ("alice_draft.pdf", "hash3", "2026-08-01", "CS101", "Alice Smith", "Assignment 1")
+            (
+                "alice_draft.pdf",
+                "hash3",
+                "2026-08-01",
+                "CS101",
+                "Alice Smith",
+                "Assignment 1",
+            ),
         )
         conn.execute(
             """
             INSERT INTO documents (filename, file_hash, upload_date, class_section, student_name, assignment_title)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            ("bob_draft.pdf", "hash4", "2026-08-02", "CS101", "Bob Jones", "Assignment 1")
+            (
+                "bob_draft.pdf",
+                "hash4",
+                "2026-08-02",
+                "CS101",
+                "Bob Jones",
+                "Assignment 1",
+            ),
         )
         conn.commit()
 
@@ -1398,16 +1455,13 @@ def test_self_plagiarism_no_exclusion_when_names_differ(test_db):
         "doc_a": "alice_draft.pdf",
         "doc_b": "bob_draft.pdf",
         "similarity": 0.85,
-        "severity": "Medium"
+        "severity": "Medium",
     }
 
     results = sync_flagged_incidents(
-        [flag],
-        db_path=test_db,
-        allow_self_plagiarism_flags=False
+        [flag], db_path=test_db, allow_self_plagiarism_flags=False
     )
 
     # 3. Assert it was NOT skipped (since student names differ)
     assert len(results) == 1
     assert results[0].document_a == "alice_draft.pdf"
-

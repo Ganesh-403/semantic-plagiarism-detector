@@ -8,7 +8,7 @@ Secured endpoints require a valid JSON Web Token (JWT) Bearer token to authorize
 
 1. **Open the Documentation Core**: Navigate to [http://localhost:8000/docs](http://localhost:8000/docs) in your browser.
 2. **Locate the Security Action Hook**: Click the lock icon button labeled **"Authorize"** positioned at the top right header section of the page.
-3. **Inject the Authorization Token**: 
+3. **Inject the Authorization Token**:
    * In the modal popup window, locate the text input field labeled **Value**.
    * Enter your token using the exact format: `Bearer <your_jwt_token_here>`
    * *Example*: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`

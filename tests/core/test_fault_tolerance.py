@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 test_fault_tolerance.py
 -----------------------
@@ -37,11 +59,7 @@ if str(ROOT_DIR) not in sys.path:
 from src.core.webhook import send_plagiarism_alert
 
 # Import modules under test
-from src.utils.redis_cache import (
-    RedisCache,
-    RedisConnectionError,
-    RedisTimeoutError,
-)
+from src.utils.redis_cache import RedisCache, RedisConnectionError, RedisTimeoutError
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
 
@@ -218,8 +236,16 @@ class TestRedisFaultTolerance:
         mock_client = MagicMock()
         mock_client.ping.return_value = True
 
-        uploaded_doc1 = {"doc_id": "doc_101", "content": "Sample student essay text", "user": "alice"}
-        uploaded_doc2 = {"doc_id": "doc_102", "content": "Sample secondary essay text", "user": "alice"}
+        uploaded_doc1 = {
+            "doc_id": "doc_101",
+            "content": "Sample student essay text",
+            "user": "alice",
+        }
+        uploaded_doc2 = {
+            "doc_id": "doc_102",
+            "content": "Sample secondary essay text",
+            "user": "alice",
+        }
 
         # First call succeeds returning doc1 from Redis
         # Second call raises ConnectionError (simulating connection drop mid-session)
@@ -239,13 +265,19 @@ class TestRedisFaultTolerance:
         assert result_doc2_initial is None
 
         # 3. Subsequent set() should succeed by storing into memory without dropping data
-        mock_client.set.side_effect = mock_redis_module.ConnectionError("Connection refused")
-        mock_client.setex.side_effect = mock_redis_module.ConnectionError("Connection refused")
+        mock_client.set.side_effect = mock_redis_module.ConnectionError(
+            "Connection refused"
+        )
+        mock_client.setex.side_effect = mock_redis_module.ConnectionError(
+            "Connection refused"
+        )
         set_result = cache.set("spd:v1:upload:doc_102", uploaded_doc2, ttl=300)
         assert set_result is True
 
         # 4. Subsequent get() successfully returns stored upload from fallback in-memory cache
-        mock_client.get.side_effect = mock_redis_module.ConnectionError("Connection refused")
+        mock_client.get.side_effect = mock_redis_module.ConnectionError(
+            "Connection refused"
+        )
         recovered_doc2 = cache.get("spd:v1:upload:doc_102")
         assert recovered_doc2 == uploaded_doc2
         assert recovered_doc2["content"] == "Sample secondary essay text"

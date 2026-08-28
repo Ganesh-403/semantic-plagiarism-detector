@@ -19,9 +19,9 @@ jobs:
             // Match patterns like Fixes #123, Closes #123, Resolves #123, or just #123
             const issueRegex = /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)?\s*#(\d+)/gi;
             const matches = [...prBody.matchAll(issueRegex)];
-            
+
             const issueNumbers = [...new Set(matches.map(m => parseInt(m[1], 10)))];
-            
+
             if (issueNumbers.length === 0) {
               console.log("No linked issues found in PR body.");
               return;

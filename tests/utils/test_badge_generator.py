@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import pytest
 
 from src.utils.badge_generator import (
@@ -69,7 +91,9 @@ def test_generate_badge_pdf_raises_when_reportlab_missing(monkeypatch):
     import src.utils.badge_generator as bg
 
     monkeypatch.setattr(bg, "SimpleDocTemplate", None)
-    with pytest.raises(ImportError, match="reportlab is required for PDF badge generation"):
+    with pytest.raises(
+        ImportError, match="reportlab is required for PDF badge generation"
+    ):
         bg.generate_badge_pdf()
 
 
@@ -140,11 +164,15 @@ def test_generate_badge_pdf_and_caching():
 def test_generate_badge_png_uses_bundled_ttf_font():
     """Verify generate_badge_png loads bundled TTF font from src/assets/fonts/."""
     from pathlib import Path
-    fonts_dir = Path(__file__).parent.parent.parent / "src" / "assets" / "fonts"
-    assert (fonts_dir / "Roboto-Regular.ttf").exists() or (fonts_dir / "DejaVuSans.ttf").exists()
 
-    buf = generate_badge_png(student_name="Bundled Font Test", student_id="test_font_123")
+    fonts_dir = Path(__file__).parent.parent.parent / "src" / "assets" / "fonts"
+    assert (fonts_dir / "Roboto-Regular.ttf").exists() or (
+        fonts_dir / "DejaVuSans.ttf"
+    ).exists()
+
+    buf = generate_badge_png(
+        student_name="Bundled Font Test", student_id="test_font_123"
+    )
     val = buf.getvalue()
     assert val.startswith(b"\x89PNG")
     assert len(val) > 1000
-

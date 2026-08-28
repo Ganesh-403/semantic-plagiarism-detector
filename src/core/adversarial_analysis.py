@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/core/adversarial_analysis.py
 --------------------------------
@@ -9,17 +31,17 @@ exhibit signs of adversarial manipulation before they consume expensive
 embedding and similarity computation resources.
 """
 
-import logging
 import hashlib
-from typing import Optional, Dict, Any
+import logging
+from typing import Any, Dict, Optional
 
-from src.security.obfuscation_detector import (
-    analyze_text_obfuscation,
-    ObfuscationReport,
-)
 from src.db.obfuscation_logs_db import (
-    log_obfuscation_attempt,
     initialize_obfuscation_db,
+    log_obfuscation_attempt,
+)
+from src.security.obfuscation_detector import (
+    ObfuscationReport,
+    analyze_text_obfuscation,
 )
 
 logger = logging.getLogger(__name__)
@@ -109,8 +131,8 @@ def strip_obfuscation_chars(text: str) -> str:
         or replaced with their Latin equivalents.
     """
     from src.security.obfuscation_detector import (
-        ZERO_WIDTH_PATTERN,
         CYRILLIC_HOMOGLYPHS,
+        ZERO_WIDTH_PATTERN,
     )
 
     # Replace Cyrillic homoglyphs with their Latin equivalents
@@ -122,9 +144,14 @@ def strip_obfuscation_chars(text: str) -> str:
     cleaned = ZERO_WIDTH_PATTERN.sub("", cleaned)
 
     return cleaned
+
+
 import hashlib
+
 from src.security.obfuscation_detector import ObfuscationDetector
+
 # from src.db.obfuscation_logs_db import log_obfuscation_incident
+
 
 class AdversarialAnalysisPipeline:
     def __init__(self):
@@ -136,11 +163,11 @@ class AdversarialAnalysisPipeline:
         Quarantines documents that cross the safety threshold.
         """
         # Calculate consistent SHA-256 fingerprint hash for auditing records
-        doc_hash = hashlib.sha256(raw_text.encode('utf-8')).hexdigest()
-        
+        doc_hash = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
+
         # Execute security inspection check
         metrics = self.detector.analyze_text(raw_text)
-        
+
         if metrics["is_flagged"]:
             # Construct log profile structure
             log_payload = {
@@ -149,15 +176,17 @@ class AdversarialAnalysisPipeline:
                 "obfuscation_score": metrics["obfuscation_score"],
                 "patterns_found": {
                     "invisible_count": len(metrics["invisible_indices"]),
-                    "homoglyph_count": len(metrics["homoglyph_indices"])
-                }
+                    "homoglyph_count": len(metrics["homoglyph_indices"]),
+                },
             }
             # Commit incident to the database
             # log_obfuscation_incident(log_payload)
-            print(f"🚨 [Security Alert]: Adversarial pattern discovered on file {document_id}. Hash: {doc_hash}")
+            print(
+                f"🚨 [Security Alert]: Adversarial pattern discovered on file {document_id}. Hash: {doc_hash}"
+            )
 
         return {
             "allow_pipeline_execution": not metrics["is_flagged"],
             "security_metrics": metrics,
-            "document_hash": doc_hash
+            "document_hash": doc_hash,
         }

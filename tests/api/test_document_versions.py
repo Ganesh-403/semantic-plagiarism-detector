@@ -1,11 +1,34 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """tests/api/test_document_versions.py
 
 Unit tests for the Document Versioning API endpoints.
 Tests cover snapshot CRUD, lineage, diffs, and analytics.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 from src.api.app import app
@@ -17,6 +40,7 @@ client = TestClient(app)
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def _mock_auth(monkeypatch):
@@ -48,6 +72,7 @@ HEADERS = {"Authorization": "Bearer test-token"}
 # ---------------------------------------------------------------------------
 # Snapshot CRUD Tests
 # ---------------------------------------------------------------------------
+
 
 class TestSnapshotCRUD:
     """Tests for version snapshot creation, listing, and retrieval."""
@@ -199,6 +224,7 @@ class TestSnapshotCRUD:
 # Lineage Tests
 # ---------------------------------------------------------------------------
 
+
 class TestLineage:
     """Tests for version lineage endpoints."""
 
@@ -273,6 +299,7 @@ class TestLineage:
 # ---------------------------------------------------------------------------
 # Diff Tests
 # ---------------------------------------------------------------------------
+
 
 class TestDiffs:
     """Tests for version diff endpoints."""
@@ -349,6 +376,7 @@ class TestDiffs:
 # Analytics Tests
 # ---------------------------------------------------------------------------
 
+
 class TestAnalytics:
     """Tests for analytics endpoints."""
 
@@ -399,6 +427,7 @@ class TestAnalytics:
 # Auth Tests
 # ---------------------------------------------------------------------------
 
+
 class TestAuth:
     """Tests for authentication requirements."""
 
@@ -428,13 +457,15 @@ class TestAuth:
 # DB Repository Unit Tests
 # ---------------------------------------------------------------------------
 
+
 class TestVersionRepoDB:
     """Unit tests for DocumentSnapshotRepository."""
 
     def test_register_and_get(self):
         """Should register and retrieve a snapshot."""
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "test.db"
             init_version_repo_db(db)
@@ -454,8 +485,9 @@ class TestVersionRepoDB:
 
     def test_version_number_increments(self):
         """Version numbers should increment for the same user + assignment."""
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "test.db"
             init_version_repo_db(db)
@@ -471,8 +503,9 @@ class TestVersionRepoDB:
 
     def test_list_versions_pagination(self):
         """Should paginate versions correctly."""
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "test.db"
             init_version_repo_db(db)
@@ -492,8 +525,9 @@ class TestVersionRepoDB:
 
     def test_lineage(self):
         """Should track and retrieve full lineage."""
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "test.db"
             init_version_repo_db(db)
@@ -510,8 +544,9 @@ class TestVersionRepoDB:
 
     def test_register_diff(self):
         """Should store and retrieve diffs."""
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "test.db"
             init_version_repo_db(db)
@@ -534,8 +569,9 @@ class TestVersionRepoDB:
 
     def test_analytics_summary(self):
         """Should return correct analytics."""
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "test.db"
             init_version_repo_db(db)
@@ -554,8 +590,9 @@ class TestVersionRepoDB:
 
     def test_most_revised_documents(self):
         """Should return documents sorted by version count."""
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "test.db"
             init_version_repo_db(db)
@@ -571,8 +608,9 @@ class TestVersionRepoDB:
 
     def test_delete_lineage(self):
         """Should delete all versions in a lineage."""
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "test.db"
             init_version_repo_db(db)

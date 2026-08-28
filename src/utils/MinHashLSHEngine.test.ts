@@ -42,7 +42,7 @@ describe('MinHashLSHEngine', () => {
   it('should estimate lower similarity for distinct texts', () => {
     const textA = "Quantum computing leverages superposition and entanglement to perform complex operations.";
     const textB = "Baking sourdough bread requires flour water salt and wild yeast fermentation.";
-    
+
     lshEngine.indexDocument("docA", textA);
     lshEngine.indexDocument("docB", textB);
 

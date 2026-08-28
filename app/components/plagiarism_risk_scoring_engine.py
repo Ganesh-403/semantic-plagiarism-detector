@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Plagiarism Risk Scoring Engine
 ==============================
@@ -24,7 +46,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import streamlit as st
 
-
 # =============================================================================
 # DATA CLASSES
 # =============================================================================
@@ -33,6 +54,7 @@ import streamlit as st
 @dataclass
 class RiskDimension:
     """A single risk dimension score."""
+
     name: str
     score: float  # 0-100
     weight: float
@@ -44,6 +66,7 @@ class RiskDimension:
 @dataclass
 class DocumentRisk:
     """Complete risk assessment for a document."""
+
     doc_id: str
     doc_title: str
     author: str
@@ -63,6 +86,7 @@ class DocumentRisk:
 @dataclass
 class MatchedSource:
     """A source matched against the document."""
+
     source_id: str
     source_title: str
     source_url: str
@@ -78,6 +102,7 @@ class MatchedSource:
 @dataclass
 class RiskPattern:
     """A detected plagiarism risk pattern."""
+
     pattern_id: str
     pattern_type: str  # copy_paste, paraphrase_heavy, structural_clone, source_hiding
     severity: str
@@ -92,6 +117,7 @@ class RiskPattern:
 @dataclass
 class RiskTrend:
     """Historical risk trend data point."""
+
     date: str
     avg_risk: float
     docs_scanned: int
@@ -134,56 +160,121 @@ def generate_documents(count: int = 25) -> List[DocumentRisk]:
         "AI-Generated Text Detection Methods",
         "Benchmarking Embedding Models for Similarity Tasks",
     ]
-    authors = ["Smith J.", "Chen W.", "Patel A.", "Kim S.", "Mueller K.", "Garcia M.", "Lee H.", "Brown T.", "Zhang Y.", "Johnson R."]
-    languages = ["English", "English", "English", "French", "German", "English", "Spanish", "English"]
-    statuses = ["scanned", "scanned", "scanned", "flagged", "pending", "scanned", "cleared"]
+    authors = [
+        "Smith J.",
+        "Chen W.",
+        "Patel A.",
+        "Kim S.",
+        "Mueller K.",
+        "Garcia M.",
+        "Lee H.",
+        "Brown T.",
+        "Zhang Y.",
+        "Johnson R.",
+    ]
+    languages = [
+        "English",
+        "English",
+        "English",
+        "French",
+        "German",
+        "English",
+        "Spanish",
+        "English",
+    ]
+    statuses = [
+        "scanned",
+        "scanned",
+        "scanned",
+        "flagged",
+        "pending",
+        "scanned",
+        "cleared",
+    ]
 
     docs = []
     for i in range(count):
         risk = random.uniform(5, 95)
-        risk_level = "critical" if risk > 80 else "high" if risk > 60 else "medium" if risk > 30 else "low"
+        risk_level = (
+            "critical"
+            if risk > 80
+            else "high"
+            if risk > 60
+            else "medium"
+            if risk > 30
+            else "low"
+        )
 
         dimensions = [
-            RiskDimension("Lexical Overlap", random.uniform(5, 90), 0.25,
-                          "Word-level similarity with known sources",
-                          ["Exact phrase matches", "N-gram overlap", "Stop word patterns"],
-                          "high" if random.random() > 0.5 else "medium"),
-            RiskDimension("Semantic Similarity", random.uniform(10, 85), 0.30,
-                          "Meaning-level similarity using embeddings",
-                          ["Embedding distance", "Paraphrase detection", "Concept overlap"],
-                          "high" if random.random() > 0.6 else "low"),
-            RiskDimension("Structural Similarity", random.uniform(5, 70), 0.20,
-                          "Document structure and organization patterns",
-                          ["Section ordering", "Paragraph structure", "Citation patterns"],
-                          "medium" if random.random() > 0.5 else "low"),
-            RiskDimension("Metadata Analysis", random.uniform(0, 50), 0.15,
-                          "Author, date, and source metadata consistency",
-                          ["Author history", "Date anomalies", "Source provenance"],
-                          "low" if random.random() > 0.3 else "medium"),
-            RiskDimension("Source Quality", random.uniform(10, 60), 0.10,
-                          "Quality and legitimacy of cited sources",
-                          ["DOI validity", "Journal reputation", "Citation density"],
-                          "high" if random.random() > 0.7 else "low"),
+            RiskDimension(
+                "Lexical Overlap",
+                random.uniform(5, 90),
+                0.25,
+                "Word-level similarity with known sources",
+                ["Exact phrase matches", "N-gram overlap", "Stop word patterns"],
+                "high" if random.random() > 0.5 else "medium",
+            ),
+            RiskDimension(
+                "Semantic Similarity",
+                random.uniform(10, 85),
+                0.30,
+                "Meaning-level similarity using embeddings",
+                ["Embedding distance", "Paraphrase detection", "Concept overlap"],
+                "high" if random.random() > 0.6 else "low",
+            ),
+            RiskDimension(
+                "Structural Similarity",
+                random.uniform(5, 70),
+                0.20,
+                "Document structure and organization patterns",
+                ["Section ordering", "Paragraph structure", "Citation patterns"],
+                "medium" if random.random() > 0.5 else "low",
+            ),
+            RiskDimension(
+                "Metadata Analysis",
+                random.uniform(0, 50),
+                0.15,
+                "Author, date, and source metadata consistency",
+                ["Author history", "Date anomalies", "Source provenance"],
+                "low" if random.random() > 0.3 else "medium",
+            ),
+            RiskDimension(
+                "Source Quality",
+                random.uniform(10, 60),
+                0.10,
+                "Quality and legitimacy of cited sources",
+                ["DOI validity", "Journal reputation", "Citation density"],
+                "high" if random.random() > 0.7 else "low",
+            ),
         ]
 
         matched = []
         for j in range(random.randint(1, 5)):
-            matched.append(MatchedSource(
-                source_id=f"src_{random.randint(1,100)}",
-                source_title=f"Source Paper {random.randint(1000,9999)}",
-                source_url=f"https://doi.org/10.{random.randint(1000,9999)}/{random.randint(10000,99999)}",
-                similarity_score=round(random.uniform(0.15, 0.95), 3),
-                matched_sections=random.randint(1, 8),
-                total_sections=random.randint(5, 15),
-                overlap_percentage=round(random.uniform(5, 60), 1),
-                match_type=random.choice(["exact", "paraphrase", "structural", "semantic"]),
-                first_matched_position=random.randint(1, 200),
-                risk_contribution=round(random.uniform(5, 25), 1),
-            ))
+            matched.append(
+                MatchedSource(
+                    source_id=f"src_{random.randint(1,100)}",
+                    source_title=f"Source Paper {random.randint(1000,9999)}",
+                    source_url=f"https://doi.org/10.{random.randint(1000,9999)}/{random.randint(10000,99999)}",
+                    similarity_score=round(random.uniform(0.15, 0.95), 3),
+                    matched_sections=random.randint(1, 8),
+                    total_sections=random.randint(5, 15),
+                    overlap_percentage=round(random.uniform(5, 60), 1),
+                    match_type=random.choice(
+                        ["exact", "paraphrase", "structural", "semantic"]
+                    ),
+                    first_matched_position=random.randint(1, 200),
+                    risk_contribution=round(random.uniform(5, 25), 1),
+                )
+            )
 
         risk_factors = []
         if risk > 70:
-            risk_factors.extend(["High lexical overlap with multiple sources", "Suspicious citation patterns"])
+            risk_factors.extend(
+                [
+                    "High lexical overlap with multiple sources",
+                    "Suspicious citation patterns",
+                ]
+            )
         if risk > 50:
             risk_factors.extend(["Structural similarity detected", "Unusual metadata"])
         if risk > 30:
@@ -191,28 +282,40 @@ def generate_documents(count: int = 25) -> List[DocumentRisk]:
 
         recommendations = []
         if risk > 80:
-            recommendations.extend(["Immediate manual review required", "Contact original authors", "Check for duplicate publication"])
+            recommendations.extend(
+                [
+                    "Immediate manual review required",
+                    "Contact original authors",
+                    "Check for duplicate publication",
+                ]
+            )
         elif risk > 60:
-            recommendations.extend(["Detailed similarity report needed", "Verify source attributions"])
+            recommendations.extend(
+                ["Detailed similarity report needed", "Verify source attributions"]
+            )
         elif risk > 30:
             recommendations.append("Review flagged sections for proper citation")
 
-        docs.append(DocumentRisk(
-            doc_id=f"doc_{i+1:03d}",
-            doc_title=titles[i % len(titles)],
-            author=random.choice(authors),
-            upload_date=(datetime.now() - timedelta(days=random.randint(0, 90))).strftime("%Y-%m-%d"),
-            overall_risk=round(risk, 1),
-            risk_level=risk_level,
-            dimensions=dimensions,
-            matched_sources=matched,
-            risk_factors=risk_factors,
-            recommendations=recommendations,
-            scan_duration=round(random.uniform(2, 45), 1),
-            word_count=random.randint(2000, 15000),
-            language=random.choice(languages),
-            status=random.choice(statuses),
-        ))
+        docs.append(
+            DocumentRisk(
+                doc_id=f"doc_{i+1:03d}",
+                doc_title=titles[i % len(titles)],
+                author=random.choice(authors),
+                upload_date=(
+                    datetime.now() - timedelta(days=random.randint(0, 90))
+                ).strftime("%Y-%m-%d"),
+                overall_risk=round(risk, 1),
+                risk_level=risk_level,
+                dimensions=dimensions,
+                matched_sources=matched,
+                risk_factors=risk_factors,
+                recommendations=recommendations,
+                scan_duration=round(random.uniform(2, 45), 1),
+                word_count=random.randint(2000, 15000),
+                language=random.choice(languages),
+                status=random.choice(statuses),
+            )
+        )
 
     return sorted(docs, key=lambda d: d.overall_risk, reverse=True)
 
@@ -221,46 +324,76 @@ def generate_patterns() -> List[RiskPattern]:
     """Generate plagiarism risk patterns."""
     patterns = [
         RiskPattern(
-            pattern_id="PAT-001", pattern_type="copy_paste", severity="critical",
+            pattern_id="PAT-001",
+            pattern_type="copy_paste",
+            severity="critical",
             confidence=0.92,
             affected_docs=["doc_001", "doc_003"],
-            evidence={"exact_matches": 47, "total_paragraphs": 120, "consecutive_matches": 12},
+            evidence={
+                "exact_matches": 47,
+                "total_paragraphs": 120,
+                "consecutive_matches": 12,
+            },
             description="Document contains 47 exact-match paragraphs from 2 sources, with 12 consecutive matching blocks.",
             mitigation="Immediate manual review. Verify proper quotation and attribution. Check for duplicate publication.",
             detected_at=(datetime.now() - timedelta(hours=3)).isoformat(),
         ),
         RiskPattern(
-            pattern_id="PAT-002", pattern_type="paraphrase_heavy", severity="high",
+            pattern_id="PAT-002",
+            pattern_type="paraphrase_heavy",
+            severity="high",
             confidence=0.85,
             affected_docs=["doc_005", "doc_008", "doc_012"],
-            evidence={"paraphrase_ratio": 0.68, "avg_edit_distance": 0.22, "synonym_substitution_rate": 0.45},
+            evidence={
+                "paraphrase_ratio": 0.68,
+                "avg_edit_distance": 0.22,
+                "synonym_substitution_rate": 0.45,
+            },
             description="3 documents show heavy paraphrasing (68% of content) with high synonym substitution rates.",
             mitigation="Review paraphrased sections. Compare semantic meaning with sources. Check citation adequacy.",
             detected_at=(datetime.now() - timedelta(hours=8)).isoformat(),
         ),
         RiskPattern(
-            pattern_id="PAT-003", pattern_type="structural_clone", severity="high",
+            pattern_id="PAT-003",
+            pattern_type="structural_clone",
+            severity="high",
             confidence=0.78,
             affected_docs=["doc_002", "doc_007"],
-            evidence={"section_order_similarity": 0.91, "heading_match_rate": 0.85, "paragraph_count_ratio": 0.95},
+            evidence={
+                "section_order_similarity": 0.91,
+                "heading_match_rate": 0.85,
+                "paragraph_count_ratio": 0.95,
+            },
             description="2 documents share 91% structural similarity with matching section ordering and headings.",
             mitigation="Compare document structures. Verify independent research vs. derivative work.",
             detected_at=(datetime.now() - timedelta(days=1)).isoformat(),
         ),
         RiskPattern(
-            pattern_id="PAT-004", pattern_type="source_hiding", severity="critical",
+            pattern_id="PAT-004",
+            pattern_type="source_hiding",
+            severity="critical",
             confidence=0.88,
             affected_docs=["doc_004"],
-            evidence={"hidden_citations": 8, "removed_metadata": True, "modified_dates": 3},
+            evidence={
+                "hidden_citations": 8,
+                "removed_metadata": True,
+                "modified_dates": 3,
+            },
             description="Document appears to have removed or modified source attributions and metadata.",
             mitigation="Restore original metadata. Cross-reference with known publication databases. Contact author.",
             detected_at=(datetime.now() - timedelta(hours=1)).isoformat(),
         ),
         RiskPattern(
-            pattern_id="PAT-005", pattern_type="copy_paste", severity="medium",
+            pattern_id="PAT-005",
+            pattern_type="copy_paste",
+            severity="medium",
             confidence=0.72,
             affected_docs=["doc_010", "doc_015", "doc_020"],
-            evidence={"code_block_matches": 15, "api_pattern_matches": 8, "comment_similarities": 22},
+            evidence={
+                "code_block_matches": 15,
+                "api_pattern_matches": 8,
+                "comment_similarities": 22,
+            },
             description="Multiple code blocks and API usage patterns match known open-source projects without attribution.",
             mitigation="Add proper open-source license attribution. Verify compliance with original licenses.",
             detected_at=(datetime.now() - timedelta(days=2)).isoformat(),
@@ -278,11 +411,18 @@ def generate_trends(days: int = 30) -> List[RiskTrend]:
         docs_scanned = random.randint(5, 30)
         flagged = int(docs_scanned * random.uniform(0.1, 0.3))
         critical = int(flagged * random.uniform(0.05, 0.15))
-        trends.append(RiskTrend(
-            date=date, avg_risk=round(avg_risk, 1), docs_scanned=docs_scanned,
-            flagged_count=flagged, critical_count=critical,
-            top_risk_type=random.choice(["lexical", "semantic", "structural", "metadata"]),
-        ))
+        trends.append(
+            RiskTrend(
+                date=date,
+                avg_risk=round(avg_risk, 1),
+                docs_scanned=docs_scanned,
+                flagged_count=flagged,
+                critical_count=critical,
+                top_risk_type=random.choice(
+                    ["lexical", "semantic", "structural", "metadata"]
+                ),
+            )
+        )
     return trends
 
 
@@ -306,14 +446,17 @@ def severity_icon(sev: str) -> str:
 
 
 def render_kpi(label: str, value: str, subtitle: str, color: str) -> None:
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div style="background:rgba(255,255,255,0.06);border-radius:14px;padding:18px 14px;
          border:1px solid rgba(255,255,255,0.08);text-align:center;">
         <div style="font-size:26px;font-weight:800;color:{color};margin-bottom:4px;">{value}</div>
         <div style="font-size:12px;font-weight:600;color:#e2e8f0;margin-bottom:2px;">{label}</div>
         <div style="font-size:10px;color:#94a3b8;">{subtitle}</div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_risk_gauge(risk: float, size: int = 120) -> str:
@@ -339,8 +482,14 @@ def render_risk_gauge(risk: float, size: int = 120) -> str:
 
 def render_document_card(doc: DocumentRisk, expanded: bool = False) -> None:
     rc = risk_color(doc.overall_risk)
-    status_colors = {"scanned": "#3b82f6", "pending": "#f59e0b", "flagged": "#ef4444", "cleared": "#22c55e"}
-    st.markdown(f"""
+    status_colors = {
+        "scanned": "#3b82f6",
+        "pending": "#f59e0b",
+        "flagged": "#ef4444",
+        "cleared": "#22c55e",
+    }
+    st.markdown(
+        f"""
     <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:14px;
          border-left:4px solid {rc};margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -361,13 +510,16 @@ def render_document_card(doc: DocumentRisk, expanded: bool = False) -> None:
             <span>📎 {len(doc.matched_sources)} sources matched</span>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
     if expanded:
         st.markdown("**Risk Dimensions:**")
         for dim in doc.dimensions:
             dim_color = risk_color(dim.score)
-            st.markdown(f"""
+            st.markdown(
+                f"""
             <div style="margin-bottom:8px;">
                 <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
                     <span style="color:#e2e8f0;font-weight:600;">{dim.name}</span>
@@ -378,13 +530,16 @@ def render_document_card(doc: DocumentRisk, expanded: bool = False) -> None:
                 </div>
                 <div style="font-size:10px;color:#94a3b8;margin-top:2px;">{dim.description}</div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
 
         if doc.matched_sources:
             st.markdown("**Matched Sources:**")
             for src in doc.matched_sources:
                 src_color = risk_color(src.similarity_score * 100)
-                st.markdown(f"""
+                st.markdown(
+                    f"""
                 <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:10px;margin-bottom:6px;border-left:3px solid {src_color};">
                     <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
                         <span style="font-size:12px;font-weight:600;color:#e2e8f0;">{src.source_title}</span>
@@ -394,22 +549,36 @@ def render_document_card(doc: DocumentRisk, expanded: bool = False) -> None:
                         📝 {src.matched_sections}/{src.total_sections} sections · 📊 {src.overlap_percentage}% overlap · 🔗 {src.match_type.replace('_', ' ').title()}
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+                """,
+                    unsafe_allow_html=True,
+                )
 
         if doc.risk_factors:
             st.markdown("**Risk Factors:**")
             for rf in doc.risk_factors:
-                st.markdown(f'<div style="font-size:12px;color:#f97316;margin-bottom:2px;">⚠️ {rf}</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div style="font-size:12px;color:#f97316;margin-bottom:2px;">⚠️ {rf}</div>',
+                    unsafe_allow_html=True,
+                )
 
         if doc.recommendations:
             st.markdown("**Recommendations:**")
             for rec in doc.recommendations:
-                st.markdown(f'<div style="font-size:12px;color:#22c55e;margin-bottom:2px;">✅ {rec}</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div style="font-size:12px;color:#22c55e;margin-bottom:2px;">✅ {rec}</div>',
+                    unsafe_allow_html=True,
+                )
 
 
 def render_pattern_card(pattern: RiskPattern) -> None:
-    sev = {"critical": "#ef4444", "high": "#f97316", "medium": "#eab308", "low": "#22c55e"}.get(pattern.severity, "#6b7280")
-    st.markdown(f"""
+    sev = {
+        "critical": "#ef4444",
+        "high": "#f97316",
+        "medium": "#eab308",
+        "low": "#22c55e",
+    }.get(pattern.severity, "#6b7280")
+    st.markdown(
+        f"""
     <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:14px;
          border-left:4px solid {sev};margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -427,7 +596,9 @@ def render_pattern_card(pattern: RiskPattern) -> None:
             <div style="font-size:11px;color:#22c55e;">💡 Mitigation: {pattern.mitigation}</div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 # =============================================================================
@@ -437,18 +608,22 @@ def render_pattern_card(pattern: RiskPattern) -> None:
 
 def render_risk_scoring_engine() -> None:
     """Render the Plagiarism Risk Scoring Engine."""
-    st.markdown("""
+    st.markdown(
+        """
     <style>
     .block-container { padding-top: 1rem; }
     </style>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
     documents = generate_documents(25)
     patterns = generate_patterns()
     trends = generate_trends(30)
 
     # Header
-    st.markdown("""
+    st.markdown(
+        """
     <div style="text-align:center;margin-bottom:20px;">
         <div style="font-size:36px;margin-bottom:8px;">🛡️</div>
         <h1 style="font-size:28px;font-weight:800;margin:0;
@@ -460,7 +635,9 @@ def render_risk_scoring_engine() -> None:
             Multi-dimensional risk assessment with pattern detection and mitigation
         </p>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
     # KPIs
     total_docs = len(documents)
@@ -477,7 +654,12 @@ def render_risk_scoring_engine() -> None:
         ("High Risk", str(high_docs), "require attention", "#f97316"),
         ("Avg Risk Score", f"{avg_risk:.0f}", "across all docs", risk_color(avg_risk)),
         ("Source Matches", str(total_matches), "across all docs", "#8b5cf6"),
-        ("Active Patterns", str(open_patterns), "high/critical", "#ef4444" if open_patterns > 2 else "#22c55e"),
+        (
+            "Active Patterns",
+            str(open_patterns),
+            "high/critical",
+            "#ef4444" if open_patterns > 2 else "#22c55e",
+        ),
     ]
     for col, (label, value, subtitle, color) in zip(cols, kpis):
         with col:
@@ -497,7 +679,9 @@ def render_risk_scoring_engine() -> None:
         _render_trends(trends, documents)
 
 
-def _render_overview(documents: List[DocumentRisk], patterns: List[RiskPattern], trends: List[RiskTrend]) -> None:
+def _render_overview(
+    documents: List[DocumentRisk], patterns: List[RiskPattern], trends: List[RiskTrend]
+) -> None:
     col1, col2 = st.columns(2)
 
     with col1:
@@ -506,8 +690,11 @@ def _render_overview(documents: List[DocumentRisk], patterns: List[RiskPattern],
         for level in ["critical", "high", "medium", "low"]:
             count = level_counts.get(level, 0)
             pct = count / len(documents) if documents else 0
-            col = risk_color({"critical": 90, "high": 70, "medium": 45, "low": 10}[level])
-            st.markdown(f"""
+            col = risk_color(
+                {"critical": 90, "high": 70, "medium": 45, "low": 10}[level]
+            )
+            st.markdown(
+                f"""
             <div style="margin-bottom:8px;">
                 <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
                     <span style="color:#e2e8f0;font-weight:600;text-transform:capitalize;">{level}</span>
@@ -517,7 +704,9 @@ def _render_overview(documents: List[DocumentRisk], patterns: List[RiskPattern],
                     <div style="height:100%;width:{pct*100}%;background:{col};border-radius:5px;"></div>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
 
         st.markdown("#### 🔍 Dimension Averages")
         dim_scores = defaultdict(list)
@@ -526,7 +715,8 @@ def _render_overview(documents: List[DocumentRisk], patterns: List[RiskPattern],
                 dim_scores[dim.name].append(dim.score)
         for name, scores in dim_scores.items():
             avg = sum(scores) / len(scores)
-            st.markdown(f"""
+            st.markdown(
+                f"""
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
                 <span style="font-size:11px;color:#94a3b8;width:130px;">{name}</span>
                 <div style="flex:1;height:8px;background:rgba(255,255,255,0.08);border-radius:4px;">
@@ -534,7 +724,9 @@ def _render_overview(documents: List[DocumentRisk], patterns: List[RiskPattern],
                 </div>
                 <span style="font-size:11px;color:{risk_color(avg)};font-weight:700;width:30px;">{avg:.0f}</span>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
 
     with col2:
         st.markdown("#### 🕐 30-Day Risk Trend")
@@ -542,7 +734,8 @@ def _render_overview(documents: List[DocumentRisk], patterns: List[RiskPattern],
             max_docs = max(t.docs_scanned for t in trends)
             for t in trends[-15:]:
                 bar_w = (t.docs_scanned / max_docs) * 100 if max_docs else 0
-                st.markdown(f"""
+                st.markdown(
+                    f"""
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
                     <span style="font-size:9px;color:#94a3b8;width:60px;">{t.date[5:]}</span>
                     <div style="flex:1;height:12px;background:rgba(255,255,255,0.08);border-radius:3px;position:relative;">
@@ -551,7 +744,9 @@ def _render_overview(documents: List[DocumentRisk], patterns: List[RiskPattern],
                     <span style="font-size:10px;color:#94a3b8;width:24px;text-align:right;">{t.docs_scanned}</span>
                     <span style="font-size:10px;color:{risk_color(t.avg_risk)};font-weight:700;width:24px;">{t.avg_risk:.0f}</span>
                 </div>
-                """, unsafe_allow_html=True)
+                """,
+                    unsafe_allow_html=True,
+                )
 
         st.markdown("#### 🔍 Active Risk Patterns")
         for p in patterns[:3]:
@@ -561,11 +756,18 @@ def _render_overview(documents: List[DocumentRisk], patterns: List[RiskPattern],
 def _render_documents(documents: List[DocumentRisk]) -> None:
     col1, col2, col3 = st.columns(3)
     with col1:
-        level_filter = st.selectbox("Risk Level", ["All", "Critical", "High", "Medium", "Low"])
+        level_filter = st.selectbox(
+            "Risk Level", ["All", "Critical", "High", "Medium", "Low"]
+        )
     with col2:
-        status_filter = st.selectbox("Status", ["All", "Scanned", "Flagged", "Pending", "Cleared"])
+        status_filter = st.selectbox(
+            "Status", ["All", "Scanned", "Flagged", "Pending", "Cleared"]
+        )
     with col3:
-        sort_by = st.selectbox("Sort By", ["Risk (High→Low)", "Risk (Low→High)", "Word Count", "Scan Duration"])
+        sort_by = st.selectbox(
+            "Sort By",
+            ["Risk (High→Low)", "Risk (Low→High)", "Word Count", "Scan Duration"],
+        )
 
     filtered = documents[:]
     if level_filter != "All":
@@ -585,11 +787,16 @@ def _render_documents(documents: List[DocumentRisk]) -> None:
     st.markdown(f"**{len(filtered)} documents** matching filters")
 
     for doc in filtered:
-        with st.expander(f"{doc.doc_title} — Risk: {doc.overall_risk:.0f} ({doc.risk_level})", expanded=False):
+        with st.expander(
+            f"{doc.doc_title} — Risk: {doc.overall_risk:.0f} ({doc.risk_level})",
+            expanded=False,
+        ):
             render_document_card(doc, expanded=True)
 
 
-def _render_patterns(patterns: List[RiskPattern], documents: List[DocumentRisk]) -> None:
+def _render_patterns(
+    patterns: List[RiskPattern], documents: List[DocumentRisk]
+) -> None:
     col1, col2 = st.columns([2, 1])
     with col1:
         st.markdown("#### 🔍 Detected Risk Patterns")
@@ -604,8 +811,14 @@ def _render_patterns(patterns: List[RiskPattern], documents: List[DocumentRisk])
         st.markdown("#### 📊 Severity Breakdown")
         sev_counts = Counter(p.severity for p in patterns)
         for sev, count in sev_counts.most_common():
-            sev_col = {"critical": "#ef4444", "high": "#f97316", "medium": "#eab308", "low": "#22c55e"}[sev]
-            st.markdown(f"""
+            sev_col = {
+                "critical": "#ef4444",
+                "high": "#f97316",
+                "medium": "#eab308",
+                "low": "#22c55e",
+            }[sev]
+            st.markdown(
+                f"""
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
                 <span style="font-size:11px;color:#94a3b8;width:70px;">{sev.title()}</span>
                 <div style="flex:1;height:10px;background:rgba(255,255,255,0.08);border-radius:5px;">
@@ -613,11 +826,16 @@ def _render_patterns(patterns: List[RiskPattern], documents: List[DocumentRisk])
                 </div>
                 <span style="font-size:11px;color:{sev_col};font-weight:700;">{count}</span>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
 
         st.markdown("#### 📊 Average Confidence")
         avg_conf = sum(p.confidence for p in patterns) / len(patterns)
-        st.markdown(f'<div style="font-size:24px;font-weight:800;color:#f59e0b;text-align:center;">{avg_conf:.0%}</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div style="font-size:24px;font-weight:800;color:#f59e0b;text-align:center;">{avg_conf:.0%}</div>',
+            unsafe_allow_html=True,
+        )
 
 
 def _render_trends(trends: List[RiskTrend], documents: List[DocumentRisk]) -> None:
@@ -629,7 +847,8 @@ def _render_trends(trends: List[RiskTrend], documents: List[DocumentRisk]) -> No
         max_d = max(t.docs_scanned for t in trends)
         for t in trends:
             bar_w = (t.docs_scanned / max_d) * 100 if max_d else 0
-            st.markdown(f"""
+            st.markdown(
+                f"""
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
                 <span style="font-size:9px;color:#94a3b8;width:50px;">{t.date[5:]}</span>
                 <div style="flex:1;height:10px;background:rgba(255,255,255,0.08);border-radius:3px;">
@@ -637,14 +856,19 @@ def _render_trends(trends: List[RiskTrend], documents: List[DocumentRisk]) -> No
                 </div>
                 <span style="font-size:10px;color:#94a3b8;width:20px;">{t.docs_scanned}</span>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
 
     with col2:
         st.markdown("**Flagged Documents Over Time**")
         for t in trends:
             if t.flagged_count > 0:
-                bar_w = (t.flagged_count / t.docs_scanned) * 100 if t.docs_scanned else 0
-                st.markdown(f"""
+                bar_w = (
+                    (t.flagged_count / t.docs_scanned) * 100 if t.docs_scanned else 0
+                )
+                st.markdown(
+                    f"""
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
                     <span style="font-size:9px;color:#94a3b8;width:50px;">{t.date[5:]}</span>
                     <div style="flex:1;height:10px;background:rgba(255,255,255,0.08);border-radius:3px;">
@@ -652,7 +876,9 @@ def _render_trends(trends: List[RiskTrend], documents: List[DocumentRisk]) -> No
                     </div>
                     <span style="font-size:10px;color:#ef4444;width:20px;">{t.flagged_count}</span>
                 </div>
-                """, unsafe_allow_html=True)
+                """,
+                    unsafe_allow_html=True,
+                )
 
     # Risk Distribution Summary
     st.markdown("#### 📊 Overall Risk Distribution Summary")
@@ -667,7 +893,8 @@ def _render_trends(trends: List[RiskTrend], documents: List[DocumentRisk]) -> No
             avg = sum(scores) / len(scores)
             min_s = min(scores)
             max_s = max(scores)
-            st.markdown(f"""
+            st.markdown(
+                f"""
             <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:10px;margin-bottom:6px;">
                 <div style="font-size:12px;font-weight:600;color:#e2e8f0;margin-bottom:4px;">{name}</div>
                 <div style="display:flex;gap:8px;font-size:11px;color:#94a3b8;">
@@ -677,19 +904,24 @@ def _render_trends(trends: List[RiskTrend], documents: List[DocumentRisk]) -> No
                     <span>Count: {len(scores)}</span>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
 
     with col_b:
         st.markdown("**Top 10 Highest Risk Documents**")
         for i, doc in enumerate(documents[:10]):
             rc = risk_color(doc.overall_risk)
-            st.markdown(f"""
+            st.markdown(
+                f"""
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;padding:8px;background:rgba(255,255,255,0.04);border-radius:8px;">
                 <span style="font-size:12px;font-weight:700;color:#94a3b8;width:20px;">#{i+1}</span>
                 <span style="flex:1;font-size:12px;color:#e2e8f0;font-weight:600;">{doc.doc_title[:45]}...</span>
                 <span style="font-size:14px;font-weight:800;color:{rc};">{doc.overall_risk:.0f}</span>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
 
 
 # =============================================================================

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/db/test_corpus_db_bulk.py
 --------------------------------
@@ -176,7 +198,7 @@ DIVERSE_METADATA_CASES = [
         "filename": "special_chars_doc.pdf",
         "file_hash": "hash_special_chars_007",
         "class_section": "SEC-404 & <Dev>",
-        "student_name": "O'Connor-Smith, Jr. & \"Co.\"",
+        "student_name": 'O\'Connor-Smith, Jr. & "Co."',
         "assignment_title": "HW #1: AI / Machine Learning (100% Final!)",
         "pdf_author": "Author & Co. 'Special'",
         "pdf_title": "Paper: 'Deep Learning & Neural Nets'",

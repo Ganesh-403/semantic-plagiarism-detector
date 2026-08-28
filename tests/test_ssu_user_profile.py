@@ -1,17 +1,40 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Comprehensive Unit Tests for SSUUserProfile Dataclass
 Issue: #3461
 Tests structure, defaults, custom values, serialization, immutability, and edge cases.
 """
 
-import pytest
-from dataclasses import dataclass, asdict, fields, replace
+from dataclasses import asdict, dataclass, fields, replace
 from typing import Optional
 
+import pytest
 
 # ==============================================================================
 # SECTION 1: Define the Dataclass Under Test
 # ==============================================================================
+
 
 @dataclass
 class SSUUserProfile:
@@ -27,27 +50,28 @@ class SSUUserProfile:
 # SECTION 2: Structure and Metadata Tests
 # ==============================================================================
 
+
 class TestSSUUserProfileStructure:
     def test_is_dataclass(self):
         """The class should be a dataclass."""
-        assert hasattr(SSUUserProfile, '__dataclass_fields__')
+        assert hasattr(SSUUserProfile, "__dataclass_fields__")
 
     def test_required_fields(self):
         """The dataclass must have id, username, and email fields."""
-        assert 'id' in SSUUserProfile.__dataclass_fields__
-        assert 'username' in SSUUserProfile.__dataclass_fields__
-        assert 'email' in SSUUserProfile.__dataclass_fields__
+        assert "id" in SSUUserProfile.__dataclass_fields__
+        assert "username" in SSUUserProfile.__dataclass_fields__
+        assert "email" in SSUUserProfile.__dataclass_fields__
 
     def test_optional_fields(self):
         """The dataclass should have optional fields for role and last_login."""
-        assert 'role' in SSUUserProfile.__dataclass_fields__
-        assert 'last_login' in SSUUserProfile.__dataclass_fields__
+        assert "role" in SSUUserProfile.__dataclass_fields__
+        assert "last_login" in SSUUserProfile.__dataclass_fields__
 
     def test_default_values(self):
         """The dataclass should have default values for optional fields."""
-        assert SSUUserProfile.__dataclass_fields__['is_active'].default is True
-        assert SSUUserProfile.__dataclass_fields__['role'].default == "member"
-        assert SSUUserProfile.__dataclass_fields__['last_login'].default is None
+        assert SSUUserProfile.__dataclass_fields__["is_active"].default is True
+        assert SSUUserProfile.__dataclass_fields__["role"].default == "member"
+        assert SSUUserProfile.__dataclass_fields__["last_login"].default is None
 
     def test_field_count(self):
         """Ensure no accidental extra fields were added."""
@@ -57,6 +81,7 @@ class TestSSUUserProfileStructure:
 # ==============================================================================
 # SECTION 3: Creation and Instance Tests
 # ==============================================================================
+
 
 class TestSSUUserProfileCreation:
     def test_create_basic_instance(self):
@@ -71,17 +96,23 @@ class TestSSUUserProfileCreation:
 
     def test_create_with_custom_role(self):
         """Custom role should override default."""
-        user = SSUUserProfile(id=1, username="admin", email="admin@example.com", role="admin")
+        user = SSUUserProfile(
+            id=1, username="admin", email="admin@example.com", role="admin"
+        )
         assert user.role == "admin"
 
     def test_create_with_last_login(self):
         """Custom last_login should be set."""
-        user = SSUUserProfile(id=1, username="test", email="test@test.com", last_login="2026-08-24")
+        user = SSUUserProfile(
+            id=1, username="test", email="test@test.com", last_login="2026-08-24"
+        )
         assert user.last_login == "2026-08-24"
 
     def test_create_with_inactive_status(self):
         """Custom status should override default."""
-        user = SSUUserProfile(id=1, username="test", email="test@test.com", is_active=False)
+        user = SSUUserProfile(
+            id=1, username="test", email="test@test.com", is_active=False
+        )
         assert user.is_active is False
 
     def test_create_different_instances(self):
@@ -101,6 +132,7 @@ class TestSSUUserProfileCreation:
 # ==============================================================================
 # SECTION 4: Serialization and Conversion Tests
 # ==============================================================================
+
 
 class TestSSUUserProfileSerialization:
     def test_asdict_returns_dict(self):
@@ -122,7 +154,9 @@ class TestSSUUserProfileSerialization:
 
     def test_asdict_values_correct(self):
         """The dict values should match the object."""
-        user = SSUUserProfile(id=1, username="testuser", email="test@example.com", role="admin")
+        user = SSUUserProfile(
+            id=1, username="testuser", email="test@example.com", role="admin"
+        )
         d = asdict(user)
         assert d["id"] == 1
         assert d["username"] == "testuser"
@@ -140,6 +174,7 @@ class TestSSUUserProfileSerialization:
 # ==============================================================================
 # SECTION 5: Equality and Immutability Tests
 # ==============================================================================
+
 
 class TestSSUUserProfileEquality:
     def test_equality_same_values(self):
@@ -177,6 +212,7 @@ class TestSSUUserProfileEquality:
 # ==============================================================================
 # SECTION 6: Edge Cases and Error Handling
 # ==============================================================================
+
 
 class TestSSUUserProfileEdgeCases:
     def test_empty_string_username(self):

@@ -1,18 +1,41 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Comprehensive Unit Tests for Email Regex Validation
 Issue: #3451
 Tests valid formats, invalid formats, edge cases, and fuzz testing.
 """
 
-import pytest
-import re
 import random
+import re
 import string
 
+import pytest
 
 # ==============================================================================
 # SECTION 1: Defining the Validation Logic (Under Test)
 # ==============================================================================
+
 
 def is_valid_email(email: str) -> bool:
     """
@@ -20,13 +43,14 @@ def is_valid_email(email: str) -> bool:
     """
     if not isinstance(email, str):
         return False
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
     return bool(re.match(pattern, email))
 
 
 # ==============================================================================
 # SECTION 2: Testing Valid Emails
 # ==============================================================================
+
 
 class TestValidEmails:
     def test_standard_email(self):
@@ -63,6 +87,7 @@ class TestValidEmails:
 # ==============================================================================
 # SECTION 3: Testing Invalid Emails
 # ==============================================================================
+
 
 class TestInvalidEmails:
     def test_missing_at_symbol(self):
@@ -112,6 +137,7 @@ class TestInvalidEmails:
 # SECTION 4: Edge Cases and Fuzz Testing
 # ==============================================================================
 
+
 class TestEdgeCases:
     def test_email_with_newline(self):
         assert is_valid_email("user@example.com\n") is False
@@ -132,9 +158,11 @@ class TestRandomizedFuzz:
         """Randomly generated valid emails should pass."""
         random.seed(42)
         for _ in range(100):
-            username = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
-            domain = ''.join(random.choices(string.ascii_lowercase, k=8))
-            tld = ''.join(random.choices(string.ascii_lowercase, k=3))
+            username = "".join(
+                random.choices(string.ascii_lowercase + string.digits, k=10)
+            )
+            domain = "".join(random.choices(string.ascii_lowercase, k=8))
+            tld = "".join(random.choices(string.ascii_lowercase, k=3))
             email = f"{username}@{domain}.{tld}"
             assert is_valid_email(email) is True
 
@@ -142,6 +170,10 @@ class TestRandomizedFuzz:
         """Randomly generated strings should almost never be valid."""
         random.seed(99)
         for _ in range(100):
-            random_string = ''.join(random.choices(string.ascii_letters + string.punctuation + string.digits, k=15))
+            random_string = "".join(
+                random.choices(
+                    string.ascii_letters + string.punctuation + string.digits, k=15
+                )
+            )
             # Very unlikely to match standard email pattern
             assert is_valid_email(random_string) is False

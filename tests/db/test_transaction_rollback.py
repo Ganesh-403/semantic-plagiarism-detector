@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/db/test_transaction_rollback.py
 --------------------------------------
@@ -18,10 +40,7 @@ from src.db.corpus_db import (
     get_chunk_registry,
     init_corpus_db,
 )
-from src.db.incidents import (
-    _get_connection,
-    init_incident_db,
-)
+from src.db.incidents import _get_connection, init_incident_db
 
 
 @pytest.fixture(autouse=True)
@@ -154,19 +173,25 @@ def test_incidents_batch_insertion_rollback_on_error(sqlite_database_path):
         # Run a multi-insert statement transaction that fails halfway
         try:
             with conn:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO plagiarism_incidents (incident_id, document_a, document_b, similarity_score, severity_rank)
                     VALUES ('INC-001', 'docA.pdf', 'docB.pdf', 0.85, 'High')
-                    """)
-                conn.execute("""
+                    """
+                )
+                conn.execute(
+                    """
                     INSERT INTO plagiarism_incidents (incident_id, document_a, document_b, similarity_score, severity_rank)
                     VALUES ('INC-002', 'docC.pdf', 'docD.pdf', 0.92, 'High')
-                    """)
+                    """
+                )
                 # Fail on 3rd row with duplicate incident_id
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO plagiarism_incidents (incident_id, document_a, document_b, similarity_score, severity_rank)
                     VALUES ('INC-001', 'docE.pdf', 'docF.pdf', 0.75, 'Medium')
-                    """)
+                    """
+                )
         except sqlite3.IntegrityError:
             pass
 

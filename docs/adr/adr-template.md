@@ -1,8 +1,8 @@
 # [ADR-XXXX]: [Short Title of the Architecture Decision]
 
-*   **Status**: [Proposed | Accepted | Deprecated | Superseded by ADR-XXXX]
-*   **Deciders**: [List of decision makers]
-*   **Date**: [YYYY-MM-DD when the decision was made/proposed]
+* **Status**: [Proposed | Accepted | Deprecated | Superseded by ADR-XXXX]
+* **Deciders**: [List of decision makers]
+* **Date**: [YYYY-MM-DD when the decision was made/proposed]
 
 ---
 

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 test_redis_cache.py
 -------------------
@@ -124,7 +146,9 @@ class TestRedisCache:
 
         result = clear_session(session_id)
         assert result is True
-        mock_redis_client.keys.assert_called_once_with(CacheNamespace.SESSION.build_key(session_id, "*"))
+        mock_redis_client.keys.assert_called_once_with(
+            CacheNamespace.SESSION.build_key(session_id, "*")
+        )
 
     def test_faiss_index_caching(self, cache_with_mock, mock_redis_client):
         """Test FAISS index caching."""
@@ -354,6 +378,7 @@ class TestRedisCache:
     def test_redis_cache_lock_exists(self):
         """Verify that RedisCache defines a threading.Lock for singleton thread safety."""
         import threading
+
         assert hasattr(RedisCache, "_lock")
         assert isinstance(RedisCache._lock, type(threading.Lock()))
 
@@ -883,6 +908,7 @@ def test_redis_fallback_exceptions():
         import importlib
 
         import src.utils.redis_cache as rc
+
         importlib.reload(rc)
 
         # Retrieve the fallback error classes
@@ -912,8 +938,8 @@ def test_redis_fallback_exceptions():
     import importlib
 
     import src.utils.redis_cache as rc
-    importlib.reload(rc)
 
+    importlib.reload(rc)
 
 
 # ── Issue #2320: REDIS_URL password injection ──────────────────
@@ -969,9 +995,7 @@ class TestRedisUrlPasswordInjection:
         monkeypatch.setenv("REDIS_PORT", "9999")
         monkeypatch.setenv("REDIS_DB", "9")
         monkeypatch.setenv("REDIS_PASSWORD", "ignored_password")
-        monkeypatch.setenv(
-            "REDIS_URL", "rediss://user:pass@explicit.redis.com:6380/3"
-        )
+        monkeypatch.setenv("REDIS_URL", "rediss://user:pass@explicit.redis.com:6380/3")
 
         importlib.reload(redis_cache_module)
 
@@ -1016,7 +1040,6 @@ class TestRedisUrlPasswordInjection:
         assert "@" not in redis_cache_module.REDIS_URL
 
 
-
 class TestPayloadCompressor:
     """Unit tests for PayloadCompressor zlib compression and decompression logic."""
 
@@ -1033,7 +1056,10 @@ class TestPayloadCompressor:
 
         decompressed = PayloadCompressor.decompress(compressed)
         assert decompressed == large_payload
-        assert PayloadCompressor.decompress(PayloadCompressor.compress(large_payload)) == large_payload
+        assert (
+            PayloadCompressor.decompress(PayloadCompressor.compress(large_payload))
+            == large_payload
+        )
 
     def test_small_payload_remains_uncompressed(self):
         """Verify that small payloads below compression threshold remain uncompressed and lack magic header."""
@@ -1070,7 +1096,10 @@ class TestPayloadCompressor:
 
     def test_decompress_garbage_data_with_magic_header_safe_fallback(self):
         """Verify that feeding garbage data prefixed with the magic header safely falls back to None."""
-        garbage_payload = PayloadCompressor.MAGIC_HEADER + b"this_is_not_valid_zlib_compressed_data_9999"
+        garbage_payload = (
+            PayloadCompressor.MAGIC_HEADER
+            + b"this_is_not_valid_zlib_compressed_data_9999"
+        )
         result = PayloadCompressor.decompress(garbage_payload)
         assert result is None
 
@@ -1090,6 +1119,7 @@ class TestPayloadCompressor:
     def test_class_level_attributes_default(self):
         """Verify default class-level attributes initialized on module load."""
         import zlib
+
         assert PayloadCompressor.COMPRESSION_LEVEL == zlib.Z_BEST_SPEED
         assert PayloadCompressor.COMPRESSION_THRESHOLD_BYTES == 64 * 1024
         assert PayloadCompressor.get_threshold() == 64 * 1024
@@ -1179,7 +1209,6 @@ class TestPayloadCompressor:
             mock_getenv.assert_not_called()
 
 
-
 def test_payload_compressor_exact_threshold_boundary():
     """Verify compression boundary behavior at exactly COMPRESSION_THRESHOLD_BYTES (64 * 1024 bytes).
 
@@ -1229,7 +1258,3 @@ def test_redis_password_special_characters_escaped(monkeypatch):
     expected_encoded = urllib.parse.quote_plus("p@ss/word#123:secret")
     assert expected_encoded in src.utils.redis_cache.REDIS_URL
     assert f":{expected_encoded}@localhost:6379/0" in src.utils.redis_cache.REDIS_URL
-
-
-
-

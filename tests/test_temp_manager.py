@@ -1,28 +1,51 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Comprehensive Unit Tests for rotate_backup_files edge cases (Issue #3185)
 Includes tests for rotation logic, cleanup functions, and context managers.
 """
 
 import os
-import time
 import tempfile
-import pytest
+import time
 from pathlib import Path
 
-from src.utils.temp_manager import (
-    rotate_backup_files,
-    cleanup_temp_files,
-    purge_expired_temp_files,
-    managed_ocr_temp_dir,
-    register_temp_path,
-    unregister_temp_path,
-    cleanup_registered_temp_paths,
-)
+import pytest
 
+from src.utils.temp_manager import (
+    cleanup_registered_temp_paths,
+    cleanup_temp_files,
+    managed_ocr_temp_dir,
+    purge_expired_temp_files,
+    register_temp_path,
+    rotate_backup_files,
+    unregister_temp_path,
+)
 
 # ==============================================================================
 # SECTION 1: Core rotate_backup_files tests
 # ==============================================================================
+
 
 class TestRotateBackupFiles:
     def test_no_files_to_delete(self, tmp_path):
@@ -99,6 +122,7 @@ class TestRotateBackupFiles:
 # SECTION 2: Integrity and File Safety
 # ==============================================================================
 
+
 class TestRotateBackupFilesIntegrity:
     def test_only_files_deleted(self, tmp_path):
         """Ensure files are deleted, but directories are not."""
@@ -135,8 +159,8 @@ class TestRotateBackupFilesIntegrity:
 # SECTION 3: Cleanup Functions
 # ==============================================================================
 
+
 class TestCleanupFunctions:
-    
     def test_unregister_temp_path(self):
         """Unregistering a path should remove it from the list."""
         with tempfile.NamedTemporaryFile(delete=False) as tmp:
@@ -168,6 +192,7 @@ class TestCleanupFunctions:
 # ==============================================================================
 # SECTION 4: Purge Expired Files and Context Managers
 # ==============================================================================
+
 
 class TestPurgeAndContextManagers:
     def test_purge_expired_temp_files_returns_int(self):

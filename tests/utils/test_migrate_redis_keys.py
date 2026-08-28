@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 tests/utils/test_migrate_redis_keys.py
 ---------------------------------------
@@ -19,7 +41,9 @@ class TestCacheNamespaceEnum:
         """Ensure all LEGACY_* attributes are removed from CacheNamespace."""
         enum_names = [e.name for e in CacheNamespace]
         legacy_names = [name for name in enum_names if name.startswith("LEGACY_")]
-        assert legacy_names == [], f"Found legacy attributes in CacheNamespace: {legacy_names}"
+        assert (
+            legacy_names == []
+        ), f"Found legacy attributes in CacheNamespace: {legacy_names}"
 
     def test_modern_namespaces_present(self):
         """Ensure standard modern namespaces are present."""
@@ -105,9 +129,13 @@ class TestMigrateRedisKeys:
         assert stats["skipped"] == 0
         assert stats["errors"] == 0
         assert mock_client.rename.call_count == 3
-        mock_client.rename.assert_any_call(b"similarity:query123", b"spd:v1:analysis:query123")
+        mock_client.rename.assert_any_call(
+            b"similarity:query123", b"spd:v1:analysis:query123"
+        )
         mock_client.rename.assert_any_call(b"doc:99", b"spd:v1:analysis:doc:99")
-        mock_client.rename.assert_any_call(b"analysis:result1", b"spd:v1:analysis:result1")
+        mock_client.rename.assert_any_call(
+            b"analysis:result1", b"spd:v1:analysis:result1"
+        )
 
     def test_migrate_handles_rename_error(self):
         """Test error handling when Redis rename raises an exception."""

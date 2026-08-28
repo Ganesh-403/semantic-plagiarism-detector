@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/api/endpoints/tasks.py
 --------------------------
@@ -41,17 +63,22 @@ router = APIRouter(prefix="/api/v1/tasks", tags=["Batch Task Queue"])
 
 # ── Pydantic schemas ───────────────────────────────────────────
 
+
 class FilePayload(BaseModel):
     """A single file encoded as base64."""
+
     filename: str = Field(..., description="Original filename (e.g. 'assignment1.pdf')")
     content_base64: str = Field(..., description="Base64-encoded file bytes")
 
 
 class BatchScanRequest(BaseModel):
     """Request body for POST /api/v1/tasks/batch-scan."""
+
     files: list[FilePayload] = Field(
-        ..., min_length=1, max_length=50,
-        description="1–50 files to scan in this batch job."
+        ...,
+        min_length=1,
+        max_length=50,
+        description="1–50 files to scan in this batch job.",
     )
     threshold: float = Field(default=0.59, ge=0.0, le=1.0)
     top_k: int = Field(default=3, ge=1, le=10)
@@ -61,13 +88,17 @@ class BatchScanRequest(BaseModel):
 
 class BatchScanResponse(BaseModel):
     """202 Accepted response with the job ID."""
+
     job_id: str
     status: str = "PENDING"
-    message: str = "Batch scan job submitted. Poll GET /api/v1/tasks/{job_id} for status."
+    message: str = (
+        "Batch scan job submitted. Poll GET /api/v1/tasks/{job_id} for status."
+    )
 
 
 class JobStatusResponse(BaseModel):
     """Full job status payload returned by GET /api/v1/tasks/{job_id}."""
+
     id: str
     status: str
     payload: Optional[dict[str, Any]] = None
@@ -87,6 +118,7 @@ class JobListResponse(BaseModel):
 
 
 # ── Endpoints ──────────────────────────────────────────────────
+
 
 @router.post(
     "/batch-scan",
@@ -144,7 +176,8 @@ async def get_job_status(job_id: str) -> JobStatusResponse:
 )
 async def list_jobs(
     status_filter: Optional[str] = Query(
-        default=None, alias="status",
+        default=None,
+        alias="status",
         description="Filter by status: PENDING, PROCESSING, COMPLETED, FAILED, DEAD_LETTER",
     ),
     limit: int = Query(default=100, ge=1, le=500),

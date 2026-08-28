@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/core/federated_minhash.py
 -----------------------------
@@ -9,9 +31,10 @@ against a global corpus without sharing raw, FERPA-protected documents.
 """
 
 import hashlib
-import struct
 import logging
-from typing import List, Set, Tuple, Optional
+import struct
+from typing import List, Optional, Set, Tuple
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -62,7 +85,7 @@ def generate_minhash_signature(
         return np.full(num_hashes, _MAX_HASH, dtype=np.uint64)
 
     # Generate k-character shingles
-    shingles = set(text[i : i + k] for i in range(len(text) - k + 1))
+    shingles = {text[i : i + k] for i in range(len(text) - k + 1)}
 
     return _hash_shingles(shingles, num_hashes)
 

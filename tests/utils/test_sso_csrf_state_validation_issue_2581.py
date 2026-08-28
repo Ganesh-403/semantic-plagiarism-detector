@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 test_sso_csrf_state_validation_issue_2581.py
 ---------------------------------------------
@@ -7,15 +29,16 @@ and verified upon callback return to protect against Login CSRF attacks.
 """
 
 from unittest.mock import patch
+
 import pytest
 
-from src.db.auth import init_db, validate_sso_state, store_sso_state
+from src.db.auth import init_db, store_sso_state, validate_sso_state
 from src.utils.sso import (
-    get_google_auth_url,
-    get_github_auth_url,
-    verify_sso_state,
-    exchange_google_code,
     exchange_github_code,
+    exchange_google_code,
+    get_github_auth_url,
+    get_google_auth_url,
+    verify_sso_state,
 )
 
 
@@ -86,4 +109,3 @@ def test_verify_sso_state_logs_security_event_on_failure(mock_log_security_event
         username="anonymous",
         details=f"Invalid state: {forged_state}",
     )
-

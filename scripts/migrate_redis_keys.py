@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 scripts/migrate_redis_keys.py
 ------------------------------
@@ -33,7 +55,7 @@ from src.utils.redis_cache import CacheNamespace
 logger = logging.getLogger("redis_migration")
 
 
-def map_legacy_key(key: str) -> Optional[str]:
+def map_legacy_key(key: str) -> str | None:
     """Map a legacy Redis key to its corresponding spd:v1:* format.
 
     Args:
@@ -83,11 +105,11 @@ def map_legacy_key(key: str) -> Optional[str]:
 
 
 def get_redis_client(
-    url: Optional[str] = None,
-    host: Optional[str] = None,
-    port: Optional[int] = None,
-    db: Optional[int] = None,
-    password: Optional[str] = None,
+    url: str | None = None,
+    host: str | None = None,
+    port: int | None = None,
+    db: int | None = None,
+    password: str | None = None,
 ) -> Any:
     """Create and return a connected Redis client instance."""
     try:
@@ -136,14 +158,18 @@ def migrate_redis_keys(client: Any, dry_run: bool = False) -> dict[str, Any]:
 
     for raw_key in key_iter:
         stats["scanned"] += 1
-        key_str = raw_key.decode("utf-8") if isinstance(raw_key, bytes) else str(raw_key)
+        key_str = (
+            raw_key.decode("utf-8") if isinstance(raw_key, bytes) else str(raw_key)
+        )
         new_key_str = map_legacy_key(key_str)
 
         if not new_key_str or new_key_str == key_str:
             stats["skipped"] += 1
             continue
 
-        new_raw_key = new_key_str.encode("utf-8") if isinstance(raw_key, bytes) else new_key_str
+        new_raw_key = (
+            new_key_str.encode("utf-8") if isinstance(raw_key, bytes) else new_key_str
+        )
 
         if dry_run:
             logger.info(f"[DRY-RUN] Would rename: {key_str} -> {new_key_str}")
@@ -156,7 +182,9 @@ def migrate_redis_keys(client: Any, dry_run: bool = False) -> dict[str, Any]:
                 stats["migrated"] += 1
                 stats["renames"].append((key_str, new_key_str))
             except Exception as e:
-                logger.error(f"[ERROR] Failed to rename {key_str} to {new_key_str}: {e}")
+                logger.error(
+                    f"[ERROR] Failed to rename {key_str} to {new_key_str}: {e}"
+                )
                 stats["errors"] += 1
 
     return stats
@@ -173,9 +201,15 @@ def main() -> int:
         help="Simulate migration without modifying any keys in Redis.",
     )
     parser.add_argument("--url", type=str, default=None, help="Redis connection URL.")
-    parser.add_argument("--host", type=str, default=None, help="Redis host (default: localhost).")
-    parser.add_argument("--port", type=int, default=None, help="Redis port (default: 6379).")
-    parser.add_argument("--db", type=int, default=None, help="Redis database number (default: 0).")
+    parser.add_argument(
+        "--host", type=str, default=None, help="Redis host (default: localhost)."
+    )
+    parser.add_argument(
+        "--port", type=int, default=None, help="Redis port (default: 6379)."
+    )
+    parser.add_argument(
+        "--db", type=int, default=None, help="Redis database number (default: 0)."
+    )
     parser.add_argument("--password", type=str, default=None, help="Redis password.")
 
     args = parser.parse_args()

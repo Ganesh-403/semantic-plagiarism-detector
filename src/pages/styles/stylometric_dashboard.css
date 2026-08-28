@@ -36,7 +36,7 @@
 
 body.dark-theme {
   background-color: var(--bg-primary);
-  background-image: 
+  background-image:
     radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.18) 0px, transparent 50%),
     radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.15) 0px, transparent 50%);
   background-attachment: fixed;

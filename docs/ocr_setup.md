@@ -5,6 +5,7 @@ When users run the app on Windows or macOS without Tesseract installed, document
 ## Installation Guide
 
 ### 1. Ubuntu
+
 Use the `apt` package manager to install Tesseract OCR and the necessary language packs.
 
 ```bash
@@ -17,6 +18,7 @@ sudo apt install tesseract-ocr-all
 ```
 
 ### 2. macOS
+
 Use Homebrew to install Tesseract OCR.
 `brew install tesseract` provides the base Tesseract formula and currently includes `eng`, `osd`, and `snum`.
 `brew install tesseract-lang` provides additional languages.
@@ -28,16 +30,19 @@ brew install tesseract-lang
 ```
 
 ### 3. Windows
+
 You can install Tesseract on Windows using Chocolatey or by downloading third-party binaries.
 
 **Option A: Using Chocolatey (Recommended)**
 Open your command prompt or PowerShell as an Administrator and run:
+
 ```powershell
 choco install tesseract
 ```
 
 **Option B: Third-Party Installers (UB Mannheim)**
 The UB Mannheim project provides Windows installers for Tesseract.
+
 1. Download the latest Windows installer from the [UB Mannheim wiki](https://github.com/UB-Mannheim/tesseract/wiki).
 2. Run the installer. **Important:** During installation, select the language data you need if the installer provides that option.
 3. Add the Tesseract installation directory (e.g., `C:\Program Files\Tesseract-OCR`) to your system's `PATH` environment variable.
@@ -45,11 +50,13 @@ The UB Mannheim project provides Windows installers for Tesseract.
 ## Verification
 
 To verify that Tesseract is correctly installed and accessible on your system `PATH`, run:
+
 ```bash
 tesseract --version
 ```
 
 To list all available language packs (tessdata) installed on your system, run:
+
 ```bash
 tesseract --list-langs
 ```

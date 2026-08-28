@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 test_load_custom_stopwords_missing_file_issue_2700.py
 ------------------------------------------------------
@@ -19,17 +41,11 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from src.core.document_parser import (
-    get_stopwords as doc_parser_get_stopwords,
-)
+from src.core.document_parser import get_stopwords as doc_parser_get_stopwords
 from src.core.document_parser import (
     load_custom_stopwords as doc_parser_load_custom_stopwords,
 )
-from src.core.parsers.cleaners import (
-    ENGLISH_STOPWORDS,
-    clean_text,
-    get_stopwords,
-)
+from src.core.parsers.cleaners import ENGLISH_STOPWORDS, clean_text, get_stopwords
 from src.core.parsers.cleaners import (
     load_custom_stopwords as cleaners_load_custom_stopwords,
 )
@@ -37,6 +53,7 @@ from src.core.parsers.cleaners import (
 # ---------------------------------------------------------------------------
 # Section 1: Non-Existent File & Missing Environment Variable Recovery Tests
 # ---------------------------------------------------------------------------
+
 
 def test_load_custom_stopwords_missing_file_env_var(monkeypatch):
     """Set STOPWORDS_FILE env var to a non-existent file path and assert
@@ -93,6 +110,7 @@ def test_load_custom_stopwords_empty_string_env_var(monkeypatch):
 # Section 2: Successful Custom Stopwords File Parsing Tests
 # ---------------------------------------------------------------------------
 
+
 def test_load_custom_stopwords_valid_file_parsing():
     """Create a temporary stopwords file and verify parsing, lowercasing, and whitespace stripping."""
     stopwords_content = "  CUSTOM_WORD_ONE  \n\nCustom_Word_Two\n\tTHIRD_WORD\t\n"
@@ -127,6 +145,7 @@ def test_load_custom_stopwords_empty_file():
 # Section 3: Permission & OS Error Exception Handling
 # ---------------------------------------------------------------------------
 
+
 def test_load_custom_stopwords_permission_error_mocked():
     """Mock open to raise PermissionError (subclass of OSError) and assert recovery."""
     with patch("builtins.open", side_effect=PermissionError("Permission denied")):
@@ -147,6 +166,7 @@ def test_load_custom_stopwords_general_oserror_mocked():
 # ---------------------------------------------------------------------------
 # Section 4: Integration with Stopword Aggregation & Text Cleaning
 # ---------------------------------------------------------------------------
+
 
 def test_get_stopwords_integration_with_missing_file(monkeypatch):
     """Verify get_stopwords() returns standard English stopwords when custom file is missing."""

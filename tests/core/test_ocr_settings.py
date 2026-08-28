@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import pytest
 
 from src.core.app_config import SUPPORTED_OCR_LANGUAGES
@@ -60,6 +82,7 @@ def test_language_mapping_matches_issue_scope():
         "ita": "Italian",
     }
 
+
 def test_dpi_bounds_match_issue_scope():
     assert MIN_OCR_DPI == 150
     assert MAX_OCR_DPI == 400
@@ -76,7 +99,9 @@ def test_validate_ocr_languages_against_mocked_tesseract():
         installed_languages = pytesseract.get_languages()
         for code in SUPPORTED_OCR_LANGUAGES:
             assert len(code) == 3, f"Language code '{code}' must be a 3-letter ISO code"
-            assert code in installed_languages, f"Language code '{code}' is not recognized by Tesseract"
+            assert (
+                code in installed_languages
+            ), f"Language code '{code}' is not recognized by Tesseract"
 
 
 def test_validate_ocr_languages_against_tesseract_binary():
@@ -90,7 +115,9 @@ def test_validate_ocr_languages_against_tesseract_binary():
 
     for code in SUPPORTED_OCR_LANGUAGES:
         assert len(code) == 3, f"Language code '{code}' must be a 3-letter ISO code"
-        assert code in installed_languages, f"Language code '{code}' is not recognized by Tesseract binary"
+        assert (
+            code in installed_languages
+        ), f"Language code '{code}' is not recognized by Tesseract binary"
 
 
 def test_multi_language_ocr_support():
@@ -117,5 +144,3 @@ def test_common_parser_multi_language_support():
     assert common_validate("eng+spa") == "eng+spa"
     assert common_validate(" eng + spa ") == "eng+spa"
     assert common_validate("eng+xyz") == "eng"
-
-

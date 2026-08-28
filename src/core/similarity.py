@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/core/similarity.py
 ----------------------
@@ -227,6 +249,7 @@ def document_similarity_matrix(
         if use_hnsw:
             try:
                 import faiss
+
                 n = len(stacked)
                 d = stacked.shape[1]
                 norms = np.linalg.norm(stacked, axis=1, keepdims=True)
@@ -315,6 +338,7 @@ def document_similarity_matrix(
         if use_hnsw:
             try:
                 import faiss
+
                 d = stacked.shape[1]
                 norms = np.linalg.norm(stacked, axis=1, keepdims=True)
                 norms = np.where(norms == 0, 1.0, norms)
@@ -350,7 +374,9 @@ def document_similarity_matrix(
         # Pre-filtering with FAISS top_k or candidate_pairs
         active_candidates = candidate_pairs
         if active_candidates is None and top_k is not None and top_k > 0 and n > top_k:
-            active_candidates = find_candidate_pairs(doc_names, doc_vectors, top_k=top_k)
+            active_candidates = find_candidate_pairs(
+                doc_names, doc_vectors, top_k=top_k
+            )
 
         if active_candidates is not None:
             name_to_idx = {name: i for i, name in enumerate(doc_names)}
@@ -370,7 +396,6 @@ def document_similarity_matrix(
                 sim = cosine_similarity(stacked[start:end], stacked)
                 sim = np.clip(sim, 0.0, 1.0)
                 matrix[start:end] = np.where(sim < min_threshold, 0.0, sim)
-
 
     df = pd.DataFrame(matrix, index=doc_names, columns=doc_names)
     return _apply_min_percentile_filter(df, min_percentile)
@@ -400,7 +425,6 @@ def compute_similarity_matrix(
         pooling=pooling,
         use_hnsw=use_hnsw,
     )
-
 
 
 # ── Hybrid similarity (lexical + semantic) ─────────────────────────────────────
@@ -1158,7 +1182,7 @@ def detect_plagiarism_clusters(
             "suspicious_groups": [],
             "total_clusters": 0,
             "error": "networkx not installed",
-            "message": "Please install networkx: pip install networkx>=3.0"
+            "message": "Please install networkx: pip install networkx>=3.0",
         }
 
     doc_names = list(similarity_df.columns)
@@ -1212,6 +1236,7 @@ def detect_plagiarism_clusters(
         "total_clusters": len(clusters),
     }
 
+
 # ============================================================================
 # HYBRID SIMILARITY INTEGRATION - Issue #2676
 # ============================================================================
@@ -1253,11 +1278,11 @@ def flag_plagiarism_hybrid(
 ) -> list[dict]:
     """
     Flag plagiarism using hybrid similarity scores.
-    
+
     Args:
         hybrid_df: Hybrid similarity DataFrame
         threshold: Flagging threshold
-    
+
     Returns:
         List of flagged pairs
     """

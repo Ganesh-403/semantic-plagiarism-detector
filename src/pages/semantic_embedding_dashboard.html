@@ -163,7 +163,7 @@
   <div class="grid-container">
     <div class="card">
       <h2 style="margin-bottom: 1rem; font-size: 1.25rem;">📄 Text Comparison Studio</h2>
-      
+
       <div class="textarea-group">
         <label for="sourceText">Source Document Text</label>
         <textarea id="sourceText" placeholder="Paste source document text here...">Artificial Intelligence models leverage transformer architectures to embed high-dimensional semantic vector spaces, enabling contextual plagiarism detection.</textarea>
@@ -222,7 +222,7 @@
       // Simulated semantic cosine calculation logic based on word overlap and structural vector alignment
       const sourceWords = new Set(source.toLowerCase().match(/\w+/g));
       const targetWords = new Set(target.toLowerCase().match(/\w+/g));
-      
+
       let intersection = 0;
       sourceWords.forEach(word => {
         if (targetWords.has(word)) intersection++;
@@ -230,7 +230,7 @@
 
       const union = new Set([...sourceWords, ...targetWords]).size;
       const jaccardSim = intersection / union;
-      
+
       // Transform Jaccard to simulated Transformer Cosine embedding score
       const cosineSim = Math.min(0.98, Math.max(0.45, jaccardSim + 0.35));
       const scorePct = (cosineSim * 100).toFixed(2);

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 conftest.py
 -----------
@@ -126,7 +148,6 @@ if "faiss" not in sys.modules:
         faiss_stub.IndexHNSWFlat = _MockIndex
         faiss_stub.METRIC_INNER_PRODUCT = 0
         sys.modules["faiss"] = faiss_stub
-
 
 
 for mod_name in [
@@ -341,9 +362,7 @@ def mock_db(tmp_path):
         "src.db.corpus_db._DB_PATH", str(corpus_db_file)
     ), unittest.mock.patch(
         "src.db.incidents.DEFAULT_DB_PATH", str(corpus_db_file)
-    ), unittest.mock.patch(
-        "src.db.auth._DB_PATH", str(auth_db_file)
-    ):
+    ), unittest.mock.patch("src.db.auth._DB_PATH", str(auth_db_file)):
         try:
             from src.db.auth import init_db
             from src.db.corpus_db import init_corpus_db
@@ -451,6 +470,7 @@ def _cleanup_corpus_db_connections():
     yield
     try:
         from src.db.corpus_db import close_connections
+
         close_connections(all_threads=True)
     except ImportError:
         pass
@@ -459,26 +479,27 @@ def _cleanup_corpus_db_connections():
 @pytest.fixture
 def db_connection(tmp_path: Path) -> sqlite3.Connection:
     """Provide a clean, initialized SQLite database connection for testing.
-    
+
     This fixture creates a temporary SQLite database in the pytest tmp_path,
     initializes the required schema (incidents, documents, etc.), yields the
     active connection for the test to use, and automatically closes the
     connection during teardown.
-    
+
     This eliminates the need for manual sqlite3.connect() and conn.close()
     calls in every test function (Issue #2725).
-    
+
     Yields:
         sqlite3.Connection: An active, initialized database connection.
     """
     db_path = tmp_path / "test_plagiarism.db"
-    
+
     # Create connection with row factory for dictionary-like access
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
-    
+
     # Initialize schema (simplified for test environment)
-    conn.executescript("""
+    conn.executescript(
+        """
         CREATE TABLE IF NOT EXISTS documents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             filename TEXT UNIQUE NOT NULL,
@@ -488,7 +509,7 @@ def db_connection(tmp_path: Path) -> sqlite3.Connection:
             student_name TEXT,
             is_deleted INTEGER DEFAULT 0
         );
-        
+
         CREATE TABLE IF NOT EXISTS plagiarism_incidents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             incident_id TEXT UNIQUE NOT NULL,
@@ -500,15 +521,16 @@ def db_connection(tmp_path: Path) -> sqlite3.Connection:
             threshold_at_time_of_flag REAL,
             review_status TEXT DEFAULT 'Pending'
         );
-        
-        CREATE INDEX IF NOT EXISTS idx_incidents_docs 
+
+        CREATE INDEX IF NOT EXISTS idx_incidents_docs
         ON plagiarism_incidents(document_a, document_b);
-    """)
+    """
+    )
     conn.commit()
-    
+
     # Yield the connection to the test
     yield conn
-    
+
     # Teardown: Close the connection
     conn.close()
 
@@ -516,7 +538,7 @@ def db_connection(tmp_path: Path) -> sqlite3.Connection:
 @pytest.fixture
 def populated_db_connection(db_connection: sqlite3.Connection) -> sqlite3.Connection:
     """Provide a database connection pre-populated with sample incident data.
-    
+
     Builds on the base db_connection fixture by inserting 50 sample
     plagiarism incidents with varying severities and similarities.
     """
@@ -524,27 +546,29 @@ def populated_db_connection(db_connection: sqlite3.Connection) -> sqlite3.Connec
     for i in range(50):
         sim = 0.50 + (i * 0.01)
         severity = "High" if sim >= 0.80 else ("Medium" if sim >= 0.60 else "Low")
-        sample_incidents.append((
-            f"INC-{i:04d}",
-            f"student_{i}_a.pdf",
-            f"student_{i}_b.pdf",
-            sim,
-            severity,
-            f"2024-01-{(i % 28) + 1:02d}T10:00:00",
-            0.59,
-            "Pending"
-        ))
-        
+        sample_incidents.append(
+            (
+                f"INC-{i:04d}",
+                f"student_{i}_a.pdf",
+                f"student_{i}_b.pdf",
+                sim,
+                severity,
+                f"2024-01-{(i % 28) + 1:02d}T10:00:00",
+                0.59,
+                "Pending",
+            )
+        )
+
     db_connection.executemany(
         """
-        INSERT INTO plagiarism_incidents 
+        INSERT INTO plagiarism_incidents
         (incident_id, document_a, document_b, similarity, severity, timestamp, threshold_at_time_of_flag, review_status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        sample_incidents
+        sample_incidents,
     )
     db_connection.commit()
-    
+
     yield db_connection
 
 
@@ -578,7 +602,9 @@ class MockFAISSIndexWrapper:
         else:
             self.vectors.append(arr)
 
-    def search_vectors(self, query_vectors: Any, k: int = 5) -> tuple[np.ndarray, np.ndarray]:
+    def search_vectors(
+        self, query_vectors: Any, k: int = 5
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Query nearest neighbors for the given query vectors.
 
         Args:
@@ -601,7 +627,10 @@ class MockFAISSIndexWrapper:
                     (q_arr.shape[0], k), -1, dtype=np.int64
                 )
             data = np.vstack(self.vectors)
-            dists = np.linalg.norm(q_arr[:, np.newaxis, :] - data[np.newaxis, :, :], axis=2) ** 2
+            dists = (
+                np.linalg.norm(q_arr[:, np.newaxis, :] - data[np.newaxis, :, :], axis=2)
+                ** 2
+            )
             actual_k = min(k, data.shape[0])
             sorted_indices = np.argsort(dists, axis=1)[:, :actual_k]
             sorted_distances = np.take_along_axis(dists, sorted_indices, axis=1)
@@ -615,7 +644,9 @@ class MockFAISSIndexWrapper:
                 )
             return sorted_distances.astype(np.float32), sorted_indices.astype(np.int64)
 
-    def get_nearest_neighbors(self, query_vectors: Any, k: int = 5) -> tuple[np.ndarray, np.ndarray]:
+    def get_nearest_neighbors(
+        self, query_vectors: Any, k: int = 5
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Alias helper to query nearest neighbors."""
         return self.search_vectors(query_vectors, k=k)
 
@@ -627,5 +658,3 @@ def mock_faiss_index():
     Provides helpers to add synthetic vectors (`add_vectors`) and query nearest neighbors (`search_vectors` / `get_nearest_neighbors`).
     """
     return MockFAISSIndexWrapper(dimension=384)
-
-

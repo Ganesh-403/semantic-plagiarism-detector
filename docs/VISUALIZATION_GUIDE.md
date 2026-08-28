@@ -50,7 +50,6 @@ defined in `app/theme.py`. Supported options include those listed in
 `UI_COLORMAP_OPTIONS`, such as `"Viridis"`, `"Plasma"`, `"Coolwarm"`, and
 `"YlOrRd"`.
 
-
 Internally, `colormap_name` is translated through `MATPLOTLIB_CMAP_MAPPING` or `PLOTLY_CMAP_MAPPING`, allowing the same UI selection to work consistently across both static and interactive heatmaps.
 
 Theme colors (background/ink/etc.) are applied conditionally with `if theme_colors:` blocks that style the figure background, axis text color, and legend — see lines 75–83 and 140–146 in `plot_similarity_heatmap`.
@@ -198,6 +197,7 @@ THEMES["HighContrast"] = {
 Once added, `set_theme("HighContrast")` makes it available through `get_colors()`, and every chart that accepts `theme_colors=get_colors()` will pick it up automatically.
 
 ## Known Gaps (useful context for future work)
+
 - `plot_similarity_heatmap(...)`, `plot_similarity_heatmap_plotly(...)`, and `plot_chunk_similarity_comparison(...)` now support a `colormap_name` parameter. If additional heatmap visualizations are added in the future, they should follow the same `colormap_name` + mapping approach so the UI exposes a consistent set of colormap options.
 - **`plot_similarity_distribution` and `plot_document_sizes` are not exported** from `src/visualization/__init__.py`. They're defined in `analytics.py` but must currently be imported as `from src.visualization.analytics import plot_similarity_distribution` rather than `from src.visualization import plot_similarity_distribution`.
 - **`analytics.py` charts don't take `theme_colors`.** Their colors are hardcoded hex strings, so they won't shift with the Light/Dark toggle the way `heatmap.py` and `network_graph.py` do.

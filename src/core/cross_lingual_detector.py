@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Cross-Lingual Plagiarism Detection Engine.
 
@@ -22,8 +44,10 @@ logger = logging.getLogger(__name__)
 # LANGUAGE DATABASE & ENUMS
 # ============================================================================
 
+
 class SupportedLanguage(Enum):
     """Supported languages for cross-lingual detection."""
+
     ENGLISH = "en"
     SPANISH = "es"
     FRENCH = "fr"
@@ -42,16 +66,45 @@ class SupportedLanguage(Enum):
 
 
 LANGUAGE_NAMES = {
-    "en": "English", "es": "Spanish", "fr": "French", "de": "German",
-    "pt": "Portuguese", "it": "Italian", "nl": "Dutch", "ru": "Russian",
-    "zh": "Chinese", "ja": "Japanese", "ar": "Arabic", "hi": "Hindi",
-    "ko": "Korean", "tr": "Turkish", "pl": "Polish", "ur": "Urdu",
-    "bn": "Bengali", "te": "Telugu", "ta": "Tamil", "mr": "Marathi",
-    "gu": "Gujarati", "kn": "Kannada", "ml": "Malayalam", "or": "Odia",
-    "pa": "Punjabi", "ne": "Nepali", "th": "Thai", "vi": "Vietnamese",
-    "id": "Indonesian", "ms": "Malay", "fil": "Filipino", "cs": "Czech",
-    "hu": "Hungarian", "ro": "Romanian", "bg": "Bulgarian", "el": "Greek",
-    "he": "Hebrew", "fa": "Persian", "sw": "Swahili"
+    "en": "English",
+    "es": "Spanish",
+    "fr": "French",
+    "de": "German",
+    "pt": "Portuguese",
+    "it": "Italian",
+    "nl": "Dutch",
+    "ru": "Russian",
+    "zh": "Chinese",
+    "ja": "Japanese",
+    "ar": "Arabic",
+    "hi": "Hindi",
+    "ko": "Korean",
+    "tr": "Turkish",
+    "pl": "Polish",
+    "ur": "Urdu",
+    "bn": "Bengali",
+    "te": "Telugu",
+    "ta": "Tamil",
+    "mr": "Marathi",
+    "gu": "Gujarati",
+    "kn": "Kannada",
+    "ml": "Malayalam",
+    "or": "Odia",
+    "pa": "Punjabi",
+    "ne": "Nepali",
+    "th": "Thai",
+    "vi": "Vietnamese",
+    "id": "Indonesian",
+    "ms": "Malay",
+    "fil": "Filipino",
+    "cs": "Czech",
+    "hu": "Hungarian",
+    "ro": "Romanian",
+    "bg": "Bulgarian",
+    "el": "Greek",
+    "he": "Hebrew",
+    "fa": "Persian",
+    "sw": "Swahili",
 }
 
 LANGUAGE_DB = {
@@ -64,9 +117,11 @@ LANGUAGE_DB = {
 # DATASTRUCTURES
 # ============================================================================
 
+
 @dataclass
 class LanguageMatch:
     """A detected cross-lingual similarity match."""
+
     source_doc: str
     source_lang: str
     source_chunk: str
@@ -85,6 +140,7 @@ class LanguageMatch:
 @dataclass
 class CrossLingualResult:
     """Result of cross-lingual plagiarism detection."""
+
     documents: list[dict[str, Any]] = field(default_factory=list)
     matches: list[LanguageMatch] = field(default_factory=list)
     language_distribution: dict[str, int] = field(default_factory=dict)
@@ -104,20 +160,25 @@ class CrossLingualResult:
     def to_dict(self) -> dict[str, Any]:
         return {
             "documents": self.documents,
-            "matches": [m.to_dict() if isinstance(m, LanguageMatch) else m for m in self.matches],
+            "matches": [
+                m.to_dict() if isinstance(m, LanguageMatch) else m for m in self.matches
+            ],
             "language_distribution": self.language_distribution,
             "total_comparisons": self.total_comparisons,
             "processing_time": self.processing_time,
             "summary": self.summary,
             "similarity_score": self.similarity_score,
-            "is_plagiarism": self.is_plagiarism
+            "is_plagiarism": self.is_plagiarism,
         }
 
 
 @dataclass
 class CrossLingualConfig:
     """Configuration for cross-lingual detection."""
-    enabled_languages: list[str] = field(default_factory=lambda: ["en", "es", "fr", "de"])
+
+    enabled_languages: list[str] = field(
+        default_factory=lambda: ["en", "es", "fr", "de"]
+    )
     similarity_threshold: float = 0.65
     use_translation_bridge: bool = True
     translation_service: str = "internal"
@@ -131,8 +192,10 @@ class CrossLingualConfig:
 # TRANSLATION CACHE & DETECTOR ENGINE
 # ============================================================================
 
+
 class TranslationCache:
     """Cache for translations."""
+
     def __init__(self, max_size: int = 1000):
         self.max_size = max_size
         self._cache: dict[str, str] = {}
@@ -148,7 +211,9 @@ class TranslationCache:
         self._misses += 1
         return None
 
-    def set(self, text: str, source_lang: str, target_lang: str, translation: str) -> None:
+    def set(
+        self, text: str, source_lang: str, target_lang: str, translation: str
+    ) -> None:
         key = f"{source_lang}:{target_lang}:{hashlib.md5(text.encode('utf-8')).hexdigest()}"  # nosec
         if len(self._cache) >= self.max_size:
             oldest_key = min(self._timestamps, key=self._timestamps.get)
@@ -161,7 +226,9 @@ class TranslationCache:
 class CrossLingualDetector:
     """Detects plagiarism across documents in different languages."""
 
-    def __init__(self, config: Optional[CrossLingualConfig | str] = None, use_cache: bool = True):
+    def __init__(
+        self, config: Optional[CrossLingualConfig | str] = None, use_cache: bool = True
+    ):
         if isinstance(config, str):
             self.config = CrossLingualConfig()
             self.target_lang = config
@@ -181,6 +248,7 @@ class CrossLingualDetector:
         if self._model is None:
             try:
                 from sentence_transformers import SentenceTransformer
+
                 self._model = SentenceTransformer(self.config.embedding_model)
             except Exception:
                 self._model = "mock"
@@ -221,29 +289,34 @@ class CrossLingualDetector:
         return embedding
 
     def compare_across_languages(
-        self,
-        source_embeddings: list[np.ndarray],
-        target_embeddings: list[np.ndarray]
+        self, source_embeddings: list[np.ndarray], target_embeddings: list[np.ndarray]
     ) -> np.ndarray:
         if not source_embeddings or not target_embeddings:
             return np.array([])
         source_matrix = np.array(source_embeddings)
         target_matrix = np.array(target_embeddings)
-        source_norm = source_matrix / np.linalg.norm(source_matrix, axis=1, keepdims=True)
-        target_norm = target_matrix / np.linalg.norm(target_matrix, axis=1, keepdims=True)
+        source_norm = source_matrix / np.linalg.norm(
+            source_matrix, axis=1, keepdims=True
+        )
+        target_norm = target_matrix / np.linalg.norm(
+            target_matrix, axis=1, keepdims=True
+        )
         return np.dot(source_norm, target_norm.T)
 
     def detect_cross_lingual_plagiarism(
         self,
         documents: dict[str, tuple[str, list[str]]],
-        threshold: Optional[float] = None
+        threshold: Optional[float] = None,
     ) -> CrossLingualResult:
         start_time = datetime.now()
         threshold = threshold or self.config.similarity_threshold
 
         doc_chunks = {name: chunks for name, (_, chunks) in documents.items()}
         embeddings = {
-            doc_name: [self.embed_text(chunk.text if hasattr(chunk, "text") else chunk) for chunk in chunks[:self.config.max_chunks_per_doc]]
+            doc_name: [
+                self.embed_text(chunk.text if hasattr(chunk, "text") else chunk)
+                for chunk in chunks[: self.config.max_chunks_per_doc]
+            ]
             for doc_name, chunks in doc_chunks.items()
         }
 
@@ -278,36 +351,50 @@ class CrossLingualDetector:
                         if score >= threshold:
                             chunks_a = doc_chunks.get(name_a, [])
                             chunks_b = doc_chunks.get(name_b, [])
-                            matches.append(LanguageMatch(
-                                source_doc=name_a,
-                                source_lang=lang_a,
-                                source_chunk=chunks_a[ci] if ci < len(chunks_a) else "",
-                                target_doc=name_b,
-                                target_lang=lang_b,
-                                target_chunk=chunks_b[cj] if cj < len(chunks_b) else "",
-                                similarity=score,
-                                method="multilingual_embedding",
-                                translation_used=is_cross_lingual and self.config.use_translation_bridge,
-                                confidence=min(score * 1.1, 1.0),
-                            ))
+                            matches.append(
+                                LanguageMatch(
+                                    source_doc=name_a,
+                                    source_lang=lang_a,
+                                    source_chunk=(
+                                        chunks_a[ci] if ci < len(chunks_a) else ""
+                                    ),
+                                    target_doc=name_b,
+                                    target_lang=lang_b,
+                                    target_chunk=(
+                                        chunks_b[cj] if cj < len(chunks_b) else ""
+                                    ),
+                                    similarity=score,
+                                    method="multilingual_embedding",
+                                    translation_used=is_cross_lingual
+                                    and self.config.use_translation_bridge,
+                                    confidence=min(score * 1.1, 1.0),
+                                )
+                            )
 
         matches.sort(key=lambda m: m.similarity, reverse=True)
-        matches = matches[:self.config.top_k]
+        matches = matches[: self.config.top_k]
         processing_time = (datetime.now() - start_time).total_seconds()
 
         summary = {
             "total_documents": len(documents),
             "languages_detected": len(lang_dist),
-            "cross_lingual_matches": sum(1 for m in matches if m.source_lang != m.target_lang),
-            "same_language_matches": sum(1 for m in matches if m.source_lang == m.target_lang),
+            "cross_lingual_matches": sum(
+                1 for m in matches if m.source_lang != m.target_lang
+            ),
+            "same_language_matches": sum(
+                1 for m in matches if m.source_lang == m.target_lang
+            ),
             "high_severity": sum(1 for m in matches if m.similarity >= 0.90),
             "threshold_used": threshold,
         }
 
         doc_info = [
-            {"name": name, "language": doc_langs.get(name, "unknown"),
-             "language_name": LANGUAGE_NAMES.get(doc_langs.get(name, ""), "Unknown"),
-             "chunk_count": len(doc_chunks.get(name, []))}
+            {
+                "name": name,
+                "language": doc_langs.get(name, "unknown"),
+                "language_name": LANGUAGE_NAMES.get(doc_langs.get(name, ""), "Unknown"),
+                "chunk_count": len(doc_chunks.get(name, [])),
+            }
             for name in doc_names
         ]
 
@@ -327,7 +414,7 @@ class CrossLingualDetector:
         lang_a: str,
         lang_b: str,
         threshold: float = 0.65,
-        **kwargs
+        **kwargs,
     ) -> CrossLingualResult:
         emb_a = [self.embed_text(text_a, lang_a)]
         emb_b = [self.embed_text(text_b, lang_b)]
@@ -341,7 +428,7 @@ class CrossLingualDetector:
             target_lang=lang_b,
             similarity_score=sim,
             is_plagiarism=sim >= threshold,
-            confidence=min(sim * 1.1, 1.0)
+            confidence=min(sim * 1.1, 1.0),
         )
 
 
@@ -350,6 +437,7 @@ def get_language_name(lang_code: str) -> str:
 
 
 _detector: Optional[CrossLingualDetector] = None
+
 
 def get_cross_lingual_detector() -> CrossLingualDetector:
     global _detector

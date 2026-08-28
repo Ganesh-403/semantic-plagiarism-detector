@@ -1,4 +1,25 @@
-# -*- coding: utf-8 -*-
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import csv
 import io
 import json
@@ -927,17 +948,21 @@ class TestLegacyFunctions:
         result = export_incidents_json_stream(incidents)
         assert json.loads(result.decode("utf-8"))[0]["incident_id"] == "1"
 
+
 # ---------------------------------------------------------------------------
 # Tests for Progress Callback (Issue #3467)
 # ---------------------------------------------------------------------------
 
+
 def test_generate_bulk_reports_zip_progress_callback():
     from src.utils.bulk_export import generate_bulk_reports_zip
+
     flags = [
         {"doc_a": "A.pdf", "doc_b": "B.pdf", "similarity": 0.5},
         {"doc_a": "C.pdf", "doc_b": "D.pdf", "similarity": 0.6},
     ]
     calls = []
+
     def progress_cb(current, total):
         calls.append((current, total))
 
@@ -945,14 +970,17 @@ def test_generate_bulk_reports_zip_progress_callback():
 
     assert calls == [(1, 2), (2, 2)]
 
+
 def test_create_batch_incident_zip_archive_progress_callback():
     from src.utils.bulk_export import create_batch_incident_zip_archive
+
     incidents = [
         {"incident_id": "1", "document_a": "A", "document_b": "B"},
         {"incident_id": "2", "document_a": "C", "document_b": "D"},
         {"incident_id": "3", "document_a": "E", "document_b": "F"},
     ]
     calls = []
+
     def progress_cb(current, total):
         calls.append((current, total))
 
@@ -963,17 +991,19 @@ def test_create_batch_incident_zip_archive_progress_callback():
 
     assert calls == [(1, 3), (2, 3), (3, 3)]
 
+
 def test_create_documents_bulk_zip_archive_progress_callback():
     from src.utils.bulk_export import create_documents_bulk_zip_archive
+
     filenames = ["doc1.pdf", "doc2.pdf"]
     calls = []
+
     def progress_cb(current, total):
         calls.append((current, total))
 
-    with patch("src.utils.bulk_export.get_all_documents", return_value=[]), \
-         patch("src.utils.bulk_export.get_document_word_counts", return_value={}), \
-         patch("src.utils.bulk_export._connect") as mock_connect:
-
+    with patch("src.utils.bulk_export.get_all_documents", return_value=[]), patch(
+        "src.utils.bulk_export.get_document_word_counts", return_value={}
+    ), patch("src.utils.bulk_export._connect") as mock_connect:
         # mock conn
         mock_conn = MagicMock()
         mock_conn.execute.return_value.fetchall.return_value = []
@@ -983,8 +1013,10 @@ def test_create_documents_bulk_zip_archive_progress_callback():
 
     assert calls == [(1, 2), (2, 2)]
 
+
 def test_generate_bulk_reports_zip_no_callback():
     from src.utils.bulk_export import generate_bulk_reports_zip
+
     flags = [
         {"doc_a": "A.pdf", "doc_b": "B.pdf", "similarity": 0.5},
     ]

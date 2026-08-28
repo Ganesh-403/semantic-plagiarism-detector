@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/core/text_chunking.py
 -------------------------
@@ -49,7 +71,9 @@ _nltk_punkt_checked = False
 # Regex pattern to split text into sentences while preserving punctuation.
 # Matches periods, exclamation marks, and question marks followed by whitespace
 # and an uppercase letter, or at the end of the string. Also matches standard CJK terminators.
-_SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[.!?])\s+(?=[A-Z])|(?<=[.!?])$|(?<=[。！？])")
+_SENTENCE_SPLIT_PATTERN = re.compile(
+    r"(?<=[.!?])\s+(?=[A-Z])|(?<=[.!?])$|(?<=[。！？])"
+)
 
 # Regex pattern to identify sentence boundaries.
 # Matches '.', '!', or '?' followed by a space and an uppercase letter,
@@ -102,6 +126,7 @@ def _split_into_sentences(text: str) -> list[str]:
             try:
                 nltk.download("punkt_tab", quiet=True)
                 from nltk.tokenize import sent_tokenize  # type: ignore
+
                 return sent_tokenize(text)
             except Exception:
                 pass
@@ -218,7 +243,11 @@ def _find_length_capped_end(
     if not count_bytes:
         end = _safe_chunk_end(text, min(start + limit, n))
         if end == start and start < n:
-            if _is_high_surrogate(text[start]) and start + 1 < n and _is_low_surrogate(text[start + 1]):
+            if (
+                _is_high_surrogate(text[start])
+                and start + 1 < n
+                and _is_low_surrogate(text[start + 1])
+            ):
                 return start + 2
             if not _is_low_surrogate(text[start]):
                 return start + 1
@@ -231,11 +260,13 @@ def _find_length_capped_end(
 
         # Treat an explicit surrogate pair as one logical character. This
         # avoids attempting to UTF-8 encode either half independently.
-        if _is_high_surrogate(char) and end + 1 < n and _is_low_surrogate(text[end + 1]):
+        if (
+            _is_high_surrogate(char)
+            and end + 1 < n
+            and _is_low_surrogate(text[end + 1])
+        ):
             codepoint = chr(
-                0x10000
-                + ((ord(char) - 0xD800) << 10)
-                + (ord(text[end + 1]) - 0xDC00)
+                0x10000 + ((ord(char) - 0xD800) << 10) + (ord(text[end + 1]) - 0xDC00)
             )
             char_bytes = len(codepoint.encode("utf-8"))
             width = 2
@@ -255,7 +286,11 @@ def _find_length_capped_end(
     if end == start and start < n:
         # A single character/pair larger than the requested byte limit still
         # needs to make progress. Include the complete Unicode unit.
-        if _is_high_surrogate(text[start]) and start + 1 < n and _is_low_surrogate(text[start + 1]):
+        if (
+            _is_high_surrogate(text[start])
+            and start + 1 < n
+            and _is_low_surrogate(text[start + 1])
+        ):
             end = start + 2
         elif not _is_low_surrogate(text[start]):
             end = start + 1

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/utils/file_parser.py
 ------------------------
@@ -11,16 +33,18 @@ Supports decrypted and password-protected PDF parsing using PyMuPDF (fitz),
 along with file categorization and validation helpers.
 """
 
-
 import logging
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from typing import Any, List, Optional, Tuple, Union
 
 import fitz
+
 logger = logging.getLogger(__name__)
 
 
 # ── String & Name Formatting ─────────────────────────────────────────────────
+
 
 def truncate_filename(name: str, max_len: int = 35) -> str:
     """Truncate filename with ellipsis if it exceeds max_len."""
@@ -60,7 +84,6 @@ _MAX_INSPECTION_BYTES = 16
 
 
 # ── Custom Exceptions ─────────────────────────────────────────────────────────
-
 
 
 # Issue #2931: Maximum seconds allowed for extracting text from a single
@@ -234,8 +257,6 @@ def get_file_size_formatted(num_bytes: int) -> str:
     return f"{size:.2f} {units[-1]}"
 
 
-
-
 def validate_pdf_page_count(
     file_bytes: bytes,
     max_pages: int = 500,
@@ -280,8 +301,7 @@ def validate_pdf_page_count(
 
     if page_count > max_pages:
         raise ValueError(
-            "PDF exceeds maximum allowed page limit "
-            f"({max_pages} pages)"
+            "PDF exceeds maximum allowed page limit " f"({max_pages} pages)"
         )
 
     return page_count

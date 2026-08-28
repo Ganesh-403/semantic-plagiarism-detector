@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import os
 import sqlite3
 
@@ -9,18 +31,21 @@ def init_wal_database(db_path: str) -> None:
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("PRAGMA journal_mode=WAL;")
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS system_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             message TEXT NOT NULL,
             status TEXT NOT NULL
         );
-    """)
+    """
+    )
     conn.commit()
     conn.close()
 
 
 # --- Recovery Verification Suite ---
+
 
 @pytest.fixture(scope="function")
 def crash_db_file(tmp_path):
@@ -58,11 +83,10 @@ def test_wal_journal_recovery_after_simulated_crash(crash_db_file):
     test_records = [
         ("Core migration tracking checkpoint initialized", "PENDING"),
         ("Asynchronous state machine worker activated", "RUNNING"),
-        ("Transactional replication loop completed", "SUCCESS")
+        ("Transactional replication loop completed", "SUCCESS"),
     ]
     cursor_writer.executemany(
-        "INSERT INTO system_logs (message, status) VALUES (?, ?);",
-        test_records
+        "INSERT INTO system_logs (message, status) VALUES (?, ?);", test_records
     )
     conn_writer.commit()
 
@@ -71,8 +95,12 @@ def test_wal_journal_recovery_after_simulated_crash(crash_db_file):
     _ = cursor_writer.fetchall()
 
     wal_file_path = f"{db_path}-wal"
-    assert os.path.exists(wal_file_path), "WAL file should actively contain uncheckpointed pages"
-    assert os.path.getsize(wal_file_path) > 0, "WAL log file should have captured active binary page deltas"
+    assert os.path.exists(
+        wal_file_path
+    ), "WAL file should actively contain uncheckpointed pages"
+    assert (
+        os.path.getsize(wal_file_path) > 0
+    ), "WAL log file should have captured active binary page deltas"
 
     # 4. Simulate a sudden crash event: close connection directly without execution of explicit CHECKPOINT
     conn_writer.close()
@@ -86,6 +114,14 @@ def test_wal_journal_recovery_after_simulated_crash(crash_db_file):
     recovered_records = cursor_reader.fetchall()
     conn_reader.close()
 
-    assert len(recovered_records) == 3, f"Data drop-out detected! Expected 3 records, recovered {len(recovered_records)}"
-    assert recovered_records[0] == ("Core migration tracking checkpoint initialized", "PENDING")
-    assert recovered_records[2] == ("Transactional replication loop completed", "SUCCESS")
+    assert (
+        len(recovered_records) == 3
+    ), f"Data drop-out detected! Expected 3 records, recovered {len(recovered_records)}"
+    assert recovered_records[0] == (
+        "Core migration tracking checkpoint initialized",
+        "PENDING",
+    )
+    assert recovered_records[2] == (
+        "Transactional replication loop completed",
+        "SUCCESS",
+    )

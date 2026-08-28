@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 test_version_check.py
 ---------------------
@@ -32,12 +54,8 @@ if "src" not in sys.modules:
     _src_stub.__path__ = [str(pathlib.Path(__file__).parent.parent.parent / "src")]
     sys.modules["src"] = _src_stub
 
-_VERSION_MOD_PATH = (
-    pathlib.Path(__file__).parent.parent.parent / "src" / "version.py"
-)
-_version_spec = importlib.util.spec_from_file_location(
-    "src.version", _VERSION_MOD_PATH
-)
+_VERSION_MOD_PATH = pathlib.Path(__file__).parent.parent.parent / "src" / "version.py"
+_version_spec = importlib.util.spec_from_file_location("src.version", _VERSION_MOD_PATH)
 _version_mod = importlib.util.module_from_spec(_version_spec)  # type: ignore[arg-type]
 sys.modules.setdefault("src.version", _version_mod)
 _version_spec.loader.exec_module(_version_mod)  # type: ignore[union-attr]

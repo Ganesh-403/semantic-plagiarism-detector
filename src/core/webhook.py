@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/core/webhook.py
 -------------------
@@ -36,10 +58,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from src.security.ssrf_protector import (
-    SSRFProtector,
-    SSRFSecurityException,
-)
+from src.security.ssrf_protector import SSRFProtector, SSRFSecurityException
 
 logger = logging.getLogger(__name__)
 
@@ -398,13 +417,13 @@ def dispatch_plagiarism_alert(
     webhook_url: str | None = None,
 ) -> bool:
     """Dispatch a plagiarism alert payload to the configured webhook endpoint.
-    
+
     Args:
         doc_a: Name of the first student document.
         doc_b: Name of the second student document.
         similarity: Cosine similarity score between 0.0 and 1.0.
         webhook_url: Optional explicit webhook URL to override the environment variable.
-        
+
     Returns:
         True if the alert was successfully delivered, False otherwise.
     """
@@ -600,4 +619,3 @@ class EventDispatcher:
             webhook_url=webhook_url,
             lms_id=lms_id,
         )
-

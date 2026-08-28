@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/db/obfuscation_logs_db.py
 -----------------------------
@@ -8,12 +30,12 @@ detector, allowing administrators to review patterns of cheating and
 identify repeat offenders.
 """
 
-import sqlite3
 import logging
-from pathlib import Path
-from typing import List, Dict, Any, Optional
+import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -60,13 +82,13 @@ def initialize_obfuscation_db(db_path: Optional[Path] = None) -> None:
 
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_obfuscation_user 
+            CREATE INDEX IF NOT EXISTS idx_obfuscation_user
             ON obfuscation_logs(user_id)
         """
         )
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_obfuscation_hash 
+            CREATE INDEX IF NOT EXISTS idx_obfuscation_hash
             ON obfuscation_logs(document_hash)
         """
         )
@@ -91,8 +113,8 @@ def log_obfuscation_attempt(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO obfuscation_logs 
-                (document_id, document_hash, user_id, obfuscation_score, 
+                INSERT INTO obfuscation_logs
+                (document_id, document_hash, user_id, obfuscation_score,
                  zero_width_count, homoglyph_count, flagged_indices_count, detected_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
@@ -121,9 +143,9 @@ def get_user_obfuscation_history(
         with get_connection(db_path) as conn:
             cursor = conn.execute(
                 """
-                SELECT * FROM obfuscation_logs 
-                WHERE user_id = ? 
-                ORDER BY detected_at DESC 
+                SELECT * FROM obfuscation_logs
+                WHERE user_id = ?
+                ORDER BY detected_at DESC
                 LIMIT ?
                 """,
                 (user_id, limit),
@@ -132,14 +154,17 @@ def get_user_obfuscation_history(
     except sqlite3.Error as e:
         logger.error("Failed to fetch obfuscation history for user %s: %s", user_id, e)
         return []
+
+
 import json
 from datetime import datetime
+
 
 # Implements mock connection context hooks; swap out for your active ORM/Supabase adapter seamlessly
 def log_obfuscation_incident(incident_data: dict) -> bool:
     """
     Saves flagged evasion attempts into the 'obfuscation_incidents' schema.
-    
+
     Expected Database Table Structure:
     CREATE TABLE obfuscation_incidents (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -157,7 +182,7 @@ def log_obfuscation_incident(incident_data: dict) -> bool:
             "document_hash": incident_data["document_hash"],
             "obfuscation_score": incident_data["obfuscation_score"],
             "patterns_json": json.dumps(incident_data["patterns_found"]),
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": datetime.utcnow().isoformat(),
         }
         # print(f"Saving security incident row: {record}")
         return True

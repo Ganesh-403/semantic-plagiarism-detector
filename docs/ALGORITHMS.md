@@ -1,16 +1,19 @@
 # NLP Architecture & Similarity Algorithm Guide
 
 ## Overview
+
 (explain the app scores every document pair using two independent signals —
  lexical and semantic — then blends them into one hybrid score)
 
 ## Document Chunking (src/core/text_chunking.py)
+
 Before embedding, documents are split into smaller chunks. See
 [CHUNKING_STRATEGIES.md](CHUNKING_STRATEGIES.md) for a full comparison of the
 three available chunking strategies (`chunk_text`, `chunk_by_sentences`,
 `chunk_text_dynamic`), their parameters, and when to use each.
 
 ## Lexical Similarity (src/core/lexical_similarity.py)
+
 - Jaccard similarity formula: |A ∩ B| / |A ∪ B| over stop-word-filtered
   token sets (see jaccard_similarity())
 - TF-IDF + Cosine similarity: the production path used in
@@ -21,6 +24,7 @@ three available chunking strategies (`chunk_text`, `chunk_by_sentences`,
   can't inflate the score (issue #222)
 
 ## Semantic Similarity (src/core/embedding_model.py + similarity.py)
+
 - Model: paraphrase-multilingual-MiniLM-L12-v2, 384-dimensional embeddings
 - Embeddings are L2-normalized at encode time, so cosine similarity reduces
   to a plain dot product (explain why that matters for speed)
@@ -30,11 +34,13 @@ three available chunking strategies (`chunk_text`, `chunk_by_sentences`,
   (chunk_max_similarity()) — used to catch localized/partial plagiarism
 
 ## Hybrid Score (hybrid_similarity_matrix())
+
 - Formula: hybrid = w × semantic + (1 - w) × lexical, default w = 0.7
 - Explain why semantic is weighted higher (catches paraphrasing, not just
   copy-paste) and give a worked numeric example
 
 ## FAISS ANN Index (src/core/faiss_index.py)
+
 - Vector dimension: 384 (must match the embedding model's output)
 - IndexFlatIP: exact brute-force inner-product search, used when
   vector count < 5,000 (the _IVF_THRESHOLD constant)
@@ -44,11 +50,13 @@ three available chunking strategies (`chunk_text`, `chunk_by_sentences`,
   reason as above)
 
 ## Severity Tiers (src/core/config.py)
+
 - Table of the three boundaries: plagiarism (0.59), medium (0.75), high (0.90)
 - Explain severity_from_score() logic: below plagiarism → Low (not flagged),
   plagiarism–medium → Low (flagged), medium–high → Medium, ≥ high → High
 
 ## AI-Generated Text Detection (src/core/ai_detector.py)
+
 The app also scores text for likely AI generation, independent of the
 plagiarism-similarity pipeline above. See
 [AI_DETECTION.md](AI_DETECTION.md) for the full breakdown of the five
@@ -56,5 +64,6 @@ metrics used, the confidence tier thresholds, and how the signals are
 combined.
 
 ## Extending the Algorithm
+
 (short code example: how to plug in a new similarity signal or change the
  hybrid weight w)

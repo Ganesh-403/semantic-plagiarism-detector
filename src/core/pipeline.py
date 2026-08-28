@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Document Execution Pipeline Module.
 
@@ -15,19 +37,10 @@ import pandas as pd
 import streamlit as st
 
 from src.core.ai_detector import detect_documents_ai_probability
-from src.core.document_parser import (
-    extract_text,
-    prepare_text_for_embedding,
-)
+from src.core.document_parser import extract_text, prepare_text_for_embedding
 from src.core.embedding_model import embed_chunks, embed_documents
-from src.core.faiss_index import (
-    build_index,
-    build_index_from_matrix,
-)
-from src.core.similarity import (
-    cosine_similarity,
-    document_similarity_matrix,
-)
+from src.core.faiss_index import build_index, build_index_from_matrix
+from src.core.similarity import cosine_similarity, document_similarity_matrix
 from src.core.text_chunking import chunk_documents
 
 logger = logging.getLogger(__name__)
@@ -47,10 +60,10 @@ class ChunkRecord:
 PipelineChunkRecord = ChunkRecord
 
 
-
 # ============================================================================
 # CROSS-LINGUAL INTEGRATION
 # ============================================================================
+
 
 def _get_cross_lingual_mode() -> bool:
     """Get cross-lingual mode from session state."""
@@ -61,12 +74,11 @@ def _get_cross_lingual_mode() -> bool:
 
 
 def _process_chunks_cross_lingual(
-    chunked_docs: dict[str, list[str]],
-    cross_lingual_mode: bool = False
+    chunked_docs: dict[str, list[str]], cross_lingual_mode: bool = False
 ) -> tuple[dict[str, list[str]], dict[str, list[dict[str, Any]]]]:
     """
     Process chunks with cross-lingual translation if enabled.
-    
+
     Returns:
         Tuple of (processed_chunks, metadata)
     """
@@ -74,12 +86,15 @@ def _process_chunks_cross_lingual(
         # Return original chunks with empty metadata
         metadata = {doc_name: [] for doc_name in chunked_docs}
         return chunked_docs, metadata
-    
+
     try:
         from src.core.cross_lingual import prepare_documents_for_embedding
+
         return prepare_documents_for_embedding(chunked_docs)
     except ImportError:
-        logger.warning("Cross-lingual module not available. Falling back to standard processing.")
+        logger.warning(
+            "Cross-lingual module not available. Falling back to standard processing."
+        )
         metadata = {doc_name: [] for doc_name in chunked_docs}
         return chunked_docs, metadata
 
@@ -87,6 +102,7 @@ def _process_chunks_cross_lingual(
 # ============================================================================
 # MAIN PIPELINE FUNCTIONS
 # ============================================================================
+
 
 def run_pipeline(
     file_bytes_dict: dict,
@@ -189,22 +205,22 @@ def run_pipeline(
     if cross_lingual_mode and chunked_docs:
         try:
             from src.core.cross_lingual import prepare_documents_for_embedding
-            
+
             # Convert chunked_docs to dict format
             doc_chunks = {}  # noqa: F841
             for doc_name, chunks in zip(file_bytes_dict.keys(), [chunked_docs]):
                 # Rebuild document chunks
                 pass
-            
+
             # Process with cross-lingual
             logger.info("Processing chunks with cross-lingual translation...")
             translated_docs, metadata = prepare_documents_for_embedding(
                 {name: [] for name in file_bytes_dict.keys()}
             )
-            
+
             # Store metadata for later use
             translation_metadata = metadata
-            
+
         except ImportError as e:
             logger.warning(f"Cross-lingual module unavailable: {e}")
     # ===================================
@@ -310,24 +326,28 @@ def run_extraction_pipeline(
     chunked_docs = chunk_documents(
         raw_texts_dict, chunk_size=chunk_size, chunk_overlap=chunk_overlap
     )
-    
+
     # ===== CROSS-LINGUAL PROCESSING =====
     translation_metadata = {}
-    
+
     if cross_lingual_mode:
         try:
             from src.core.cross_lingual import prepare_documents_for_embedding
-            
+
             logger.info("Processing documents with cross-lingual translation...")
-            translated_chunked_docs, metadata = prepare_documents_for_embedding(chunked_docs)
-            
+            translated_chunked_docs, metadata = prepare_documents_for_embedding(
+                chunked_docs
+            )
+
             # Store metadata for UI
             translation_metadata = metadata
-            
+
             # Use translated chunks for embedding
             processed_chunked_docs = translated_chunked_docs
-            logger.info(f"Cross-lingual processing complete for {len(processed_chunked_docs)} documents")
-            
+            logger.info(
+                f"Cross-lingual processing complete for {len(processed_chunked_docs)} documents"
+            )
+
         except ImportError as e:
             logger.warning(f"Cross-lingual module unavailable: {e}")
             # Fallback to standard processing
@@ -335,7 +355,9 @@ def run_extraction_pipeline(
             for doc_name, chunks in chunked_docs.items():
                 processed_chunked_docs[doc_name] = []
                 for chunk in chunks:
-                    prepared = prepare_text_for_embedding(chunk.text if hasattr(chunk, "text") else chunk)
+                    prepared = prepare_text_for_embedding(
+                        chunk.text if hasattr(chunk, "text") else chunk
+                    )
                     processed_chunked_docs[doc_name].append(prepared["embedding_text"])
     else:
         # Standard processing without translation
@@ -343,7 +365,9 @@ def run_extraction_pipeline(
         for doc_name, chunks in chunked_docs.items():
             processed_chunked_docs[doc_name] = []
             for chunk in chunks:
-                prepared = prepare_text_for_embedding(chunk.text if hasattr(chunk, "text") else chunk)
+                prepared = prepare_text_for_embedding(
+                    chunk.text if hasattr(chunk, "text") else chunk
+                )
                 processed_chunked_docs[doc_name].append(prepared["embedding_text"])
     # ===================================
 

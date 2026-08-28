@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """Tests for scanned and mixed PDF OCR fallback."""
 
 import io
@@ -115,11 +137,22 @@ def test_ocr_pdf_page_oom(mock_check_ocr):
     mock_fitz = MagicMock()
     mock_fitz.open.return_value.__enter__.return_value = mock_doc
     mock_pytesseract = MagicMock()
-    mock_pytesseract.TesseractNotFoundError = type("TesseractNotFoundError", (Exception,), {})
-    mock_pytesseract.image_to_string.side_effect = MemoryError("Out of memory mock error")
+    mock_pytesseract.TesseractNotFoundError = type(
+        "TesseractNotFoundError", (Exception,), {}
+    )
+    mock_pytesseract.image_to_string.side_effect = MemoryError(
+        "Out of memory mock error"
+    )
 
-
-    with patch.dict("sys.modules", {"fitz": mock_fitz, "pytesseract": mock_pytesseract, "PIL": MagicMock(), "PIL.Image": MagicMock()}):
+    with patch.dict(
+        "sys.modules",
+        {
+            "fitz": mock_fitz,
+            "pytesseract": mock_pytesseract,
+            "PIL": MagicMock(),
+            "PIL.Image": MagicMock(),
+        },
+    ):
         res = _ocr_pdf_page(b"%PDF-1.4", 0)
         assert "[OCR extraction failed for page 0]" in res
 
@@ -132,12 +165,16 @@ def test_extract_text_from_image_oom(mock_check_ocr):
     mock_image = MagicMock()
     mock_image.open.return_value = mock_img
     mock_pytesseract = MagicMock()
-    mock_pytesseract.image_to_string.side_effect = MemoryError("Out of memory mock error")
+    mock_pytesseract.image_to_string.side_effect = MemoryError(
+        "Out of memory mock error"
+    )
 
-    with patch.dict("sys.modules", {"pytesseract": mock_pytesseract, "PIL": MagicMock(), "PIL.Image": mock_image}):
+    with patch.dict(
+        "sys.modules",
+        {"pytesseract": mock_pytesseract, "PIL": MagicMock(), "PIL.Image": mock_image},
+    ):
         res = extract_text_from_image(b"fake image bytes")
         assert "[OCR extraction failed for the file]" in res
-
 
 
 def test_check_ocr_dependencies_success():
@@ -145,7 +182,15 @@ def test_check_ocr_dependencies_success():
     mock_pytesseract = MagicMock()
     mock_pytesseract.get_tesseract_version.return_value = "5.0.0"
 
-    with patch.dict("sys.modules", {"fitz": MagicMock(), "pytesseract": mock_pytesseract, "PIL": MagicMock(), "PIL.Image": MagicMock()}):
+    with patch.dict(
+        "sys.modules",
+        {
+            "fitz": MagicMock(),
+            "pytesseract": mock_pytesseract,
+            "PIL": MagicMock(),
+            "PIL.Image": MagicMock(),
+        },
+    ):
         check_ocr_dependencies()
 
 
@@ -160,10 +205,18 @@ def test_check_ocr_dependencies_missing_tesseract_binary():
     """Verify check_ocr_dependencies raises OCRDependencyError when Tesseract binary is missing."""
     mock_pytesseract = MagicMock()
     mock_pytesseract.TesseractNotFoundError = Exception
-    mock_pytesseract.get_tesseract_version.side_effect = Exception("Tesseract not found")
+    mock_pytesseract.get_tesseract_version.side_effect = Exception(
+        "Tesseract not found"
+    )
 
-    with patch.dict("sys.modules", {"fitz": MagicMock(), "pytesseract": mock_pytesseract, "PIL": MagicMock(), "PIL.Image": MagicMock()}):
+    with patch.dict(
+        "sys.modules",
+        {
+            "fitz": MagicMock(),
+            "pytesseract": mock_pytesseract,
+            "PIL": MagicMock(),
+            "PIL.Image": MagicMock(),
+        },
+    ):
         with pytest.raises(OCRDependencyError, match="Tesseract OCR was not found"):
             check_ocr_dependencies()
-
-

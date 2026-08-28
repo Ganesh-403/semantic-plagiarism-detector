@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import io
 
 import docx
@@ -51,7 +73,7 @@ def test_docx_headings_extraction_and_chunking():
         elif "deeply nested third section" in chunk:
             assert chunk.metadata.get("section_title") == "### Heading 3 Title"
             found_heading_3 = True
-            
+
     assert found_heading_2
     assert found_heading_3
 
@@ -88,6 +110,7 @@ def test_extract_text_from_docx_with_tables():
     from src.core.parsers.docx_parser import (
         extract_text_from_docx as parser_extract_docx,
     )
+
     # Create an in-memory DOCX file with a 2x2 table
     doc = docx.Document()
     table = doc.add_table(rows=2, cols=2)
@@ -116,5 +139,3 @@ def test_extract_text_from_docx_with_tables():
     assert "Cell 1,2 Text" in parsed_text_2.text
     assert "Cell 2,1 Text" in parsed_text_2.text
     assert "Cell 2,2 Text" in parsed_text_2.text
-
-        

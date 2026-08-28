@@ -1,6 +1,6 @@
 # .streamlit/config.toml
 # Streamlit server and UI configuration.
-# 
+#
 # Issue #2926: Prevent RAM spikes on massive file uploads.
 # By default, Streamlit's st.file_uploader reads the entire file into server memory.
 # A malicious or accidental upload of massive files (e.g., 10x 100MB PDFs) can

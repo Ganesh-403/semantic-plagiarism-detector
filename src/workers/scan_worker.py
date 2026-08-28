@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/workers/scan_worker.py
 --------------------------
@@ -79,13 +101,16 @@ def execute_scan_job(payload: dict[str, Any]) -> dict[str, Any]:
         try:
             files_bytes[name] = base64.b64decode(b64_data)
         except Exception as exc:
-            raise ValueError(f"Failed to decode base64 for file '{name}': {exc}") from exc
+            raise ValueError(
+                f"Failed to decode base64 for file '{name}': {exc}"
+            ) from exc
 
     # Step 1: Extract text from each file.
     raw_texts: dict[str, str] = {}
     for name, data in files_bytes.items():
         try:
             from src.core.document_parser import extract_text
+
             extracted = extract_text(data, name)
             if extracted and extracted.strip():
                 raw_texts[name] = extracted
@@ -98,6 +123,7 @@ def execute_scan_job(payload: dict[str, Any]) -> dict[str, Any]:
 
     # Step 2: Chunk documents.
     from src.core.text_chunking import chunk_documents
+
     chunked: dict[str, list[str]] = chunk_documents(
         raw_texts,
         chunk_size=chunk_size,
@@ -114,6 +140,7 @@ def execute_scan_job(payload: dict[str, Any]) -> dict[str, Any]:
 
     # Step 3: Embed chunks.
     from src.core.embedding_model import embed_chunks
+
     embeddings: np.ndarray = embed_chunks(all_chunks)
 
     # Step 4: Compute pairwise similarity (if ≥2 docs).
@@ -123,6 +150,7 @@ def execute_scan_job(payload: dict[str, Any]) -> dict[str, Any]:
     if len(raw_texts) >= 2:
         try:
             from src.core.similarity import document_similarity_matrix
+
             doc_names = list(raw_texts.keys())
             doc_embeddings: list[np.ndarray] = []
             offset = 0
@@ -161,12 +189,12 @@ class ScanWorker:
 
     def __init__(
         self,
-        worker_id: Optional[str] = None,
-        queue: Optional[TaskQueue] = None,
+        worker_id: str | None = None,
+        queue: TaskQueue | None = None,
     ) -> None:
         self.worker_id = worker_id or f"scan-worker-{threading.get_ident()}"
         self._queue = queue or get_default_queue()
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
 
     def start(self) -> None:
@@ -211,6 +239,7 @@ class ScanWorker:
 
 
 # ── CLI entry point ────────────────────────────────────────────
+
 
 def main() -> None:
     """Run a standalone scan worker process.

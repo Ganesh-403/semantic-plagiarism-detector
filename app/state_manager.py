@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Streamlit App State Manager.
 
@@ -8,13 +30,12 @@ and UI exception wrapping.
 
 import functools
 import logging
+import multiprocessing
 import os
 import threading
 import time
 import traceback
 import uuid
-import os
-import multiprocessing
 from datetime import datetime
 
 import streamlit as st
@@ -96,7 +117,8 @@ def get_active_sessions_count() -> int:
                 fallback_keys = [
                     k
                     for k in list(fallback_dict.keys())
-                    if k.startswith("spd:v1:session:") and k.endswith(":last_interaction")
+                    if k.startswith("spd:v1:session:")
+                    and k.endswith(":last_interaction")
                 ]
                 for k in fallback_keys:
                     if k not in keys:
@@ -135,7 +157,6 @@ def get_active_sessions_count() -> int:
 
 def _start_api_server():
     import uvicorn
-
     from starlette.middleware.base import BaseHTTPMiddleware
 
     from src.api.app import app as fastapi_app
@@ -201,7 +222,7 @@ def _run_backup_daemon():
             cache = get_cache()
             timeout = get_backup_idle_timeout()
             now = time.time()
-            
+
             # Establish a safe startup state: wait for at least one timeout interval
             # after daemon startup before allowing ANY backups to trigger.
             # We track this explicit condition rather than using an arbitrary sleep/continue.
@@ -280,6 +301,7 @@ def init_backup_daemon():
 def init_session_state():
     """Initialize session state keys and global background services."""
     import app.session_manager as sm
+
     st.session_state[SessionKeys.SESSION_ID] = sm.initialize_and_verify_session()
 
     if SessionKeys.AUTHENTICATED not in st.session_state:
@@ -432,4 +454,3 @@ def reset_analysis_data() -> None:
 def reset_analysis_state() -> None:
     """Alias for reset_analysis_data() to preserve authentication state while clearing document analysis."""
     reset_analysis_data()
-

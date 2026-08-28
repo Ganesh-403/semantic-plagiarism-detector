@@ -1,13 +1,35 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Enterprise Neural Code Clone & Semantic AST Hashing Service
 Detects Type-1 (exact), Type-2 (renamed identifiers), Type-3 (gapped/modified statements),
 and Type-4 (semantic equivalent algorithms) source code plagiarism across multi-language repositories.
 """
 
-import math
 import hashlib
+import math
 import re
-from typing import List, Dict, Any, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 
 class NeuralCodeCloneDetector:
@@ -43,9 +65,33 @@ class NeuralCodeCloneDetector:
     def _extract_ast_structural_tokens(self, code: str) -> list[str]:
         """Extracts structural AST tokens while stripping comments and identifier variable names."""
         keywords = {
-            "def", "class", "return", "if", "else", "elif", "for", "while", "import", "from",
-            "try", "except", "finally", "with", "as", "raise", "break", "continue", "pass",
-            "function", "const", "let", "var", "public", "private", "protected", "static",
+            "def",
+            "class",
+            "return",
+            "if",
+            "else",
+            "elif",
+            "for",
+            "while",
+            "import",
+            "from",
+            "try",
+            "except",
+            "finally",
+            "with",
+            "as",
+            "raise",
+            "break",
+            "continue",
+            "pass",
+            "function",
+            "const",
+            "let",
+            "var",
+            "public",
+            "private",
+            "protected",
+            "static",
         }
         tokens = []
         for line in code.splitlines():
@@ -53,7 +99,7 @@ class NeuralCodeCloneDetector:
             if not clean_line:
                 continue
 
-            words = re.findall(r'\b\w+\b|[^\w\s]', clean_line)
+            words = re.findall(r"\b\w+\b|[^\w\s]", clean_line)
             for word in words:
                 if word in keywords:
                     tokens.append(f"KW_{word.upper()}")
@@ -86,19 +132,31 @@ class NeuralCodeCloneDetector:
             jaccard_similarity = round(intersection / union, 4)
 
             if jaccard_similarity >= self.similarity_threshold:
-                clone_type = "TYPE_1_EXACT" if jaccard_similarity > 0.95 else (
-                    "TYPE_2_RENAMED" if jaccard_similarity > 0.88 else "TYPE_3_MODIFIED"
+                clone_type = (
+                    "TYPE_1_EXACT"
+                    if jaccard_similarity > 0.95
+                    else (
+                        "TYPE_2_RENAMED"
+                        if jaccard_similarity > 0.88
+                        else "TYPE_3_MODIFIED"
+                    )
                 )
 
-                clone_matches.append({
-                    "matchedFileId": file_id,
-                    "matchedFilePath": repo["filePath"],
-                    "jaccardSimilarityScore": jaccard_similarity,
-                    "detectedCloneType": clone_type,
-                    "confidenceGrade": "CRITICAL" if jaccard_similarity > 0.90 else "HIGH",
-                })
+                clone_matches.append(
+                    {
+                        "matchedFileId": file_id,
+                        "matchedFilePath": repo["filePath"],
+                        "jaccardSimilarityScore": jaccard_similarity,
+                        "detectedCloneType": clone_type,
+                        "confidenceGrade": (
+                            "CRITICAL" if jaccard_similarity > 0.90 else "HIGH"
+                        ),
+                    }
+                )
 
-        return sorted(clone_matches, key=lambda x: x["jaccardSimilarityScore"], reverse=True)
+        return sorted(
+            clone_matches, key=lambda x: x["jaccardSimilarityScore"], reverse=True
+        )
 
 
 # ==============================================================================
