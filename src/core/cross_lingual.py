@@ -46,7 +46,14 @@ logger = logging.getLogger(__name__)
 DetectorFactory.seed = 0
 
 ENGLISH_CODES = {"en"}
-MIN_DETECTION_CHARACTERS = 20
+
+# Configurable minimum character threshold for language detection.
+# For short titles or math formulas, the default 20 may be too long,
+# defaulting non-English text to English.
+try:
+    MIN_DETECTION_CHARACTERS: int = int(os.getenv("MIN_LANGUAGE_DETECTION_CHARS", "20"))
+except (TypeError, ValueError):
+    MIN_DETECTION_CHARACTERS = 20
 
 # Target language for back-translation (primary corpus language)
 TARGET_LANGUAGE = "en"
