@@ -38,11 +38,14 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install ruff pylint mypy pip-audit pytest pytest-cov yamllint
+          pip install ruff pylint mypy pip-audit pytest pytest-cov pre-commit yamllint
           # Pre-install numpy<2.5.0 so pip's resolver doesn't try to pull
           # numpy 2.5.x (which requires Python >=3.12) on Python 3.9-3.11.
           pip install "numpy>=1.26.0,<2.5.0"
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run pre-commit
+        run: pre-commit run --all-files
 
       - name: Run YAML Linter (yamllint)
         run: |
@@ -104,7 +107,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12']
+         python-version: ['3.10', '3.11', '3.12', '3.13']
 
     steps:
       - name: Checkout repository
@@ -119,6 +122,15 @@ jobs:
           cache: 'pip'
           # Issue #695 Implementation: Enabling pip cache
           cache-dependency-path: '**/requirements*.txt'
+
+      # Issue #3483: Cache HuggingFace transformer model weights
+      - name: Cache HuggingFace Hub
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface/hub
+          key: ${{ runner.os }}-hf-paraphrase-multilingual-MiniLM-L12-v2-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-hf-paraphrase-multilingual-MiniLM-L12-v2-
 
       - name: Install dependencies
         run: |

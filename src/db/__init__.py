@@ -47,6 +47,8 @@ from .corpus_db import (
     get_total_document_count,
     get_unique_class_sections,
     init_corpus_db,
+    restore_document,
+    soft_delete_document,
 )
 from .incidents import (
     IncidentsRepository,
@@ -55,6 +57,8 @@ from .incidents import (
     get_recent_incidents,
     log_incident,
     bulk_update_incident_status,
+    add_false_positive,
+    dismiss_incident,
 )
 
 __all__ = [
@@ -90,6 +94,8 @@ __all__ = [
     "add_document",
     "get_document_by_hash",
     "get_all_documents",
+    "soft_delete_document",
+    "restore_document",
     "get_total_document_count",
     "get_deleted_documents_count",
     "get_documents_by_class",
@@ -107,6 +113,8 @@ __all__ = [
     "get_recent_incidents",
     "log_incident",
     "bulk_update_incident_status",
+    "add_false_positive",
+    "dismiss_incident",
 ]
 
 

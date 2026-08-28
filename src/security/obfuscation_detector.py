@@ -121,6 +121,11 @@ def detect_homoglyphs(text: str) -> tuple[int, list[int]]:
 def detect_control_chars(text: str) -> tuple[int, list[int]]:
     """Identify invisible Unicode control characters (categories Cc and Cf).
 
+    Characters already reported by :func:`detect_zero_width_chars` are excluded.
+    Every member of ``ZERO_WIDTH_PATTERN`` is also category Cf, so counting them
+    here as well would report each one twice and make the three counts on an
+    ObfuscationReport sum to more than the document's length.
+
     Args:
         text: The input text to scan.
 
@@ -130,6 +135,9 @@ def detect_control_chars(text: str) -> tuple[int, list[int]]:
     count = 0
     indices = []
     for i, char in enumerate(text):
+        if ZERO_WIDTH_PATTERN.match(char):
+            # Already accounted for as a zero-width character.
+            continue
         category = unicodedata.category(char)
         # Cc = Control, Cf = Format (excluding standard whitespace like \n, \t)
         if category in ("Cc", "Cf") and char not in ("\n", "\r", "\t"):
@@ -138,11 +146,24 @@ def detect_control_chars(text: str) -> tuple[int, list[int]]:
     return count, indices
 
 
+# Per-signal weights applied to the density of each obfuscation pattern.
+ZERO_WIDTH_WEIGHT = 10
+HOMOGLYPH_WEIGHT = 15
+CONTROL_CHAR_WEIGHT = 12
+
+# Ceiling on the density term. High enough that a saturated document clears any
+# realistic suspicion threshold on density alone, while leaving room for the
+# absolute penalties below to push a document the rest of the way to 1.0.
+MAX_DENSITY_SCORE = 0.8
+
+
 def calculate_obfuscation_score(report: ObfuscationReport) -> float:
     """Calculate a normalized obfuscation score between 0.0 and 1.0.
 
     The score is weighted based on the severity and density of the
-    obfuscation patterns relative to the total text length.
+    obfuscation patterns relative to the total text length. All three
+    detected signals contribute: zero-width characters, Cyrillic homoglyphs,
+    and invisible control characters.
 
     Args:
         report: The populated ObfuscationReport object.
@@ -153,20 +174,27 @@ def calculate_obfuscation_score(report: ObfuscationReport) -> float:
     if report.total_characters == 0:
         return 0.0
 
-    # Weighted density calculation
-    # Zero-width and homoglyphs are high severity
+    # Weighted density calculation.
+    # Zero-width, homoglyphs and control characters are all high severity.
     zw_density = report.zero_width_count / report.total_characters
     hg_density = report.homoglyph_count / report.total_characters
+    ctrl_density = report.control_char_count / report.total_characters
 
-    # Base score from densities (capped at 0.5)
-    base_score = min(0.5, (zw_density * 10) + (hg_density * 15))
+    base_score = min(
+        MAX_DENSITY_SCORE,
+        (zw_density * ZERO_WIDTH_WEIGHT)
+        + (hg_density * HOMOGLYPH_WEIGHT)
+        + (ctrl_density * CONTROL_CHAR_WEIGHT),
+    )
 
-    # Absolute threshold penalty: if there are > 10 zero-width chars,
-    # it's highly suspicious regardless of text length
+    # Absolute threshold penalty: a large raw count is suspicious regardless of
+    # how long the surrounding document is.
     absolute_penalty = 0.0
     if report.zero_width_count > 10:
-        absolute_penalty = 0.3
+        absolute_penalty += 0.3
     if report.homoglyph_count > 5:
+        absolute_penalty += 0.2
+    if report.control_char_count > 10:
         absolute_penalty += 0.2
 
     final_score = min(1.0, base_score + absolute_penalty)

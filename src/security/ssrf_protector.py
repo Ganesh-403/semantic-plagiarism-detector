@@ -61,6 +61,13 @@ RESTRICTED_IPV4_CIDR_BLOCKS: tuple[str, ...] = (
     "192.168.0.0/16",
 )
 
+RESTRICTED_IPV6_CIDR_BLOCKS: tuple[str, ...] = (
+    "::1/128",
+    "fc00::/7",
+    "fe80::/10",
+    "ff00::/8",
+)
+
 
 def is_ip_in_cidr_block(ip_str: str, cidr_block: str) -> bool:
     """Return whether an IP address belongs to a CIDR network under strict typing."""
@@ -112,6 +119,28 @@ def get_allowed_webhook_domains() -> list[str]:
     return _configured_domains()
 
 
+def get_user_agent(user_agent: Optional[str] = None) -> str:
+    """Return a validated User-Agent for outbound SSRF validation requests.
+
+    An explicit ``user_agent`` takes precedence. When it is omitted, the
+    ``SSRF_USER_AGENT`` environment variable is used, falling back to
+    ``DEFAULT_USER_AGENT``. CR/LF characters are rejected to prevent HTTP
+    header injection.
+    """
+    configured_user_agent = (
+        user_agent
+        if user_agent is not None
+        else os.getenv("SSRF_USER_AGENT", DEFAULT_USER_AGENT)
+    )
+
+    if "\r" in configured_user_agent or "\n" in configured_user_agent:
+        raise SSRFSecurityException(
+            "User-Agent must not contain carriage return or line feed characters"
+        )
+
+    return configured_user_agent
+
+
 class SSRFSecurityException(Exception):
     """Raised when a Webhook URL fails SSRF security checks."""
 
@@ -126,6 +155,7 @@ class SSRFProtector:
     DNS_CACHE_TTL_SECONDS: int = 300
     DNS_CACHE_MAX_SIZE: int = 1000
     RESTRICTED_IPV4_CIDR_BLOCKS: tuple[str, ...] = RESTRICTED_IPV4_CIDR_BLOCKS
+    RESTRICTED_IPV6_CIDR_BLOCKS: tuple[str, ...] = RESTRICTED_IPV6_CIDR_BLOCKS
     MAX_REDIRECT_DEPTH: int = 5
     DEFAULT_USER_AGENT: str = DEFAULT_USER_AGENT
 
@@ -326,6 +356,26 @@ class SSRFProtector:
             raise SSRFSecurityException(SSRF_INVALID_IP_FORMAT.format(error=e))
 
         if ip.version == 6:
+            for cidr_block in cls.RESTRICTED_IPV6_CIDR_BLOCKS:
+                if is_ip_in_cidr_block(ip_str, cidr_block):
+                    if cidr_block == "::1/128":
+                        raise SSRFSecurityException(
+                            SSRF_BLOCKED_LOOPBACK.format(ip=ip_str)
+                        )
+                    if cidr_block == "fc00::/7":
+                        raise SSRFSecurityException(
+                            SSRF_BLOCKED_PRIVATE.format(ip=ip_str)
+                        )
+                    if cidr_block == "fe80::/10":
+                        raise SSRFSecurityException(
+                            SSRF_BLOCKED_LINK_LOCAL.format(ip=ip_str)
+                        )
+                    if cidr_block == "ff00::/8":
+                        raise SSRFSecurityException(
+                            SSRF_BLOCKED_MULTICAST.format(ip=ip_str)
+                        )
+
+        if ip.version == 6:
             mapped = getattr(ip, "ipv4_mapped", None)
             if mapped is not None:
                 ip = mapped
@@ -400,13 +450,14 @@ class SSRFProtector:
         cls,
         url: str,
         allowed_domains: Optional[list[str]] = None,
-        user_agent: str = DEFAULT_USER_AGENT,
+        user_agent: Optional[str] = None,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
     ) -> bool:
+        resolved_user_agent = get_user_agent(user_agent)
         cls._validate_url_target(url, allowed_domains=allowed_domains)
 
         try:
-            cls._make_validation_request(url, user_agent, timeout)
+            cls._make_validation_request(url, resolved_user_agent, timeout)
         except Exception as e:
             logger.debug(f"Outgoing HTTP validation request failed for {url}: {e}")
 
@@ -417,11 +468,12 @@ class SSRFProtector:
         cls,
         current_url: str,
         allowed_domains: Optional[list[str]] = None,
-        user_agent: str = DEFAULT_USER_AGENT,
+        user_agent: Optional[str] = None,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
     ) -> Optional[str]:
+        resolved_user_agent = get_user_agent(user_agent)
         cls._validate_url_target(current_url, allowed_domains=allowed_domains)
-        response = cls._make_validation_request(current_url, user_agent, timeout)
+        response = cls._make_validation_request(current_url, resolved_user_agent, timeout)
 
         if response.status_code in REDIRECT_STATUS_CODES:
             location = response.headers.get("Location")
@@ -435,9 +487,10 @@ class SSRFProtector:
         url: str,
         allowed_domains: Optional[list[str]] = None,
         max_redirects: Optional[int] = None,
-        user_agent: str = DEFAULT_USER_AGENT,
+        user_agent: Optional[str] = None,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
     ) -> tuple[str, str]:
+        resolved_user_agent = get_user_agent(user_agent)
         if max_redirects is None:
             max_redirects = cls.MAX_REDIRECT_DEPTH
 
@@ -450,7 +503,7 @@ class SSRFProtector:
             next_url = cls._check_redirect_depth(
                 current_url,
                 allowed_domains=allowed_domains,
-                user_agent=user_agent,
+                user_agent=resolved_user_agent,
                 timeout=timeout,
             )
             if next_url is None:

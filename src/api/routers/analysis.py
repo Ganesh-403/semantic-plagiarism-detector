@@ -169,6 +169,36 @@ def _process_scan_job(
         scan_jobs[job_id]["progress_percent"] = 40
         scan_jobs[job_id]["stage"] = "chunking"
 
+        if isinstance(file_input, (str, os.PathLike)) and os.path.exists(file_input):
+            file_hash = calculate_file_sha256(str(file_input))
+            existing_doc_filename = get_document_by_hash(file_hash)
+            if existing_doc_filename:
+                scan_jobs[job_id]["status"] = "completed"
+                scan_jobs[job_id]["progress_percent"] = 100
+                scan_jobs[job_id]["stage"] = "done"
+                scan_jobs[job_id]["completed_at"] = datetime.now(timezone.utc).isoformat()
+                scan_jobs[job_id]["result"] = {
+                    "filename": filename,
+                    "word_count": word_count,
+                    "chunk_count": len(chunks),
+                    "plagiarism_flagged": True,
+                    "threshold_used": threshold,
+                    "plagiarism_density": 100,
+                    "overall_document_similarity": 1.0,
+                    "max_chunk_similarity": 1.0,
+                    "matched_documents_count": 1,
+                    "matched_documents": [
+                        {
+                            "filename": existing_doc_filename,
+                            "document_similarity_score": 1.0,
+                            "max_chunk_similarity_score": 1.0,
+                            "severity": "🔴 High",
+                            "flagged_chunks": [],
+                        }
+                    ],
+                }
+                return
+
         with spd_scan_duration_seconds.labels(stage="embedding").time():
             uploaded_embeddings = embed_chunks(chunks)
             doc_embedding = get_document_embedding(uploaded_embeddings)

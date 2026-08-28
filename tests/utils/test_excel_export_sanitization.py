@@ -20,6 +20,7 @@ from src.utils.excel_export import (
     _truncate_title,
     build_similarity_workbook,
     generate_csv_matrix_stream,
+    generate_tsv_matrix_stream,
     sanitize_spreadsheet_value,
 )
 
@@ -222,3 +223,47 @@ def test_csv_stream_keeps_similarity_values_numeric(malicious_matrix):
     reconstructed = pd.read_csv(io.StringIO(full_csv), index_col=0)
 
     assert reconstructed.dtypes.apply(lambda d: d.kind == "f").all()
+
+
+# ── TSV stream export ──────────────────────────────────────────────────────────
+
+
+def test_tsv_stream_sanitizes_header_and_index(malicious_matrix):
+    chunks = list(generate_tsv_matrix_stream(malicious_matrix))
+    full_tsv = "".join(chunks)
+
+    parsed = list(io.StringIO(full_tsv))
+    assert parsed  # sanity
+
+    reader = pd.read_csv(io.StringIO(full_tsv), sep="\t", index_col=0)
+    for label in list(reader.index) + list(reader.columns):
+        assert not str(label).startswith(
+            FORMULA_TRIGGER_PREFIXES
+        ), f"unsanitized TSV label: {label!r}"
+
+
+def test_tsv_stream_preserves_row_count(malicious_matrix):
+    chunks = list(generate_tsv_matrix_stream(malicious_matrix))
+    assert len(chunks) == len(malicious_matrix) + 1
+
+
+def test_tsv_stream_leaves_benign_matrix_untouched():
+    data = {
+        "DocA.txt": [1.0, 0.85, 0.12],
+        "DocB.txt": [0.85, 1.0, 0.45],
+        "DocC.txt": [0.12, 0.45, 1.0],
+    }
+    df = pd.DataFrame(data, index=["DocA.txt", "DocB.txt", "DocC.txt"])
+
+    full_tsv = "".join(generate_tsv_matrix_stream(df))
+    reconstructed = pd.read_csv(io.StringIO(full_tsv), sep="\t", index_col=0)
+
+    pd.testing.assert_frame_equal(df, reconstructed, check_names=False)
+
+
+def test_tsv_stream_keeps_similarity_values_numeric(malicious_matrix):
+    full_tsv = "".join(generate_tsv_matrix_stream(malicious_matrix))
+    reconstructed = pd.read_csv(io.StringIO(full_tsv), sep="\t", index_col=0)
+
+    assert reconstructed.dtypes.apply(lambda d: d.kind == "f").all()
+

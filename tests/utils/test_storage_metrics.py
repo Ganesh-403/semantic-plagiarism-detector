@@ -424,6 +424,77 @@ class TestCalculateStorageUsageContract:
         assert result["faiss_bytes"] == 0
 
 
+def test_record_storage_snapshot_writes_history_row(tmp_path: Path) -> None:
+    history_db = tmp_path / "storage_history.db"
+    db_file = tmp_path / "corpus.db"
+    db_file.write_bytes(b"x" * 2048)
+
+    with patch(
+        "src.utils.storage_metrics.calculate_storage_usage",
+        return_value={"sqlite_bytes": 2048},
+    ), patch(
+        "src.utils.temp_manager.get_temp_directory_size_bytes",
+        return_value=512,
+    ):
+        from src.utils.storage_metrics import record_storage_snapshot
+
+        record_storage_snapshot(db_path=history_db)
+
+    import sqlite3
+
+    conn = sqlite3.connect(str(history_db))
+    row = conn.execute(
+        "SELECT date, db_size_bytes, temp_size_bytes FROM storage_history"
+    ).fetchone()
+    conn.close()
+
+    assert row is not None
+    assert row[1] == 2048
+    assert row[2] == 512
+
+
+def test_get_projected_days_until_full_from_growth(tmp_path: Path) -> None:
+    from src.utils.storage_metrics import (
+        _connect_storage_history,
+        get_projected_days_until_full,
+    )
+
+    history_db = tmp_path / "storage_history.db"
+    conn = _connect_storage_history(history_db)
+    conn.execute(
+        "INSERT INTO storage_history VALUES (?, ?, ?)",
+        ("2026-08-01", 1000, 0),
+    )
+    conn.execute(
+        "INSERT INTO storage_history VALUES (?, ?, ?)",
+        ("2026-08-11", 2000, 0),
+    )
+    conn.commit()
+    conn.close()
+
+    # Grew 1000 bytes over 10 days => 100 B/day; 3000 remaining to 5000 => 30 days
+    days = get_projected_days_until_full(5000, db_path=history_db)
+    assert days == pytest.approx(30.0)
+
+
+def test_get_projected_days_until_full_insufficient_history(tmp_path: Path) -> None:
+    from src.utils.storage_metrics import (
+        _connect_storage_history,
+        get_projected_days_until_full,
+    )
+
+    history_db = tmp_path / "storage_history.db"
+    conn = _connect_storage_history(history_db)
+    conn.execute(
+        "INSERT INTO storage_history VALUES (?, ?, ?)",
+        ("2026-08-01", 1000, 0),
+    )
+    conn.commit()
+    conn.close()
+
+    assert get_projected_days_until_full(10_000, db_path=history_db) == float("inf")
+
+
 class TestGetDirectorySizeBytes:
     """Test suite for get_directory_size_bytes calculation and symlink handling."""
 
@@ -472,5 +543,3 @@ class TestGetDirectorySizeBytes:
         """Verify nonexistent directory path returns 0 bytes."""
         nonexistent = tmp_path / "does_not_exist"
         assert get_directory_size_bytes(nonexistent) == 0
-
-

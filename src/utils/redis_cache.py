@@ -33,6 +33,10 @@ except ImportError:
     REDIS_CACHE_TTL = int(os.getenv("REDIS_CACHE_TTL", "3600"))
 
 try:
+    from src.core.app_config import REDIS_PORT
+except ImportError:
+    REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+try:
     from src.version import APP_VERSION
 except ImportError:
     APP_VERSION = "1.0.0"
@@ -76,7 +80,6 @@ RedisTimeoutError = (
 
 # Redis connection configuration
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 try:
     REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 except ValueError:

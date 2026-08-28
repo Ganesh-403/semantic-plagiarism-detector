@@ -911,8 +911,10 @@ def _ocr_pdf_page(
     import pytesseract
     from PIL import Image
 
+    from src.core.metrics import ocr_invocations_total
     from src.utils.temp_manager import managed_ocr_temp_dir
 
+    ocr_invocations_total.labels(status="started").inc()
     try:
         with managed_ocr_temp_dir(prefix=f"ocr_pdf_p{page_index}_"):
             with fitz.open(stream=pdf_bytes, filetype="pdf") as document:
@@ -927,16 +929,20 @@ def _ocr_pdf_page(
                     (pixmap.width, pixmap.height),
                     pixmap.samples,
                 )
-                return pytesseract.image_to_string(
+                extracted = pytesseract.image_to_string(
                     image,
                     lang=language,
                     config="--oem 3 --psm 3",
                 ).strip()
-    except pytesseract.TesseractNotFoundError as exc:
-        from src.errors import OCR_TESSERACT_NOT_FOUND
+                ocr_invocations_total.labels(status="success").inc()
+                return extracted
+    except Exception as exc:
+        ocr_invocations_total.labels(status="failure").inc()
+        tess_err_type = getattr(pytesseract, "TesseractNotFoundError", None)
+        if tess_err_type is not None and isinstance(tess_err_type, type) and issubclass(tess_err_type, BaseException) and isinstance(exc, tess_err_type):
+            from src.errors import OCR_TESSERACT_NOT_FOUND
 
-        raise OCRDependencyError(OCR_TESSERACT_NOT_FOUND) from exc
-    except (MemoryError, Exception) as exc:
+            raise OCRDependencyError(OCR_TESSERACT_NOT_FOUND) from exc
         if isinstance(exc, MemoryError):
             logger.warning(
                 f"[document_parser] OCR page extraction failed due to memory exhaustion: {exc}"
@@ -1836,19 +1842,24 @@ def extract_text_from_image(
     import pytesseract
     from PIL import Image
 
+    from src.core.metrics import ocr_invocations_total
     from src.utils.temp_manager import managed_ocr_temp_dir
 
     file_bytes = _read_pdf_bytes(file)
+    ocr_invocations_total.labels(status="started").inc()
     try:
         with managed_ocr_temp_dir(prefix="ocr_image_"):
             image = Image.open(io.BytesIO(file_bytes))
             try:
-                return pytesseract.image_to_string(
+                extracted = pytesseract.image_to_string(
                     image,
                     lang=ocr_language,
                     config="--oem 3 --psm 3",
                 ).strip()
+                ocr_invocations_total.labels(status="success").inc()
+                return extracted
             except (MemoryError, Exception) as exc:
+                ocr_invocations_total.labels(status="failure").inc()
                 if isinstance(exc, MemoryError):
                     logger.warning(
                         f"[document_parser] OCR image extraction failed due to memory exhaustion: {exc}"
@@ -1856,11 +1867,18 @@ def extract_text_from_image(
                 else:
                     logger.warning(f"[document_parser] OCR image extraction failed: {exc}")
                 return "[OCR extraction failed for the file]"
-    except pytesseract.TesseractNotFoundError as exc:
-        from src.errors import OCR_TESSERACT_NOT_FOUND
-
-        raise OCRDependencyError(OCR_TESSERACT_NOT_FOUND) from exc
     except Exception as exc:
+        ocr_invocations_total.labels(status="failure").inc()
+        tess_err_type = getattr(pytesseract, "TesseractNotFoundError", None)
+        if tess_err_type is not None and isinstance(tess_err_type, type) and issubclass(tess_err_type, BaseException) and isinstance(exc, tess_err_type):
+            from src.errors import OCR_TESSERACT_NOT_FOUND
+
+            raise OCRDependencyError(OCR_TESSERACT_NOT_FOUND) from exc
+        if isinstance(exc, MemoryError):
+            logger.warning(
+                f"[document_parser] OCR image extraction failed due to memory exhaustion: {exc}"
+            )
+            return "[OCR extraction failed for the file]"
         logger.error(f"[document_parser] Error reading image: {exc}")
         return ""
 

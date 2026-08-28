@@ -8,8 +8,10 @@ import pytest
 from src.db.database_backup import (
     _ALLOWED_DB_DIR,
     SQLITE_HEADER,
+    BackupRestoreSecurityError,
     create_sqlite_snapshot,
     get_database_file_size_bytes,
+    verify_backup_file,
 )
 
 
@@ -212,3 +214,196 @@ def test_create_database_backup_sets_restrictive_permissions(tmp_path, monkeypat
     assert len(chmod_calls) >= 2
     assert chmod_calls[-1][0] == db_backup
     assert chmod_calls[-1][1] == 0o600
+
+
+def test_create_database_backup_respects_gzip_compression_level_env(tmp_path, monkeypatch):
+    """Verify that create_database_backup reads BACKUP_GZIP_COMPRESSION_LEVEL from the env and passes it to GzipFile."""
+    import gzip
+    from unittest.mock import patch
+    from src.db.database_backup import create_database_backup
+
+    source = tmp_path / "source.db"
+    create_test_database(source)
+    backup_dir = tmp_path / "backups"
+
+    # Mock GzipFile to record the compression level
+    passed_compresslevel = []
+    original_gzip_file = gzip.GzipFile
+
+    class MockGzipFile(original_gzip_file):
+        def __init__(self, *args, **kwargs):
+            if "compresslevel" in kwargs:
+                passed_compresslevel.append(kwargs["compresslevel"])
+            super().__init__(*args, **kwargs)
+
+    # 1. Test default value of 6
+    with patch("gzip.GzipFile", MockGzipFile):
+        monkeypatch.delenv("BACKUP_GZIP_COMPRESSION_LEVEL", raising=False)
+        create_database_backup(source, backup_dir=backup_dir, compress_backup=True)
+        assert len(passed_compresslevel) == 1
+        assert passed_compresslevel[0] == 6
+
+    # 2. Test configured value (e.g. 3)
+    passed_compresslevel.clear()
+    with patch("gzip.GzipFile", MockGzipFile):
+        monkeypatch.setenv("BACKUP_GZIP_COMPRESSION_LEVEL", "3")
+        create_database_backup(source, backup_dir=backup_dir, compress_backup=True)
+        assert len(passed_compresslevel) == 1
+        assert passed_compresslevel[0] == 3
+
+ feature/cleanup-failed-backups
+ feature/cleanup-failed-backups
+ feature/cleanup-failed-backups
+
+ feature/cleanup-failed-backups
+
+ feature/utc-timestamp-backups
+ feature/utc-timestamp-backups
+
+ feature/utc-timestamp-backups
+ main
+
+ feature/pre-snapshot-integrity-check
+ feature/pre-snapshot-integrity-check
+
+ feature/pre-snapshot-integrity-check
+
+ feature/backup-integrity-check-3407
+
+ feature/backup-integrity-check-3407
+ main
+ main
+def test_verify_backup_file_valid_gzip(tmp_path):
+    import gzip
+    source = tmp_path / "source.db"
+    create_test_database(source)
+
+    backup = tmp_path / "backup.db.gz"
+    with open(source, "rb") as f_in:
+        with gzip.open(backup, "wb") as f_out:
+            f_out.write(f_in.read())
+
+    assert verify_backup_file(backup) is True
+
+
+def test_verify_backup_file_valid_uncompressed(tmp_path):
+    source = tmp_path / "source.db"
+    create_test_database(source)
+    assert verify_backup_file(source) is True
+
+
+def test_verify_backup_file_corrupted_gzip(tmp_path):
+    backup = tmp_path / "corrupt.db.gz"
+    # Write invalid gzip data starting with magic bytes
+    backup.write_bytes(b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xffinvalidjunkdata")
+    assert verify_backup_file(backup) is False
+
+
+def test_verify_backup_file_invalid_header(tmp_path):
+    import gzip
+    backup = tmp_path / "invalid_header.db.gz"
+    with gzip.open(backup, "wb") as f:
+        f.write(b"not a sqlite database file header but it has 100 bytes of content so it is read without issues")
+    assert verify_backup_file(backup) is False
+
+
+def test_verify_backup_file_nonexistent():
+    assert verify_backup_file("nonexistent_backup_file_path.db.gz") is False
+
+
+def test_create_sqlite_snapshot_check_integrity_healthy(tmp_path):
+    source = tmp_path / "healthy.db"
+    create_test_database(source)
+    snapshot = create_sqlite_snapshot(source, check_integrity=True)
+    assert snapshot.startswith(SQLITE_HEADER)
+
+
+def test_create_sqlite_snapshot_check_integrity_corrupted(tmp_path):
+    source = tmp_path / "corrupt.db"
+    create_test_database(source)
+
+    # Overwrite the database with junk bytes starting after the header
+    with open(source, "r+b") as f:
+        f.seek(100)
+        f.write(b"CORRUPTEDDATA" * 100)
+
+    with pytest.raises(sqlite3.DatabaseError, match="Database integrity check failed"):
+        create_sqlite_snapshot(source, check_integrity=True)
+
+
+def test_create_sqlite_snapshot_check_integrity_disabled_by_default(tmp_path):
+    source = tmp_path / "corrupt_default.db"
+    create_test_database(source)
+
+    # Overwrite database pages to corrupt it
+    with open(source, "r+b") as f:
+        f.seek(100)
+        f.write(b"CORRUPTEDDATA" * 100)
+
+    # By default (check_integrity=False), it should not raise DatabaseError from quick_check
+    # (though backup itself might raise sqlite3.DatabaseError if it's completely unreadable,
+    # let's assert it runs or at least does not fail on integrity quick_check)
+    try:
+        create_sqlite_snapshot(source, check_integrity=False)
+    except sqlite3.DatabaseError as exc:
+        # If it raises DatabaseError, it must not be "Database integrity check failed"
+        assert "Database integrity check failed" not in str(exc)
+
+
+def test_create_database_backup_uses_utc_timestamp(tmp_path):
+    from src.db.database_backup import create_database_backup
+
+    source = tmp_path / "source.db"
+    create_test_database(source)
+    backup_dir = tmp_path / "backups"
+
+    # Test compressed backup (.db.gz) UTC Zulu timestamp pattern
+    gz_backup = create_database_backup(source, backup_dir=backup_dir, compress_backup=True)
+    assert gz_backup.exists()
+    assert re.search(r"\.\d{8}_\d{6}Z\.db\.gz$", gz_backup.name) is not None
+
+    # Test uncompressed backup (.db) UTC Zulu timestamp pattern
+    db_backup = create_database_backup(source, backup_dir=backup_dir, compress_backup=False)
+    assert db_backup.exists()
+    assert re.search(r"\.\d{8}_\d{6}Z\.db$", db_backup.name) is not None
+
+
+def test_create_database_backup_cleans_up_on_failure(tmp_path, monkeypatch):
+    from src.db.database_backup import create_database_backup
+    import src.db.database_backup
+
+    source = tmp_path / "source.db"
+    create_test_database(source)
+    backup_dir = tmp_path / "backups"
+
+    def mock_iter_chunks(db_path, chunk_size=64*1024):
+        yield b"partial header..."
+        raise IOError("Disk full or connection lost")
+
+    monkeypatch.setattr(src.db.database_backup, "iter_sqlite_snapshot_chunks", mock_iter_chunks)
+
+    # 1. Test compressed backup cleanup
+    with pytest.raises(IOError, match="Disk full or connection lost"):
+        create_database_backup(source, backup_dir=backup_dir, compress_backup=True)
+
+    # Assert no files remain in the backup directory
+    files = list(backup_dir.glob("*"))
+    assert len(files) == 0
+
+    # 2. Test uncompressed backup cleanup
+    with pytest.raises(IOError, match="Disk full or connection lost"):
+        create_database_backup(source, backup_dir=backup_dir, compress_backup=False)
+
+    files = list(backup_dir.glob("*"))
+    assert len(files) == 0
+
+
+
+
+
+
+
+ main
+ main
+
+ main

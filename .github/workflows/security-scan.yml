@@ -45,3 +45,11 @@ jobs:
           else
             pip-audit
           fi
+
+      - name: Install bandit
+        run: |
+          pip install bandit
+
+      - name: Run bandit security scan
+        run: |
+          bandit -r src/ -ll

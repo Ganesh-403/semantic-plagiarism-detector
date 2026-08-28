@@ -17,11 +17,13 @@ from src.db.corpus_db import (
     get_document_chunks_count,
     get_document_count_by_user,
     get_document_count_fast,
+    get_document_word_counts,
     get_documents_by_class,
     get_unique_class_sections,
     purge_stale_trash,
     restore_document,
     soft_delete_document,
+    CorpusRepository,
 )
 
 
@@ -817,4 +819,60 @@ def test_get_embedding_storage_footprint_null_values(mock_db):
         assert res["chunk_count"] == 0
     finally:
         src.db.corpus_db._connect = original_connect
+
+
+def test_soft_delete_and_restore_document_returns_bool():
+    add_document("doc_bool_1.pdf", "hash_b1")
+    add_document("doc_bool_2.pdf", "hash_b2")
+    add_document("doc_bool_3.pdf", "hash_b3")
+
+    # Soft delete doc1
+    assert soft_delete_document("doc_bool_1.pdf") is True
+    # Attempting to soft-delete again returns False
+    assert soft_delete_document("doc_bool_1.pdf") is False
+    # Attempting to soft-delete non-existent doc returns False
+    assert soft_delete_document("nonexistent.pdf") is False
+
+    # Default get_all_documents excludes soft-deleted docs
+    active_docs = get_all_documents()
+    active_filenames = [d["filename"] for d in active_docs]
+    assert "doc_bool_1.pdf" not in active_filenames
+    assert "doc_bool_2.pdf" in active_filenames
+    assert "doc_bool_3.pdf" in active_filenames
+
+    # With include_deleted=True, soft-deleted doc is returned
+    all_docs = get_all_documents(include_deleted=True)
+    doc1_entry = next(d for d in all_docs if d["filename"] == "doc_bool_1.pdf")
+    assert doc1_entry["deleted_at"] is not None
+
+    doc2_entry = next(d for d in all_docs if d["filename"] == "doc_bool_2.pdf")
+    assert doc2_entry["deleted_at"] is None
+
+    # Restore doc1
+    assert restore_document("doc_bool_1.pdf") is True
+    # Attempting to restore already restored doc returns False
+    assert restore_document("doc_bool_1.pdf") is False
+    # Attempting to restore non-existent doc returns False
+    assert restore_document("nonexistent.pdf") is False
+
+    # Verify doc1 is back in default get_all_documents
+    restored_docs = get_all_documents()
+    restored_filenames = [d["filename"] for d in restored_docs]
+    assert "doc_bool_1.pdf" in restored_filenames
+
+
+def test_corpus_repository_class_interface():
+    repo = CorpusRepository()
+    add_document("repo_doc.pdf", "repo_hash_1")
+    assert get_document_by_hash("repo_hash_1") == "repo_doc.pdf"
+
+    docs = repo.get_all_documents()
+    assert any(d["filename"] == "repo_doc.pdf" for d in docs)
+
+    assert repo.soft_delete_document("repo_doc.pdf") is True
+    assert not any(d["filename"] == "repo_doc.pdf" for d in repo.get_all_documents())
+    assert any(d["filename"] == "repo_doc.pdf" for d in repo.get_all_documents(include_deleted=True))
+
+    assert repo.restore_document("repo_doc.pdf") is True
+    assert any(d["filename"] == "repo_doc.pdf" for d in repo.get_all_documents())
 

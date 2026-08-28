@@ -13,10 +13,8 @@ named colors, providing a robust fallback mechanism for theme configurations.
 Issue #2898: Fallback behavior for named colors in Badge Generator.
 """
 
-import html
-import logging
-import re
 import hashlib
+import html
 import logging
 import re
 import xml.etree.ElementTree as ET

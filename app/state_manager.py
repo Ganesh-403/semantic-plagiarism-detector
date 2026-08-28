@@ -148,13 +148,14 @@ def _start_api_server():
 
     fastapi_app.add_middleware(ActivityMiddleware)
 
+    from src.core.app_config import API_PORT
+
     uvicorn.run(
         fastapi_app,
         host=os.getenv("API_HOST", "0.0.0.0"),
-        port=int(os.getenv("API_PORT", 8000)),
+        port=API_PORT,
         log_level="warning",
     )
-
 
 def init_api_server_daemon():
     """Ensure background REST API server is started once in a thread-safe manner."""
@@ -432,4 +433,23 @@ def reset_analysis_data() -> None:
 def reset_analysis_state() -> None:
     """Alias for reset_analysis_data() to preserve authentication state while clearing document analysis."""
     reset_analysis_data()
+
+
+def reset_analysis_session_state() -> None:
+    """Reset document lists, matrices, and scan flags for a new analysis.
+
+    Keeps SessionKeys.THEME and SessionKeys.SESSION_ID.
+    """
+    for key in (
+        SessionKeys.FAILED_DOCUMENTS,
+        SessionKeys.DRIVE_FILES_DICT,
+        SessionKeys.SELECTED_DOCUMENT_ID,
+        SessionKeys.ANALYSIS_RESULTS,
+        SessionKeys.ANALYSIS_FILE_SIGNATURE,
+        SessionKeys.SCANNING,
+        SessionKeys.AUDIT_REPORT_GENERATED,
+        SessionKeys.SENT_ALERTS,
+    ):
+        if key in st.session_state:
+            del st.session_state[key]
 

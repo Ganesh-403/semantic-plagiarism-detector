@@ -30,6 +30,8 @@ from src.utils.filename import (
     unique_filename,
     validate_document_extension,
 )
+from src.utils.tar_processor import process_tar_file
+from src.utils.zip_processor import process_zip_file
 
 try:
     from src.utils.google_drive import bulk_download_drive_folder
@@ -37,6 +39,8 @@ except Exception:
     bulk_download_drive_folder = None
 
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB limit
+
+ARCHIVE_EXTENSIONS = (".tar.gz", ".tar.bz2", ".zip")
 
 
 def render_student_portal(threshold: float, faiss_top_k: int):
@@ -140,6 +144,32 @@ def render_student_portal(threshold: float, faiss_top_k: int):
                 )
 
 
+def _is_tar_archive(filename: str) -> bool:
+    """Return True only for supported compressed TAR archive names."""
+    normalized = filename.strip().casefold()
+    return normalized.endswith((".tar.gz", ".tar.bz2"))
+
+
+def _extract_archive_upload(
+    original_name: str,
+    file_bytes: bytes,
+    existing_names: dict,
+) -> dict[str, bytes]:
+    """Extract a supported archive into uniquely named pipeline documents."""
+    if _is_tar_archive(original_name):
+        extracted = process_tar_file(file_bytes)
+    else:
+        extracted = process_zip_file(file_bytes)
+
+    extracted_files: dict[str, bytes] = {}
+    for member_name, member_bytes in extracted.items():
+        safe_name = unique_filename(member_name, existing_names)
+        existing_names[safe_name] = member_bytes
+        extracted_files[safe_name] = member_bytes
+
+    return extracted_files
+
+
 def render_upload_section(user_role: str, lang_code: str, index_path: str):
     """Render document upload section, Google Drive integration, and return file_bytes_dict."""
     if user_role != "admin":
@@ -170,7 +200,18 @@ def render_upload_section(user_role: str, lang_code: str, index_path: str):
 
     uploaded_files = st.file_uploader(
         get_text("upload_title", lang=lang_code),
-        type=["pdf", "docx", "txt", "md", "markdown", "mdown", "zip", "csv"],
+        type=[
+            "pdf",
+            "docx",
+            "txt",
+            "md",
+            "markdown",
+            "mdown",
+            "zip",
+            "tar.gz",
+            "tar.bz2",
+            "csv",
+        ],
         accept_multiple_files=True,
         key="file_uploader",
     )
@@ -239,25 +280,28 @@ def render_upload_section(user_role: str, lang_code: str, index_path: str):
     if uploaded_files:
         for uploaded_file in uploaded_files:
             original_name = uploaded_file.name
-            try:
-                validate_document_extension(
-                    original_name,
-                    allowed_extensions={
-                        ".csv",
-                        ".docx",
-                        ".md",
-                        ".markdown",
-                        ".mdown",
-                        ".pdf",
-                        ".txt",
-                        ".zip",
-                    },
-                )
-            except InvalidFileExtensionError as exc:
-                st.error(
-                    f"⚠️ File **'{sanitize_filename(original_name)}'** was rejected: {exc}"
-                )
-                continue
+            is_tar_archive = _is_tar_archive(original_name)
+            is_zip_archive = original_name.strip().casefold().endswith(".zip")
+
+            if not (is_tar_archive or is_zip_archive):
+                try:
+                    validate_document_extension(
+                        original_name,
+                        allowed_extensions={
+                            ".csv",
+                            ".docx",
+                            ".md",
+                            ".markdown",
+                            ".mdown",
+                            ".pdf",
+                            ".txt",
+                        },
+                    )
+                except InvalidFileExtensionError as exc:
+                    st.error(
+                        f"⚠️ File **'{sanitize_filename(original_name)}'** was rejected: {exc}"
+                    )
+                    continue
 
             safe_name = unique_filename(original_name, file_bytes_dict)
 
@@ -268,6 +312,52 @@ def render_upload_section(user_role: str, lang_code: str, index_path: str):
                 continue
 
             file_bytes = uploaded_file.read()
+
+            if is_tar_archive or is_zip_archive:
+                try:
+                    extracted_files = _extract_archive_upload(
+                        original_name,
+                        file_bytes,
+                        file_bytes_dict,
+                    )
+                except ValueError as exc:
+                    st.error(
+                        f"⚠️ Archive **'{sanitize_filename(original_name)}'** was rejected: {exc}"
+                    )
+                    continue
+                except Exception as exc:
+                    st.error(
+                        f"⚠️ Failed to extract archive **'{sanitize_filename(original_name)}'**: {exc}"
+                    )
+                    continue
+
+                if not extracted_files:
+                    st.warning(
+                        f"⚠️ Archive **'{sanitize_filename(original_name)}'** contains no supported documents."
+                    )
+                    continue
+
+                for member_name, member_bytes in extracted_files.items():
+                    file_hash = hashlib.sha256(member_bytes).hexdigest()
+                    existing_doc = get_document_by_hash(file_hash)
+
+                    if existing_doc:
+                        st.warning(
+                            f"⚠️ File **'{member_name}'** from **'{original_name}'** "
+                            f"is identical to **'{existing_doc}'** already in the database."
+                        )
+                        continue
+
+                    file_bytes_dict[member_name] = strip_exif_metadata(
+                        member_bytes, member_name
+                    )
+
+                st.success(
+                    f"📦 Extracted {len(extracted_files)} supported document(s) "
+                    f"from **'{original_name}'**."
+                )
+                continue
+
             file_hash = hashlib.sha256(file_bytes).hexdigest()
             existing_doc = get_document_by_hash(file_hash)
 

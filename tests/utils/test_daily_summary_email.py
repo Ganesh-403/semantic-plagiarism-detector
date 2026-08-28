@@ -4,6 +4,7 @@ test_daily_summary_email.py
 Tests for daily summary email functionality and HTML template generation.
 """
 
+import html
 import re
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
@@ -11,10 +12,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.utils.daily_summary_email import (
+    DEFAULT_EMAIL_SUBJECT_TEMPLATE,
     build_email_html_body,
+    build_email_text_body,
     build_incident_row_html,
     build_severity_section_html,
     export_incidents_to_csv,
+    format_subject_line,
     generate_daily_summary_html,
     get_admin_emails,
     get_incidents_last_24h,
@@ -254,6 +258,34 @@ def test_send_email_success(mock_smtp):
         "FROM_EMAIL": "test@example.com",
     },
 )
+
+def test_send_email_includes_anti_spam_headers(mock_smtp):
+    """Issue #3447: automated summary emails must carry Auto-Submitted and
+    X-Auto-Response-Suppress headers so Outlook/Gmail spam filters and
+    auto-responders treat them correctly."""
+    mock_server = MagicMock()
+    mock_smtp.return_value.__enter__.return_value = mock_server
+
+    result = send_email(["recipient@example.com"], "Test Subject", "<p>Test Body</p>")
+
+    assert result is True
+    sent_message = mock_server.send_message.call_args[0][0]
+    assert sent_message["Auto-Submitted"] == "auto-generated"
+    assert sent_message["X-Auto-Response-Suppress"] == "All"
+
+
+@patch("smtplib.SMTP")
+@patch.dict(
+    "os.environ",
+    {
+        "SMTP_SERVER": "smtp.example.com",
+        "SMTP_PORT": "587",
+        "SMTP_USERNAME": "test@example.com",
+        "SMTP_PASSWORD": "password",
+        "FROM_EMAIL": "test@example.com",
+    },
+)
+
 def test_send_email_custom_attachment_filename(mock_smtp):
     """Test custom CSV attachment filename."""
     mock_server = MagicMock()
@@ -1097,6 +1129,113 @@ class TestEmailStructureAndAccessibility:
 
 
 # ---------------------------------------------------------------------------
+# Tests for Dynamic Subject Line Formatting (#3444)
+# ---------------------------------------------------------------------------
+
+
+class TestDynamicSubjectFormatting:
+    """Test suite for dynamic email subject line formatting tokens (#3444)."""
+
+    def test_default_subject_template_constant(self):
+        """Verify DEFAULT_EMAIL_SUBJECT_TEMPLATE constant has expected format."""
+        assert DEFAULT_EMAIL_SUBJECT_TEMPLATE == "Daily Plagiarism Summary - {date} ({count} incidents)"
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_default_subject_formatting(self):
+        """Verify default formatting without custom env vars or prefix."""
+        subject = format_subject_line(date="2026-08-25", count=7)
+        assert subject == "Daily Plagiarism Summary - 2026-08-25 (7 incidents)"
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_default_subject_formatting_with_prefix(self):
+        """Verify default formatting with standard subject prefix."""
+        subject = format_subject_line(
+            date="2026-08-25", count=4, subject_prefix="[Plagiarism Alert]"
+        )
+        assert subject == "[Plagiarism Alert] Daily Plagiarism Summary - 2026-08-25 (4 incidents)"
+
+    @patch.dict(
+        "os.environ",
+        {
+            "EMAIL_SUBJECT_TEMPLATE": "[{app_name}] Daily Digest - {date}: {count} flagged",
+            "APP_NAME": "EthicsGuard",
+        },
+        clear=True,
+    )
+    def test_env_subject_template_dynamic_tokens(self):
+        """Verify EMAIL_SUBJECT_TEMPLATE environment variable formats {date}, {count}, and {app_name}."""
+        subject = format_subject_line(date="2026-08-25", count=15, subject_prefix="")
+        assert subject == "[EthicsGuard] Daily Digest - 2026-08-25: 15 flagged"
+
+    def test_custom_template_argument_override(self):
+        """Verify passing explicit template overrides env var and defaults."""
+        custom_template = "Report for {app_name} on {date} (Total: {count})"
+        subject = format_subject_line(
+            template=custom_template,
+            date="2026-08-25",
+            count=2,
+            app_name="Physics Department",
+        )
+        assert subject == "Report for Physics Department on 2026-08-25 (Total: 2)"
+
+    def test_template_safe_handling_of_unknown_tokens(self):
+        """Verify template formatting does not crash when unrecognised tokens are present."""
+        template_with_extra = "Daily Report: {count} issues ({date}) [{course_id}]"
+        subject = format_subject_line(
+            template=template_with_extra, date="2026-08-25", count=3
+        )
+        assert "3 issues" in subject
+        assert "2026-08-25" in subject
+        assert "{course_id}" in subject
+
+    @patch("src.utils.daily_summary_email.send_email")
+    @patch("src.utils.daily_summary_email.get_admin_emails")
+    @patch("src.utils.daily_summary_email.get_incidents_last_24h")
+    @patch.dict(
+        "os.environ",
+        {
+            "EMAIL_SUBJECT_TEMPLATE": "Plagiarism Summary for {date} ({count} items)",
+        },
+    )
+    def test_send_daily_summary_uses_env_subject_template(
+        self, mock_get_incidents, mock_get_emails, mock_send_email, mock_incidents
+    ):
+        """Verify send_daily_summary dynamically formats subject line with incident count."""
+        mock_get_incidents.return_value = mock_incidents  # 3 incidents
+        mock_get_emails.return_value = ["admin@example.com"]
+        mock_send_email.return_value = True
+
+        result = send_daily_summary(subject_prefix="[Alert]")
+
+        assert result is True
+        mock_send_email.assert_called_once()
+        sent_subject = mock_send_email.call_args[0][1]
+        assert sent_subject.startswith("[Alert] Plagiarism Summary for")
+        assert "(3 items)" in sent_subject
+
+    @patch("src.utils.daily_summary_email.send_email")
+    @patch("src.utils.daily_summary_email.get_admin_emails")
+    @patch("src.utils.daily_summary_email.get_incidents_last_24h")
+    def test_send_daily_summary_custom_subject_template_param(
+        self, mock_get_incidents, mock_get_emails, mock_send_email, mock_incidents
+    ):
+        """Verify send_daily_summary accepts explicit subject_template parameter."""
+        mock_get_incidents.return_value = mock_incidents[:2]  # 2 incidents
+        mock_get_emails.return_value = ["admin@example.com"]
+        mock_send_email.return_value = True
+
+        result = send_daily_summary(
+            subject_prefix="",
+            subject_template="Summary: {count} findings on {date}",
+        )
+
+        assert result is True
+        mock_send_email.assert_called_once()
+        sent_subject = mock_send_email.call_args[0][1]
+        assert sent_subject.startswith("Summary: 2 findings on")
+
+
+# ---------------------------------------------------------------------------
 # Tests for Incident CSV Attachment Option (#3445)
 # ---------------------------------------------------------------------------
 
@@ -1273,5 +1412,305 @@ class TestIncidentCsvAttachment:
         assert len(lines) == 51  # Header + 50 rows
         for i in range(50):
             assert f"INC-{i:03d}" in csv_text
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for plain-text MIME alternative summary emails (#3450)
+# ---------------------------------------------------------------------------
+
+
+class TestPlainTextMimeSummaryEmail:
+    """Test suite verifying plain-text MIME alternative generation and attachment (#3450)."""
+
+    def test_build_email_text_body_empty_incidents(self):
+        """Verify plain text structure when no incidents occurred."""
+        text = build_email_text_body(incidents_data=[], total_scans=42)
+        assert "DAILY PLAGIARISM SUMMARY" in text
+        assert "No new plagiarism incidents detected in the last 24 hours." in text
+        assert "Total scans processed: 42" in text
+
+    def test_build_email_text_body_with_custom_footer_note(self):
+        """Verify plain text format appends administrator footer note."""
+        note = "Please review before Monday."
+        text = build_email_text_body(incidents_data=[], total_scans=10, footer_note=note)
+        assert "Note from Administrator:" in text
+        assert note in text
+
+    def test_build_email_text_body_with_populated_incidents(self):
+        """Verify plain text formatting lists all severity groups and incident details clearly."""
+        incidents = [
+            {
+                "document_a": "Essay1.docx",
+                "document_b": "Essay2.docx",
+                "similarity_score": 0.952,
+                "severity_rank": "High",
+                "date_flagged": "2026-08-25 10:00:00",
+            },
+            {
+                "document_a": "LabReportA.pdf",
+                "document_b": "LabReportB.pdf",
+                "similarity_score": 0.725,
+                "severity_rank": "Medium",
+                "date_flagged": "2026-08-25 11:30:00",
+            },
+            {
+                "document_a": "ProjectAlpha.pdf",
+                "document_b": "ProjectBeta.pdf",
+                "similarity_score": 0.421,
+                "severity_rank": "Low",
+                "date_flagged": "2026-08-25 14:15:00",
+            },
+        ]
+        text = build_email_text_body(incidents, total_scans=150, footer_note="Review needed.")
+
+        assert "DAILY PLAGIARISM SUMMARY" in text
+        assert "Total new incidents: 3" in text
+        assert "Total scans processed: 150" in text
+        assert "- High: 1" in text
+        assert "- Medium: 1" in text
+        assert "- Low: 1" in text
+        assert "--- HIGH SEVERITY INCIDENTS (1) ---" in text
+        assert "* Document A: Essay1.docx" in text
+        assert "Document B: Essay2.docx" in text
+        assert "Similarity: 95.20%" in text
+        assert "Date Flagged: 2026-08-25 10:00:00" in text
+        assert "--- MEDIUM SEVERITY INCIDENTS (1) ---" in text
+        assert "* Document A: LabReportA.pdf" in text
+        assert "--- LOW SEVERITY INCIDENTS (1) ---" in text
+        assert "* Document A: ProjectAlpha.pdf" in text
+        assert "Note from Administrator:\nReview needed." in text
+        assert "Review all incidents in the dashboard: http://localhost:8501" in text
+
+    @patch("smtplib.SMTP")
+    def test_send_email_attaches_both_plain_and_html_mime_parts(self, mock_smtp):
+        """Verify send_email attaches both MIMEText('text/plain') and MIMEText('text/html') in MIMEMultipart('alternative')."""
+        mock_server = MagicMock()
+        mock_smtp.return_value.__enter__.return_value = mock_server
+
+        plain_content = "Plain text version of the summary"
+        html_content = "<p>HTML version of the summary</p>"
+
+        with patch.dict(
+            "os.environ",
+            {
+                "SMTP_SERVER": "smtp.example.com",
+                "SMTP_PORT": non_integer_port,
+                "SMTP_USERNAME": "user@example.com",
+                "SMTP_PASSWORD": "password",
+            },
+        ):
+            res = send_email(
+                to_emails=["admin@example.com"],
+                subject="Daily Summary",
+                html_body=html_content,
+                text_body=plain_content,
+                attach_csv=False,
+            )
+
+            assert res is True
+            mock_server.send_message.assert_called_once()
+            msg = mock_server.send_message.call_args[0][0]
+
+            assert msg.is_multipart()
+            assert msg.get_content_type() == "multipart/alternative"
+
+            payloads = msg.get_payload()
+            assert len(payloads) == 2
+
+            plain_part = payloads[0]
+            html_part = payloads[1]
+
+            assert plain_part.get_content_type() == "text/plain"
+            assert plain_part.get_payload(decode=True).decode("utf-8") == plain_content
+
+            assert html_part.get_content_type() == "text/html"
+            assert html_part.get_payload(decode=True).decode("utf-8") == html_content
+
+    @patch("smtplib.SMTP")
+    def test_send_email_with_csv_attachment_and_both_mime_parts(self, mock_smtp):
+        """Verify container contains plain part, html part, and CSV application/octet-stream attachment."""
+        mock_server = MagicMock()
+        mock_smtp.return_value.__enter__.return_value = mock_server
+
+        with patch.dict(
+            "os.environ",
+            {
+                "SMTP_SERVER": "smtp.example.com",
+                "SMTP_PORT": "587",
+                "SMTP_USERNAME": "user@example.com",
+                "SMTP_PASSWORD": "password",
+            },
+        ):
+            res = send_email(
+                to_emails=["admin@example.com"],
+                subject="Daily Summary with CSV",
+                html_body="<h1>HTML</h1>",
+                text_body="Plain text",
+                attach_csv=True,
+                csv_data=b"col1,col2\nval1,val2",
+                attachment_filename="incidents_report.csv",
+            )
+
+            assert res is True
+            msg = mock_server.send_message.call_args[0][0]
+            parts = list(msg.walk())
+
+            content_types = [p.get_content_type() for p in parts]
+            assert "text/plain" in content_types
+            assert "text/html" in content_types
+            assert "application/csv" in content_types or "application/octet-stream" in content_types
+
+    @patch("src.utils.daily_summary_email.send_email")
+    @patch("src.utils.daily_summary_email.get_admin_emails")
+    @patch("src.utils.daily_summary_email.get_incidents_last_24h")
+    def test_send_daily_summary_integrates_plain_text_body(
+        self, mock_get_incidents, mock_get_emails, mock_send_email
+    ):
+        """Verify send_daily_summary builds and provides text_body to send_email."""
+        mock_get_incidents.return_value = [
+            {
+                "incident_id": "INC-01",
+                "document_a": "docA.txt",
+                "document_b": "docB.txt",
+                "similarity_score": 0.89,
+                "severity_rank": "High",
+                "date_flagged": "2026-08-25",
+            }
+        ]
+        mock_get_emails.return_value = ["admin@example.com"]
+        mock_send_email.return_value = True
+
+        result = send_daily_summary(footer_note="High alert")
+        assert result is True
+        mock_send_email.assert_called_once()
+        _, kwargs = mock_send_email.call_args
+
+        text_body = kwargs.get("text_body")
+        assert text_body is not None
+        assert "DAILY PLAGIARISM SUMMARY" in text_body
+        assert "docA.txt" in text_body
+        assert "High alert" in text_body
+
+    def test_build_email_text_body_handles_missing_incident_fields(self):
+        """Verify missing incident dictionary keys do not cause KeyError and default cleanly in plain text."""
+        incidents = [
+            {"similarity_score": 0.5},
+            {"document_a": "OnlyA.pdf"},
+        ]
+        text = build_email_text_body(incidents, total_scans=10)
+        assert "Unknown" in text
+        assert "OnlyA.pdf" in text
+        assert "50.00%" in text
+
+    def test_build_email_text_body_custom_base_url(self):
+        """Verify APP_BASE_URL environment variable is reflected in plain text dashboard link."""
+        with patch.dict("os.environ", {"APP_BASE_URL": "https://plagiarism.university.edu"}):
+            text = build_email_text_body(
+                incidents_data=[
+                    {
+                        "document_a": "A.pdf",
+                        "document_b": "B.pdf",
+                        "similarity_score": 0.9,
+                        "severity_rank": "High",
+                    }
+                ],
+                total_scans=50,
+            )
+            assert "https://plagiarism.university.edu" in text
+
+    def test_build_email_text_body_all_severity_types_empty(self):
+        """Verify each empty severity rank displays the appropriate 'No ... detected' line."""
+        incidents = [
+            {
+                "document_a": "OnlyLow.docx",
+                "document_b": "Ref.docx",
+                "similarity_score": 0.25,
+                "severity_rank": "Low",
+            }
+        ]
+        text = build_email_text_body(incidents, total_scans=20)
+        assert "No high severity incidents detected." in text
+        assert "No medium severity incidents detected." in text
+        assert "* Document A: OnlyLow.docx" in text
+
+    def test_build_email_text_body_many_incidents_plain_list(self):
+        """Verify large volume of incidents is rendered cleanly in plain text."""
+        incidents = [
+            {
+                "document_a": f"doc_a_{i}.pdf",
+                "document_b": f"doc_b_{i}.pdf",
+                "similarity_score": 0.75,
+                "severity_rank": "Medium" if i % 2 == 0 else "High",
+                "date_flagged": f"2026-08-25 12:{i:02d}:00",
+            }
+            for i in range(25)
+        ]
+        text = build_email_text_body(incidents, total_scans=500)
+        assert "Total new incidents: 25" in text
+        assert "Total scans processed: 500" in text
+        for i in range(25):
+            assert f"doc_a_{i}.pdf" in text
+
+    @patch("smtplib.SMTP")
+    def test_send_email_default_text_body_none_attaches_only_html(self, mock_smtp):
+        """Verify backward compatibility: if text_body is None, send_email attaches html MIMEText without plain text."""
+        mock_server = MagicMock()
+        mock_smtp.return_value.__enter__.return_value = mock_server
+
+        with patch("src.utils.daily_summary_email.logger.warning") as mock_warn, patch.dict(
+            "os.environ",
+            {
+                "SMTP_SERVER": "smtp.example.com",
+                "SMTP_PORT": "587.5",
+                "SMTP_USERNAME": "user@example.com",
+                "SMTP_PASSWORD": "password",
+            },
+        ):
+            res = send_email(
+                to_emails=["admin@example.com"],
+                subject="HTML Only",
+                html_body="<p>Just HTML</p>",
+                text_body=None,
+                attach_csv=False,
+            )
+            assert res is True
+            msg = mock_server.send_message.call_args[0][0]
+            payloads = msg.get_payload()
+            assert len(payloads) == 1
+            assert payloads[0].get_content_type() == "text/html"
+
+    @patch("smtplib.SMTP")
+    def test_send_email_both_mime_parts_unicode_payload(self, mock_smtp):
+        """Verify UTF-8 characters in both plain text and HTML payloads are properly preserved in MIME parts."""
+        mock_server = MagicMock()
+        mock_smtp.return_value.__enter__.return_value = mock_server
+
+        plain_text = "Unicode test: 🔴 High severity ⚠️ Café résumé 測試"
+        html_text = "<p>Unicode test: 🔴 High severity ⚠️ Café résumé 測試</p>"
+
+        with patch.dict(
+            "os.environ",
+            {
+                "SMTP_SERVER": "smtp.example.com",
+                "SMTP_PORT": "0",
+                "SMTP_USERNAME": "user@example.com",
+                "SMTP_PASSWORD": "password",
+            },
+        ):
+            res = send_email(
+                to_emails=["admin@example.com"],
+                subject="Unicode Test",
+                html_body=html_text,
+                text_body=plain_text,
+                attach_csv=False,
+            )
+            assert res is True
+            msg = mock_server.send_message.call_args[0][0]
+            parts = msg.get_payload()
+            assert len(parts) == 2
+            assert parts[0].get_payload(decode=True).decode("utf-8") == plain_text
+            assert parts[1].get_payload(decode=True).decode("utf-8") == html_text
+
+
 
 

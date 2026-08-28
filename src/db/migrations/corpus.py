@@ -6,7 +6,7 @@ import sqlite3
 
 from .common import column_exists, run_migrations, table_exists
 
-CORPUS_SCHEMA_VERSION = 16
+CORPUS_SCHEMA_VERSION = 18
 
 
 def migration_001_create_base_schema(
@@ -78,7 +78,7 @@ def migration_004_add_plagiarism_incidents(
             similarity_score REAL NOT NULL,
             severity_rank TEXT NOT NULL,
             review_status TEXT NOT NULL DEFAULT 'Pending'
-                CHECK (review_status IN ('Pending', 'Resolved')),
+                CHECK (review_status IN ('Pending', 'Resolved', 'Dismissed')),
             date_flagged TEXT NOT NULL,
             last_seen TEXT NOT NULL
         )
@@ -391,6 +391,30 @@ def migration_016_add_scheduler_runs(
         """)
 
 
+def migration_017_add_incident_date_flagged_index(
+    connection: sqlite3.Connection,
+) -> None:
+    """Index plagiarism_incidents(date_flagged) for faster get_recent_incidents queries."""
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_incidents_date_flagged "
+        "ON plagiarism_incidents(date_flagged)"
+    )
+
+
+def migration_018_add_false_positives_audit_columns(
+    connection: sqlite3.Connection,
+) -> None:
+    """Add dismissed_by and dismissal_reason audit columns to false_positives table."""
+    if not column_exists(connection, "false_positives", "dismissed_by"):
+        connection.execute(
+            "ALTER TABLE false_positives ADD COLUMN dismissed_by TEXT DEFAULT 'admin'"
+        )
+    if not column_exists(connection, "false_positives", "dismissal_reason"):
+        connection.execute(
+            "ALTER TABLE false_positives ADD COLUMN dismissal_reason TEXT"
+        )
+
+
 CORPUS_MIGRATIONS = {
     1: migration_001_create_base_schema,
     2: migration_002_add_document_metadata,
@@ -408,6 +432,8 @@ CORPUS_MIGRATIONS = {
     14: migration_013_add_incident_severity_idx,
     15: migration_015_pattern_recognition,
     16: migration_016_add_scheduler_runs,
+    17: migration_017_add_incident_date_flagged_index,
+    18: migration_018_add_false_positives_audit_columns,
 }
 
 
@@ -511,6 +537,18 @@ def down_016_add_scheduler_runs(connection: sqlite3.Connection) -> None:
     connection.execute("DROP TABLE IF EXISTS scheduler_runs")
 
 
+def down_017_add_incident_date_flagged_index(connection: sqlite3.Connection) -> None:
+    connection.execute("DROP INDEX IF EXISTS idx_incidents_date_flagged")
+
+
+def down_018_add_false_positives_audit_columns(
+    connection: sqlite3.Connection,
+) -> None:
+    """Remove dismissed_by and dismissal_reason audit columns from false_positives table."""
+    _drop_column_if_exists(connection, "false_positives", "dismissed_by")
+    _drop_column_if_exists(connection, "false_positives", "dismissal_reason")
+
+
 CORPUS_DOWN_MIGRATIONS = {
     1: down_001_create_base_schema,
     2: down_002_add_document_metadata,
@@ -528,6 +566,8 @@ CORPUS_DOWN_MIGRATIONS = {
     14: down_014_add_incident_severity_idx,
     15: down_015_pattern_recognition,
     16: down_016_add_scheduler_runs,
+    17: down_017_add_incident_date_flagged_index,
+    18: down_018_add_false_positives_audit_columns,
 }
 
 

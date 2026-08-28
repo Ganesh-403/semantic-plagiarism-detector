@@ -8,7 +8,6 @@ and calibration weights across review committees.
 """
 
 import plotly.graph_objects as go
-from typing import List, Dict, Any
 import logging
 
 logger = logging.getLogger(__name__)
@@ -87,28 +86,4 @@ def generate_calibration_weight_chart(
         height=400
     )
     
-    return fig
-
-# semantic-plagiarism-detector/src/visualization/reliability_dashboard.py
-
-import plotly.express as px
-import plotly.graph_objects as go
-from typing import List
-
-def generate_reviewer_agreement_heatmap(agreement_matrix: list[list[float]], reviewer_labels: list[str]) -> go.Figure:
-    """
-    Generates a Plotly heatmap displaying pairwise or committee reviewer agreement scores.
-    """
-    fig = px.imshow(
-        agreement_matrix,
-        x=reviewer_labels,
-        y=reviewer_labels,
-        color_continuousScale="Greens",
-        labels=dict(x="Reviewer", y="Reviewer", color="Kappa Score"),
-        title="Inter-Rater Reliability & Reviewer Agreement Heatmap"
-    )
-    fig.update_layout(
-        template="plotly_white",
-        font=dict(family="Segoe UI", size=12)
-    )
     return fig

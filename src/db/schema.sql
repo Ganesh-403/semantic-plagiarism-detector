@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS false_positives (
     document_a TEXT,
     document_b TEXT,
     date_dismissed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    dismissed_by TEXT DEFAULT 'admin',
+    dismissal_reason TEXT,
     PRIMARY KEY (document_a, document_b)
 );
 

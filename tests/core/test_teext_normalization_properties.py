@@ -5,6 +5,8 @@ across all possible inputs.
 """
 
 import pytest
+
+hypothesis = pytest.importorskip("hypothesis")
 from hypothesis import given, strategies as st, assume
 from hypothesis.stateful import RuleBasedStateMachine, rule, invariant
 import string

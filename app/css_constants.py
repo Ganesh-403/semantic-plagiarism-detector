@@ -199,3 +199,29 @@ ST_TABS_BUTTON = "stTabs button"
 
 ST_TABS_BUTTON_ACTIVE = 'stTabs button[aria-selected="true"]'
 """Active (selected) tab button."""
+
+# ── Mobile layout ──────────────────────────────────────────────────────────────
+
+MOBILE_LAYOUT_CSS = """
+@media (max-width: 768px) {
+    .block-container {
+        padding-top: 1rem !important;
+        padding-right: 0.75rem !important;
+        padding-left: 0.75rem !important;
+        padding-bottom: 1rem !important;
+    }
+
+    [data-testid="stPlotlyChart"],
+    .stPlotlyChart {
+        height: 280px !important;
+        max-height: 280px !important;
+    }
+
+    [data-testid="stPlotlyChart"] .js-plotly-plot,
+    .js-plotly-plot {
+        height: 260px !important;
+        max-height: 260px !important;
+    }
+}
+"""
+"""Responsive rules for narrow viewports: tighter padding and shorter charts."""

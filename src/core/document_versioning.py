@@ -105,39 +105,79 @@ def _backtrack_myers(
     tokens_v2: list[str],
     d: int
 ) -> list[tuple[DiffOp, str, str]]:
-    """Backtrack through the Myers trace to build the edit script."""
+    """Backtrack through the Myers trace to build the edit script.
+
+    ``trace[i]`` is the V-state *entering* forward step ``i``, so the state that
+    belongs with the ``k == -i`` / ``k != i`` diagonal test is ``trace[i]`` —
+    reading ``trace[i - 1]`` there reconstructs the path from the wrong
+    edit-distance level and can walk ``x`` or ``y`` below zero.
+
+    Each iteration walks the snake back to ``(prev_x, prev_y)``, records the one
+    non-diagonal move that reached this diagonal, and then *lands* on
+    ``(prev_x, prev_y)``. The leading snake is emitted after the loop, which is
+    also the entire script when the inputs are identical and ``d == 0``.
+
+    Args:
+        trace: One V-state snapshot per forward step, oldest first.
+        tokens_v1: Token list from the older version.
+        tokens_v2: Token list from the newer version.
+        d: The edit distance the forward pass settled on.
+
+    Returns:
+        The edit script in chronological order.
+    """
     x = len(tokens_v1)
     y = len(tokens_v2)
-    edits = []
-    
-    for i in range(d, 0, -1):
-        v = trace[i - 1]
+    edits: list[tuple[DiffOp, str, str]] = []
+
+    for i in range(min(d, len(trace) - 1), 0, -1):
+        v = trace[i]
         k = x - y
-        
-        if k == -i or (k != i and v.get(k - 1, -1) < v.get(k + 1, -1)):
+
+        # Which neighbouring diagonal did this position come from? Mirrors the
+        # choice the forward pass made when it filled v[k] at step i.
+        if k == -i or (k != i and v.get(k - 1, 0) < v.get(k + 1, 0)):
             prev_k = k + 1
         else:
             prev_k = k - 1
-            
+
         prev_x = v.get(prev_k, 0)
         prev_y = prev_x - prev_k
-        
-        # Add diagonal (equal) moves
+
+        # Unwind the diagonal (equal) run that led into this position.
         while x > prev_x and y > prev_y:
             x -= 1
             y -= 1
             edits.append((DiffOp.EQUAL, tokens_v1[x], tokens_v2[y]))
-            
-        if i > 0:
-            if x == prev_x:
-                # Insert
-                y -= 1
-                edits.append((DiffOp.INSERT, "", tokens_v2[y]))
-            else:
-                # Delete
-                x -= 1
-                edits.append((DiffOp.DELETE, tokens_v1[x], ""))
-                
+
+        # Then the single insert or delete that crossed onto this diagonal.
+        if x == prev_x:
+            y -= 1
+            edits.append((DiffOp.INSERT, "", tokens_v2[y]))
+        else:
+            x -= 1
+            edits.append((DiffOp.DELETE, tokens_v1[x], ""))
+
+        # Land exactly on the predecessor before the next iteration reads k.
+        x, y = prev_x, prev_y
+
+    # The snake running back to the origin. When d == 0 the loop above never
+    # ran and this is the whole script, which is what identical inputs need.
+    while x > 0 and y > 0:
+        x -= 1
+        y -= 1
+        edits.append((DiffOp.EQUAL, tokens_v1[x], tokens_v2[y]))
+
+    # Anything still left on one side is a pure prefix insert or delete. Only
+    # reachable via the max_d fallback, but cheap insurance against a truncated
+    # trace producing a script that does not rebuild the inputs.
+    while x > 0:
+        x -= 1
+        edits.append((DiffOp.DELETE, tokens_v1[x], ""))
+    while y > 0:
+        y -= 1
+        edits.append((DiffOp.INSERT, "", tokens_v2[y]))
+
     # Reverse to get chronological order
     edits.reverse()
     return edits
@@ -211,19 +251,22 @@ def generate_diff_blocks(
 
 def calculate_retention_score(blocks: list[DiffBlock]) -> float:
     """Calculate the percentage of text retained from v1 to v2.
-    
+
     Args:
         blocks: The list of DiffBlock objects.
-        
+
     Returns:
-        A float between 0.0 and 1.0 representing retention.
+        A float between 0.0 and 1.0 representing retention. A v1 with nothing
+        in it — no blocks at all, or blocks that are all insertions — scores
+        1.0: there was nothing to lose, which is not the same as having lost
+        everything.
     """
     total_v1_len = sum(b.end_v1 - b.start_v1 for b in blocks if b.op != DiffOp.INSERT)
     equal_len = sum(b.end_v1 - b.start_v1 for b in blocks if b.op == DiffOp.EQUAL)
-    
+
     if total_v1_len == 0:
-        return 0.0
-        
+        return 1.0
+
     return round(equal_len / total_v1_len, 4)
 
 import difflib

@@ -43,7 +43,7 @@ class MultimodalPDFOCREngine:
         self.processed_pages_log.append(page_record)
         return page_record
 
-    def get_extraction_summary() -> dict[str, Any]:
+    def get_extraction_summary(self) -> dict[str, Any]:
         """Calculates aggregate OCR confidence and total pages processed telemetry."""
         total_pages = len(self.processed_pages_log)
         avg_confidence = (

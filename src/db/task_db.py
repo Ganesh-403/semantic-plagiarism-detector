@@ -24,17 +24,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional
 
-logger = logging.getLogger(__name__)
+from src.core.app_config import DATA_DIR
 
+logger = logging.getLogger(__name__)
 # ── Constants ────────────────────────────────────────────────────
 
 VALID_STATUSES = ("PENDING", "PROCESSING", "COMPLETED", "FAILED", "DEAD_LETTER")
 
 DEFAULT_DB_PATH = Path(os.environ.get(
     "TASK_QUEUE_DB_PATH",
-    str(Path(__file__).resolve().parents[2] / "data" / "task_queue.db"),
+    str(DATA_DIR / "task_queue.db"),
 ))
-
 _connection_pool = threading.local()
 _pool_lock = threading.Lock()
 _all_connections: set[sqlite3.Connection] = set()
@@ -72,9 +72,8 @@ def _resolve_db_path(db_path: Optional[Union[Path, str]] = None) -> Path:
         return Path(db_path)
     return Path(os.environ.get(
         "TASK_QUEUE_DB_PATH",
-        str(Path(__file__).resolve().parents[2] / "data" / "task_queue.db"),
+        str(DATA_DIR / "task_queue.db"),
     ))
-
 
 def _get_connection(db_path: Optional[Union[Path, str]] = None) -> sqlite3.Connection:
     """Return a thread-local connection, creating one if needed."""

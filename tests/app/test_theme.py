@@ -745,19 +745,19 @@ def test_sanitize_hex_color_invalid():
 
 def get_luminance(hex_color: str) -> float:
     """Calculate the relative luminance of a hex color."""
-    hex_color = hex_color.lstrip('#')
+    hex_color = hex_color.lstrip("#")
     if len(hex_color) == 3:
-        hex_color = ''.join(c + c for c in hex_color)
-    
+        hex_color = "".join(c + c for c in hex_color)
+
     rgb = tuple(int(hex_color[i:i+2], 16) / 255.0 for i in (0, 2, 4))
-    
+
     linear_rgb = []
     for c in rgb:
         if c <= 0.03928:
             linear_rgb.append(c / 12.92)
         else:
             linear_rgb.append(((c + 0.055) / 1.055) ** 2.4)
-            
+
     return 0.2126 * linear_rgb[0] + 0.7152 * linear_rgb[1] + 0.0722 * linear_rgb[2]
 
 
@@ -765,11 +765,29 @@ def get_contrast_ratio(hex1: str, hex2: str) -> float:
     """Calculate the WCAG contrast ratio between two hex colors."""
     l1 = get_luminance(hex1)
     l2 = get_luminance(hex2)
-    
+
     lighter = max(l1, l2)
     darker = min(l1, l2)
-    
+
     return (lighter + 0.05) / (darker + 0.05)
+
+
+def test_get_luminance():
+    """Verify luminance calculations for standard reference colors."""
+    assert abs(get_luminance("#000000") - 0.0) < 1e-4
+    assert abs(get_luminance("#FFFFFF") - 1.0) < 1e-4
+    assert abs(get_luminance("#FFF") - 1.0) < 1e-4
+    assert abs(get_luminance("#000") - 0.0) < 1e-4
+
+
+def test_get_contrast_ratio():
+    """Verify contrast ratio calculations for standard reference pairs."""
+    # Black on white has maximum contrast ratio 21:1
+    assert abs(get_contrast_ratio("#000000", "#FFFFFF") - 21.0) < 0.1
+    assert abs(get_contrast_ratio("#FFFFFF", "#000000") - 21.0) < 0.1
+    # Same color has minimum contrast ratio 1:1
+    assert abs(get_contrast_ratio("#FFFFFF", "#FFFFFF") - 1.0) < 1e-4
+    assert abs(get_contrast_ratio("#123456", "#123456") - 1.0) < 1e-4
 
 
 def test_theme_wcag_contrast():
@@ -777,9 +795,14 @@ def test_theme_wcag_contrast():
     for theme_name, theme in THEMES.items():
         bg = theme.get("background")
         ink = theme.get("ink")
-        
-        if bg and ink:
-            contrast = get_contrast_ratio(bg, ink)
-            assert contrast >= 4.5, f"{theme_name} theme contrast ratio {contrast:.2f} is below 4.5:1 (bg: {bg}, ink: {ink})"
+
+        assert bg is not None, f"Theme {theme_name} missing 'background'"
+        assert ink is not None, f"Theme {theme_name} missing 'ink'"
+
+        contrast = get_contrast_ratio(bg, ink)
+        assert contrast >= 4.5, (
+            f"{theme_name} theme contrast ratio {contrast:.2f} is below 4.5:1 (bg: {bg}, ink: {ink})"
+        )
+
 
 

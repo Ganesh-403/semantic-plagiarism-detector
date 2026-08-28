@@ -1205,6 +1205,13 @@ def inject_css() -> None:
 
     css = main_css + base_css + file_uploader_css + sidebar_active_tab_css
 
+    try:
+        from app.css_constants import MOBILE_LAYOUT_CSS
+    except ImportError:
+        from css_constants import MOBILE_LAYOUT_CSS
+
+    css += MOBILE_LAYOUT_CSS
+
     if st.session_state.get("privacy_mode", False):
         css += """
         /* Privacy Mode: Blur student name labels */

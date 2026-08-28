@@ -58,6 +58,18 @@ class CorpusRepository(BaseRepository):
         """Create or upgrade corpus.db without deleting persisted data."""
         init_corpus_db()
 
+    def soft_delete_document(self, filename: str) -> bool:
+        """Soft delete a document by filename."""
+        return soft_delete_document(filename)
+
+    def restore_document(self, filename: str) -> bool:
+        """Restore a soft-deleted document by filename."""
+        return restore_document(filename)
+
+    def get_all_documents(self, include_deleted: bool = False) -> list:
+        """Return all indexed documents, optionally including soft-deleted ones."""
+        return get_all_documents(include_deleted=include_deleted)
+
 
 corpus_repo = CorpusRepository(_DB_PATH)
 
@@ -203,7 +215,7 @@ def init_corpus_db() -> None:
                 similarity_score REAL NOT NULL,
                 severity_rank TEXT NOT NULL,
                 review_status TEXT NOT NULL DEFAULT 'Pending'
-                    CHECK (review_status IN ('Pending', 'Resolved')),
+                    CHECK (review_status IN ('Pending', 'Resolved', 'Dismissed')),
                 date_flagged TEXT NOT NULL,
                 last_seen TEXT NOT NULL,
                 threshold_at_time_of_flag REAL DEFAULT 0.0
@@ -215,6 +227,8 @@ def init_corpus_db() -> None:
                 document_a TEXT,
                 document_b TEXT,
                 date_dismissed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                dismissed_by TEXT DEFAULT 'admin',
+                dismissal_reason TEXT,
                 PRIMARY KEY (document_a, document_b)
             )
             """)
@@ -483,7 +497,7 @@ def get_all_documents(include_deleted: bool = False) -> list:
 
     query = (
         "SELECT filename, file_hash, upload_date, class_section, student_name, "
-        "assignment_title, pdf_author, pdf_creation_date, pdf_title, detected_language "
+        "assignment_title, pdf_author, pdf_creation_date, pdf_title, detected_language, deleted_at "
         "FROM documents"
     )
     if not include_deleted:
@@ -504,6 +518,7 @@ def get_all_documents(include_deleted: bool = False) -> list:
                 pdf_creation_date=r[7],
                 pdf_title=r[8],
                 detected_language=r[9],
+                deleted_at=r[10],
             )
             for r in rows
         ]
@@ -573,13 +588,15 @@ def delete_document(filename: str) -> None:
 
 
 @with_sqlite_retry
-def soft_delete_document(filename: str) -> None:
+def soft_delete_document(filename: str) -> bool:
     """Soft delete a document by setting is_deleted=1 and moving chunks to deleted_chunks."""
     with _connect() as conn:
-        conn.execute(
-            "UPDATE documents SET is_deleted = 1, deleted_at = ? WHERE filename = ?",
+        cursor = conn.execute(
+            "UPDATE documents SET is_deleted = 1, deleted_at = ? WHERE filename = ? AND (is_deleted IS NULL OR is_deleted = 0)",
             (datetime.now().isoformat(), filename),
         )
+        if cursor.rowcount == 0:
+            return False
         conn.execute(
             """
             INSERT INTO deleted_chunks (vector_id, filename, chunk_index, chunk_text, embedding)
@@ -591,6 +608,7 @@ def soft_delete_document(filename: str) -> None:
         )
         conn.execute("DELETE FROM chunks WHERE filename = ?", (filename,))
         _compact_vector_ids()
+        return True
 
 
 def get_deleted_documents() -> list:
@@ -628,13 +646,15 @@ def get_deleted_documents_count() -> int:
 
 
 @with_sqlite_retry
-def restore_document(filename: str) -> None:
+def restore_document(filename: str) -> bool:
     """Restore a soft-deleted document by setting is_deleted=0 and moving chunks back."""
     with _connect() as conn:
-        conn.execute(
-            "UPDATE documents SET is_deleted = 0, deleted_at = NULL WHERE filename = ?",
+        cursor = conn.execute(
+            "UPDATE documents SET is_deleted = 0, deleted_at = NULL WHERE filename = ? AND is_deleted = 1",
             (filename,),
         )
+        if cursor.rowcount == 0:
+            return False
         restored = conn.execute(
             "SELECT filename, chunk_index, chunk_text, embedding FROM deleted_chunks WHERE filename = ?",
             (filename,),
@@ -650,6 +670,7 @@ def restore_document(filename: str) -> None:
             )
         conn.execute("DELETE FROM deleted_chunks WHERE filename = ?", (filename,))
         _compact_vector_ids()
+        return True
 
 
 @with_sqlite_retry
@@ -1106,6 +1127,19 @@ def check_database_integrity() -> list[str]:
     except Exception as e:
         logger.error(f"Integrity check failed: {e}")
         return [f"Error: {e}"]
+
+
+def vacuum_corpus_database() -> None:
+    """Reclaim unused SQLite pages after bulk corpus deletions."""
+    close_connections(all_threads=True)
+
+    path = get_corpus_db_path()
+    conn = sqlite3.connect(os.path.abspath(path))
+    conn.isolation_level = None
+    try:
+        conn.execute("VACUUM")
+    finally:
+        conn.close()
 
 
 @with_sqlite_retry

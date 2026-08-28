@@ -1,9 +1,25 @@
+"""
+src/utils/zip_processor.py
+--------------------------
+In-memory extraction of supported documents from uploaded ZIP archives.
+
+Two entry points are exposed:
+
+``iter_zip_files``
+    A generator yielding ``(filename, file_bytes)`` one entry at a time so a
+    large archive never has every decompressed member resident at once.
+
+``process_zip_file``
+    A thin convenience wrapper that materialises the generator into a dict for
+    callers that want the whole archive up front.
+"""
+
 import io
 import logging
 import os
 import zipfile
 from pathlib import Path
-from typing import Dict, Generator, Tuple
+from typing import Generator, Tuple
 
 from src.utils.filename import (
     InvalidFileExtensionError,
@@ -45,7 +61,9 @@ def is_safe_zip_path(target_dir: Path, extracted_path: Path) -> bool:
     return True
 
 
-def process_zip_file(zip_bytes: bytes, skip_corrupted: bool = False) -> dict[str, bytes]:
+def iter_zip_files(
+    zip_bytes: bytes, skip_corrupted: bool = False
+) -> Generator[Tuple[str, bytes], None, None]:
     """
     Yields (filename, file_bytes) tuples one entry at a time from a ZIP archive.
 
@@ -55,9 +73,16 @@ def process_zip_file(zip_bytes: bytes, skip_corrupted: bool = False) -> dict[str
 
     Args:
         zip_bytes: The raw binary data of the ZIP archive.
+        skip_corrupted: When True, encrypted and unreadable members are logged
+            and skipped instead of aborting the whole archive.
 
     Yields:
         Tuple[str, bytes]: (sanitized_unique_filename, raw_file_bytes)
+
+    Raises:
+        ValueError: The archive is empty, malformed, exceeds a decompression
+            safety limit, contains a path-traversal entry, or (when
+            ``skip_corrupted`` is False) holds an encrypted or unreadable member.
     """
     if not zip_bytes:
         raise ValueError("ZIP archive is empty.")
@@ -67,7 +92,9 @@ def process_zip_file(zip_bytes: bytes, skip_corrupted: bool = False) -> dict[str
     if magic not in (b"PK\x03\x04", b"PK\x05\x06"):
         raise ValueError("Invalid or corrupted ZIP archive: missing ZIP header signature.")
 
-    extracted_files: dict[str, bytes] = {}
+    # Tracks the names already yielded so colliding basenames from different
+    # archive directories are disambiguated rather than silently overwritten.
+    used_filenames: set[str] = set()
 
     try:
         zip_stream = io.BytesIO(zip_bytes)
@@ -171,7 +198,7 @@ def process_zip_file(zip_bytes: bytes, skip_corrupted: bool = False) -> dict[str
                     filename,
                     used_filenames,
                 )
-                used_filenames[unique_name] = b""
+                used_filenames.add(unique_name)
 
                 yield unique_name, file_data
 
@@ -179,14 +206,18 @@ def process_zip_file(zip_bytes: bytes, skip_corrupted: bool = False) -> dict[str
         raise ValueError("Invalid or corrupted ZIP archive.") from e
 
 
-def process_zip_file(zip_bytes: bytes) -> dict[str, bytes]:
+def process_zip_file(
+    zip_bytes: bytes, skip_corrupted: bool = False
+) -> dict[str, bytes]:
     """
     Extracts supported documents (.pdf, .docx, .txt, .rtf, .csv, .odt, .md) from a ZIP archive entirely in memory.
 
     Args:
         zip_bytes: The raw binary data of the ZIP archive.
+        skip_corrupted: Forwarded to :func:`iter_zip_files`. When True,
+            encrypted and unreadable members are skipped instead of aborting.
 
     Returns:
         Dict[str, bytes]: A dictionary mapping unique, sanitized filenames to their raw bytes.
     """
-    return dict(iter_zip_files(zip_bytes))
+    return dict(iter_zip_files(zip_bytes, skip_corrupted=skip_corrupted))

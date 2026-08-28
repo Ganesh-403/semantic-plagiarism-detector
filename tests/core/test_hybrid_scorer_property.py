@@ -40,6 +40,8 @@ import re
 import string
 
 import pytest
+
+hypothesis = pytest.importorskip("hypothesis")
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 

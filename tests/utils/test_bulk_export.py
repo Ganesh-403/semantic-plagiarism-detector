@@ -1,4 +1,5 @@
-﻿import csv
+# -*- coding: utf-8 -*-
+import csv
 import io
 import json
 import zipfile
@@ -313,8 +314,8 @@ class TestNormalizeCsvHeaders:
 
     def test_unicode_characters_preserved(self):
         """Unicode characters must be preserved in normalized headers."""
-        result = normalize_csv_headers(["cafÃ©", "naÃ¯ve", "rÃ©sumÃ©"])
-        assert result == ["cafÃ©", "naÃ¯ve", "rÃ©sumÃ©"]
+        result = normalize_csv_headers(["caf\u00e9", "na\u00efve", "r\u00e9sum\u00e9"])
+        assert result == ["caf\u00e9", "na\u00efve", "r\u00e9sum\u00e9"]
 
     def test_single_header(self):
         """A single header must be normalized correctly."""

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel
 
@@ -53,7 +53,7 @@ class Document(DictLikeModel):
 class MatchResult(DictLikeModel):
     """Pydantic model representing a similarity PlagiarismIncident DTO."""
 
-    incident_id: Optional[int] = None
+    incident_id: Optional[str | int] = None
     document_a: str
     document_b: str
     similarity_score: float

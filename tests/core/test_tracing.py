@@ -1,4 +1,7 @@
 import pytest
+
+opentelemetry = pytest.importorskip("opentelemetry")
+
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from src.core.processing import run_full_pipeline

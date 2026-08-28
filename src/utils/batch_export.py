@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from src.utils.export_sanitizer import sanitize_spreadsheet_value
+
 logger = logging.getLogger(__name__)
 
 
@@ -87,7 +89,19 @@ class BatchExporter:
         with open(output_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=headers)
             writer.writeheader()
-            writer.writerows(data[:self.config.max_results])
+            for row in data[: self.config.max_results]:
+                writer.writerow(
+                    {
+                        key: (
+                            ""
+                            if value is None
+                            else sanitize_spreadsheet_value(value)
+                            if isinstance(value, str)
+                            else value
+                        )
+                        for key, value in row.items()
+                    }
+                )
         logger.info(f"Exported CSV to {output_path}")
         return output_path
 

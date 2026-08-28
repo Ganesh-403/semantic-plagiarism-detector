@@ -35,6 +35,8 @@ import numpy as np
 import pandas as pd
 
 from src.core.similarity import find_most_similar_chunks
+from src.db.corpus_db import _connect, get_all_documents, get_document_word_counts
+from src.utils.export_sanitizer import sanitize_spreadsheet_value
 from src.utils.filename import sanitize_filename
 from src.utils.pdf_report import generate_plagiarism_report
 
@@ -135,8 +137,8 @@ class ExportFormat(str, Enum):
 def sanitize_csv_cell_value(val: Any) -> str:
     """Sanitize a CSV cell value to prevent CSV formula injection (Issue #1744).
 
-    Prepends a single quote `'` if the string representation of val begins with
-    '=', '+', '-', or '@'.
+    Uses the shared spreadsheet sanitizer so CSV and Excel exports apply the
+    same formula-injection rules.
 
     Args:
         val: Any cell value (string, numeric, None, etc.)
@@ -146,10 +148,8 @@ def sanitize_csv_cell_value(val: Any) -> str:
     """
     if val is None:
         return ""
-    str_val = str(val)
-    if str_val and str_val[0] in ("=", "+", "-", "@"):
-        return f"'{str_val}"
-    return str_val
+    sanitized = sanitize_spreadsheet_value(str(val))
+    return sanitized if isinstance(sanitized, str) else str(sanitized)
 
 
 def normalize_csv_headers(headers: list[str]) -> list[str]:
@@ -817,9 +817,10 @@ def create_batch_incident_zip_archive(
     return memory_file.getvalue()
 
 
-def create_documents_bulk_zip_archive(
+def create_bulk_export_zip(
     filenames: list[str],
     progress_callback: Optional[Callable[[int, int], None]] = None,
+    preserve_hierarchy: bool = True,
 ) -> bytes:
     """Create a downloadable .zip archive containing text content and metadata manifest
     for the specified document filenames from the corpus database.
@@ -827,12 +828,12 @@ def create_documents_bulk_zip_archive(
     Args:
         filenames: List of document filenames to include in the ZIP archive.
         progress_callback: Optional callback invoked with (current_idx, total_count) after processing each document.
+        preserve_hierarchy: If True (default), structure archive files into folders as
+            "{class_section}/{assignment_title}/{filename}". If False, flatten files into the root of the ZIP.
 
     Returns:
         ZIP archive file bytes ready for download.
     """
-    from src.db.corpus_db import _connect, get_all_documents, get_document_word_counts
-
     buffer = io.BytesIO()
     raw_docs = get_all_documents(include_deleted=True)
     all_docs = {}
@@ -877,12 +878,22 @@ def create_documents_bulk_zip_archive(
             if not os.path.splitext(clean_name)[1]:
                 clean_name += ".txt"
 
-            zip_file.writestr(clean_name, text_content.encode("utf-8"))
+            class_section = doc_meta.get("class_section") or "Unassigned"
+            assignment_title = doc_meta.get("assignment_title") or "General"
+
+            if preserve_hierarchy:
+                safe_class = sanitize_filename(str(class_section), fallback="Unassigned")
+                safe_assignment = sanitize_filename(str(assignment_title), fallback="General")
+                archive_member_path = f"{safe_class}/{safe_assignment}/{clean_name}"
+            else:
+                archive_member_path = clean_name
+
+            zip_file.writestr(archive_member_path, text_content.encode("utf-8"))
 
             manifest_rows.append(
                 {
                     "filename": filename,
-                    "exported_as": clean_name,
+                    "exported_as": archive_member_path,
                     "student_name": doc_meta.get("student_name") or "N/A",
                     "assignment_title": doc_meta.get("assignment_title") or "N/A",
                     "class_section": doc_meta.get("class_section") or "N/A",
@@ -902,3 +913,20 @@ def create_documents_bulk_zip_archive(
 
     buffer.seek(0)
     return buffer.getvalue()
+
+
+def create_documents_bulk_zip_archive(
+    filenames: list[str],
+    progress_callback: Optional[Callable[[int, int], None]] = None,
+    preserve_hierarchy: bool = True,
+) -> bytes:
+    """Create a downloadable .zip archive for document filenames.
+
+    Alias for create_bulk_export_zip for backward compatibility.
+    """
+    return create_bulk_export_zip(
+        filenames,
+        progress_callback=progress_callback,
+        preserve_hierarchy=preserve_hierarchy,
+    )
+

@@ -135,8 +135,31 @@ def create_managed_temp_file(
     return temp_path
 
 
-def create_managed_temp_dir(
+@contextmanager
+def managed_temp_file(
     suffix: Optional[str] = None, prefix: Optional[str] = None
+) -> Generator[str, None, None]:
+    """Context manager for a temp file that is cleaned up immediately on exit.
+
+    Unlike ``create_managed_temp_file``, which relies on the ``atexit``
+    handler to delete the file at process shutdown, this yields the path
+    inside a ``with`` block and unregisters + unlinks the file as soon as
+    the block exits (even if an exception was raised), so short-lived
+    tasks don't have to wait for process exit to free disk space.
+    """
+    temp_path = create_managed_temp_file(suffix=suffix, prefix=prefix)
+    try:
+        yield temp_path
+    finally:
+        unregister_temp_path(temp_path)
+        try:
+            if os.path.exists(temp_path) or os.path.islink(temp_path):
+                os.remove(temp_path)
+        except OSError as exc:
+            logger.warning("Failed to clean up temp file %s: %s", temp_path, exc)
+
+
+def create_managed_temp_dir(    suffix: Optional[str] = None, prefix: Optional[str] = None
 ) -> str:
     """Creates a temporary directory on disk and registers it for automatic deletion on exit."""
     temp_dir = tempfile.mkdtemp(suffix=suffix, prefix=prefix)

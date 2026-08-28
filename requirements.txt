@@ -53,6 +53,7 @@ networkx>=3.0                     # Plagiarism cluster detection
 faker>=20.0.0                   # Fake data generation for mock essay utility (#255)
 hypothesis>=6.100.0             # Property-based testing for filename sanitization (#963)
 jsonschema>=4.20.0               # JSON Schema validation for API error-response tests
+pytest-xdist>=3.5.0             # Parallel test execution across CPU cores (#3773)
 
 # ── Caching & Session Management ───────────────────────────────────────────────
 

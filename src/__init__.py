@@ -41,6 +41,7 @@ from .core import (
     translate_text,
 )
 from .db import (
+    CorpusRepository,
     add_chunks,
     add_document,
     add_user,
@@ -65,7 +66,9 @@ from .db import (
     init_corpus_db,
     init_db,
     is_user_active,
+    restore_document,
     set_user_active_status,
+    soft_delete_document,
     update_password,
     update_user_profile,
     verify_user,
@@ -89,8 +92,6 @@ except ImportError:
     plot_similarity_network = None
     render_network_plotly = None
     plot_document_similarity_heatmap = None
-except ImportError:
-    pass
 
 
 __all__ = [
@@ -152,6 +153,8 @@ __all__ = [
     "add_document",
     "get_document_by_hash",
     "get_all_documents",
+    "soft_delete_document",
+    "restore_document",
     "add_chunks",
     "get_chunk_registry",
     "get_all_embeddings",
@@ -167,4 +170,5 @@ __all__ = [
     "sanitize_zero_width_characters",
     "TagManager",
     "sanitize_tag_name",
+    "CorpusRepository",
 ]

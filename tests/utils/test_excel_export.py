@@ -1,16 +1,21 @@
 import inspect
 import io
+import os
 from datetime import datetime, timezone
 
 import openpyxl
 import pandas as pd
+import pytest
 
 from src.utils.bulk_export import export_incidents_xlsx_stream
 from src.utils.excel_export import (
     build_similarity_workbook,
     export_similarity_matrix_to_excel,
+    export_similarity_matrix_to_temp_file,
     generate_csv_matrix_stream,
+    generate_tsv_matrix_stream,
 )
+from src.utils.export_sanitizer import sanitize_spreadsheet_value
 
 
 def test_generate_csv_matrix_stream():
@@ -44,6 +49,38 @@ def test_generate_csv_matrix_stream():
     pd.testing.assert_frame_equal(df, reconstructed_df, check_names=False)
 
 
+def test_generate_tsv_matrix_stream():
+    # Setup test DataFrame
+    data = {
+        "DocA.txt": [1.0, 0.85, 0.12],
+        "DocB.txt": [0.85, 1.0, 0.45],
+        "DocC.txt": [0.12, 0.45, 1.0],
+    }
+    df = pd.DataFrame(data, index=["DocA.txt", "DocB.txt", "DocC.txt"])
+
+    # Test 1: Return type is a Generator
+    stream = generate_tsv_matrix_stream(df)
+    assert inspect.isgenerator(stream)
+
+    # Test 2: Verify chunk output
+    chunks = list(stream)
+    assert len(chunks) == len(df) + 1  # 1 header row + 3 data rows
+
+    # Verify header line with tabs
+    assert chunks[0].strip() == "Document\tDocA.txt\tDocB.txt\tDocC.txt"
+
+    # Verify data lines with tabs
+    assert chunks[1].strip() == "DocA.txt\t1.0\t0.85\t0.12"
+    assert chunks[2].strip() == "DocB.txt\t0.85\t1.0\t0.45"
+    assert chunks[3].strip() == "DocC.txt\t0.12\t0.45\t1.0"
+
+    # Test 3: Verify complete TSV reconstruction matches Expected TSV output
+    full_tsv = "".join(chunks)
+    reconstructed_df = pd.read_csv(io.StringIO(full_tsv), sep="\t", index_col=0)
+    pd.testing.assert_frame_equal(df, reconstructed_df, check_names=False)
+
+
+
 def test_build_similarity_workbook_metadata_properties():
     """Verify build_similarity_workbook populates document title, creator, and created timestamp (#3438)."""
     df = pd.DataFrame({"Doc1.txt": [1.0]}, index=["Doc1.txt"])
@@ -56,6 +93,24 @@ def test_build_similarity_workbook_metadata_properties():
     assert wb.properties.created is not None
     assert isinstance(wb.properties.created, datetime)
     assert before <= wb.properties.created <= after
+
+
+def test_build_similarity_workbook_custom_color_thresholds():
+    df = pd.DataFrame(
+        {"a.txt": [1.0, 0.4], "b.txt": [0.4, 1.0]},
+        index=["a.txt", "b.txt"],
+    )
+    wb = build_similarity_workbook(
+        df,
+        low_threshold=0.1,
+        mid_threshold=0.4,
+        high_threshold=0.9,
+    )
+    rules = list(wb.active.conditional_formatting._cf_rules.values())
+    rule = rules[0][0]
+    assert float(rule.colorScale.cfvo[0].val) == 0.1
+    assert float(rule.colorScale.cfvo[1].val) == 0.4
+    assert float(rule.colorScale.cfvo[2].val) == 0.9
 
 
 def test_export_similarity_matrix_to_excel_persists_metadata():

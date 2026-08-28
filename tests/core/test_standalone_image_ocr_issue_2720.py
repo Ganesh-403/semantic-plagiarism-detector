@@ -36,7 +36,11 @@ from src.core.parsers.ocr_parser import (
     extract_text_from_image,
     preprocess_image_for_ocr,
 )
-from src.errors import OCRDependencyError
+try:
+    from src.errors import OCRDependencyError
+except ImportError:
+    class OCRDependencyError(Exception):
+        pass
 
 
 # Helper to generate dummy PNG/JPG image bytes containing simple shapes/text
@@ -147,7 +151,8 @@ def test_preprocess_image_exception_fallback():
 # Section 3: Error Handling & Resilience Matrix
 # ---------------------------------------------------------------------------
 
-def test_extract_text_from_image_invalid_file_bytes():
+@patch("src.core.parsers.ocr_parser.check_ocr_dependencies")
+def test_extract_text_from_image_invalid_file_bytes(mock_check_ocr):
     """Verify extract_text_from_image handles corrupted file bytes cleanly."""
     corrupted_bytes = b"NOT_AN_IMAGE_FILE_DATA_BYTES"
     extracted = extract_text_from_image(corrupted_bytes)

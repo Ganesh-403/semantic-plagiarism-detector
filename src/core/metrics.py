@@ -22,19 +22,25 @@ logger = logging.getLogger(__name__)
 # ── Counters ───────────────────────────────────────────────────────────────────
 
 documents_total = Counter(
-    "documents_total",
+    "spd_documents_total",
     "Cumulative number of documents ingested since process start. "
     "Monotonic: use rate()/increase() on this. For the current corpus size "
     "see the corpus_documents gauge.",
 )
 
 flagged_incidents_total = Counter(
-    "flagged_incidents_total",
+    "spd_flagged_incidents_total",
     "Total number of flagged plagiarism incidents",
 )
 
+plagiarism_incidents_total = Counter(
+    "spd_plagiarism_incidents_total",
+    "Total plagiarism incidents flagged",
+    ["severity"],
+)
+
 uploads_total = Counter(
-    "uploads_total",
+    "spd_uploads_total",
     "Total number of file upload batches processed",
     labelnames=["status"],
 )
@@ -51,26 +57,32 @@ cache_misses_total = Counter(
     labelnames=["cache_type"],
 )
 
+ocr_invocations_total = Counter(
+    "spd_ocr_invocations_total",
+    "Total OCR extraction attempts",
+    ["status"],
+)
+
 # ── Gauges ─────────────────────────────────────────────────────────────────────
 
 corpus_size_gauge = Gauge(
-    "corpus_size_bytes",
+    "spd_corpus_size_bytes",
     "Total size on disk of the corpus database",
 )
 
 index_size_gauge = Gauge(
-    "index_size_bytes",
+    "spd_index_size_bytes",
     "Total size on disk of the FAISS index file",
 )
 
 corpus_documents_gauge = Gauge(
-    "corpus_documents",
+    "spd_corpus_documents",
     "Current number of documents in the corpus. Goes down when documents are "
     "deleted, which is why this is a gauge and not documents_total.",
 )
 
 active_users_gauge = Gauge(
-    "active_users",
+    "spd_active_users",
     "Current number of active users",
 )
 
@@ -79,10 +91,14 @@ active_threads_gauge = Gauge(
     "Active Python threads",
 )
 
+faiss_vectors_gauge = Gauge(
+    "spd_faiss_vectors_total",
+    "Number of vectors in FAISS index",
+)
 # ── Histograms ─────────────────────────────────────────────────────────────────
 
 pipeline_duration_seconds = Histogram(
-    "pipeline_duration_seconds",
+    "spd_pipeline_duration_seconds",
     "Duration of each pipeline stage in seconds",
     labelnames=["stage"],
     buckets=(0.01, 0.05, 0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0),
@@ -95,7 +111,7 @@ spd_scan_duration_seconds = Histogram(
 )
 
 query_response_time_seconds = Histogram(
-    "query_response_time_seconds",
+    "spd_query_response_time_seconds",
     "Duration of similarity search queries in seconds",
     buckets=(0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0),
 )

@@ -179,7 +179,7 @@ def test_timed_decorator_records_even_when_the_stage_raises():
     payload = metrics.generate_metrics_json()
     counts = [
         sample["value"]
-        for sample in payload["pipeline_duration_seconds"]["metrics"]
+        for sample in payload["spd_pipeline_duration_seconds"]["metrics"]
         if sample["labels"].get("stage") == "unit_test_failing_stage"
         and sample["labels"].get("le") is None
     ]
@@ -204,15 +204,15 @@ def test_generate_metrics_json_includes_the_new_gauges(fake_telemetry):
 
     payload = metrics.generate_metrics_json()
 
-    assert "corpus_documents" in payload
-    assert "active_users" in payload
-    assert payload["corpus_documents"]["type"] == "gauge"
+    assert "spd_corpus_documents" in payload
+    assert "spd_active_users" in payload
+    assert payload["spd_corpus_documents"]["type"] == "gauge"
 
 
 def test_generate_metrics_json_reports_the_counter_as_a_counter():
     payload = metrics.generate_metrics_json()
 
-    assert payload["documents"]["type"] == "counter"
+    assert payload["spd_documents"]["type"] == "counter"
 
 
 # ── Scan Stage Duration Histogram ──────────────────────────────────────────────

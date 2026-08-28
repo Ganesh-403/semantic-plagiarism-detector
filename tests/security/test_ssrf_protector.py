@@ -18,6 +18,7 @@ from src.security.ssrf_protector import (
     RESTRICTED_IPV4_CIDR_BLOCKS,
     SSRFProtector,
     SSRFSecurityException,
+    get_user_agent,
     is_ip_in_cidr_block,
 )
 
@@ -410,6 +411,49 @@ def test_validate_url_safety_allows_public_address(
 
     assert validated_url == "https://example.com/webhook"
     assert pinned_ip == "93.184.216.34"
+
+
+def test_user_agent_uses_environment_override(monkeypatch):
+    monkeypatch.setenv("SSRF_USER_AGENT", "SemanticPlagiarismDetector/2.0")
+    assert get_user_agent() == "SemanticPlagiarismDetector/2.0"
+
+
+def test_user_agent_environment_override_rejects_crlf(monkeypatch):
+    monkeypatch.setenv("SSRF_USER_AGENT", "TrustedAgent\r\nX-Injected: true")
+    with pytest.raises(
+        SSRFSecurityException,
+        match="User-Agent must not contain carriage return or line feed characters",
+    ):
+        get_user_agent()
+
+
+def test_explicit_user_agent_rejects_crlf():
+    with pytest.raises(
+        SSRFSecurityException,
+        match="User-Agent must not contain carriage return or line feed characters",
+    ):
+        get_user_agent("TrustedAgent\nX-Injected: true")
+
+
+@patch("src.security.ssrf_protector.socket.getaddrinfo")
+def test_validate_url_safety_uses_environment_user_agent(
+    mock_getaddrinfo,
+    mock_requests_head,
+    monkeypatch,
+):
+    mock_getaddrinfo.return_value = [
+        (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))
+    ]
+    monkeypatch.setenv("SSRF_USER_AGENT", "ConfiguredAgent/3.0")
+
+    SSRFProtector.validate_url_safety("https://example.com/webhook")
+
+    mock_requests_head.assert_called_once_with(
+        "https://example.com/webhook",
+        headers={"User-Agent": "ConfiguredAgent/3.0"},
+        timeout=5.0,
+        allow_redirects=False,
+    )
 
 
 def test_default_user_agent_constant_defined():

@@ -326,14 +326,97 @@ def mock_embed_chunks():
     return MockDataFactory.embed_chunks
 
 
+import time
+import logging
+import abc
+import typing
+from typing import List, Optional, Set
+from pathlib import Path
+
+# -----------------------------------------------------------------------------
+# Enterprise Database Lifecycle Management
+# -----------------------------------------------------------------------------
+class AbstractTeardownStrategy(abc.ABC):
+    """Abstract base class for all file and connection teardown strategies."""
+    @abc.abstractmethod
+    def execute_teardown(self, target_path: Path) -> bool:
+        pass
+
+class SQLiteConnectionTeardownStrategy(AbstractTeardownStrategy):
+    """Safely terminates dangling SQLite connections to prevent Win32 file lock exceptions."""
+    def execute_teardown(self, target_path: Path) -> bool:
+        try:
+            # Force close connections from known singleton caches
+            from src.db.corpus_db import close_connections
+            close_connections(all_threads=True)
+            return True
+        except ImportError:
+            return False
+        except Exception as e:
+            logging.error(f"Failed to close SQLite connections: {e}")
+            return False
+
+class ExponentialBackoffFileUnlinkStrategy(AbstractTeardownStrategy):
+    """Attempts to unlink files with exponential backoff to handle transient OS locks."""
+    def __init__(self, max_retries: int = 5, initial_backoff: float = 0.05):
+        self.max_retries = max_retries
+        self.initial_backoff = initial_backoff
+
+    def execute_teardown(self, target_path: Path) -> bool:
+        if not target_path.exists():
+            return True
+            
+        for attempt in range(self.max_retries):
+            try:
+                target_path.unlink()
+                return True
+            except OSError as e:
+                if attempt == self.max_retries - 1:
+                    logging.error(f"Failed to unlink {target_path} after {self.max_retries} attempts: {e}")
+                    return False
+                time.sleep(self.initial_backoff * (2 ** attempt))
+        return False
+
+class EnterpriseFixtureTeardownManager:
+    """Orchestrates complex teardown logic across multi-file database artifacts."""
+    def __init__(self) -> None:
+        self.strategies: List[AbstractTeardownStrategy] = [
+            SQLiteConnectionTeardownStrategy(),
+            ExponentialBackoffFileUnlinkStrategy()
+        ]
+        self.tracked_files: Set[Path] = set()
+
+    def track_database(self, db_path: Path) -> None:
+        """Tracks the primary database and its associated WAL/SHM artifacts."""
+        self.tracked_files.add(db_path)
+        self.tracked_files.add(db_path.with_suffix(db_path.suffix + "-wal"))
+        self.tracked_files.add(db_path.with_suffix(db_path.suffix + "-shm"))
+        self.tracked_files.add(db_path.with_suffix(db_path.suffix + "-journal"))
+
+    def execute_all(self) -> None:
+        """Executes all teardown strategies across all tracked files."""
+        # Step 1: Close connections first
+        connection_strategy = self.strategies[0]
+        connection_strategy.execute_teardown(Path("."))
+        
+        # Step 2: Unlink all files
+        unlink_strategy = self.strategies[1]
+        for file_path in self.tracked_files:
+            unlink_strategy.execute_teardown(file_path)
+
 @pytest.fixture
 def mock_db(tmp_path):
     """
     Provides an isolated, empty, and writable SQLite database schema for tests.
     Patches the global database paths in src.db modules to use temporary files.
+    Includes highly-engineered, fail-safe teardown logic to prevent test pollution.
     """
     corpus_db_file = tmp_path / "test_corpus.db"
     auth_db_file = tmp_path / "test_users.db"
+    
+    manager = EnterpriseFixtureTeardownManager()
+    manager.track_database(corpus_db_file)
+    manager.track_database(auth_db_file)
 
     import unittest.mock
 
@@ -354,10 +437,12 @@ def mock_db(tmp_path):
             init_db()
         except Exception:
             import traceback
-
             traceback.print_exc()
 
         yield str(corpus_db_file)
+        
+        # Acceptance Criteria Teardown execution
+        manager.execute_all()
 
 
 # ── Multi-Format Sample Files Fixture (Issue #566) ───────────────────────────

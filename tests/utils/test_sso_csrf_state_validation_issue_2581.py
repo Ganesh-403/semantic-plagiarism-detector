@@ -30,7 +30,7 @@ def setup_auth_db(tmp_path, monkeypatch):
 def test_google_auth_url_stores_state(monkeypatch):
     """Verify get_google_auth_url generates and stores state server-side."""
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "test-google-client-id")
-    url, state = get_google_auth_url()
+    url, state, state_data = get_google_auth_url()
 
     assert f"state={state}" in url
     assert state.startswith("google_")
@@ -73,3 +73,17 @@ def test_exchange_github_code_rejects_invalid_csrf_state():
     profile, error = exchange_github_code(code="dummy_code", state="invalid_state_123")
     assert profile is None
     assert "CSRF protection failed" in error
+
+
+@patch("src.db.auth.log_security_event")
+def test_verify_sso_state_logs_security_event_on_failure(mock_log_security_event):
+    """Verify log_security_event is called with SSO_CSRF_REJECTED on state verification failure."""
+    forged_state = "google_forged_csrf_state_12345"
+    assert verify_sso_state(forged_state) is False
+
+    mock_log_security_event.assert_called_with(
+        "SSO_CSRF_REJECTED",
+        username="anonymous",
+        details=f"Invalid state: {forged_state}",
+    )
+

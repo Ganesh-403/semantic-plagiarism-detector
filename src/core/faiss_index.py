@@ -22,12 +22,12 @@ inner product == cosine similarity.
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
+from src.core.metrics import faiss_vectors_gauge
 from src.core.text_chunking import ChunkString
 
 # FAISS has no official type stubs; suppress Pylance false positives
 import faiss  # type: ignore
 import numpy as np
-
 logger = logging.getLogger(__name__)
 
 # ── Threshold for automatic index selection ────────────────────────────────────
@@ -100,8 +100,8 @@ def build_index(
                 registry.append(ChunkRecord(doc_name, i, chunk))
 
     if not all_vectors:
+        faiss_vectors_gauge.set(0)
         return faiss.IndexFlatIP(dim), registry
-
     matrix = np.vstack(all_vectors)
     norms = np.linalg.norm(matrix, axis=1, keepdims=True)
     norms = np.where(norms == 0, 1.0, norms)
@@ -136,11 +136,11 @@ def build_index(
             f"[faiss_index] Built IndexFlatIP  ({n_vectors} vectors, exact search)"
         )
 
+    faiss_vectors_gauge.set(index.ntotal)
     return index, registry
 
 
-def search_similar_chunks(
-    query_embedding: np.ndarray,
+def search_similar_chunks(    query_embedding: np.ndarray,
     index: faiss.Index,
     registry: list[ChunkRecord],
     top_k: int = 10,
@@ -344,8 +344,8 @@ def add_to_index(
         f"[faiss_index] Incrementally added {len(new_vectors)} vectors "
         f"(total: {index.ntotal})"
     )
+    faiss_vectors_gauge.set(index.ntotal)
     return index, registry + new_registry
-
 
 def remove_vectors_by_doc(
     index: faiss.Index,
@@ -495,11 +495,11 @@ def build_index_from_matrix(
             base.add(mat)
             index = base
 
+    faiss_vectors_gauge.set(index.ntotal)
     return index
 
 
-def validate_index(
-    index: Optional[faiss.Index], expected_count: int, expected_dimension: int = 384
+def validate_index(    index: Optional[faiss.Index], expected_count: int, expected_dimension: int = 384
 ) -> bool:
     """Check whether a loaded index matches the expected vector count and dimension."""
     if index is None:

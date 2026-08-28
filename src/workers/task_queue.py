@@ -16,6 +16,7 @@ import logging
 import queue
 import threading
 import time
+from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 from src.db import task_db
