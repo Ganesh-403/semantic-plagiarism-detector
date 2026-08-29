@@ -58,3 +58,14 @@ class SessionKeys(str, Enum):
 
     def __str__(self) -> str:  # pragma: no cover - convenience for f-strings/logging
         return self.value
+
+
+def _validate_unique_keys():
+    values = [member.value for member in SessionKeys]
+    duplicates = {val for val in values if values.count(val) > 1}
+    if duplicates:
+        raise ValueError(f"Duplicate session key values detected in SessionKeys: {duplicates}")
+
+
+# Execute module-level validation to prevent key collisions at startup
+_validate_unique_keys()
