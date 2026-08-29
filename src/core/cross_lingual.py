@@ -157,6 +157,54 @@ def detect_chunk_language(text: str) -> str:
     return detected_lang
 
 
+# ── Untranslatable Content Detection (Issue #3693) ──────────────────────────
+
+# Content that is expected to remain identical after back-translation
+# (numbers, URLs, code, acronyms, file paths, ...). For such chunks the
+# "suspiciously identical" warning is misleading and should be suppressed.
+_UNTRANSLATABLE_PATTERNS = (
+    r"^[\d.,:\-/\\+%$€£¥₹# ]+$",          # pure numbers, dates, currency
+    r"^https?://\S+$",                    # URLs
+    r"^[\w.+-]+@[\w-]+\.[\w.-]+$",        # email addresses
+    r"^[A-Z](?:\.?[A-Z]){1,5}\.?$",        # short acronyms (API, HTTP, U.S.A.)
+    r"^[\w./\\-]+\.[a-zA-Z]{1,5}$",       # file paths / extensions
+    r"^[a-z][a-zA-Z0-9]*(?:_[a-z][a-zA-Z0-9]*)*$",  # snake_case identifiers
+    r"^[a-z][a-zA-Z0-9]*(?:\.[a-z][a-zA-Z0-9]*)+$", # dotted / camelCase identifiers
+)
+_UNTRANSLATABLE_RE = [re.compile(p, re.IGNORECASE) for p in _UNTRANSLATABLE_PATTERNS]
+
+
+def _is_untranslatable_content(text: str) -> bool:
+    """Return ``True`` when *text* is expected to survive back-translation unchanged.
+
+    Handles numbers, dates, currency, URLs, email addresses, acronyms, file
+    paths/extensions and code-like identifiers (camelCase, snake_case, dotted).
+    Also returns ``True`` for text whose alphabetic ratio is below 30% — a
+    strong signal of machine-formatted rather than natural-language content.
+
+    Used by :func:`back_translate_chunk` to suppress the noisy
+    "suspiciously identical" warning for Issue #3693.
+    """
+    if not text or not isinstance(text, str):
+        return True
+
+    stripped = text.strip()
+    if not stripped:
+        return True
+
+    for pattern in _UNTRANSLATABLE_RE:
+        if pattern.match(stripped):
+            return True
+
+    # Predominantly non-letter characters => code, symbols, or numbers.
+    letter_count = len(re.findall(r"[a-zA-Z]", stripped))
+    total_count = len(stripped)
+    if total_count > 0 and letter_count / total_count < 0.3:
+        return True
+
+    return False
+
+
 # ── Back-Translation with SQLite Cache (Issue #1956) ─────────────────────────
 
 
@@ -226,8 +274,13 @@ def back_translate_chunk(
         translated_text = translated_text.strip()
         
         # Check if translation is suspiciously identical to source
-        # (could indicate translation service failure)
-        if translated_text == text.strip() and source_lang != TARGET_LANGUAGE:
+        # (could indicate translation service failure). Skip the warning for
+        # content that is expected to remain unchanged (Issue #3693).
+        if (
+            translated_text == text.strip()
+            and source_lang != TARGET_LANGUAGE
+            and not _is_untranslatable_content(text.strip())
+        ):
             logger.warning(
                 "Translation service returned identical text for %s -> %s. "
                 "This may indicate a translation failure.",

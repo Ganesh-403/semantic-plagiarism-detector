@@ -8,6 +8,7 @@ import pytest
 
 from src.core.cross_lingual import (
     TranslationMemoryCache,
+    _is_untranslatable_content,
     back_translate_chunk,
     back_translate_chunks,
     detect_chunk_language,
@@ -911,3 +912,105 @@ def test_back_translate_chunks_batching_groups_of_10():
         mock_batch.assert_any_call([f"Chunk {i}" for i in range(10)], target_lang="en", source_lang="es")
         mock_batch.assert_any_call([f"Chunk {i}" for i in range(10, 20)], target_lang="en", source_lang="es")
         mock_batch.assert_any_call([f"Chunk {i}" for i in range(20, 25)], target_lang="en", source_lang="es")
+
+
+# ── Issue #3693: Untranslatable content detection ────────────────────────────
+
+
+def test_is_untranslatable_empty():
+    """Empty or whitespace-only text is untranslatable."""
+    assert _is_untranslatable_content("") is True
+    assert _is_untranslatable_content("   ") is True
+    assert _is_untranslatable_content(None) is True
+
+
+def test_is_untranslatable_numbers():
+    """Pure numbers, decimals, and dates are untranslatable."""
+    assert _is_untranslatable_content("42") is True
+    assert _is_untranslatable_content("3.14159") is True
+    assert _is_untranslatable_content("2026-08-29") is True
+    assert _is_untranslatable_content("100") is True
+    assert _is_untranslatable_content("$1,234.56") is True
+    assert _is_untranslatable_content("42%") is True
+
+
+def test_is_untranslatable_urls():
+    """URLs are untranslatable."""
+    assert _is_untranslatable_content("https://example.com/path?q=1") is True
+    assert _is_untranslatable_content("http://docs.python.org/3") is True
+
+
+def test_is_untranslatable_emails():
+    """Email addresses are untranslatable."""
+    assert _is_untranslatable_content("user@example.com") is True
+    assert _is_untranslatable_content("admin@corp.io") is True
+
+
+def test_is_untranslatable_acronyms():
+    """Short acronyms are untranslatable."""
+    assert _is_untranslatable_content("API") is True
+    assert _is_untranslatable_content("HTTP") is True
+    assert _is_untranslatable_content("URL") is True
+    assert _is_untranslatable_content("U.S.A.") is True
+    assert _is_untranslatable_content("N.A.T.O.") is True
+
+
+def test_is_untranslatable_code_identifiers():
+    """Code identifiers (camelCase, snake_case, dotted) are untranslatable."""
+    assert _is_untranslatable_content("getElementById") is True
+    assert _is_untranslatable_content("my_function_name") is True
+    assert _is_untranslatable_content("module.export") is True
+    assert _is_untranslatable_content("config.database.host") is True
+
+
+def test_is_untranslatable_file_paths():
+    """File paths and extensions are untranslatable."""
+    assert _is_untranslatable_content("main.py") is True
+    assert _is_untranslatable_content("src/utils/helper.ts") is True
+    assert _is_untranslatable_content("README.md") is True
+
+
+def test_is_not_untranslatable_normal_text():
+    """Normal prose should not be flagged as untranslatable."""
+    assert _is_untranslatable_content("Hello world") is False
+    assert _is_untranslatable_content("The quick brown fox") is False
+    assert _is_untranslatable_content("Machine learning is transforming education") is False
+
+
+def test_back_translate_chunk_skips_warning_for_untranslatable():
+    """back_translate_chunk should not warn when identical text is expected."""
+    # Mock translate_text to return identical text (simulating untranslatable content)
+    with patch("src.core.cross_lingual.translate_text") as mock_translate:
+        mock_translate.return_value = "42"
+
+        with patch("src.core.cross_lingual.logger") as mock_logger:
+            result = back_translate_chunk("42", source_lang="es")
+
+            assert result == "42"
+            # Should NOT have logged a warning about identical text
+            mock_logger.warning.assert_not_called()
+
+
+def test_back_translate_chunk_warns_for_translatable_identical():
+    """back_translate_chunk should warn when identical text is unexpected."""
+    # A normal sentence returning identical text is suspicious.
+    with patch("src.core.cross_lingual.translate_text") as mock_translate:
+        mock_translate.return_value = "Hola mundo"
+
+        with patch("src.core.cross_lingual.logger") as mock_logger:
+            result = back_translate_chunk("Hola mundo", source_lang="es")
+
+            assert result == "Hola mundo"
+            mock_logger.warning.assert_called_once()
+
+
+def test_back_translate_chunk_warns_for_proper_noun_identical():
+    """Proper-noun-like sentences that are not untranslatable still warn."""
+    with patch("src.core.cross_lingual.translate_text") as mock_translate:
+        mock_translate.return_value = "Paris"
+
+        with patch("src.core.cross_lingual.logger") as mock_logger:
+            result = back_translate_chunk("Paris", source_lang="fr")
+
+            assert result == "Paris"
+            mock_logger.warning.assert_called_once()
