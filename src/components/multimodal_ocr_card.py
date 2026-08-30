@@ -68,6 +68,10 @@ def render_ocr_match_card(match: Dict[str, Any]) -> str:
         </div>
     </div>
     """
+
+
+class MultimodalOCRCard:
+    """
     Renders enterprise Streamlit dashboard interface for multimodal OCR
     and neural paraphrase detection telemetry.
     """

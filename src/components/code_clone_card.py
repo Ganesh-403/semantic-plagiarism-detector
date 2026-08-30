@@ -68,6 +68,10 @@ def render_code_clone_card(clone: Dict[str, Any]) -> str:
         </div>
     </div>
     """
+
+
+class CodeCloneCard:
+    """
     Renders enterprise Streamlit UI widgets for source code clone detection,
     Jaccard similarity telemetry, and AST token sequence comparisons.
     """

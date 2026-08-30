@@ -70,6 +70,10 @@ def render_vector_match_card(match: Dict[str, Any]) -> str:
         </div>
     </div>
     """
+
+
+class FAISSVectorCard:
+    """
     Renders enterprise Streamlit UI widgets for FAISS dense vector search,
     L2 distance distribution, and nearest neighbor matches.
     """

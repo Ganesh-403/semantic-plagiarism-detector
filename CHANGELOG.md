@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `show_notification()` toast helper with success/warning/error/info icons (`app/components/notifications.py`).
 
 ### Fixed
+- Restored the `class` statement and its opening docstring quote in the four card components that had lost them, leaving an unterminated triple-quoted string and taking the Neural Code Clone, FAISS Vector, Multimodal OCR and Stylometric Author dashboards down at import; the orphaned `@staticmethod` helpers are members of `CodeCloneCard`, `FAISSVectorCard`, `MultimodalOCRCard` and `StylometricAuthorCard` again (`src/components/code_clone_card.py`, `src/components/faiss_vector_card.py`, `src/components/multimodal_ocr_card.py`, `src/components/stylometric_author_card.py`).
 - Handled Windows reserved device names with extensions (e.g. `NUL.txt`, `CON.pdf`, `COM1.docx`) in `sanitize_filename` by checking base stems against `_WINDOWS_RESERVED_NAMES` (`src/utils/filename.py`).
 - Mobile viewports (<768px): tighter main padding and shorter plotly chart heights (`app/css_constants.py`).
 - Add `role="button"` and `aria-label` on custom HTML tag chips and notification badges (`app/components/`).

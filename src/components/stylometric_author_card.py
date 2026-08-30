@@ -65,6 +65,10 @@ def render_stylometric_card(match: Dict[str, Any]) -> str:
         </div>
     </div>
     """
+
+
+class StylometricAuthorCard:
+    """
     Renders interactive Streamlit UI widgets for writeprint metrics,
     vocabulary richness metrics, and authorship classification scores.
     """
