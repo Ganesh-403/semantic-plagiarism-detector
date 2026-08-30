@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `show_notification()` toast helper with success/warning/error/info icons (`app/components/notifications.py`).
 
 ### Fixed
+- Defined the `/metrics/json` response models: `MetricSample` had been reduced to a mangled one-line string literal with no class body and `MetricFamily` was absent entirely, even though `src/api/routers/admin.py` imports it as the endpoint's `response_model` — so every router that imports `src.api.schemas` failed at import. Both models now match what `generate_metrics_json()` emits, and `docs/metrics_json.md` documents `name` rather than `namc` (`src/api/schemas.py`, `docs/metrics_json.md`).
 - Handled Windows reserved device names with extensions (e.g. `NUL.txt`, `CON.pdf`, `COM1.docx`) in `sanitize_filename` by checking base stems against `_WINDOWS_RESERVED_NAMES` (`src/utils/filename.py`).
 - Mobile viewports (<768px): tighter main padding and shorter plotly chart heights (`app/css_constants.py`).
 - Add `role="button"` and `aria-label` on custom HTML tag chips and notification badges (`app/components/`).

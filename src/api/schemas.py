@@ -594,7 +594,71 @@ class AsyncScanStatusResponse(BaseModel):
 
 
 class MetricSample(BaseModel):
-    " \Schema for an individual Prometheus metric sample.\\n
+    """Schema for an individual Prometheus metric sample.
+
+    One entry of a family's ``metrics`` list. A family expands into several
+    samples: a counter contributes ``<name>_total`` and ``<name>_created``, a
+    histogram one ``<name>_bucket`` per boundary plus ``_sum`` and ``_count``.
+    ``name`` is therefore the sample's own suffixed name, not the family's.
+    """
+
+    name: str = Field(
+        ..., description="Sample name, including any type suffix (e.g. _total, _bucket)"
+    )
+    labels: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Label key/value pairs identifying this sample; empty when unlabelled",
+    )
+    value: float = Field(..., description="Current numeric value of the sample")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "documents_total",
+                "labels": {"status": "success"},
+                "value": 10.0,
+            }
+        }
+    )
+
+
+class MetricFamily(BaseModel):
+    """Schema for one Prometheus metric family in the /metrics/json payload.
+
+    The endpoint returns a mapping of family name to this model, mirroring what
+    ``src.core.metrics.generate_metrics_json()`` builds from the Prometheus text
+    exposition format.
+    """
+
+    name: str = Field(..., description="Metric family name, without type suffixes")
+    type: str = Field(
+        ...,
+        description="Prometheus metric type: counter, gauge, histogram, summary, or untyped",
+    )
+    help: str = Field(..., description="Documentation string describing the metric")
+    metrics: List[MetricSample] = Field(
+        default_factory=list, description="Individual samples belonging to this family"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "documents",
+                "type": "counter",
+                "help": "Cumulative number of documents ingested since process start.",
+                "metrics": [
+                    {"name": "documents_total", "labels": {}, "value": 10.0},
+                    {
+                        "name": "documents_created",
+                        "labels": {},
+                        "value": 1693356000.0,
+                    },
+                ],
+            }
+        }
+    )
+
+
 # ============================================================================
 # Example Paginated Response for Documents
 # ============================================================================
