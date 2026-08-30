@@ -2,8 +2,6 @@
 
 This file has been replaced by the canonical path `docs/architecture.md`.
 
-Please see the updated Cross‑Lingual Back‑Translation Pipeline and implementation notes at:
+Please refer to `docs/architecture.md` for the complete architecture documentation, including the Cross-Lingual Back-Translation Pipeline and implementation notes.
 
-https://github.com/cjsumit/semantic-plagiarism-detector/blob/fix/issue-4052/docs/architecture.md
-
-If you prefer the uppercase path retained, tell me and I will instead sync both files.
+For consistency and to avoid case-sensitivity issues across different filesystems, `docs/architecture.md` (lowercase) is now the single source of truth for all architecture documentation.
