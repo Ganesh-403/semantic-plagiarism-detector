@@ -26,14 +26,20 @@ import base64
 import io
 import logging
 
+ feature/invalidate-tokens-on-password-change
+from fastapi import APIRouter, HTTPException, Request, Security, status
+from src.api.middleware import get_current_user
+
 import pyotp
 import qrcode
 from fastapi import APIRouter, HTTPException, Request, status
+ main
 
 from src.api.dependencies import limiter
 from src.api.schemas import (
     ErrorResponse,
     LoginResponse,
+    PasswordChangeSchema,
     RefreshRequest,
     RevokeRequest,
     RevokeResponse,
@@ -228,6 +234,73 @@ async def revoke_token_endpoint(
 
 
 @router.post(
+ feature/invalidate-tokens-on-password-change
+    "/api/v1/auth/change-password",
+    summary="Change user password",
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad Request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        500: {"model": ErrorResponse, "description": "Internal Server Error"},
+    },
+)
+async def change_password(
+    payload: PasswordChangeSchema,
+    current_user: dict = Security(get_current_user, scopes=["write"]),
+):
+    """
+    Update the authenticated user's password and invalidate all active sessions.
+    """
+    from src.security.jwt_utils import verify_access_token
+    
+    token = current_user.get("token")
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required.",
+        )
+    
+    try:
+        payload_data = verify_access_token(token)
+        username = payload_data.get("sub")
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token.",
+        )
+        
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user session.",
+        )
+
+    # 1. Verify old password matches
+    from src.db.auth import authenticate_user, update_password, revoke_all_user_refresh_tokens
+    
+    if not authenticate_user(username, payload.old_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect old password provisioned.",
+        )
+        
+    # 2. Update password and revoke tokens
+    try:
+        update_password(username, payload.new_password)
+        revoke_all_user_refresh_tokens(username)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update password: {str(exc)}",
+        )
+
+    return {"message": "Password changed successfully. All active device sessions have been terminated."}
+
     "/auth/2fa/setup",
     summary="Initialize 2FA setup and return TOTP secret, otpauth URL, and base64 PNG QR code data URI",
     response_model=TwoFactorSetupResponse,
@@ -546,3 +619,4 @@ async def disable_two_factor_auth_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to disable 2FA: {str(e)}",
         )
+ main
