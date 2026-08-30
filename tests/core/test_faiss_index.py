@@ -14,6 +14,7 @@ from src.core.faiss_index import (
     remove_document_from_index,
     save_index,
     search_batch_vectors,
+    search_index,
     search_similar_chunks,
 )
 
@@ -99,6 +100,16 @@ def test_search_similar_chunks_threshold_filters(two_doc_data):
     results = search_similar_chunks(query, index, registry, top_k=5, threshold=0.9999)
     # Very high threshold — may return 0 or 1 (self-match if not excluded)
     assert all(s >= 0.9999 for _, s in results)
+
+
+def test_search_index_threshold_filtering(two_doc_data):
+    """Issue #4036: Test search_index(query_vectors, threshold=0.8) excludes similarity < 0.8."""
+    embeddings, chunked = two_doc_data
+    index, registry = build_index(embeddings, chunked, index_type="flat")
+    query = embeddings["doc_a"][0]
+    threshold = 0.8
+    results = search_index(query, index=index, registry=registry, threshold=threshold)
+    assert all(r["similarity_score"] >= threshold for r in results)
 
 
 def test_find_plagiarised_chunks_deduplicates(two_doc_data):

@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import logging
+
 from deep_translator import GoogleTranslator
+
+logger = logging.getLogger(__name__)
 
 # Comprehensive ISO-639-1 (and ISO-639-2) language code database
 ISO_639_LANGUAGES: dict[str, dict[str, str]] = {

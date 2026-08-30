@@ -14,14 +14,27 @@ import threading
 import time
 from typing import Any, Callable
 
+from prometheus_client import REGISTRY, Counter, Gauge, Histogram, generate_latest
 from prometheus_client import Counter, Gauge, Histogram
 from prometheus_client import generate_latest as _prometheus_generate_latest
 
 logger = logging.getLogger(__name__)
 
+# Configurable environment variable to completely disable metrics collection.
+# If set to False, no metrics will be registered with the global collector
+# and the /metrics endpoints will return a 404 Not Found error.
+PROMETHEUS_METRICS_ENABLED = os.environ.get('PROMETHEUS_METRICS_ENABLED', 'True').lower() in ('true', '1', 't', 'yes')
+
+# The registry controls exposure. If enabled, it binds to the global prometheus REGISTRY.
+# If disabled, it binds to None, keeping metrics isolated and hidden from HTTP scrape endpoints.
+_registry = REGISTRY if PROMETHEUS_METRICS_ENABLED else None
+
+
 # ── Counters ───────────────────────────────────────────────────────────────────
 
 documents_total = Counter(
+    "documents_total",
+    registry=_registry,
     "spd_documents_total",
     "Cumulative number of documents ingested since process start. "
     "Monotonic: use rate()/increase() on this. For the current corpus size "
@@ -29,6 +42,8 @@ documents_total = Counter(
 )
 
 flagged_incidents_total = Counter(
+    "flagged_incidents_total",
+    registry=_registry,
     "spd_flagged_incidents_total",
     "Total number of flagged plagiarism incidents",
 )
@@ -40,6 +55,8 @@ plagiarism_incidents_total = Counter(
 )
 
 uploads_total = Counter(
+    "uploads_total",
+    registry=_registry,
     "spd_uploads_total",
     "Total number of file upload batches processed",
     labelnames=["status"],
@@ -66,22 +83,30 @@ ocr_invocations_total = Counter(
 # ── Gauges ─────────────────────────────────────────────────────────────────────
 
 corpus_size_gauge = Gauge(
+    "corpus_size_bytes",
+    registry=_registry,
     "spd_corpus_size_bytes",
     "Total size on disk of the corpus database",
 )
 
 index_size_gauge = Gauge(
+    "index_size_bytes",
+    registry=_registry,
     "spd_index_size_bytes",
     "Total size on disk of the FAISS index file",
 )
 
 corpus_documents_gauge = Gauge(
+    "corpus_documents",
+    registry=_registry,
     "spd_corpus_documents",
     "Current number of documents in the corpus. Goes down when documents are "
     "deleted, which is why this is a gauge and not documents_total.",
 )
 
 active_users_gauge = Gauge(
+    "active_users",
+    registry=_registry,
     "spd_active_users",
     "Current number of active users",
 )
@@ -98,6 +123,8 @@ faiss_vectors_gauge = Gauge(
 # ── Histograms ─────────────────────────────────────────────────────────────────
 
 pipeline_duration_seconds = Histogram(
+    "pipeline_duration_seconds",
+    registry=_registry,
     "spd_pipeline_duration_seconds",
     "Duration of each pipeline stage in seconds",
     labelnames=["stage"],
@@ -119,6 +146,8 @@ spd_doc_parse_seconds = Histogram(
 doc_parse_seconds = spd_doc_parse_seconds
 
 query_response_time_seconds = Histogram(
+    "query_response_time_seconds",
+    registry=_registry,
     "spd_query_response_time_seconds",
     "Duration of similarity search queries in seconds",
     buckets=(0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0),
@@ -166,6 +195,8 @@ def generate_latest(*args: Any, **kwargs: Any) -> bytes:
 
 def generate_metrics_json() -> dict[str, Any]:
     """Return all metrics as a JSON-serialisable dict for non-Prometheus consumers."""
+    if not PROMETHEUS_METRICS_ENABLED:
+        return {}
     from prometheus_client.parser import text_string_to_metric_families
 
     raw = generate_latest().decode("utf-8")
