@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `reset_analysis_session_state()` clears document lists, matrices, and scan flags while keeping theme and session id (`app/state_manager.py`).
 - Custom low/mid/high color-scale thresholds in `build_similarity_workbook` (`src/utils/excel_export.py`).
 - `show_notification()` toast helper with success/warning/error/info icons (`app/components/notifications.py`).
+- `ContextPreservingChunker` prefers `\n\n` paragraph boundaries when packing chunks (`app/components/advanced_analytics.py`).
 
 ### Fixed
 - Defined the module-level `logger` that `translate_text_batch()` referenced but never imported; the batch error handler raised `NameError` instead of logging, which left the per-text fallback loop unreachable (`src/core/translator.py`).

@@ -370,6 +370,74 @@ class ContextPreservingChunker:
     def chunk_with_context(
         self, text: str, min_chunk_size: int = 100
     ) -> list[tuple[str, dict[str, Any]]]:
+        """Chunk text preferring paragraph boundaries, then sentence boundaries."""
+        paragraphs = self._split_paragraphs(text)
+        if len(paragraphs) <= 1:
+            return self._chunk_by_sentences(text, min_chunk_size)
+
+        chunks: list[tuple[str, dict[str, Any]]] = []
+        current_parts: list[str] = []
+        current_size = 0
+        para_start = 0
+
+        for i, paragraph in enumerate(paragraphs):
+            para_size = len(paragraph)
+
+            # Oversized paragraph: flush what we have, then fall back to sentences.
+            if para_size > self.chunk_size:
+                if current_parts:
+                    chunks.append(
+                        self._pack_paragraph_chunk(
+                            current_parts, para_start, i
+                        )
+                    )
+                    current_parts = []
+                    current_size = 0
+                chunks.extend(self._chunk_by_sentences(paragraph, min_chunk_size))
+                para_start = i + 1
+                continue
+
+            # Prefer ending the chunk at this paragraph boundary when full.
+            if current_size + para_size > self.chunk_size and current_parts:
+                chunks.append(
+                    self._pack_paragraph_chunk(current_parts, para_start, i)
+                )
+                current_parts = []
+                current_size = 0
+                para_start = i
+
+            current_parts.append(paragraph)
+            current_size += para_size + (2 if current_size else 0)
+
+        if current_parts:
+            chunks.append(
+                self._pack_paragraph_chunk(
+                    current_parts, para_start, len(paragraphs)
+                )
+            )
+
+        return [
+            (chunk_text, meta)
+            for chunk_text, meta in chunks
+            if len(chunk_text.split()) >= min_chunk_size // 10
+        ]
+
+    def _pack_paragraph_chunk(
+        self, paragraphs: list[str], start_idx: int, end_idx: int
+    ) -> tuple[str, dict[str, Any]]:
+        chunk_text = "\n\n".join(paragraphs)
+        meta = self._create_chunk_metadata(paragraphs, start_idx, end_idx)
+        meta["split_at"] = "paragraph"
+        return chunk_text, meta
+
+    def _split_paragraphs(self, text: str) -> list[str]:
+        """Split on double-newline paragraph boundaries."""
+        parts = re.split(r"\n\s*\n", text.strip())
+        return [p.strip() for p in parts if p.strip()]
+
+    def _chunk_by_sentences(
+        self, text: str, min_chunk_size: int = 100
+    ) -> list[tuple[str, dict[str, Any]]]:
         """Chunk text while preserving sentence boundaries and context."""
         # Split into sentences
         sentences = self._split_sentences(text)
