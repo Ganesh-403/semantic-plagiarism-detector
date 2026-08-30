@@ -1,6 +1,6 @@
 ## Cross-Lingual Back-Translation Pipeline
 
-To detect plagiarism that has been translated from one language into another (a common evasion technique), the system supports a cross-lingual detection workflow. Non-English text is first identified, checked against a translation cache to avoid redundant API/model calls, back-translated into the corpus's reference language, and then run through the standard embedding and FAISS similarity search pipeline.
+To detect plagiarism that has been translated from one language into another (a common evasion technique), the system supports a cross-lingual detection workflow. Text not in the corpus reference language is first identified, checked against a translation cache to avoid redundant API/model calls, back-translated into the corpus's reference language, and then run through the standard embedding and FAISS similarity search pipeline.
 
 The following Mermaid flowchart illustrates this pipeline:
 
