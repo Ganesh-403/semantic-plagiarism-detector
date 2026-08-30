@@ -59,6 +59,9 @@ _SENTENCE_BOUNDARY_PATTERN = re.compile(r"([.!?])\s+(?=[A-Z])|([.!?])$|([。！�
 # Regex pattern to count words (alphanumeric sequences)
 _WORD_COUNT_PATTERN = re.compile(r"\b\w+\b")
 
+# ATX Markdown headings (# / ## / ###) used as forced section boundaries (#4000).
+_MARKDOWN_HEADER_SPLIT = re.compile(r"(?m)(?=^#{1,3} )")
+
 
 # ── Helper Functions ──────────────────────────────────────────────────────────
 
@@ -81,6 +84,18 @@ def count_words(text: str) -> int:
     if not text:
         return 0
     return len(_WORD_COUNT_PATTERN.findall(text))
+
+
+def split_at_markdown_headers(text: str) -> list[str]:
+    """Split text so each Markdown ATX heading starts a new section.
+
+    Top-level section headings (``#``, ``##``, ``###``) force chunk boundaries
+    so a heading is not glued onto unrelated preceding prose.
+    """
+    if not text or "#" not in text:
+        return [text] if text else []
+    parts = _MARKDOWN_HEADER_SPLIT.split(text)
+    return [part for part in parts if part and part.strip()]
 
 
 def _split_into_sentences(text: str) -> list[str]:
@@ -416,8 +431,30 @@ def chunk_text(
 
     text = text.strip()
     text_len = len(text)
-    chunks: list[str] = []
+    chunks: list[ChunkString] = []
     start = 0
+
+    # Issue #4000: force boundaries at Markdown section headings.
+    md_sections = split_at_markdown_headers(text)
+    if len(md_sections) > 1:
+        for section in md_sections:
+            remaining = max_chunks - len(chunks)
+            if remaining <= 0:
+                break
+            chunks.extend(
+                chunk_text(
+                    section,
+                    chunk_size=chunk_size,
+                    chunk_overlap=chunk_overlap,
+                    min_words=min_words,
+                    overlap_percentage=None,
+                    max_chunks=remaining,
+                    sentence_padding=sentence_padding,
+                    count_bytes=count_bytes,
+                    separator=separator,
+                )
+            )
+        return chunks[:max_chunks]
 
     while start < text_len:
         end = _find_length_capped_end(text, start, chunk_size, count_bytes)
@@ -575,6 +612,25 @@ def chunk_by_sentences(
     text = text.strip()
     if not text:
         return []
+
+    # Issue #4000: force boundaries at Markdown section headings.
+    md_sections = split_at_markdown_headers(text)
+    if len(md_sections) > 1:
+        chunks: list[str] = []
+        for section in md_sections:
+            remaining = max_chunks - len(chunks)
+            if remaining <= 0:
+                break
+            chunks.extend(
+                chunk_by_sentences(
+                    section,
+                    max_chunks=remaining,
+                    min_chunk_length=min_chunk_length,
+                    max_chunk_size=max_chunk_size,
+                    min_words=min_words,
+                )
+            )
+        return chunks[:max_chunks]
 
     # Split text into individual sentences
     raw_sentences = _SENTENCE_SPLIT_PATTERN.split(text)
