@@ -911,6 +911,46 @@ def compute_vectorized_jaccard_matrix(documents: list[str]) -> np.ndarray:
     return jaccard_matrix
 
 
+def _levenshtein_distance(str_a: str, str_b: str) -> int:
+    """Compute raw Levenshtein edit distance between two strings."""
+    if str_a == str_b:
+        return 0
+    if not str_a:
+        return len(str_b)
+    if not str_b:
+        return len(str_a)
+
+    # Keep the shorter string in columns to bound memory.
+    if len(str_a) < len(str_b):
+        str_a, str_b = str_b, str_a
+
+    prev = list(range(len(str_b) + 1))
+    for i, ca in enumerate(str_a, start=1):
+        curr = [i]
+        for j, cb in enumerate(str_b, start=1):
+            ins = curr[j - 1] + 1
+            delete = prev[j] + 1
+            sub = prev[j - 1] + (ca != cb)
+            curr.append(min(ins, delete, sub))
+        prev = curr
+    return prev[-1]
+
+
+def levenshtein_similarity(str_a: str, str_b: str) -> float:
+    """Return normalized Levenshtein similarity in ``[0.0, 1.0]``.
+
+    Useful for short strings such as titles and student names.
+    Identical inputs yield ``1.0``; fully distinct inputs yield ``0.0``.
+    """
+    if str_a == str_b:
+        return 1.0
+    if not str_a or not str_b:
+        return 0.0
+
+    distance = _levenshtein_distance(str_a, str_b)
+    return 1.0 - distance / max(len(str_a), len(str_b))
+
+
 def compute_char_ngram_similarity(text_a: str, text_b: str, n: int = 5) -> float:
     """Compute character-level sliding n-gram Jaccard similarity between two texts.
 
