@@ -519,8 +519,56 @@ def chunk_text(
     return [c for c in chunks if len(c.text.split()) >= min_words]
 
 
-# Alias for backward compatibility with src/core/__init__.py
-chunk_document = chunk_text
+def _merge_undersized_trailing_chunk(
+    chunks: list[ChunkString],
+    min_chunk_length: int,
+) -> list[ChunkString]:
+    """Merge a too-short final chunk into the previous one (Issue #4001)."""
+    if min_chunk_length <= 0 or len(chunks) < 2:
+        return chunks
+
+    last = chunks[-1]
+    if len(last.text) >= min_chunk_length:
+        return chunks
+
+    prev = chunks[-2]
+    merged = ChunkString(
+        text=f"{prev.text} {last.text}".strip(),
+        metadata=dict(prev.metadata),
+    )
+    return [*chunks[:-2], merged]
+
+
+def chunk_document(
+    text: str,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+    chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
+    min_words: int = 10,
+    overlap_percentage: float | None = None,
+    max_chunks: int = 1000,
+    sentence_padding: bool = True,
+    count_bytes: bool = False,
+    separator: str = " ",
+    min_chunk_length: int = 40,
+) -> list[ChunkString]:
+    """Chunk a single document and fold undersized trailing fragments back.
+
+    ``min_chunk_length`` drops noisy trailer chunks like ``\"Page 12\"`` by
+    merging them into the previous chunk when they are shorter than the
+    threshold (default 40 characters).
+    """
+    chunks = chunk_text(
+        text,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        min_words=min_words,
+        overlap_percentage=overlap_percentage,
+        max_chunks=max_chunks,
+        sentence_padding=sentence_padding,
+        count_bytes=count_bytes,
+        separator=separator,
+    )
+    return _merge_undersized_trailing_chunk(chunks, min_chunk_length)
 
 
 # ── Sentence-boundary-aware chunking (Issue #919 & #2054) ────────────────────────────
