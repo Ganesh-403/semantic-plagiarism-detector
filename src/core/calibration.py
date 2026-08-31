@@ -98,7 +98,7 @@ def confusion_matrix(
     scores: Sequence[float],
     labels: Sequence[Any],
     threshold: float,
-) -> Dict[str, int]:
+) -> dict[str, int]:
     """Build the ``{tp, fp, fn, tn}`` confusion matrix at a threshold.
 
     A prediction is positive when ``score >= threshold`` (inclusive, matching
@@ -134,7 +134,7 @@ def evaluate_thresholds(
     results: Sequence[float],
     labels: Sequence[Any],
     grid: Sequence[float],
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Evaluate detection quality across candidate thresholds.
 
     Sweeps every threshold in *grid* against the predicted *results* and the
@@ -160,7 +160,7 @@ def evaluate_thresholds(
     if len(scores) != len(y):
         raise ValueError("results and labels must have the same length")
 
-    evaluations: List[Dict[str, Any]] = []
+    evaluations: list[dict[str, Any]] = []
     for raw_threshold in grid:
         threshold = float(raw_threshold)
         counts = confusion_matrix(scores, y, threshold)
@@ -223,7 +223,7 @@ def best_threshold(evaluations: Sequence[Mapping[str, Any]]) -> float:
 
 def best_evaluation(
     evaluations: Sequence[Mapping[str, Any]],
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Return the full metric row at the threshold selected by :func:`best_threshold`."""
     threshold = best_threshold(evaluations)
     for row in evaluations:
@@ -242,7 +242,7 @@ def build_recommendation(
     samples: Optional[int] = None,
     n_plagiarized: Optional[int] = None,
     sweep: Optional[Sequence[Mapping[str, Any]]] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build a config-loader-compatible threshold recommendation dict.
 
     The returned dict uses the same top-level keys (``plagiarism``, ``medium``,
@@ -265,7 +265,7 @@ def build_recommendation(
         Recommendation dict, JSON/YAML-serialisable.
     """
     recommended_threshold = float(best_row["threshold"])
-    calibration: Dict[str, Any] = {
+    calibration: dict[str, Any] = {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "recommended_threshold": round(recommended_threshold, 6),
         "precision": round(float(best_row["precision"]), 6),
@@ -346,7 +346,7 @@ def write_recommended_config(
     return str(destination)
 
 
-def load_calibration_report(path: str) -> Optional[Dict[str, Any]]:
+def load_calibration_report(path: str) -> Optional[dict[str, Any]]:
     """Load the ``calibration`` metadata block from a recommendation file.
 
     Returns ``None`` when the file is missing, unreadable, or contains no

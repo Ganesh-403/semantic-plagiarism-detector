@@ -98,13 +98,13 @@ class ReportData:
     avg_similarity: float
     max_similarity: float
     min_similarity: float
-    flagged_pairs_list: List[Dict]
+    flagged_pairs_list: list[dict]
     similarity_matrix: pd.DataFrame
-    document_names: List[str]
+    document_names: list[str]
     threshold_used: float
     execution_time: float
-    system_info: Dict[str, Any]
-    alerts: List[Dict]
+    system_info: dict[str, Any]
+    alerts: list[dict]
 
 
 # ==============================================================================
@@ -251,7 +251,9 @@ class PlagiarismReportGenerator:
                 severity = (
                     "High"
                     if pair.get("similarity", 0) > 0.90
-                    else "Medium" if pair.get("similarity", 0) > 0.80 else "Low"
+                    else "Medium"
+                    if pair.get("similarity", 0) > 0.80
+                    else "Low"
                 )
                 pair_table_data.append(
                     [
@@ -412,7 +414,8 @@ class PlagiarismReportGenerator:
                     width: 100%;
                     border-collapse: collapse;
                     margin: 15px 0;
-                    background: white;
+                    background-color: var(--background-color, #ffffff);
+                    color: var(--text-color, #111827);
                     border-radius: 8px;
                     overflow: hidden;
                 }}
@@ -518,13 +521,15 @@ class PlagiarismReportGenerator:
                 severity_class = (
                     "high"
                     if similarity > 0.90
-                    else "medium" if similarity > 0.80 else "low"
+                    else "medium"
+                    if similarity > 0.80
+                    else "low"
                 )
                 html_content += f"""
                             <tr>
                                 <td>{idx}</td>
-                                <td>{pair.get('doc_a', '')[:50]}</td>
-                                <td>{pair.get('doc_b', '')[:50]}</td>
+                                <td>{pair.get("doc_a", "")[:50]}</td>
+                                <td>{pair.get("doc_b", "")[:50]}</td>
                                 <td>{similarity:.1%}</td>
                                 <td><span class="badge badge-{severity_class}">{severity_class.title()}</span></td>
                             </tr>
@@ -642,7 +647,7 @@ class ReportScheduler:
         with open(schedule_file, "w") as f:
             json.dump(self.schedules, f, indent=2)
 
-    def add_schedule(self, name: str, frequency: str, config: Dict):
+    def add_schedule(self, name: str, frequency: str, config: dict):
         """Add a new report schedule."""
         schedule = {
             "id": len(self.schedules) + 1,
@@ -671,7 +676,7 @@ class ReportScheduler:
             next_run = now + timedelta(days=1)
         return next_run.isoformat()
 
-    def get_due_schedules(self) -> List[Dict]:
+    def get_due_schedules(self) -> list[dict]:
         """Get schedules that are due to run."""
         now = datetime.now()
         due = []

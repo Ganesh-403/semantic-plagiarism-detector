@@ -9,9 +9,11 @@ from app.components.document_comparison import render_document_comparison
 
 def test_render_document_comparison_inputs_empty():
     """Verify component renders correctly with empty inputs."""
-    with patch("streamlit.columns") as mock_cols, patch(
-        "streamlit.text_area"
-    ) as mock_text_area, patch("streamlit.popover") as mock_popover:  # noqa: F841
+    with (
+        patch("streamlit.columns") as mock_cols,
+        patch("streamlit.text_area") as mock_text_area,
+        patch("streamlit.popover") as mock_popover,
+    ):  # noqa: F841
         mock_col = MagicMock()
         mock_cols.return_value = [mock_col, mock_col]
         mock_text_area.return_value = ""
@@ -26,11 +28,14 @@ def test_render_document_comparison_highlight_overlap():
     st.session_state["comp_doc_a"] = "This is a document content."
     st.session_state["comp_doc_b"] = "This is another document content."
 
-    with patch("streamlit.columns") as mock_cols, patch(
-        "streamlit.text_area"
-    ) as mock_text_area, patch("streamlit.popover") as mock_popover, patch(  # noqa: F841
-        "streamlit.markdown"
-    ) as mock_markdown:
+    with (
+        patch("streamlit.columns") as mock_cols,
+        patch("streamlit.text_area") as mock_text_area,
+        patch("streamlit.popover") as mock_popover,
+        patch(  # noqa: F841
+            "streamlit.markdown"
+        ) as mock_markdown,
+    ):
         mock_col = MagicMock()
         mock_cols.return_value = [mock_col, mock_col]
         mock_text_area.side_effect = [
@@ -64,14 +69,13 @@ def test_render_document_comparison_clear_popover_clicks():
         def __exit__(self, *args):
             pass
 
-    with patch("streamlit.columns") as mock_cols, patch(
-        "streamlit.text_area"
-    ) as mock_text_area, patch("streamlit.popover") as mock_popover, patch(
-        "streamlit.button"
-    ) as mock_button, patch(
-        "streamlit.rerun"
-    ) as mock_rerun:
-
+    with (
+        patch("streamlit.columns") as mock_cols,
+        patch("streamlit.text_area") as mock_text_area,
+        patch("streamlit.popover") as mock_popover,
+        patch("streamlit.button") as mock_button,
+        patch("streamlit.rerun") as mock_rerun,
+    ):
         mock_col = MagicMock()
         mock_cols.return_value = [mock_col, mock_col]
         mock_text_area.side_effect = ["staged text a", "staged text b"]

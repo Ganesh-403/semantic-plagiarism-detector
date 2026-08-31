@@ -31,7 +31,6 @@ def test_extract_text_from_unicode_escape_rtf():
     assert "Unicode" in text
 
 
-
 def test_extract_text_from_rtf_rejects_oversized_bytes_before_striprtf(monkeypatch):
     """Oversized RTF payloads are rejected before striprtf is invoked."""
 
@@ -90,7 +89,9 @@ def test_extract_text_from_rtf_rejects_oversized_bytesio_before_reading(monkeypa
     assert called is False
 
 
-def test_extract_text_from_rtf_rejects_oversized_file_path_before_read(tmp_path, monkeypatch):
+def test_extract_text_from_rtf_rejects_oversized_file_path_before_read(
+    tmp_path, monkeypatch
+):
     """An oversized RTF file on disk is rejected using its file size first."""
 
     called = False
@@ -108,3 +109,47 @@ def test_extract_text_from_rtf_rejects_oversized_file_path_before_read(tmp_path,
 
     assert document_parser.extract_text_from_rtf(str(path)) == ""
     assert called is False
+
+
+def test_extract_text_from_rtf_raises_unsupported_format_error_when_striprtf_missing(
+    monkeypatch,
+):
+    """Ensure UnsupportedFormatError is raised when striprtf is missing rather than returning raw RTF."""
+    from src.exceptions import UnsupportedFormatError
+
+    def fake_rtf_to_text_fallback(_content):
+        raise UnsupportedFormatError(
+            "striprtf is required to process RTF files. Please install striprtf to parse RTF documents."
+        )
+
+    monkeypatch.setattr(document_parser, "rtf_to_text", fake_rtf_to_text_fallback)
+
+    rtf_content = r"{\rtf1\ansi Hello World!}"
+    import pytest
+
+    with pytest.raises(UnsupportedFormatError, match="striprtf is required"):
+        document_parser.extract_text_from_rtf(rtf_content.encode("utf-8"))
+
+
+def test_text_parser_extract_rtf_raises_unsupported_format_error(monkeypatch):
+    """Ensure text_parser.extract_text_from_rtf raises UnsupportedFormatError when striprtf cannot be imported."""
+    import builtins
+
+    import pytest
+
+    from src.core.parsers import text_parser
+    from src.exceptions import UnsupportedFormatError
+
+    real_import = builtins.__import__
+
+    def mock_import(name, *args, **kwargs):
+        if "striprtf" in name:
+            raise ImportError("No module named 'striprtf'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", mock_import)
+
+    rtf_content = r"{\rtf1\ansi Hello World!}"
+    with pytest.raises(UnsupportedFormatError, match="striprtf is required"):
+        text_parser.extract_text_from_rtf(rtf_content.encode("utf-8"))
+

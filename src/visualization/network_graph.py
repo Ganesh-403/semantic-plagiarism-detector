@@ -301,7 +301,7 @@ def build_network_data(
         edge_hover_x.append((x0 + x1) / 2.0)
         edge_hover_y.append((y0 + y1) / 2.0)
         edge_hover_texts.append(
-            f"<b>Match:</b> {doc_a} ↔ {doc_b}<br>" f"<b>Similarity:</b> {score:.1%}"
+            f"<b>Match:</b> {doc_a} ↔ {doc_b}<br><b>Similarity:</b> {score:.1%}"
         )
 
     edge_hover_trace = go.Scatter(

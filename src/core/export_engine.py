@@ -9,7 +9,51 @@ from typing import Any
 from src.utils.html_report import generate_html_report
 
 logger = logging.getLogger(__name__)
+def export_evidence_for_flags(
+    flags: list[dict],
+    output_format: str = "json",
+) -> str:
+    """
+    Export plagiarism evidence for all flags.
 
+    Args:
+        flags: List of flag dicts with 'evidence' key.
+        output_format: 'json' or 'csv'.
+
+    Returns:
+        Serialized evidence string.
+    """
+    import json
+
+    if output_format == "json":
+        evidence_list = [f.get("evidence") for f in flags if "evidence" in f]
+        return json.dumps(evidence_list, indent=2)
+    elif output_format == "csv":
+        import csv
+        from io import StringIO
+
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(
+            ["doc_a", "doc_b", "final_score", "severity", "matched_chunks_count"]
+        )
+
+        for flag in flags:
+            if "evidence" in flag:
+                ev = flag["evidence"]
+                writer.writerow(
+                    [
+                        ev.get("doc_a"),
+                        ev.get("doc_b"),
+                        ev.get("final_score"),
+                        ev.get("final_severity"),
+                        len(ev.get("matched_chunks", [])),
+                    ]
+                )
+
+        return output.getvalue()
+
+    raise ValueError(f"Unsupported format: {output_format}")
 import csv
 import io
 import json
@@ -55,9 +99,7 @@ class LMSExportEngine:
             return None
 
         try:
-            return generate_html_report(
-                incidents, min_match_length=min_match_length
-            )
+            return generate_html_report(incidents, min_match_length=min_match_length)
         except Exception as exception:
             logger.error("Failed to format incident data as HTML: %s", exception)
             return None
@@ -142,14 +184,31 @@ class LMSExportEngine:
     ) -> str | None:
         """Generate a readable plain-text summary of flagged incidents.
 
+        Every field is written through a single ``io.StringIO`` buffer. An
+        earlier revision appended part of the report to a separate ``lines``
+        list that was never created and never read back, which raised
+        ``NameError`` on the first incident and would have dropped four fields
+        even if the list had existed (Issue #3564).
+
+        Each incident block carries the two document names, the similarity as
+        both a percentage and a raw score, and the severity. Matched length,
+        matching text, date flagged and the threshold in force at flagging time
+        are written only when the incident supplies them, so sparse rows do not
+        grow empty labels.
+
         Args:
             incidents: Sequence of incident dictionaries.
             min_match_length: If > 0, only incidents with
                 ``matched_length`` >= this value are exported (Issue #2474).
+
+        Returns:
+            The report text, or ``None`` when there is nothing to export or the
+            incident data cannot be formatted.
         """
         if min_match_length > 0:
             incidents = [
-                i for i in incidents
+                i
+                for i in incidents
                 if int(i.get("matched_length", 0) or 0) >= min_match_length
             ]
 
@@ -188,30 +247,21 @@ class LMSExportEngine:
                     row.get("matched_text") or row.get("matching_text") or ""
                 ).strip()
                 if matched_text:
-                    lines.extend(
-                        [
-                            "Matching text:",
-                            matched_text,
-                        ]
-                    )
+                    buffer.write("Matching text:\n")
+                    buffer.write(f"{matched_text}\n")
 
                 date_flagged = row.get("date_flagged")
                 if date_flagged not in (None, ""):
-                    lines.append(f"Date flagged: {date_flagged}")
+                    buffer.write(f"Date flagged: {date_flagged}\n")
 
                 threshold_used = row.get("threshold_at_time_of_flag")
                 if threshold_used not in (None, ""):
-                    lines.append(f"Threshold at time of flag: {threshold_used}")
+                    buffer.write(f"Threshold at time of flag: {threshold_used}\n")
 
-                lines.append("")
+                buffer.write("\n")
 
-            lines.extend(
-                [
-                    "=" * 38,
-                    "End of report",
-                    "",
-                ]
-            )
+            buffer.write(f"{'=' * 38}\n")
+            buffer.write("End of report\n")
 
             report = buffer.getvalue()
         except OSError as exception:

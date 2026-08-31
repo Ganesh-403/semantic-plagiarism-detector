@@ -19,6 +19,11 @@ Recent Additions (Issue #1580):
 - Added verify_model_cache_integrity() to detect zero-byte (corrupted)
   cached SentenceTransformer weight files and automatically re-download
   the model when the cached copy is unusable.
+
+Recent Additions (Issue #3479):
+- Added release_large_batch_memory() so callers (_process_scan_job and the
+  batch CLI commands) can explicitly run gc.collect() and, when CUDA is
+  available, torch.cuda.empty_cache() after scans larger than 20 documents.
 """
 
 from __future__ import annotations
@@ -28,16 +33,23 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Dict, List
+from typing import Callable, Dict, List, Optional
 
 import numpy as np
 import torch
 import torch.quantization
 from sentence_transformers import SentenceTransformer
 
+from src.core.text_chunking import ChunkString
 from src.exceptions import ModelInitializationError
 
 logger = logging.getLogger(__name__)
+
+try:
+    import optimum.onnxruntime
+    _ONNX_AVAILABLE = True
+except ImportError:
+    _ONNX_AVAILABLE = False
 
 # ── Singleton model loader ─────────────────────────────────────────────────────
 _DEFAULT_MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
@@ -91,7 +103,13 @@ def _apply_dynamic_quantization(model: SentenceTransformer) -> SentenceTransform
 
 
 def _detect_device(model: SentenceTransformer | None = None) -> str:
-    """Detect active PyTorch compute device (cpu, cuda, or mps)."""
+    """Detect the active PyTorch compute device.
+
+    Supports NVIDIA CUDA, AMD ROCm (exposed by PyTorch through the CUDA
+    device API), Intel XPU, and Apple MPS. ROCm intentionally returns
+    ``"cuda"`` because PyTorch uses ``torch.device("cuda")`` for HIP
+    devices as well.
+    """
     if model is not None and hasattr(model, "device"):
         dev = getattr(model, "device")
         if isinstance(dev, str):
@@ -99,12 +117,42 @@ def _detect_device(model: SentenceTransformer | None = None) -> str:
         if hasattr(dev, "type") and isinstance(getattr(dev, "type", None), str):
             return dev.type
 
+    # Intel oneAPI/XPU devices. Keep this ahead of CUDA so an available XPU
+    # is not shadowed by another backend exposed by the same PyTorch build.
     try:
+        xpu = getattr(torch, "xpu", None)
         if (
-            hasattr(torch, "cuda")
-            and hasattr(torch.cuda, "is_available")
-            and torch.cuda.is_available()
+            xpu is not None
+            and hasattr(xpu, "is_available")
+            and xpu.is_available()
         ):
+            return "xpu"
+    except Exception:
+        pass
+
+    # PyTorch exposes AMD ROCm through the CUDA API. ``torch.version.hip`` is
+    # the reliable indicator that the installed PyTorch build targets HIP.
+    # ``torch.backends.cuda.is_built()`` is checked as a safe fallback for
+    # CUDA-enabled builds where the HIP version metadata is unavailable.
+    try:
+        cuda = getattr(torch, "cuda", None)
+        cuda_available = (
+            cuda is not None
+            and hasattr(cuda, "is_available")
+            and cuda.is_available()
+        )
+        cuda_backend = getattr(getattr(torch, "backends", None), "cuda", None)
+        cuda_built = bool(
+            cuda_backend is not None
+            and hasattr(cuda_backend, "is_built")
+            and cuda_backend.is_built()
+        )
+        hip_version = getattr(getattr(torch, "version", None), "hip", None)
+
+        if cuda_available and hip_version:
+            logger.info("[embedding_model] AMD ROCm/HIP device detected.")
+            return "cuda"
+        if cuda_available and cuda_built:
             return "cuda"
     except Exception:
         pass
@@ -178,7 +226,7 @@ class EmbeddingModelManager:
                 return _model
 
         primary = _get_model_name()
-        fallback = "all-MiniLM-L6-v2"
+        fallback = os.getenv("SEMANTIC_PLAGIARISM_FALLBACK_MODEL", "all-MiniLM-L6-v2")
         cache_dir = _get_cache_dir()
         logger.info(f"[embedding_model] Loading model: {primary} ...")
         logger.info(
@@ -187,11 +235,17 @@ class EmbeddingModelManager:
 
         try:
             _repair_corrupted_model_cache(_resolve_cache_root(), primary)
-            loaded_model = SentenceTransformer(primary, cache_folder=cache_dir)
+            kwargs = {}
+            if _ONNX_AVAILABLE:
+                kwargs["backend"] = "onnx"
+                logger.info("[embedding_model] optimum[onnxruntime] detected. Enabling ONNX backend for 2x-3x CPU speedup.")
+            
+            loaded_model = SentenceTransformer(primary, cache_folder=cache_dir, **kwargs)
             device = _detect_device(loaded_model)
             logger.info(
-                "SentenceTransformer model [%s] running on device [%s]",
+                "Initialized Embedding Model: %s | Dimensions: %d | Target Device: %s",
                 primary,
+                loaded_model.get_sentence_embedding_dimension(),
                 device,
             )
             logger.info("[embedding_model] Model loaded successfully.")
@@ -202,7 +256,10 @@ class EmbeddingModelManager:
                 fallback,
             )
             try:
-                loaded_model = SentenceTransformer(fallback, cache_folder=cache_dir)
+                kwargs_fallback = {}
+                if _ONNX_AVAILABLE:
+                    kwargs_fallback["backend"] = "onnx"
+                loaded_model = SentenceTransformer(fallback, cache_folder=cache_dir, **kwargs_fallback)
             except Exception as fallback_exc:
                 raise ModelInitializationError(
                     "Unable to initialize the embedding model. Both the configured "
@@ -222,8 +279,9 @@ class EmbeddingModelManager:
                 ) from fallback_exc
             device = _detect_device(loaded_model)
             logger.info(
-                "SentenceTransformer model [%s] running on device [%s]",
+                "Initialized Fallback Embedding Model: %s | Dimensions: %d | Target Device: %s",
                 fallback,
+                loaded_model.get_sentence_embedding_dimension(),
                 device,
             )
 
@@ -248,6 +306,7 @@ def _get_model() -> SentenceTransformer:
 # breaking when HuggingFace ships new weight formats (e.g. GGUF, ONNX)
 # under different filenames.
 _MODEL_WEIGHT_EXTENSIONS = (".bin", ".safetensors", ".onnx", ".gguf")
+
 
 def _resolve_cache_root() -> Path:
     """Resolve the HuggingFace hub cache root used for model downloads."""
@@ -299,18 +358,19 @@ def verify_model_cache_integrity(cache_dir: Path) -> bool:
         )
         return True
 
-    corrupted: List[tuple[Path, str]] = []
+    corrupted: list[tuple[Path, str]] = []
     for root, _, filenames in os.walk(cache_path):
         for filename in filenames:
             if not filename.endswith(_MODEL_WEIGHT_EXTENSIONS):
-                continue            weight_path = Path(root) / filename
+                continue
+            weight_path = Path(root) / filename
             try:
                 size = weight_path.stat().st_size
             except OSError as exc:
                 corrupted.append((weight_path, f"unreadable ({exc})"))
                 continue
-            if size == 0:
-                corrupted.append((weight_path, "zero-byte"))
+            if size <= 1024 * 1024:
+                corrupted.append((weight_path, "too small (<= 1MB)"))
 
     if corrupted:
         for weight_path, reason in corrupted:
@@ -346,7 +406,54 @@ def _repair_corrupted_model_cache(cache_root: Path, model_name: str) -> None:
         shutil.rmtree(model_cache_dir, ignore_errors=True)
 
 
-def embed_chunks(chunks: List[str], batch_size: int = 32) -> np.ndarray:
+# Issue #3479: batches larger than this many documents trigger explicit
+# garbage collection (and CUDA cache release when applicable).
+LARGE_BATCH_GC_THRESHOLD = 20
+
+
+def release_large_batch_memory(batch_size: int) -> None:
+    """Explicitly free heap memory after large batch scans (Issue #3479).
+
+    Processing 100+ documents in a single batch leaves NumPy arrays and
+    PyTorch tensors on the heap. ``_process_scan_job`` and the batch CLI
+    commands call this once a scan finishes so those intermediates are
+    released promptly instead of lingering until the next allocation cycle.
+
+    Args:
+        batch_size: Number of documents/chunks processed in the finished
+            batch. Cleanup only runs when this exceeds
+            ``LARGE_BATCH_GC_THRESHOLD``.
+    """
+    if batch_size <= LARGE_BATCH_GC_THRESHOLD:
+        return
+
+    logger.debug(
+        "[embedding_model] Releasing memory after large batch of %d items",
+        batch_size,
+    )
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
+_DEFAULT_BATCH_SIZE = 32
+
+
+def _get_embedding_batch_size() -> int:
+    """Return the configured batch size for chunk embeddings from environment."""
+    raw = os.getenv("EMBEDDING_BATCH_SIZE", str(_DEFAULT_BATCH_SIZE))
+    try:
+        val = int(raw)
+        return val if val > 0 else _DEFAULT_BATCH_SIZE
+    except (ValueError, TypeError):
+        return _DEFAULT_BATCH_SIZE
+
+
+def embed_chunks(
+    chunks: list[str],
+    batch_size: int | None = None,
+    cancel_callback: Optional[Callable[[], bool]] = None,
+) -> np.ndarray:
     """
     Generate embeddings for a list of text chunks using explicit mini-batching.
 
@@ -358,18 +465,24 @@ def embed_chunks(chunks: List[str], batch_size: int = 32) -> np.ndarray:
 
     Args:
         chunks: List of text strings to embed.
-        batch_size: Number of texts encoded per forward pass. Defaults to 32
+        batch_size: Number of texts encoded per forward pass. Defaults to None,
+                    which resolves to EMBEDDING_BATCH_SIZE from environment (default: 32)
                     to balance throughput and memory consumption.
+        cancel_callback: Optional callback returning True if processing should be cancelled.
 
     Returns:
         numpy array of shape (N, 384) where N = len(chunks). Returns an
         empty array of shape (0, 384) if the input list is empty.
     """
     if not chunks:
-        return np.empty((0, 384), dtype=np.float32)
+        model = _get_model()
+        dimension = model.get_sentence_embedding_dimension()
+        return np.empty((0, dimension), dtype=np.float32)
+    if batch_size is None:
+        batch_size = _get_embedding_batch_size()
 
     model = _get_model()
-    all_embeddings: List[np.ndarray] = []
+    all_embeddings: list[np.ndarray] = []
     total_chunks = len(chunks)
 
     logger.debug(
@@ -380,13 +493,21 @@ def embed_chunks(chunks: List[str], batch_size: int = 32) -> np.ndarray:
 
     # Process in explicit mini-batches to optimize memory utilization
     for i in range(0, total_chunks, batch_size):
-        batch = chunks[i : i + batch_size]
+        if cancel_callback and cancel_callback():
+            logger.info("[embedding_model] Embedding forward pass cancelled by callback.")
+            raise RuntimeError("Scan job cancelled")
+
+        batch = [
+            chunk.text if isinstance(chunk, ChunkString) else chunk
+            for chunk in chunks[i : i + batch_size]
+        ]
 
         # Encode the current mini-batch
         # show_progress_bar=False keeps console clean in Streamlit
         # normalize_embeddings=True ensures L2-normalisation (cosine sim = dot product)
         batch_embeddings = model.encode(
             batch,
+            batch_size=batch_size,
             show_progress_bar=False,
             normalize_embeddings=True,
         )
@@ -406,8 +527,8 @@ def embed_chunks(chunks: List[str], batch_size: int = 32) -> np.ndarray:
 
 
 def embed_documents(
-    chunked_docs: Dict[str, List[str]], batch_size: int = 32
-) -> Dict[str, np.ndarray]:
+    chunked_docs: dict[str, list[str]], batch_size: int | None = None
+) -> dict[str, np.ndarray]:
     """
     Embed all chunks across multiple documents using optimized mini-batching.
 
@@ -418,21 +539,27 @@ def embed_documents(
 
     Args:
         chunked_docs: Dict mapping document name → list of chunk strings.
-        batch_size: Batch size forwarded to embed_chunks(). Defaults to 32.
+        batch_size: Batch size forwarded to embed_chunks(). Defaults to None,
+                    which resolves to EMBEDDING_BATCH_SIZE from environment (default: 32).
 
     Returns:
         Dict mapping document name → numpy array of embeddings (shape: N×384).
         Documents with no chunks will have an empty array of shape (0, 384).
     """
-    embeddings: Dict[str, np.ndarray] = {}
-    all_chunks: List[str] = []
-    doc_chunk_counts: List[int] = []
-    doc_names: List[str] = []
+    embeddings: dict[str, np.ndarray] = {}
+    all_chunks: list[str] = []
+    doc_chunk_counts: list[int] = []
+    doc_names: list[str] = []
 
     # Initialize all documents with empty arrays to ensure consistent return types
-    for doc_name in chunked_docs.keys():
-        embeddings[doc_name] = np.empty((0, 384), dtype=np.float32)
+    model = _get_model()
+    embedding_dimension = model.get_sentence_embedding_dimension()
 
+    for doc_name in chunked_docs.keys():
+        embeddings[doc_name] = np.empty(
+            (0, embedding_dimension),
+            dtype=np.float32,
+        )
     # Flatten all chunks while tracking document boundaries
     for doc_name, chunks in chunked_docs.items():
         if not chunks:
@@ -448,11 +575,15 @@ def embed_documents(
         logger.info("[embedding_model] No chunks to embed across all documents.")
         return embeddings
 
+    effective_batch_size = (
+        batch_size if batch_size is not None else _get_embedding_batch_size()
+    )
+
     logger.info(
         "[embedding_model] Embedding %d total chunks across %d documents with batch_size=%d",
         len(all_chunks),
         len(doc_names),
-        batch_size,
+        effective_batch_size,
     )
 
     # Call embed_chunks once for the entire flattened batch of chunks
@@ -483,3 +614,19 @@ def get_document_embedding(doc_embedding: np.ndarray) -> np.ndarray:
     if doc_embedding.ndim == 1:
         return doc_embedding  # Already a single embedding
     return np.mean(doc_embedding, axis=0)
+
+
+def warmup_embedding_model() -> bool:
+    """Executes a dummy inference pass on startup to pre-load weights
+    and trigger JIT compilation, eliminating first-request latency overhead.
+    """
+    logger.info("Initializing embedding model warmup routine...")
+    try:
+        dummy_text = "Warmup"
+        _ = embed_chunks([dummy_text])
+        logger.info("Embedding model warmup completed successfully. JIT layers compiled.")
+        return True
+    except Exception as e:
+        logger.error(f"Embedding model warmup failed: {str(e)}", exc_info=True)
+        # Fail gracefully to avoid blocking the main runtime setup if the network/device drops
+        return False

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import html
+import json
 import re
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
@@ -11,6 +13,7 @@ import streamlit as st
 
 from app.theme import badge_html, tier_from_severity_label
 from src.core.config import normalize_severity_label, severity_from_score, severity_rank
+from src.core.stopwords import get_stopwords
 from src.db.incidents import _normalise_pair, add_false_positive, get_false_positives
 from src.i18n.translator import get_text
 from src.utils.pagination import PaginationPage, paginate_items
@@ -22,8 +25,18 @@ except ImportError:
         from fuzzywuzzy import fuzz  # type: ignore[import-untyped,reportMissingImports]
     except ImportError:
         fuzz = None
+
+
 FUZZY_THRESHOLD = 75
 MAX_SEARCH_QUERY_LENGTH = 200
+WARNING_SHORT_DOCUMENT = (
+    "Document contains fewer than 50 words; similarity scoring may be unreliable."
+)
+WARNING_BINARY_CHARACTERS = (
+    "Document contains an unusually high ratio of non-printable control "
+    "characters; the file may be binary or corrupted rather than text."
+)
+CONTROL_CHARACTER_RATIO_THRESHOLD = 0.01
 
 _SORT_KEYS = {
     "warn_sort_similarity": "similarity",
@@ -40,6 +53,145 @@ def _sort_display_names(lang_code: str) -> dict[str, str]:
 WarningPage = PaginationPage[dict[str, Any]]
 
 
+@dataclass
+class DocumentWarning:
+    """Represents a document-level plagiarism or processing warning."""
+
+    doc_a: str = ""
+    doc_b: str = ""
+    similarity: float = 0.0
+    severity: str = "Low"
+    message: str = ""
+    warning_type: str = ""
+    details: dict[str, Any] = field(default_factory=dict)
+    occurrence_count: int = 1
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "doc_a": self.doc_a,
+            "doc_b": self.doc_b,
+            "similarity": self.similarity,
+            "severity": self.severity,
+            "message": self.message,
+            "warning_type": self.warning_type,
+            "occurrence_count": self.occurrence_count,
+            **self.details,
+        }
+
+
+class WarningList:
+    """Collection manager for document warnings supporting filtering by severity."""
+
+    def __init__(
+        self,
+        warnings: Iterable[DocumentWarning | Mapping[str, Any]] | None = None,
+    ) -> None:
+        self.warnings: list[DocumentWarning] = []
+        if warnings:
+            for item in warnings:
+                self.add_warning(item)
+
+    def add_warning(self, item: DocumentWarning | Mapping[str, Any]) -> None:
+        if isinstance(item, DocumentWarning):
+            dw = item
+        elif isinstance(item, Mapping):
+            dw = DocumentWarning(
+                doc_a=str(item.get("doc_a", "")),
+                doc_b=str(item.get("doc_b", "")),
+                similarity=float(item.get("similarity", 0.0)),
+                severity=str(item.get("severity", "Low")),
+                message=str(item.get("message", "")),
+                warning_type=str(item.get("warning_type", "")),
+                details=dict(item),
+            )
+        else:
+            return
+
+        # Same (filename, code) pair already recorded — bump its count
+        # instead of adding a duplicate row to the UI warning panel.
+        for existing in self.warnings:
+            if existing.doc_a == dw.doc_a and existing.warning_type == dw.warning_type:
+                existing.occurrence_count += 1
+                return
+
+        self.warnings.append(dw)
+
+    def filter_by_severity(self, severity: str) -> list[DocumentWarning]:
+        """Filter warnings by severity level (e.g. 'High', 'Medium', 'Low')."""
+        target = str(severity or "").strip().casefold()
+        return [
+            w
+            for w in self.warnings
+            if w.severity.strip().casefold() == target
+        ]
+
+    def __len__(self) -> int:
+        return len(self.warnings)
+
+    def __iter__(self):
+        return iter(self.warnings)
+
+    def __getitem__(self, index: int) -> DocumentWarning:
+        return self.warnings[index]
+
+
+def filter_by_severity(
+    warnings_or_severity: Iterable[DocumentWarning | Mapping[str, Any]] | str,
+    severity: str | None = None,
+) -> list[DocumentWarning]:
+    """Filter warnings by severity level (e.g. 'High', 'Medium', 'Low').
+
+    Can be called as:
+      - filter_by_severity(warnings, "High")
+      - filter_by_severity("High", warnings)
+      - filter_by_severity("High")
+    """
+    if isinstance(warnings_or_severity, str):
+        target_severity = warnings_or_severity
+        items = severity if severity is not None else []
+    else:
+        items = warnings_or_severity
+        target_severity = severity or ""
+
+    if isinstance(items, WarningList):
+        return items.filter_by_severity(target_severity)
+
+    wl = WarningList(items if isinstance(items, Iterable) else [])
+    return wl.filter_by_severity(target_severity)
+
+
+def _warning_to_export_record(
+    item: DocumentWarning | Mapping[str, Any],
+) -> dict[str, str]:
+    """Flatten a warning into the Filename/Warning Code/Severity/Message row used for export."""
+    data = item.to_dict() if isinstance(item, DocumentWarning) else dict(item)
+    return {
+        "Filename": str(data.get("doc_a", "")),
+        "Warning Code": str(data.get("warning_type", "")),
+        "Severity": str(data.get("severity", "")),
+        "Message": str(data.get("message", "")),
+    }
+
+
+def export_warnings_to_csv(
+    warnings: Iterable[DocumentWarning | Mapping[str, Any]],
+) -> str:
+    """Export warnings to a CSV string with Filename, Warning Code, Severity, Message columns."""
+    records = [_warning_to_export_record(item) for item in warnings]
+    df = pd.DataFrame(
+        records, columns=["Filename", "Warning Code", "Severity", "Message"]
+    )
+    return df.to_csv(index=False)
+
+
+def export_warnings_to_json(
+    warnings: Iterable[DocumentWarning | Mapping[str, Any]],
+) -> str:
+    """Export warnings to a JSON string with Filename, Warning Code, Severity, Message keys."""
+    records = [_warning_to_export_record(item) for item in warnings]
+    return json.dumps(records, indent=2)
+
+
 def _normalise_warning(
     warning: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -54,14 +206,82 @@ def _normalise_warning(
     except ValueError:
         severity = severity_from_score(similarity)
 
-    return {
+    # Compute document-level stop-word percentages using chunked docs
+    def _doc_stopword_pct(doc_id: str) -> float:
+        try:
+            if (
+                "analysis_results" not in st.session_state
+                or st.session_state.analysis_results is None
+            ):
+                return 0.0
+            chunked_docs = _chunked_docs_from_results(st.session_state.analysis_results)
+            chunks = chunked_docs.get(doc_id, [])
+        except Exception:
+            return 0.0
+
+        text = " ".join([c for c in chunks if c])
+        tokens = re.findall(r"\w+", text.lower())
+        if not tokens:
+            return 0.0
+        stopset = get_stopwords()
+        stop_count = sum(1 for t in tokens if t in stopset)
+        return float(stop_count) / float(len(tokens))
+
+    stop_pct_a = _doc_stopword_pct(str(warning.get("doc_a", "")))
+    stop_pct_b = _doc_stopword_pct(str(warning.get("doc_b", "")))
+    high_stop = (stop_pct_a > 0.7) or (stop_pct_b > 0.7)
+
+    existing_warnings = warning.get("warnings")
+    if isinstance(existing_warnings, (list, tuple, set)):
+        warnings_list = list(existing_warnings)
+    elif isinstance(existing_warnings, str):
+        warnings_list = [existing_warnings]
+    else:
+        warnings_list = []
+
+    for wc_key in ("word_count", "word_count_a", "word_count_b"):
+        val = warning.get(wc_key)
+        if val is not None:
+            try:
+                if float(val) < 50:
+                    if WARNING_SHORT_DOCUMENT not in warnings_list:
+                        warnings_list.append(WARNING_SHORT_DOCUMENT)
+                    break
+            except (TypeError, ValueError):
+                pass
+
+    for cc_key in (
+        "control_char_ratio",
+        "control_char_ratio_a",
+        "control_char_ratio_b",
+    ):
+        val = warning.get(cc_key)
+        if val is not None:
+            try:
+                if float(val) > CONTROL_CHARACTER_RATIO_THRESHOLD:
+                    if WARNING_BINARY_CHARACTERS not in warnings_list:
+                        warnings_list.append(WARNING_BINARY_CHARACTERS)
+                    break
+            except (TypeError, ValueError):
+                pass
+
+    res = {
         **dict(warning),
         "doc_a": str(warning.get("doc_a", "")).strip(),
         "doc_b": str(warning.get("doc_b", "")).strip(),
         "similarity": similarity,
         "severity": severity,
         "severity_rank": severity_rank(severity),
+        "stopword_pct_a": stop_pct_a,
+        "stopword_pct_b": stop_pct_b,
+        "high_stopword_density": high_stop,
+        "warning_codes": (["WARNING_HIGH_STOPWORD_DENSITY"] if high_stop else []),
     }
+
+    if warnings_list or "warnings" in warning:
+        res["warnings"] = warnings_list
+
+    return res
 
 
 def _truncate_search_query(search_query: Any) -> str:
@@ -77,6 +297,7 @@ def filter_warnings(
     warnings: Iterable[Mapping[str, Any]],
     search_query: str = "",
     min_match_length: int = 0,
+    severity: str | None = None,
 ) -> list[dict[str, Any]]:
     """Filter normalized warnings using functional predicate matching."""
     normalised = [_normalise_warning(item) for item in warnings]
@@ -86,6 +307,14 @@ def filter_warnings(
             item
             for item in normalised
             if item.get("matched_length", 0) >= min_match_length
+        ]
+
+    if severity:
+        target = severity.strip().casefold()
+        normalised = [
+            item
+            for item in normalised
+            if str(item.get("severity", "")).strip().casefold() == target
         ]
 
     predicate = matches_query_predicate(search_query)
@@ -387,10 +616,67 @@ def _has_exact_match(doc_a: str, doc_b: str) -> bool:
     chunks_b = chunked_docs.get(doc_b, [])
 
     # Normalize chunks by removing all whitespace
-    norm_a = {"".join(c.split()) for c in chunks_a if c.strip()}
-    norm_b = {"".join(c.split()) for c in chunks_b if c.strip()}
+    norm_a = {"".join((c.text if hasattr(c, "text") else c).split()) for c in chunks_a if (c.text if hasattr(c, "text") else c).strip()}
+    norm_b = {"".join((c.text if hasattr(c, "text") else c).split()) for c in chunks_b if (c.text if hasattr(c, "text") else c).strip()}
 
     return not norm_a.isdisjoint(norm_b)
+
+
+# When a large proportion of the matching text consists of stop-words
+# the similarity score can be inflated by function words rather than
+# meaningful shared content. Trigger a visible warning when density is
+# above this threshold.
+STOPWORD_DENSITY_WARNING_THRESHOLD = 0.6
+
+
+def _stopword_density_for_flag(flag: Mapping[str, Any]) -> float:
+    """Estimate stop-word density for exact matching chunks between two docs.
+
+    Returns a float 0..1 representing the fraction of tokens in the
+    matching text that are stop-words (using the global stopword manager).
+    """
+    if (
+        "analysis_results" not in st.session_state
+        or st.session_state.analysis_results is None
+    ):
+        return 0.0
+
+    chunked_docs = _chunked_docs_from_results(st.session_state.analysis_results)
+    chunks_a = chunked_docs.get(flag.get("doc_a", ""), [])
+    chunks_b = chunked_docs.get(flag.get("doc_b", ""), [])
+
+    # Build mapping of normalized chunk -> original text for both docs
+    def _norm_map(chunks: Sequence[str]) -> dict[str, str]:
+        m: dict[str, str] = {}
+        for c in chunks:
+            if not c or not c.strip():
+                continue
+            key = "".join(c.split())
+            if key:
+                # keep the first occurrence
+                m.setdefault(key, c)
+        return m
+
+    map_a = _norm_map(chunks_a)
+    map_b = _norm_map(chunks_b)
+    common_keys = set(map_a.keys()).intersection(map_b.keys())
+    if not common_keys:
+        return 0.0
+
+    stopset = get_stopwords()
+    total_tokens = 0
+    stop_tokens = 0
+    for k in common_keys:
+        text = map_a.get(k, "")
+        tokens = re.findall(r"\w+", text.lower())
+        if not tokens:
+            continue
+        total_tokens += len(tokens)
+        stop_tokens += sum(1 for t in tokens if t in stopset)
+
+    if total_tokens == 0:
+        return 0.0
+    return float(stop_tokens) / float(total_tokens)
 
 
 def render_compact_warning_row(flag: Mapping[str, Any]) -> None:
@@ -840,6 +1126,33 @@ def render_warning_controls(
                                         ai_b=ai_b,
                                     )
                                 )
+                            # Document-level stop-word density warning
+                            if flag.get("high_stopword_density", False):
+                                pct_a = flag.get("stopword_pct_a", 0.0) * 100
+                                pct_b = flag.get("stopword_pct_b", 0.0) * 100
+                                parts = []
+                                if pct_a > 70:
+                                    parts.append(f"{flag['doc_a']}: {pct_a:.0f}%")
+                                if pct_b > 70:
+                                    parts.append(f"{flag['doc_b']}: {pct_b:.0f}%")
+                                if parts:
+                                    st.warning(
+                                        f"WARNING_HIGH_STOPWORD_DENSITY — stop-words > 70% in {', '.join(parts)}. "
+                                        "Document-level similarity may be unreliable."
+                                    )
+                        # Warn when matched content is mostly stop-words
+                        try:
+                            density = _stopword_density_for_flag(flag)
+                        except Exception:
+                            density = 0.0
+                        if density >= STOPWORD_DENSITY_WARNING_THRESHOLD:
+                            st.warning(
+                                f"High stop-word density in matching text ({density * 100:.0f}%). "
+                                "Similarity may be inflated by common function words."
+                            )
+                        if flag.get("warnings"):
+                            for w_msg in flag["warnings"]:
+                                st.caption(f"⚠️ {w_msg}")
                     with c2:
                         st.markdown(
                             f"<div style='text-align:right;'>{badge_html(tier, flag['severity'])}</div>",

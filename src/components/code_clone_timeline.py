@@ -3,7 +3,7 @@
 from typing import Any, List
 
 
-def render_code_clone_timeline(matches: List[Any]) -> str:
+def render_code_clone_timeline(matches: list[Any]) -> str:
     """Renders HTML telemetry timeline list for code clone detections."""
     if not matches:
         return """
@@ -30,10 +30,10 @@ def render_code_clone_timeline(matches: List[Any]) -> str:
         ">
             <div>
                 <span style="color: #6366F1; font-weight: 800; font-size: 14px;">
-                    {match_dict.get('clone_id', 'CLONE-NODE')}
+                    {match_dict.get("clone_id", "CLONE-NODE")}
                 </span>
                 <div style="color: #94A3B8; font-size: 12px; margin-top: 4px;">
-                    {match_dict.get('source_file_id')} ↔ {match_dict.get('target_file_id')} ({match_dict.get('clone_type')})
+                    {match_dict.get("source_file_id")} ↔ {match_dict.get("target_file_id")} ({match_dict.get("clone_type")})
                 </div>
             </div>
             <div style="text-align: right;">

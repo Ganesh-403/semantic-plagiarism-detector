@@ -28,7 +28,7 @@ class PlagiarismPatternAnalyzer:
     @staticmethod
     def detect_collusion_rings(
         sim_matrix: pd.DataFrame, threshold: float = 0.75
-    ) -> Dict:
+    ) -> dict:
         """Detect groups of highly similar documents."""
         if sim_matrix.empty:
             return {"rings": [], "summary": "No data available"}
@@ -82,7 +82,7 @@ class PlagiarismPatternAnalyzer:
 
     @staticmethod
     def _calculate_avg_similarity(
-        sim_matrix: pd.DataFrame, documents: List[str]
+        sim_matrix: pd.DataFrame, documents: list[str]
     ) -> float:
         """Calculate average similarity within a group."""
         similarities = []
@@ -92,7 +92,7 @@ class PlagiarismPatternAnalyzer:
         return np.mean(similarities) if similarities else 0.0
 
     @staticmethod
-    def identify_outlier_patterns(scores: List[float]) -> Dict:
+    def identify_outlier_patterns(scores: list[float]) -> dict:
         """Identify outlier patterns in similarity scores."""
         if not scores:
             return {"outliers": [], "summary": "No data available"}
@@ -117,7 +117,7 @@ class PlagiarismPatternAnalyzer:
 class DocumentTrendAnalyzer:
     """Analyze document processing trends."""
 
-    def __init__(self, history_data: List[Dict]):
+    def __init__(self, history_data: list[dict]):
         self.history_data = history_data
 
     def get_daily_trends(self) -> pd.DataFrame:
@@ -135,7 +135,7 @@ class DocumentTrendAnalyzer:
 
         return daily_stats
 
-    def get_peak_times(self) -> Dict:
+    def get_peak_times(self) -> dict:
         """Identify peak processing times."""
         if not self.history_data:
             return {"peak_hours": [], "summary": "No data available"}
@@ -162,7 +162,7 @@ class PerformanceDashboard:
     """Performance monitoring dashboard."""
 
     @staticmethod
-    def render_performance_metrics(metrics: Dict[str, List[float]]):
+    def render_performance_metrics(metrics: dict[str, list[float]]):
         """Render performance metrics dashboard."""
         if not metrics:
             st.info("No performance metrics available")
@@ -181,8 +181,8 @@ class PerformanceDashboard:
                 p95 = np.percentile(values, 95)
                 col.metric(
                     f"{name.replace('_', ' ').title()}",
-                    f"{avg*1000:.1f}ms",
-                    delta=f"P95: {p95*1000:.1f}ms",
+                    f"{avg * 1000:.1f}ms",
+                    delta=f"P95: {p95 * 1000:.1f}ms",
                 )
 
         # Performance trend chart
@@ -190,7 +190,7 @@ class PerformanceDashboard:
             PerformanceDashboard._create_performance_chart(metrics)
 
     @staticmethod
-    def _create_performance_chart(metrics: Dict[str, List[float]]):
+    def _create_performance_chart(metrics: dict[str, list[float]]):
         """Create performance trend chart."""
         fig = go.Figure()
 
@@ -223,7 +223,7 @@ class PerformanceDashboard:
 # ==============================================================================
 
 
-def render_similarity_trend_chart(history_data: List[Dict]) -> None:
+def render_similarity_trend_chart(history_data: list[dict]) -> None:
     """Render similarity trend chart."""
     if not history_data:
         st.info("No history data available for trends")
@@ -275,7 +275,7 @@ def render_similarity_trend_chart(history_data: List[Dict]) -> None:
     st.plotly_chart(fig, use_container_width=True)
 
 
-def render_document_activity_heatmap(history_data: List[Dict]) -> None:
+def render_document_activity_heatmap(history_data: list[dict]) -> None:
     """Render document activity heatmap."""
     if not history_data:
         return
@@ -333,7 +333,7 @@ def render_collusion_ring_dashboard(
         st.success("✅ No collusion rings detected")
 
 
-def render_processing_time_breakdown(timings: Dict[str, float]) -> None:
+def render_processing_time_breakdown(timings: dict[str, float]) -> None:
     """Render processing time breakdown chart."""
     if not timings:
         st.info("No timing data available")
@@ -424,7 +424,7 @@ class ComparisonHistoryDashboard:
 
 
 def render_enhanced_analytics_tab(
-    sim_matrix: pd.DataFrame, history_data: List[Dict], timings: Dict[str, float]
+    sim_matrix: pd.DataFrame, history_data: list[dict], timings: dict[str, float]
 ):
     """Render enhanced analytics tab."""
     st.markdown("### 📊 Enhanced Analytics Dashboard")

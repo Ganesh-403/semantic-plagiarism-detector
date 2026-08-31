@@ -138,7 +138,9 @@ def render_drilldown_view(active_sim_df, raw_texts: dict, flags: list, doc_names
 
             st.markdown("---")
             st.markdown("### 📄 Full Document Context")
-            st.markdown("Below is the complete text of both documents, with flagged passages highlighted.")
+            st.markdown(
+                "Below is the complete text of both documents, with flagged passages highlighted."
+            )
 
             full_a = str(raw_texts.get(da, ""))
             full_b = str(raw_texts.get(db, ""))
@@ -148,12 +150,18 @@ def render_drilldown_view(active_sim_df, raw_texts: dict, flags: list, doc_names
                 snip_b = str(flag.get("snippet_b", ""))
                 if flag.get("doc_a") == db:
                     snip_a, snip_b = snip_b, snip_a
-                
+
                 if snip_a and snip_a in full_a:
-                    full_a = full_a.replace(snip_a, f'<mark style="background-color: #fca5a5; padding: 0.1em; border-radius: 2px;">{snip_a}</mark>')
+                    full_a = full_a.replace(
+                        snip_a,
+                        f'<mark style="background-color: #fca5a5; padding: 0.1em; border-radius: 2px;">{snip_a}</mark>',
+                    )
                 if snip_b and snip_b in full_b:
-                    full_b = full_b.replace(snip_b, f'<mark style="background-color: #fca5a5; padding: 0.1em; border-radius: 2px;">{snip_b}</mark>')
-            
+                    full_b = full_b.replace(
+                        snip_b,
+                        f'<mark style="background-color: #fca5a5; padding: 0.1em; border-radius: 2px;">{snip_b}</mark>',
+                    )
+
             # Format text for markdown rendering with html
             full_a_html = full_a.replace("\n", "<br>")
             full_b_html = full_b.replace("\n", "<br>")
@@ -161,8 +169,13 @@ def render_drilldown_view(active_sim_df, raw_texts: dict, flags: list, doc_names
             c_full_a, c_full_b = st.columns(2)
             with c_full_a:
                 st.markdown(f"**{da}**")
-                st.markdown(f"<div style='border: 1px solid #ddd; padding: 10px; border-radius: 5px;'>{full_a_html}</div>", unsafe_allow_html=True)
+                st.markdown(
+                    f"<div style='border: 1px solid #ddd; padding: 10px; border-radius: 5px;'>{full_a_html}</div>",
+                    unsafe_allow_html=True,
+                )
             with c_full_b:
                 st.markdown(f"**{db}**")
-                st.markdown(f"<div style='border: 1px solid #ddd; padding: 10px; border-radius: 5px;'>{full_b_html}</div>", unsafe_allow_html=True)
-
+                st.markdown(
+                    f"<div style='border: 1px solid #ddd; padding: 10px; border-radius: 5px;'>{full_b_html}</div>",
+                    unsafe_allow_html=True,
+                )

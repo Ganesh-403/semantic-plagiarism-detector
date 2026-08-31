@@ -30,14 +30,18 @@ def test_zip_entries_are_sanitized():
     ]
 
 
-def test_zip_path_traversal_entry_is_skipped():
-    result = process_zip_file(
-        make_zip(
-            [
-                ("../../evil.pdf", b"bad"),
-                ("safe.pdf", b"good"),
-            ]
-        )
-    )
+import pytest
 
-    assert result == {"safe.pdf": b"good"}
+
+def test_zip_path_traversal_entry_is_rejected():
+    with pytest.raises(
+        ValueError, match="Malicious path traversal detected in ZIP archive entry"
+    ):
+        process_zip_file(
+            make_zip(
+                [
+                    ("../../evil.pdf", b"bad"),
+                    ("safe.pdf", b"good"),
+                ]
+            )
+        )

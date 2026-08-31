@@ -290,15 +290,17 @@ def detect_text_language(text: str) -> str:
 
 def strip_bibliography(text: str) -> str:
     """Remove everything from the first standalone bibliography header onward."""
-    match = _BIBLIOGRAPHY_HEADERS.search(text)
-    if match:
-        sliced_text = text[: match.start()].rstrip()
-        if hasattr(text, "word_headings"):
-            words_in_sliced = len(sliced_text.split())
-            from src.core.parsers.docx_parser import ParsedDocxText
+    from src.core.parsers.docx_parser import ParsedDocxText
 
+    structured_headings = getattr(text, "headings", None)
+    plain_text = text.text if isinstance(text, ParsedDocxText) else text
+    match = _BIBLIOGRAPHY_HEADERS.search(plain_text)
+    if match:
+        sliced_text = plain_text[: match.start()].rstrip()
+        if structured_headings is not None:
+            words_in_sliced = len(sliced_text.split())
             return ParsedDocxText(
-                sliced_text, word_headings=text.word_headings[:words_in_sliced]
+                text=sliced_text, headings=structured_headings[:words_in_sliced]
             )
         return sliced_text
     return text

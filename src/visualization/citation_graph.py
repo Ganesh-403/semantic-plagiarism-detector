@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 def plot_citation_network(
     doc_a: str,
     doc_b: str,
-    shared_citations: List[Dict[str, str]],
-    theme_colors: Optional[Dict[str, str]] = None,
+    shared_citations: list[dict[str, str]],
+    theme_colors: Optional[dict[str, str]] = None,
 ) -> go.Figure:
     """Render a bipartite network graph of shared citations.
 

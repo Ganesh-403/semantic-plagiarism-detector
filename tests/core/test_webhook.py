@@ -178,9 +178,9 @@ class TestWebhookThreadSafety:
         assert len(results) == 5
         for worker_id, success, attempts in results:
             assert success is True, f"Worker {worker_id} failed"
-            assert (
-                attempts == 3
-            ), f"Worker {worker_id} saw {attempts} attempts instead of 3"
+            assert attempts == 3, (
+                f"Worker {worker_id} saw {attempts} attempts instead of 3"
+            )
 
     @patch.dict(os.environ, {"PLAGIARISM_WEBHOOK_URL": WEBHOOK_URL})
     @patch("src.core.webhook.SSRFProtector.validate_webhook_url")
@@ -229,22 +229,23 @@ class TestHMACSignatures:
         )
 
 
-
 class TestWebhookURLParameterOverride:
     """Test suite for webhook_url parameter override (Issue #1995)."""
 
-    @patch.dict(os.environ, {"PLAGIARISM_WEBHOOK_URL": "https://env-var-url.com/webhook"})
+    @patch.dict(
+        os.environ, {"PLAGIARISM_WEBHOOK_URL": "https://env-var-url.com/webhook"}
+    )
     @patch("src.core.webhook.SSRFProtector.validate_webhook_url")
     @patch("src.core.webhook.requests.post")
     def test_explicit_webhook_url_overrides_env_var(self, mock_post, mock_validate):
         """Verify that an explicit webhook_url parameter overrides the environment variable."""
         mock_post.return_value = make_response(200)
         custom_url = "https://custom-override.com/webhook"
-        
+
         success, attempts = send_plagiarism_alert(
             "DocA", "DocB", 0.95, webhook_url=custom_url
         )
-        
+
         assert success is True
         # Verify the custom URL was used, not the env var
         mock_post.assert_called_once()
@@ -252,17 +253,19 @@ class TestWebhookURLParameterOverride:
         assert call_args[0][0] == custom_url
         assert call_args[0][0] != "https://env-var-url.com/webhook"
 
-    @patch.dict(os.environ, {"PLAGIARISM_WEBHOOK_URL": "https://env-var-url.com/webhook"})
+    @patch.dict(
+        os.environ, {"PLAGIARISM_WEBHOOK_URL": "https://env-var-url.com/webhook"}
+    )
     @patch("src.core.webhook.SSRFProtector.validate_webhook_url")
     @patch("src.core.webhook.requests.post")
     def test_none_webhook_url_falls_back_to_env_var(self, mock_post, mock_validate):
         """Verify that passing None falls back to the environment variable."""
         mock_post.return_value = make_response(200)
-        
+
         success, attempts = send_plagiarism_alert(
             "DocA", "DocB", 0.95, webhook_url=None
         )
-        
+
         assert success is True
         mock_post.assert_called_once()
         call_args = mock_post.call_args
@@ -275,17 +278,17 @@ class TestWebhookURLParameterOverride:
         """Verify explicit URL works even when env var is completely missing."""
         mock_post.return_value = make_response(200)
         custom_url = "https://custom-override.com/webhook"
-        
+
         success, attempts = send_plagiarism_alert(
             "DocA", "DocB", 0.95, webhook_url=custom_url
         )
-        
+
         assert success is True
         mock_post.assert_called_once_with(
-            custom_url, 
+            custom_url,
             json=mock_post.call_args[1]["json"],
             headers=mock_post.call_args[1]["headers"],
-            timeout=mock_post.call_args[1]["timeout"]
+            timeout=mock_post.call_args[1]["timeout"],
         )
 
     @patch("src.core.webhook.send_plagiarism_alert")
@@ -293,20 +296,13 @@ class TestWebhookURLParameterOverride:
         """Verify dispatch_plagiarism_alert correctly passes the webhook_url parameter."""
         mock_send.return_value = (True, 1)
         custom_url = "https://dispatch-override.com/webhook"
-        
-        result = dispatch_plagiarism_alert(
-            "DocA", "DocB", 0.88, webhook_url=custom_url
-        )
-        
+
+        result = dispatch_plagiarism_alert("DocA", "DocB", 0.88, webhook_url=custom_url)
+
         assert result is True
         mock_send.assert_called_once_with(
-            doc_a="DocA",
-            doc_b="DocB",
-            similarity=0.88,
-            webhook_url=custom_url
+            doc_a="DocA", doc_b="DocB", similarity=0.88, webhook_url=custom_url
         )
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -460,9 +456,7 @@ class TestDispatchForwardsWebhookUrl:
         """Per-tenant and per-severity routing depends on this precedence."""
         mock_post.return_value = make_response(200)
 
-        dispatch_plagiarism_alert(
-            "DocA", "DocB", 0.91, webhook_url=self.OVERRIDE_URL
-        )
+        dispatch_plagiarism_alert("DocA", "DocB", 0.91, webhook_url=self.OVERRIDE_URL)
 
         assert mock_post.call_args.args[0] == self.OVERRIDE_URL
 

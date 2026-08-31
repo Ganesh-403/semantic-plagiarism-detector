@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Cross-Lingual Paraphrase Detector Suite | Semantic Plagiarism Detector</title>
+    <meta name="description" content="Enterprise Cross-Lingual Paraphrase Detection Dashboard featuring multilingual embedding space mapping, translation alignment metrics, and semantic shift analysis.">
+    <link rel="stylesheet" href="styles/cross_lingual_dashboard.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <!-- Architecture Comment: Cross-Lingual Paraphrase Alignment & Multilingual Vector Space Dashboard -->
+    <!-- Design Pattern: Glassmorphic Modular Dashboard with Multi-Language Telemetry and Translation Alignment Controls -->
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar-navigation" id="sidebar-nav">
+            <div class="brand-header">
+                <div class="brand-logo">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h2>PolyGlotShield</h2>
+                    <span>Cross-Lingual v5.1</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#overview" class="nav-item active" id="nav-overview">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span>Language Matrix</span>
+                </a>
+                <a href="#translation-alignment" class="nav-item" id="nav-translation-alignment">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 8l6 6"></path><path d="M4 14e1 2 0 0 0 2 2h12"></path><path d="M2 5h12"></path><path d="M7 2h1"></path><path d="M22 22l-5-10-5 10"></path><path d="M14 18h6"></path></svg>
+                    <span>Translation Vectors</span>
+                </a>
+                <a href="#multilingual-corpus" class="nav-item" id="nav-multilingual-corpus">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    <span>Corpus Repository</span>
+                </a>
+                <a href="#paraphrase-clusters" class="nav-item" id="nav-paraphrase-clusters">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                    <span>Semantic Clusters</span>
+                </a>
+                <a href="#settings" class="nav-item" id="nav-settings">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>mBERT Engine Parameters</span>
+                </a>
+            </nav>
+
+            <div class="system-status-widget glass-card">
+                <div class="status-indicator online"></div>
+                <div class="status-info">
+                    <span class="status-title">mBERT / XLM-R Active</span>
+                    <span class="status-subtitle">104 Languages Supported</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Surface -->
+        <main class="main-content">
+            <!-- Top Controls Bar -->
+            <header class="top-header glass-card">
+                <div class="header-search">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="cross-lingual-search-input" placeholder="Search multilingual document ID, translation pair, or language..." aria-label="Search cross-lingual corpus">
+                </div>
+
+                <div class="header-actions">
+                    <div class="filter-dropdown">
+                        <select id="cross-lingual-model-select" class="styled-select">
+                            <option value="xlm-roberta-base">XLM-RoBERTa (768d)</option>
+                            <option value="laBSE">LaBSE Language-Agnostic Embeddings</option>
+                            <option value="m-mpnet-base-v2">Multilingual MPNet Base v2</option>
+                            <option value="multilingual-e5-large">Multilingual E5 Large (1024d)</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-secondary" id="btn-sync-cross-telemetry">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        <span>Sync Telemetry</span>
+                    </button>
+
+                    <button class="btn btn-primary" id="btn-run-cross-audit">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="12 8 8 12 12 16 12 8"></polygon></svg>
+                        <span>Run Cross-Lingual Audit</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Content Scroll Area -->
+            <div class="dashboard-body">
+                <!-- Metric Cards Grid -->
+                <section class="metrics-grid">
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon blue-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Cross-Lingual Pairs</span>
+                            <span class="metric-value" id="val-cross-pairs">112,490</span>
+                            <span class="metric-trend positive">+22.4% scanned</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon red-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Flagged Paraphrases</span>
+                            <span class="metric-value" id="val-flagged-cross">4,120</span>
+                            <span class="metric-trend negative">3.6% high risk</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon purple-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Avg Translation Distance</span>
+                            <span class="metric-value" id="val-avg-trans-dist">0.142</span>
+                            <span class="metric-trend neutral">Cosine metric</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon green-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Alignment Inference</span>
+                            <span class="metric-value" id="val-align-speed">5.1 ms/pair</span>
+                            <span class="metric-trend positive">TensorRT Optimized</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Analytics Section Grid -->
+                <section class="analytics-section-grid">
+                    <!-- Multilingual Alignment Graph -->
+                    <div class="analytics-card glass-card span-col-2">
+                        <div class="card-header">
+                            <div class="title-group">
+                                <h3>Multilingual Similarity Spectrum</h3>
+                                <p class="card-subtitle">Semantic translation vector similarity across language pairs</p>
+                            </div>
+                            <div class="card-actions">
+                                <span class="badge badge-accent" id="badge-cross-cutoff">Threshold: 82%</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="vector-graph-container" id="cross-graph-visual">
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 18%;"></div>
+                                    <span class="graph-label">EN -> ES</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 62%;"></div>
+                                    <span class="graph-label">EN -> FR</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 86%;"></div>
+                                    <span class="graph-label">EN -> DE</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 42%;"></div>
+                                    <span class="graph-label">EN -> ZH</span>
+                                </div>
+                                <div class="graph-bar-wrapper danger-zone">
+                                    <div class="graph-bar danger" style="height: 28%;"></div>
+                                    <span class="graph-label">EN -> RU</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Paraphrase Controls Form -->
+                    <div class="analytics-card glass-card">
+                        <div class="card-header">
+                            <h3>Cross-Lingual Parameters</h3>
+                        </div>
+                        <div class="card-body controls-form">
+                            <div class="form-group">
+                                <label for="range-cross-cutoff">Semantic Threshold: <span id="lbl-cross-cutoff">82%</span></label>
+                                <input type="range" id="range-cross-cutoff" min="50" max="99" value="82" class="styled-range">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="select-source-lang">Source Language Filter</label>
+                                <select id="select-source-lang" class="styled-select">
+                                    <option value="all">All Source Languages</option>
+                                    <option value="en">English (EN)</option>
+                                    <option value="es">Spanish (ES)</option>
+                                    <option value="fr">French (FR)</option>
+                                    <option value="de">German (DE)</option>
+                                    <option value="zh">Chinese (ZH)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="select-target-lang">Target Language Filter</label>
+                                <select id="select-target-lang" class="styled-select">
+                                    <option value="all">All Target Languages</option>
+                                    <option value="es">Spanish (ES)</option>
+                                    <option value="fr">French (FR)</option>
+                                    <option value="de">German (DE)</option>
+                                    <option value="zh">Chinese (ZH)</option>
+                                    <option value="ru">Russian (RU)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group toggle-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="chk-auto-backtranslation" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label">Auto-Verify via Pivot Back-Translation</span>
+                            </div>
+
+                            <button class="btn btn-primary btn-full" id="btn-reindex-cross">
+                                <span>Re-Compute Vector Projections</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Multilingual Telemetry Data Table -->
+                <section class="table-section glass-card">
+                    <div class="card-header">
+                        <div class="title-group">
+                            <h3>Cross-Lingual Paraphrase Matches</h3>
+                            <p class="card-subtitle">Real-time cross-language vector similarity and translation alignment</p>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-sm btn-secondary" id="btn-export-cross-csv">Export Cross-Lingual CSV</button>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="data-table" id="cross-lingual-telemetry-table">
+                            <thead>
+                                <tr>
+                                    <th>Pair ID</th>
+                                    <th>Source Text (Lang)</th>
+                                    <th>Target Candidate (Lang)</th>
+                                    <th>Vector Distance</th>
+                                    <th>Back-Trans Score</th>
+                                    <th>Risk Category</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cross-table-body">
+                                <!-- Dynamic JS rendering -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="../src/services/cross_lingual_engine.js"></script>
+</body>
+</html>

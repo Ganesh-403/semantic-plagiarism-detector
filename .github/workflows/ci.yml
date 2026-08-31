@@ -38,11 +38,18 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install ruff pylint mypy pip-audit pytest pytest-cov
+          pip install ruff pylint mypy pip-audit pytest pytest-cov pre-commit yamllint
           # Pre-install numpy<2.5.0 so pip's resolver doesn't try to pull
           # numpy 2.5.x (which requires Python >=3.12) on Python 3.9-3.11.
           pip install "numpy>=1.26.0,<2.5.0"
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run pre-commit
+        run: pre-commit run --all-files
+
+      - name: Run YAML Linter (yamllint)
+        run: |
+          yamllint .github/ docker-compose.yml .pre-commit-config.yaml
 
       - name: Run Ruff Linter
         run: |
@@ -66,6 +73,33 @@ jobs:
           name: pip-audit-report
           path: security-report.json
 
+  markdown-lint:
+    name: Markdown Formatting Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # Issue #3485: Catch inconsistent heading levels, trailing whitespace,
+      # and other Markdown formatting problems across docs/ and README.md.
+      #
+      # continue-on-error is intentional for now: a repo-wide scan found
+      # existing heading-level violations (H1 -> H3/H4 skips) in 13 files,
+      # including README.md itself. Flipping this to a hard failure should
+      # happen in a follow-up PR once those pre-existing violations are
+      # cleaned up — otherwise this step would block every unrelated PR
+      # from merging on day one.
+      - name: Run markdownlint-cli2
+        uses: DavidAnson/markdownlint-cli2-action@v18
+        continue-on-error: true
+        with:
+          globs: |
+            **/*.md
+            !node_modules
+            !.github/ISSUE_TEMPLATE/**
+
   test:
     name: Execute Test Suite
     runs-on: ubuntu-latest
@@ -73,11 +107,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Modified: Fetch full git history required for diff-cover comparison
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -87,10 +123,19 @@ jobs:
           # Issue #695 Implementation: Enabling pip cache
           cache-dependency-path: '**/requirements*.txt'
 
+      # Issue #3483: Cache HuggingFace transformer model weights
+      - name: Cache HuggingFace Hub
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface/hub
+          key: ${{ runner.os }}-hf-paraphrase-multilingual-MiniLM-L12-v2-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-hf-paraphrase-multilingual-MiniLM-L12-v2-
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov pytest-xdist
+          pip install pytest pytest-cov pytest-xdist diff-cover # Added diff-cover
           # Pre-install numpy<2.5.0 so pip's resolver doesn't try to pull
           # numpy 2.5.x (which requires Python >=3.12) on Python 3.9-3.11.
           pip install "numpy>=1.26.0,<2.5.0"
@@ -103,10 +148,17 @@ jobs:
 
       - name: Enforce Coverage Threshold (≥85%)
         # Resolves #1616 – fail the build if total coverage drops below 85 %.
-        # The previous step already ran pytest with --cov, which writes .coverage.
-        # This step reads that data and exits non-zero when the threshold is not met.
         run: |
           coverage report --fail-under=85
+          coverage xml  # Added: Generate coverage.xml required for diff-cover
+
+      - name: Enforce Diff Coverage Threshold (≥90%) for New Code
+        # Resolves #3492 - Diff coverage enforcement for new code
+        # Runs only on Pull Requests and dynamically compares against the base branch.
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=90
 
       - name: Upload Coverage to Action Artifacts
         uses: actions/upload-artifact@v4

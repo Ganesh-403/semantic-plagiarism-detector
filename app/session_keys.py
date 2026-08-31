@@ -53,6 +53,8 @@ class SessionKeys(str, Enum):
     FORCE_DARK_CHARTS = "force_dark_charts"
     SESSION_START_TIME = "session_start_time"
     COMPACT_VIEW = "compact_view"
+    ACCENT_COLOR = "accent_color"
+    THEME = "theme"
 
     def __str__(self) -> str:  # pragma: no cover - convenience for f-strings/logging
         return self.value

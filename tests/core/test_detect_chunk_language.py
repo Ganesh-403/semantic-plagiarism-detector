@@ -95,3 +95,16 @@ def test_mixed_language_does_not_crash():
     text = "The student dit que le travail était muy difícil para todos."
     result = detect_chunk_language(text)
     assert isinstance(result, str)
+
+
+def test_detects_arabic():
+    # Arabic script test text
+    text = "هذه ورقة بحثية حول الذكاء الاصطناعي وتطبيقاته في التعليم."
+    assert detect_chunk_language(text) == "ar"
+
+
+def test_detects_hindi():
+    # Hindi script test text (Devanagari)
+    text = "यह आर्टिफिशियल इंटेलिजेंस और शिक्षा में इसके अनुप्रयोगों पर एक शोध पत्र है।"
+    assert detect_chunk_language(text) == "hi"
+

@@ -17,7 +17,7 @@ import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Optional
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -72,7 +72,7 @@ class Alert:
     timestamp: float
     acknowledged: bool = False
     resolved: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # ==============================================================================
@@ -86,12 +86,12 @@ class MonitoringEngine:
     def __init__(self, max_history: int = 3600):  # 1 hour at 1s intervals
         self.max_history = max_history
         self.metrics_history: deque = deque(maxlen=max_history)
-        self.alerts: List[Alert] = []
-        self.alert_rules: List[AlertRule] = []
+        self.alerts: list[Alert] = []
+        self.alert_rules: list[AlertRule] = []
         self.running = False
         self.monitor_thread = None
         self._lock = threading.Lock()
-        self._callbacks: List[Callable] = []
+        self._callbacks: list[Callable] = []
 
     def start_monitoring(self):
         """Start the monitoring thread."""
@@ -185,9 +185,7 @@ class MonitoringEngine:
             cache = get_cache()
             if cache.is_available():
                 keys = list(
-                    cache._client.scan_iter(
-                        match="spd:v1:session:*:last_interaction"
-                    )
+                    cache._client.scan_iter(match="spd:v1:session:*:last_interaction")
                 )
                 active = 0
                 now = time.time()
@@ -337,7 +335,7 @@ class MonitoringEngine:
                 return self.metrics_history[-1]
         return None
 
-    def get_metrics_history(self, seconds: int = 60) -> List[SystemMetric]:
+    def get_metrics_history(self, seconds: int = 60) -> list[SystemMetric]:
         """Get metrics history for last N seconds."""
         cutoff = time.time() - seconds
         result = []
@@ -369,7 +367,7 @@ class MonitoringEngine:
                 alert.resolved = True
                 break
 
-    def get_active_alerts(self) -> List[Alert]:
+    def get_active_alerts(self) -> list[Alert]:
         """Get active (unresolved) alerts."""
         return [a for a in self.alerts if not a.resolved]
 
@@ -383,7 +381,7 @@ class HealthChecker:
     """System health check and diagnostics."""
 
     @staticmethod
-    def check_database() -> Dict[str, Any]:
+    def check_database() -> dict[str, Any]:
         """Check database health."""
         try:
             from src.core.app_config import AUTH_DB_PATH, CORPUS_DB_PATH
@@ -422,7 +420,7 @@ class HealthChecker:
             }
 
     @staticmethod
-    def check_redis() -> Dict[str, Any]:
+    def check_redis() -> dict[str, Any]:
         """Check Redis health."""
         try:
             from src.utils.redis_cache import get_cache
@@ -453,7 +451,7 @@ class HealthChecker:
             }
 
     @staticmethod
-    def check_embedding_model() -> Dict[str, Any]:
+    def check_embedding_model() -> dict[str, Any]:
         """Check embedding model health."""
         try:
             from src.core.embedding_model import EmbeddingModelManager
@@ -479,7 +477,7 @@ class HealthChecker:
             }
 
     @staticmethod
-    def check_faiss_index() -> Dict[str, Any]:
+    def check_faiss_index() -> dict[str, Any]:
         """Check FAISS index health."""
         try:
             from src.core.app_config import FAISS_INDEX_PATH
@@ -514,7 +512,7 @@ class HealthChecker:
             }
 
     @staticmethod
-    def run_full_health_check() -> Dict[str, Any]:
+    def run_full_health_check() -> dict[str, Any]:
         """Run complete health check."""
         results = {
             "timestamp": datetime.now().isoformat(),
@@ -540,7 +538,9 @@ class HealthChecker:
         results["overall_status"] = (
             "healthy"
             if all(critical_checks)
-            else "degraded" if any(critical_checks) else "critical"
+            else "degraded"
+            if any(critical_checks)
+            else "critical"
         )
 
         return results
@@ -556,7 +556,7 @@ class AnomalyDetector:
 
     def __init__(self, window_size: int = 60):
         self.window_size = window_size
-        self.history: List[float] = []
+        self.history: list[float] = []
 
     def detect_spike(self, value: float, threshold: float = 3.0) -> bool:
         """Detect if value is a spike (3 standard deviations from mean)."""
@@ -578,7 +578,7 @@ class AnomalyDetector:
         z_score = (value - mean) / std
         return abs(z_score) > threshold
 
-    def detect_trend(self, values: List[float], window: int = 10) -> str:
+    def detect_trend(self, values: list[float], window: int = 10) -> str:
         """Detect trend in values."""
         if len(values) < window:
             return "stable"
@@ -634,8 +634,10 @@ def render_system_health_dashboard():
     col1.metric("CPU", f"{sys['cpu_percent']:.1f}%")
     col2.metric("Memory", f"{sys['memory_percent']:.1f}%")
     col3.metric("Disk", f"{sys['disk_usage']:.1f}%")
-    uptime = int(sys["uptime_seconds"] / 3600)
-    col4.metric("Uptime", f"{uptime}h")
+    from src.utils.processing_time import format_uptime_seconds
+
+    uptime_str = format_uptime_seconds(sys["uptime_seconds"])
+    col4.metric("Uptime", uptime_str)
 
     # Component status
     st.markdown("#### Component Status")
@@ -894,9 +896,7 @@ def render_monitoring_controls(monitor: MonitoringEngine):
 
     with col1:
         if monitor.running:
-            if st.button(
-                "⏹️ Stop Monitoring", type="primary", use_container_width=True
-            ):
+            if st.button("⏹️ Stop Monitoring", type="primary", use_container_width=True):
                 monitor.stop_monitoring()
                 st.rerun()
         else:

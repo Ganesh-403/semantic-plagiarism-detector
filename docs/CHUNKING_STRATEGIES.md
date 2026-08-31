@@ -28,7 +28,7 @@ chunk_text(
     overlap_percentage: float | None = None,
     max_chunks: int = 1000,
     sentence_padding: bool = True,
-) -> List[str]
+) -> List[ChunkString]
 ```
 
 **Key parameters:**

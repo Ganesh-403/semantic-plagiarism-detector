@@ -33,6 +33,8 @@ from .core import (
     get_document_embedding,
     load_branding_config,
     load_index,
+    rebuild_index_from_database,
+    rebuild_index_from_db,
     reload_branding_config,
     sanitize_tag_name,
     sanitize_zero_width_characters,
@@ -41,6 +43,7 @@ from .core import (
     translate_text,
 )
 from .db import (
+    CorpusRepository,
     add_chunks,
     add_document,
     add_user,
@@ -65,7 +68,10 @@ from .db import (
     init_corpus_db,
     init_db,
     is_user_active,
+    restore_document,
     set_user_active_status,
+    soft_delete_document,
+    revoke_all_user_refresh_tokens,
     update_password,
     update_user_profile,
     verify_user,
@@ -89,8 +95,6 @@ except ImportError:
     plot_similarity_network = None
     render_network_plotly = None
     plot_document_similarity_heatmap = None
-except ImportError:
-    pass
 
 
 __all__ = [
@@ -128,6 +132,8 @@ __all__ = [
     "find_plagiarised_chunks",
     "save_index",
     "load_index",
+    "rebuild_index_from_database",
+    "rebuild_index_from_db",
     "ChunkRecord",
     "FaissChunkRecord",
     "PipelineChunkRecord",
@@ -139,6 +145,7 @@ __all__ = [
     "add_user",
     "delete_user",
     "update_password",
+    "revoke_all_user_refresh_tokens",
     "get_2fa_status",
     "enable_2fa",
     "disable_2fa",
@@ -152,6 +159,8 @@ __all__ = [
     "add_document",
     "get_document_by_hash",
     "get_all_documents",
+    "soft_delete_document",
+    "restore_document",
     "add_chunks",
     "get_chunk_registry",
     "get_all_embeddings",
@@ -167,4 +176,5 @@ __all__ = [
     "sanitize_zero_width_characters",
     "TagManager",
     "sanitize_tag_name",
+    "CorpusRepository",
 ]

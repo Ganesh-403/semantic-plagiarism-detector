@@ -57,7 +57,6 @@ def check_ocr_dependencies() -> None:
         raise OCRDependencyError(OCR_TESSERACT_NOT_FOUND) from exc
 
 
-
 def _is_blank_scanned_page(
     pdf_bytes: bytes,
     page_index: int,
@@ -116,8 +115,10 @@ def _ocr_pdf_page(
     import pytesseract
     from PIL import Image
 
+    from src.core.metrics import ocr_invocations_total
     from src.utils.temp_manager import managed_ocr_temp_dir
 
+    ocr_invocations_total.labels(status="started").inc()
     try:
         with managed_ocr_temp_dir(prefix=f"ocr_pdf_p{page_index}_") as tmp_dir:
             with fitz.open(stream=pdf_bytes, filetype="pdf") as document:
@@ -132,12 +133,15 @@ def _ocr_pdf_page(
                     (pixmap.width, pixmap.height),
                     pixmap.samples,
                 )
-                return pytesseract.image_to_string(
+                extracted = pytesseract.image_to_string(
                     image,
                     lang=language,
                     config="--oem 3 --psm 3",
                 ).strip()
+                ocr_invocations_total.labels(status="success").inc()
+                return extracted
     except Exception as exc:
+        ocr_invocations_total.labels(status="failure").inc()
         logger.error(f"[document_parser] OCR page extraction failed: {exc}")
         return ""
 
@@ -159,7 +163,9 @@ def preprocess_image_for_ocr(image):
         from PIL import ImageEnhance, ImageFilter
 
         # Convert palette/RGBA modes to RGB for uniform channel processing
-        if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
+        if image.mode in ("RGBA", "LA") or (
+            image.mode == "P" and "transparency" in image.info
+        ):
             bg = Image.new("RGB", image.size, (255, 255, 255))
             if image.mode == "P":
                 image = image.convert("RGBA")
@@ -220,10 +226,12 @@ def extract_text_from_image(
     import pytesseract
     from PIL import Image
 
+    from src.core.metrics import ocr_invocations_total
     from src.core.parsers.pdf_parser import _read_pdf_bytes
     from src.utils.temp_manager import managed_ocr_temp_dir
 
     file_bytes = _read_pdf_bytes(file)
+    ocr_invocations_total.labels(status="started").inc()
     try:
         with managed_ocr_temp_dir(prefix="ocr_image_") as tmp_dir:
             image = Image.open(io.BytesIO(file_bytes))
@@ -238,19 +246,25 @@ def extract_text_from_image(
                     lang=ocr_language,
                     config="--oem 3 --psm 3",
                 ).strip()
+                ocr_invocations_total.labels(status="success").inc()
                 return extracted_text
             except (MemoryError, Exception) as exc:
+                ocr_invocations_total.labels(status="failure").inc()
                 if isinstance(exc, MemoryError):
                     logger.warning(
                         f"[document_parser] OCR image extraction failed due to memory exhaustion: {exc}"
                     )
                 else:
-                    logger.warning(f"[document_parser] OCR image extraction failed: {exc}")
+                    logger.warning(
+                        f"[document_parser] OCR image extraction failed: {exc}"
+                    )
                 return "[OCR extraction failed for the file]"
     except pytesseract.TesseractNotFoundError as exc:
+        ocr_invocations_total.labels(status="failure").inc()
         from src.errors import OCR_TESSERACT_NOT_FOUND
 
         raise OCRDependencyError(OCR_TESSERACT_NOT_FOUND) from exc
     except Exception as exc:
+        ocr_invocations_total.labels(status="failure").inc()
         logger.error(f"[document_parser] Error reading standalone image: {exc}")
         return ""

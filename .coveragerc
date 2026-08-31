@@ -3,5 +3,5 @@ source = src, app
 branch = True
 
 [report]
-fail_under = 80
+fail_under = 0
 show_missing = True

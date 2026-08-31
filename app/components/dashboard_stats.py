@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 @st.cache_data(ttl=60)
-def _load_documents_cached() -> List[Any]:
+def _load_documents_cached() -> list[Any]:
     """Fetch all non-deleted documents from the database, cached for performance."""
     try:
         from src.db.corpus_db import get_all_documents
@@ -36,7 +36,7 @@ def _load_documents_cached() -> List[Any]:
 
 
 @st.cache_data(ttl=60)
-def _load_incidents_cached() -> List[Any]:
+def _load_incidents_cached() -> list[Any]:
     """Fetch all incidents from the database, cached for performance."""
     try:
         from src.db.incidents import get_all_incidents
@@ -49,7 +49,7 @@ def _load_incidents_cached() -> List[Any]:
 
 
 @st.cache_data(ttl=60)
-def _load_high_severity_trends_cached(days: int = 30) -> List[Dict[str, Any]]:
+def _load_high_severity_trends_cached(days: int = 30) -> list[dict[str, Any]]:
     """Fetch daily high severity incident trend counts, cached for performance."""
     try:
         from src.db.incidents import get_high_severity_trends
@@ -61,7 +61,7 @@ def _load_high_severity_trends_cached(days: int = 30) -> List[Dict[str, Any]]:
 
 
 @st.cache_data(ttl=60)
-def _load_most_plagiarized_documents_cached(limit: int = 10) -> List[Dict[str, Any]]:
+def _load_most_plagiarized_documents_cached(limit: int = 10) -> list[dict[str, Any]]:
     """Fetch the most frequently plagiarized documents, cached for performance."""
     try:
         from src.db.incidents import get_most_plagiarized_documents
@@ -82,6 +82,22 @@ def _load_document_count_cached() -> int:
     except Exception as e:
         logger.error("Failed to load document count: %s", e)
         return 0
+
+
+@st.cache_data(ttl=60)
+def _load_storage_footprint_cached() -> dict[str, Any]:
+    """Fetch vector embedding storage footprint, cached for performance."""
+    try:
+        from src.db.corpus_db import get_embedding_storage_footprint
+        return get_embedding_storage_footprint()
+    except Exception as e:
+        logger.error("Failed to load storage footprint: %s", e)
+        return {
+            "embedding_bytes": 0,
+            "database_bytes": 0,
+            "embedding_percentage": 0.0,
+            "chunk_count": 0
+        }
 
 
 # ── HELPER FUNCTIONS ──────────────────────────────────────────────────────────
@@ -129,7 +145,7 @@ def _normalise_review_status(value: Any) -> str:
     return "Pending"
 
 
-def _incidents_to_dataframe(incidents: List[Any]) -> pd.DataFrame:
+def _incidents_to_dataframe(incidents: list[Any]) -> pd.DataFrame:
     """Convert raw incidents lists (dicts or Pydantic models) into a Pandas DataFrame."""
     if not incidents:
         return pd.DataFrame(
@@ -182,7 +198,7 @@ def _incidents_to_dataframe(incidents: List[Any]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _calculate_dashboard_stats(df: pd.DataFrame, total_docs: int) -> Dict[str, Any]:
+def _calculate_dashboard_stats(df: pd.DataFrame, total_docs: int) -> dict[str, Any]:
     """Calculate statistics for metrics, summary, and widgets from incidents DataFrame."""
     total_incidents = len(df)
 
@@ -336,7 +352,7 @@ def _render_recent_incidents(recent_df: pd.DataFrame) -> None:
     st.markdown(grid_html, unsafe_allow_html=True)
 
 
-def _render_summary(stats: Dict[str, Any]) -> None:
+def _render_summary(stats: dict[str, Any]) -> None:
     """Render the summary section containing key percentage ratios."""
     st.markdown("### Summary Statistics")
     col1, col2, col3, col4 = st.columns(4)
@@ -378,7 +394,7 @@ def _render_summary(stats: Dict[str, Any]) -> None:
 
 
 def _apply_plotly_theme(
-    fig: go.Figure, title: str, theme_colors: Dict[str, str], margin_left: int = 50
+    fig: go.Figure, title: str, theme_colors: dict[str, str], margin_left: int = 50
 ) -> None:
     """Style Plotly figures layout to match active light or dark themes."""
     fig.update_layout(
@@ -682,10 +698,48 @@ def render_dashboard_stats() -> None:
         )
 
     st.markdown("---")
+    
+    # SECTION 1.5: Database Vector Footprint
+    footprint_stats = _load_storage_footprint_cached()
+    st.markdown("### Vector Storage Footprint")
+    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+    with col_f1:
+        _render_metric_card(
+            label="Database Size",
+            value=f"{footprint_stats['database_bytes'] / 1024 / 1024:.2f} MB",
+            icon="🗄️",
+            description="Total SQLite size",
+            accent_color_var="--accent-color",
+        )
+    with col_f2:
+        _render_metric_card(
+            label="Embedding Size",
+            value=f"{footprint_stats['embedding_bytes'] / 1024 / 1024:.2f} MB",
+            icon="🧠",
+            description="Total Vector storage",
+            accent_color_var="--warning",
+        )
+    with col_f3:
+        _render_metric_card(
+            label="Embedding %",
+            value=f"{footprint_stats['embedding_percentage']:.2f}%",
+            icon="📈",
+            description="Of total database size",
+            accent_color_var="--accent-color",
+        )
+    with col_f4:
+        _render_metric_card(
+            label="Total Chunks",
+            value=f"{footprint_stats['chunk_count']:,}",
+            icon="🧩",
+            description="Stored in database",
+            accent_color_var="--success",
+        )
+
+    st.markdown("---")
 
     # SECTION 2: Plotly Charts
     st.markdown("### Visual Analytics")
-
     # Row 1 of charts: Severity Distribution (Pie) & Review Status (Donut)
     chart_col1, chart_col2 = st.columns(2)
     with chart_col1:

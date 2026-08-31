@@ -48,7 +48,7 @@ class ComparisonRecord:
     chunks_compared: int
     processing_time_ms: float
     user_id: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 # ==============================================================================
@@ -63,7 +63,7 @@ class AdvancedTextPreprocessor:
         self.language = language
         self.stopwords = self._load_stopwords(language)
 
-    def _load_stopwords(self, language: str) -> Set[str]:
+    def _load_stopwords(self, language: str) -> set[str]:
         """Load language-specific stopwords."""
         stopwords_sets = {
             "en": {
@@ -229,7 +229,7 @@ class AdvancedTextPreprocessor:
         }
         return stopwords_sets.get(language, set())
 
-    def preprocess_for_comparison(self, text: str) -> Dict[str, str]:
+    def preprocess_for_comparison(self, text: str) -> dict[str, str]:
         """Apply comprehensive preprocessing pipeline."""
         result = {}
 
@@ -307,7 +307,7 @@ class AdvancedTextPreprocessor:
         text = re.sub(r"([.!?])\1+", r"\1", text)
         return text.strip()
 
-    def extract_key_phrases(self, text: str, max_phrases: int = 10) -> List[str]:
+    def extract_key_phrases(self, text: str, max_phrases: int = 10) -> list[str]:
         """Extract key phrases using simple frequency-based approach."""
         if not text.strip():
             return []
@@ -323,7 +323,7 @@ class AdvancedTextPreprocessor:
         top_words = [word for word, _ in word_freq.most_common(max_phrases)]
         return top_words
 
-    def compute_readability_score(self, text: str) -> Dict[str, float]:
+    def compute_readability_score(self, text: str) -> dict[str, float]:
         """Compute readability metrics."""
         if not text.strip():
             return {
@@ -369,7 +369,7 @@ class ContextPreservingChunker:
 
     def chunk_with_context(
         self, text: str, min_chunk_size: int = 100
-    ) -> List[Tuple[str, Dict[str, Any]]]:
+    ) -> list[tuple[str, dict[str, Any]]]:
         """Chunk text while preserving sentence boundaries and context."""
         # Split into sentences
         sentences = self._split_sentences(text)
@@ -455,12 +455,12 @@ class ContextPreservingChunker:
 
         return chunks
 
-    def _split_sentences(self, text: str) -> List[str]:
+    def _split_sentences(self, text: str) -> list[str]:
         """Split text into sentences."""
         sentences = re.split(r"(?<=[.!?])\s+", text)
         return [s.strip() for s in sentences if s.strip()]
 
-    def _split_long_sentence(self, sentence: str) -> List[str]:
+    def _split_long_sentence(self, sentence: str) -> list[str]:
         """Split a long sentence into smaller chunks."""
         # Split by clauses (comma, semicolon, etc.)
         parts = re.split(r"(?<=[;,]\s)", sentence)
@@ -503,8 +503,8 @@ class ContextPreservingChunker:
         return chunks
 
     def _create_chunk_metadata(
-        self, sentences: List[str], start_idx: int, end_idx: int
-    ) -> Dict[str, Any]:
+        self, sentences: list[str], start_idx: int, end_idx: int
+    ) -> dict[str, Any]:
         """Create metadata for a chunk."""
         return {
             "sentence_count": len(sentences),
@@ -538,8 +538,8 @@ class OptimizedBatchProcessor:
         self.processing_status = {}
 
     async def process_documents_async(
-        self, documents: Dict[str, bytes], processing_fn, **kwargs
-    ) -> Dict[str, Any]:
+        self, documents: dict[str, bytes], processing_fn, **kwargs
+    ) -> dict[str, Any]:
         """Process documents asynchronously in parallel batches."""
         results = {}
         tasks = []
@@ -580,7 +580,7 @@ class OptimizedBatchProcessor:
         if batch:
             yield batch
 
-    def get_processing_status(self) -> Dict[str, str]:
+    def get_processing_status(self) -> dict[str, str]:
         """Get processing status for all documents."""
         return {doc_name: status for doc_name, status in self.processing_status.items()}
 
@@ -615,7 +615,7 @@ class ComparisonHistoryManager:
         max_similarity: Optional[float] = None,
         was_flagged: Optional[bool] = None,
         limit: int = 100,
-    ) -> List[ComparisonRecord]:
+    ) -> list[ComparisonRecord]:
         """Query comparison history with filters."""
         records = []
         try:
@@ -658,7 +658,7 @@ class ComparisonHistoryManager:
 
         return records
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get statistics about comparison history."""
         records = self.get_comparisons(limit=10000)
 
@@ -722,7 +722,7 @@ class PerformanceMonitor:
 
         return elapsed
 
-    def get_statistics(self) -> Dict[str, Dict[str, float]]:
+    def get_statistics(self) -> dict[str, dict[str, float]]:
         """Get statistics for all monitored operations."""
         stats = {}
         for name, measurements in self.metrics.items():
@@ -802,7 +802,7 @@ def render_processing_status_widget(batch_processor: OptimizedBatchProcessor):
 
 
 def render_document_analysis_widget(
-    doc_name: str, preprocessing_results: Dict[str, str]
+    doc_name: str, preprocessing_results: dict[str, str]
 ):
     """Render a detailed document analysis widget."""
     with st.expander(f"📄 Analysis: {doc_name}", expanded=False):
@@ -848,9 +848,9 @@ def render_performance_metrics(monitor: PerformanceMonitor):
     for op_name, op_stats in stats.items():
         with st.expander(f"**{op_name.replace('_', ' ').title()}**", expanded=False):
             cols = st.columns(4)
-            cols[0].metric("Avg", f"{op_stats['avg']*1000:.1f}ms")
-            cols[1].metric("P95", f"{op_stats['p95']*1000:.1f}ms")
-            cols[2].metric("P99", f"{op_stats['p99']*1000:.1f}ms")
+            cols[0].metric("Avg", f"{op_stats['avg'] * 1000:.1f}ms")
+            cols[1].metric("P95", f"{op_stats['p95'] * 1000:.1f}ms")
+            cols[2].metric("P99", f"{op_stats['p99'] * 1000:.1f}ms")
             cols[3].metric("Count", op_stats["count"])
 
 

@@ -1,5 +1,5 @@
 import sys
-
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -43,3 +43,39 @@ def test_cors_wildcard_origin_disables_credentials(monkeypatch):
     )
 
     assert "access-control-allow-credentials" not in response.headers
+
+
+def test_cors_wildcard_subdomain_success(monkeypatch):
+    """Verify secure wildcard subdomain configuration matches valid origins correctly."""
+    app = get_fresh_app(monkeypatch, "https://*.university.edu")
+    client = TestClient(app)
+
+    response = client.options(
+        "/",
+        headers={
+            "Origin": "https://cs.university.edu",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert (
+        response.headers["access-control-allow-origin"] == "https://cs.university.edu"
+    )
+    assert response.headers.get("access-control-allow-credentials") == "true"
+
+
+def test_cors_wildcard_subdomain_rejection(monkeypatch):
+    """Verify invalid wildcard subdomain formats do not grant access."""
+    app = get_fresh_app(monkeypatch, "https://*.university.edu")
+    client = TestClient(app)
+
+    response = client.options(
+        "/",
+        headers={
+            "Origin": "https://evil-university.edu.com",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    # FastAPI/Starlette will not echo back the origin if it fails validation/regex check
+    assert "access-control-allow-origin" not in response.headers

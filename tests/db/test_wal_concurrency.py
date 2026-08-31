@@ -57,6 +57,6 @@ def test_wal_concurrency_mode():
         conn.close()
 
         expected_total = num_threads * iterations_per_thread
-        assert (
-            total_rows == expected_total
-        ), f"Expected {expected_total} rows, but found {total_rows}"
+        assert total_rows == expected_total, (
+            f"Expected {expected_total} rows, but found {total_rows}"
+        )

@@ -4,8 +4,12 @@ import pytest
 import requests
 
 from src.utils.sso import (
+    SSOUserProfile,
+    exchange_azure_code,
     exchange_github_code,
     exchange_google_code,
+    generate_pkce_pair,
+    get_azure_auth_url,
     get_github_auth_url,
     get_google_auth_url,
 )
@@ -21,9 +25,13 @@ def test_get_google_auth_url_missing_client_id(monkeypatch):
 
 def test_get_google_auth_url_success(monkeypatch):
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "dummy_google_client_id")
-    url, state = get_google_auth_url()
+    url, state, state_data = get_google_auth_url()
     assert "dummy_google_client_id" in url
+    assert "prompt=select_account" in url
+    assert "code_challenge=" in url
+    assert "code_challenge_method=S256" in url
     assert state.startswith("google_")
+    assert "code_verifier" in state_data
 
 
 def test_exchange_google_code_missing_client_id(monkeypatch):
@@ -59,13 +67,43 @@ def test_exchange_google_code_success(mock_post, mock_get, monkeypatch):
     mock_get.return_value.json.return_value = {
         "email": "user@example.com",
         "name": "Test User",
+        "picture": "https://example.com/avatar.png",
     }
 
     user_data, error_msg = exchange_google_code("valid_code")
-    assert user_data == {"email": "user@example.com", "name": "Test User"}
+    assert user_data == SSOUserProfile(email="user@example.com", username="user", name="Test User", avatar="https://example.com/avatar.png")
     assert error_msg is None
     mock_post.assert_called_once()
     mock_get.assert_called_once()
+
+
+@patch("src.utils.sso.requests.get")
+@patch("src.utils.sso.requests.post")
+def test_exchange_google_code_sanitizes_username(mock_post, mock_get, monkeypatch):
+    """Test that email with special characters (dots, pluses) produces a sanitized username."""
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "dummy_client_id")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "dummy_secret")
+
+    mock_post.return_value.ok = True
+    mock_post.return_value.status_code = 200
+    mock_post.return_value.json.return_value = {"access_token": "google_token_123"}
+
+    mock_get.return_value.ok = True
+    mock_get.return_value.status_code = 200
+    mock_get.return_value.json.return_value = {
+        "email": "john.doe+class@school.edu",
+        "name": "John Doe",
+        "picture": "https://example.com/avatar.png",
+    }
+
+    user_data, error_msg = exchange_google_code("valid_code")
+    assert user_data == SSOUserProfile(
+        email="john.doe+class@school.edu",
+        username="john_doe_class",
+        name="John Doe",
+        avatar="https://example.com/avatar.png",
+    )
+    assert error_msg is None
 
 
 @patch("src.utils.sso.requests.post")
@@ -94,7 +132,7 @@ def test_get_github_auth_url_missing_client_id(monkeypatch):
 
 def test_get_github_auth_url_success(monkeypatch):
     monkeypatch.setenv("GITHUB_CLIENT_ID", "dummy_github_client_id")
-    url, state = get_github_auth_url()
+    url, state, *rest = get_github_auth_url()
     assert "dummy_github_client_id" in url
     assert state.startswith("github_")
 
@@ -132,10 +170,12 @@ def test_exchange_github_code_success(mock_post, mock_get, monkeypatch):
     mock_get.return_value.json.return_value = {
         "login": "octocat",
         "email": "octocat@github.com",
+        "name": "The Octocat",
+        "avatar_url": "https://example.com/octocat.png",
     }
 
     user_data, error_msg = exchange_github_code("valid_code")
-    assert user_data == {"login": "octocat", "email": "octocat@github.com"}
+    assert user_data == SSOUserProfile(email="octocat@github.com", username="octocat", name="The Octocat", avatar="https://example.com/octocat.png")
     assert error_msg is None
     mock_post.assert_called_once()
     mock_get.assert_called_once()
@@ -186,7 +226,7 @@ def test_oauth_token_exchange_timeout(mock_post, monkeypatch):
     user_data, error_msg = exchange_google_code("valid_code")
     assert user_data is None
     assert error_msg == "SSO provider timed out. Please try again."
-    
+
     mock_post.assert_called_once()
     _, kwargs = mock_post.call_args
     assert kwargs.get("timeout") == 10
@@ -202,7 +242,7 @@ def test_github_oauth_token_exchange_timeout(mock_post, monkeypatch):
     user_data, error_msg = exchange_github_code("valid_code")
     assert user_data is None
     assert error_msg == "SSO provider timed out. Please try again."
-    
+
     mock_post.assert_called_once()
     _, kwargs = mock_post.call_args
     assert kwargs.get("timeout") == 10
@@ -222,7 +262,7 @@ def test_oauth_user_request_timeout(mock_post, mock_get, monkeypatch):
     user_data, error_msg = exchange_google_code("valid_code")
     assert user_data is None
     assert error_msg == "SSO provider timed out. Please try again."
-    
+
     mock_get.assert_called_once()
     _, kwargs = mock_get.call_args
     assert kwargs.get("timeout") == 10
@@ -263,7 +303,7 @@ def test_exchange_github_code_email_fallback_success(mock_post, mock_get, monkey
     user_response = MagicMock()
     user_response.ok = True
     user_response.status_code = 200
-    user_response.json.return_value = {"login": "octocat", "email": None}
+    user_response.json.return_value = {"login": "octocat", "email": None, "name": "The Octocat", "avatar_url": "https://example.com/octocat.png"}
 
     # Second call: GET /user/emails (returns list of emails)
     emails_response = MagicMock()
@@ -277,7 +317,7 @@ def test_exchange_github_code_email_fallback_success(mock_post, mock_get, monkey
     mock_get.side_effect = [user_response, emails_response]
 
     user_data, error_msg = exchange_github_code("valid_code")
-    assert user_data == {"login": "octocat", "email": "primary@github.com"}
+    assert user_data == SSOUserProfile(email="primary@github.com", username="octocat", name="The Octocat", avatar="https://example.com/octocat.png")
     assert error_msg is None
     assert mock_get.call_count == 2
 
@@ -308,7 +348,9 @@ def test_exchange_github_code_email_fallback_timeout(mock_post, mock_get, monkey
 
 @patch("src.utils.sso.requests.get")
 @patch("src.utils.sso.requests.post")
-def test_exchange_github_code_filters_noreply_profile_email(mock_post, mock_get, monkeypatch):
+def test_exchange_github_code_filters_noreply_profile_email(
+    mock_post, mock_get, monkeypatch
+):
     """Test that users.noreply.github.com email in user profile is filtered out and we fallback."""
     monkeypatch.setenv("GITHUB_CLIENT_ID", "dummy_client_id")
     monkeypatch.setenv("GITHUB_CLIENT_SECRET", "dummy_secret")
@@ -321,27 +363,36 @@ def test_exchange_github_code_filters_noreply_profile_email(mock_post, mock_get,
     user_response = MagicMock()
     user_response.ok = True
     user_response.status_code = 200
-    user_response.json.return_value = {"login": "octocat", "email": "12345+octocat@users.noreply.github.com"}
+    user_response.json.return_value = {
+        "login": "octocat",
+        "email": "12345+octocat@users.noreply.github.com",
+    }
 
     # /user/emails returns list with real verified email
     emails_response = MagicMock()
     emails_response.ok = True
     emails_response.status_code = 200
     emails_response.json.return_value = [
-        {"email": "12345+octocat@users.noreply.github.com", "primary": True, "verified": True},
+        {
+            "email": "12345+octocat@users.noreply.github.com",
+            "primary": True,
+            "verified": True,
+        },
         {"email": "octocat@github.com", "primary": False, "verified": True},
     ]
 
     mock_get.side_effect = [user_response, emails_response]
 
     user_data, error_msg = exchange_github_code("valid_code")
-    assert user_data == {"login": "octocat", "email": "octocat@github.com"}
+    assert user_data == SSOUserProfile(email="octocat@github.com", username="octocat", name="The Octocat", avatar="https://example.com/octocat.png")
     assert error_msg is None
 
 
 @patch("src.utils.sso.requests.get")
 @patch("src.utils.sso.requests.post")
-def test_exchange_github_code_rejects_login_with_no_public_email(mock_post, mock_get, monkeypatch):
+def test_exchange_github_code_rejects_login_with_no_public_email(
+    mock_post, mock_get, monkeypatch
+):
     """Test that login is rejected with ValueError if no valid public verified email is found."""
     monkeypatch.setenv("GITHUB_CLIENT_ID", "dummy_client_id")
     monkeypatch.setenv("GITHUB_CLIENT_SECRET", "dummy_secret")
@@ -361,13 +412,17 @@ def test_exchange_github_code_rejects_login_with_no_public_email(mock_post, mock
     emails_response.ok = True
     emails_response.status_code = 200
     emails_response.json.return_value = [
-        {"email": "12345+octocat@users.noreply.github.com", "primary": True, "verified": True},
+        {
+            "email": "12345+octocat@users.noreply.github.com",
+            "primary": True,
+            "verified": True,
+        },
         {"email": "unverified@github.com", "primary": False, "verified": False},
     ]
 
     mock_get.side_effect = [user_response, emails_response]
 
-    with pytest.raises(ValueError, match="GitHub login failed: A verified public email is required"):
+    with pytest.raises(
+        ValueError, match="GitHub login failed: A verified public email is required"
+    ):
         exchange_github_code("valid_code")
-
-

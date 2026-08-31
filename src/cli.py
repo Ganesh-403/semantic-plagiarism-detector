@@ -23,7 +23,7 @@ from src.core.document_parser import (
     DEFAULT_OCR_LANGUAGE,
     extract_text,
 )
-from src.core.embedding_model import embed_documents
+from src.core.embedding_model import embed_documents, release_large_batch_memory
 from src.core.export_engine import LMSExportEngine
 from src.core.logging_setup import setup_logging
 from src.core.similarity import (
@@ -194,7 +194,7 @@ def run_scan(
             for doc_name, chunks in chunked_docs.items():
                 translated_chunked_docs[doc_name] = []
                 for chunk in chunks:
-                    prepared = prepare_text_for_embedding(chunk)
+                    prepared = prepare_text_for_embedding(chunk.text if hasattr(chunk, "text") else chunk)
                     translated_chunked_docs[doc_name].append(prepared["embedding_text"])
 
             embeddings = embed_documents(translated_chunked_docs)
@@ -212,6 +212,9 @@ def run_scan(
         except Exception as e:
             sys.stderr.write(f"Error during plagiarism detection pipeline: {e}\n")
             return 1
+
+    # Issue #3479: free NumPy/PyTorch heap memory after large batch scans.
+    release_large_batch_memory(num_processed)
 
     execution_time_seconds = time.time() - start_time
 
@@ -330,6 +333,10 @@ def run_prewarm(folder_path: str | None = None) -> int:
     docs_processed = len(raw_texts)
     redis_status = "unavailable"
 
+    if docs_processed == 0:
+        sys.stdout.write("No documents found. Exiting.\n")
+        return 0
+
     if docs_processed > 0:
         try:
             chunked_docs = chunk_documents(raw_texts)
@@ -375,6 +382,9 @@ def run_prewarm(folder_path: str | None = None) -> int:
         except Exception as e:
             sys.stderr.write(f"Error during cache pre-warming pipeline: {e}\n")
             return 1
+
+    # Issue #3479: free NumPy/PyTorch heap memory after large batch scans.
+    release_large_batch_memory(docs_processed)
 
     report = {
         "prewarmed_documents": docs_processed,
@@ -636,6 +646,17 @@ def main() -> None:
         help="Number of migrations to revert (default: 1).",
     )
 
+    footprint_parser = db_subparsers.add_parser(
+        "footprint",
+        help="Measure vector embedding storage footprint in the corpus database.",
+    )
+    footprint_parser.add_argument(
+        "--output-format",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text).",
+    )
+
     # Issue #2985: Add purge-cache subcommand
     purge_parser = subparsers.add_parser(
         "purge-cache", help="Purge stale translations from the cross-lingual cache."
@@ -739,9 +760,27 @@ def main() -> None:
                 steps=args.steps,
             )
             sys.exit(exit_code)
+        elif getattr(args, "db_action", None) == "footprint":
+            try:
+                from src.db.corpus_db import get_embedding_storage_footprint
+                res = get_embedding_storage_footprint()
+            except Exception as e:
+                sys.stderr.write(f"Error calculating storage footprint: {e}\n")
+                sys.exit(1)
+
+            if args.output_format == "json":
+                print(json.dumps(res, indent=2))
+            else:
+                print("Vector Embedding Storage Footprint")
+                print("----------------------------------")
+                print(f"Total Database Size: {res['database_bytes']:,} bytes")
+                print(f"Total Embedding Size: {res['embedding_bytes']:,} bytes")
+                print(f"Embedding Storage Percentage: {res['embedding_percentage']:.2f}%")
+                print(f"Total Chunks: {res['chunk_count']:,}")
+            sys.exit(0)
         else:
             sys.stderr.write(
-                "Error: A valid db action (such as 'downgrade') is required.\n"
+                "Error: A valid db action (such as 'downgrade' or 'footprint') is required.\n"
             )
             sys.exit(1)
 

@@ -16,6 +16,7 @@ Streamlit DOM notes
 We target these elements by their **label text** so the test is
 resilient to Streamlit's internal class-name churn.
 """
+
 from __future__ import annotations
 
 from playwright.sync_api import Page, expect
@@ -52,8 +53,9 @@ class LoginPage:
         return self.page.locator("text='Invalid username or password.'")
 
     def goto(self) -> None:
-        self.page.goto(self.page.url.split("?")[0] + self.URL_PATH,
-                       wait_until="domcontentloaded")
+        self.page.goto(
+            self.page.url.split("?")[0] + self.URL_PATH, wait_until="domcontentloaded"
+        )
 
     def fill_username(self, value: str) -> None:
         self.username_input.wait_for(state="visible")

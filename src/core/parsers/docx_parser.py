@@ -7,19 +7,24 @@ import re
 import shutil
 import subprocess
 import tempfile
+from dataclasses import dataclass
 
 from src.core.parsers.common import PDFInput
 
 logger = logging.getLogger(__name__)
 
 
-class ParsedDocxText(str):
-    """String subclass attaching Word heading metadata per word."""
+@dataclass(frozen=True)
+class ParsedDocxText:
+    """Parsed DOCX text together with heading metadata for each word."""
 
-    def __new__(cls, content: str, word_headings: list = None):
-        obj = super().__new__(cls, content)
-        obj.word_headings = word_headings if word_headings is not None else []
-        return obj
+    text: str
+    headings: list[str | None]
+
+    @property
+    def word_headings(self) -> list[str | None]:
+        """Backward-compatible alias for the heading metadata."""
+        return self.headings
 
 
 def extract_text_from_docx(file: PDFInput) -> str:

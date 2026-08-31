@@ -13,6 +13,7 @@ __all__ = [
     "ModelInitializationError",
     "OCRFileBatchError",
     "StaleDataException",
+    "UnsupportedFormatError",
 ]
 
 
@@ -40,5 +41,11 @@ class OCRFileBatchError(Exception):
 
 class StaleDataException(Exception):
     """Raised when an update fails because the version has changed (optimistic locking)."""
+
+    pass
+
+
+class UnsupportedFormatError(Exception):
+    """Raised when an optional dependency required to parse a file format is missing or the format is unsupported."""
 
     pass

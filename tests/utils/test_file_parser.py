@@ -278,4 +278,3 @@ class TestPDFPageCountValidation:
             extract_text_from_pdf(b"oversized")
 
         assert calls == [(b"oversized", 500)]
-

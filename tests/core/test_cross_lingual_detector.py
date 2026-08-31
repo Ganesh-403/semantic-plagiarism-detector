@@ -5,7 +5,6 @@ Comprehensive test suite covering language detection, embedding,
 cross-language comparison, and result generation.
 """
 
-
 import numpy as np
 
 from src.core.cross_lingual_detector import (
@@ -123,7 +122,10 @@ class TestCrossLingualDetection:
         """Test basic detection flow."""
         documents = {
             "doc_en": ("en", ["This is an English document about machine learning."]),
-            "doc_fr": ("fr", ["Ceci est un document français sur l'apprentissage automatique."]),
+            "doc_fr": (
+                "fr",
+                ["Ceci est un document français sur l'apprentissage automatique."],
+            ),
         }
         result = self.detector.detect_cross_lingual_plagiarism(documents)
         assert isinstance(result, CrossLingualResult)
@@ -139,7 +141,10 @@ class TestCrossLingualDetection:
     def test_same_language_pair(self):
         """Test same-language comparison."""
         documents = {
-            "doc_a": ("en", ["Machine learning is a subset of artificial intelligence."]),
+            "doc_a": (
+                "en",
+                ["Machine learning is a subset of artificial intelligence."],
+            ),
             "doc_b": ("en", ["Deep learning is a subset of machine learning."]),
         }
         result = self.detector.detect_cross_lingual_plagiarism(documents)
@@ -152,8 +157,12 @@ class TestResultSerialization:
     def test_result_to_dict(self):
         """Test result to_dict."""
         result = CrossLingualResult(
-            documents=[], matches=[], language_distribution={"en": 2},
-            total_comparisons=1, processing_time=0.5, summary={"total_documents": 2}
+            documents=[],
+            matches=[],
+            language_distribution={"en": 2},
+            total_comparisons=1,
+            processing_time=0.5,
+            summary={"total_documents": 2},
         )
         d = result.to_dict()
         assert d["summary"]["total_documents"] == 2
@@ -162,9 +171,16 @@ class TestResultSerialization:
     def test_match_to_dict(self):
         """Test match to_dict."""
         match = LanguageMatch(
-            source_doc="a.pdf", source_lang="en", source_chunk="Hello",
-            target_doc="b.pdf", target_lang="es", target_chunk="Hola",
-            similarity=0.85, method="cosine", translation_used=True, confidence=0.9
+            source_doc="a.pdf",
+            source_lang="en",
+            source_chunk="Hello",
+            target_doc="b.pdf",
+            target_lang="es",
+            target_chunk="Hola",
+            similarity=0.85,
+            method="cosine",
+            translation_used=True,
+            confidence=0.9,
         )
         d = match.to_dict()
         assert d["source_doc"] == "a.pdf"
@@ -183,7 +199,9 @@ class TestConfiguration:
 
     def test_custom_config(self):
         """Test custom config."""
-        config = CrossLingualConfig(enabled_languages=["en", "es"], similarity_threshold=0.8)
+        config = CrossLingualConfig(
+            enabled_languages=["en", "es"], similarity_threshold=0.8
+        )
         assert len(config.enabled_languages) == 2
         assert config.similarity_threshold == 0.8
 

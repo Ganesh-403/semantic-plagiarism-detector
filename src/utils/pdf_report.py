@@ -21,6 +21,8 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 from reportlab.platypus import (
     PageBreak,
@@ -46,6 +48,38 @@ _BRANDING_CONFIG_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "config", "branding_config.json"
 )
 
+# Resolved once; falls back to Helvetica if no bundled TTF is available.
+_PDF_FONT_REGULAR = "Helvetica"
+_PDF_FONT_BOLD = "Helvetica-Bold"
+_PDF_FONTS_READY = False
+
+
+def _ensure_pdf_fonts() -> tuple[str, str]:
+    """Register a bundled Unicode TTF for ReportLab and return (regular, bold)."""
+    global _PDF_FONT_REGULAR, _PDF_FONT_BOLD, _PDF_FONTS_READY
+    if _PDF_FONTS_READY:
+        return _PDF_FONT_REGULAR, _PDF_FONT_BOLD
+
+    fonts_dir = os.path.join(os.path.dirname(__file__), "..", "assets", "fonts")
+    for filename, font_name in (
+        ("DejaVuSans.ttf", "DejaVuSans"),
+        ("Roboto-Regular.ttf", "Roboto"),
+    ):
+        font_path = os.path.join(fonts_dir, filename)
+        if not os.path.isfile(font_path):
+            continue
+        try:
+            pdfmetrics.registerFont(TTFont(font_name, font_path))
+            _PDF_FONT_REGULAR = font_name
+            # Only regular faces are bundled; reuse for bold styles.
+            _PDF_FONT_BOLD = font_name
+            break
+        except Exception:
+            continue
+
+    _PDF_FONTS_READY = True
+    return _PDF_FONT_REGULAR, _PDF_FONT_BOLD
+
 
 def load_branding_logo() -> bytes | None:
     """
@@ -63,6 +97,7 @@ def load_branding_logo() -> bytes | None:
     except Exception:
         return None
 
+
 def truncate_filename(filename: str, max_len: int = 30) -> str:
     """
     Truncates a filename to max_len characters with an ellipsis if needed,
@@ -79,7 +114,7 @@ def truncate_filename(filename: str, max_len: int = 30) -> str:
         return filename[: max_len - 3] + "..."
 
     half = needed_len // 2
-    truncated_name = f"{name[:half]}...{name[-(needed_len - half):]}"
+    truncated_name = f"{name[:half]}...{name[-(needed_len - half) :]}"
     return f"{truncated_name}{ext}"
 
 
@@ -206,7 +241,8 @@ class NumberedCanvas(canvas.Canvas):
         super().save()
 
     def draw_page_number(self, total_pages):
-        self.setFont("Helvetica", 9)
+        font_regular, _ = _ensure_pdf_fonts()
+        self.setFont(font_regular, 9)
         self.setFillColor(colors.grey)
 
         self.drawRightString(
@@ -221,7 +257,7 @@ def generate_plagiarism_report(
     doc_b: str,
     overall_similarity: float,
     threshold: float,
-    top_pairs: List[Tuple[str, str, float]],
+    top_pairs: list[tuple[str, str, float]],
     doc_a_text: Optional[str] = None,
     doc_b_text: Optional[str] = None,
     report_title: str = "Plagiarism Detection Report",
@@ -294,10 +330,11 @@ def generate_plagiarism_report(
     )
 
     # Get custom styles
+    font_regular, font_bold = _ensure_pdf_fonts()
 
     title_style = ParagraphStyle(
         "CustomTitle",
-        fontName="Helvetica-Bold",
+        fontName=font_bold,
         fontSize=18,
         leading=22,
         textColor=brand_clr,
@@ -308,7 +345,7 @@ def generate_plagiarism_report(
     )
     heading_style = ParagraphStyle(
         "CustomHeading",
-        fontName="Helvetica-Bold",
+        fontName=font_bold,
         fontSize=14,
         leading=18,
         textColor=brand_clr,
@@ -319,7 +356,7 @@ def generate_plagiarism_report(
     )
     normal_style = ParagraphStyle(
         "CustomNormal",
-        fontName="Helvetica",
+        fontName=font_regular,
         fontSize=10,
         leading=14,
         textColor=HexColor("#FFFFFF") if dark_mode else HexColor("#31333f"),
@@ -401,7 +438,7 @@ def generate_plagiarism_report(
                 pass
         footer_text = get_pdf_footer_text()
         if footer_text:
-            canvas_obj.setFont("Helvetica", 9)
+            canvas_obj.setFont(font_regular, 9)
             if dark_mode:
                 canvas_obj.setFillColor(HexColor("#94a3b8"))
             else:
@@ -414,7 +451,7 @@ def generate_plagiarism_report(
 
         if footer_text:
             canvas_obj.saveState()
-            canvas_obj.setFont("Helvetica", 9)
+            canvas_obj.setFont(font_regular, 9)
             if dark_mode:
                 canvas_obj.setFillColor(HexColor("#9CA3AF"))
             else:
@@ -448,7 +485,7 @@ def generate_plagiarism_report(
             ("BACKGROUND", (0, 0), (0, -1), HexColor("#1E293B")),
             ("TEXTCOLOR", (0, 0), (0, -1), HexColor("#FFFFFF")),
             ("TEXTCOLOR", (1, 0), (1, -1), HexColor("#FFFFFF")),
-            ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+            ("FONTNAME", (0, 0), (-1, -1), font_regular),
             ("FONTSIZE", (0, 0), (-1, -1), 10),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
             ("TOPPADDING", (0, 0), (-1, -1), 8),
@@ -460,7 +497,7 @@ def generate_plagiarism_report(
         table_style_cmds = [
             ("BACKGROUND", (0, 0), (0, -1), HexColor("#f3f4f6")),
             ("TEXTCOLOR", (0, 0), (0, -1), HexColor("#374151")),
-            ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+            ("FONTNAME", (0, 0), (-1, -1), font_regular),
             ("FONTSIZE", (0, 0), (-1, -1), 10),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
             ("TOPPADDING", (0, 0), (-1, -1), 8),
@@ -515,8 +552,8 @@ def generate_plagiarism_report(
                 [
                     ("BACKGROUND", (0, 0), (0, -1), HexColor("#f3f4f6")),
                     ("TEXTCOLOR", (0, 0), (0, -1), HexColor("#374151")),
-                    ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-                    ("FONTNAME", (1, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTNAME", (0, 0), (0, -1), font_bold),
+                    ("FONTNAME", (1, 0), (-1, 0), font_bold),
                     ("FONTSIZE", (0, 0), (-1, -1), 10),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
                     ("TOPPADDING", (0, 0), (-1, -1), 8),
@@ -574,7 +611,7 @@ def generate_plagiarism_report(
                 f"<b>Pair #{rank}</b> — Similarity: <font color='{pair_color}'>{score:.1%}</font>",
                 ParagraphStyle(
                     "PairHeader",
-                    fontName="Helvetica-Bold",
+                    fontName=font_bold,
                     fontSize=11,
                     leading=14,
                     textColor=HexColor("#FFFFFF") if dark_mode else HexColor("#1f2937"),
@@ -616,7 +653,7 @@ def generate_plagiarism_report(
 
             cell_header_style = ParagraphStyle(
                 f"ComparisonCellHeader_{rank}",
-                fontName="Helvetica-Bold",
+                fontName=font_bold,
                 fontSize=9,
                 leading=12,
                 textColor=HexColor("#FFFFFF") if dark_mode else HexColor("#111827"),
@@ -624,7 +661,7 @@ def generate_plagiarism_report(
             )
             cell_body_style = ParagraphStyle(
                 f"ComparisonCellBody_{rank}",
-                fontName="Helvetica",
+                fontName=font_regular,
                 fontSize=9,
                 leading=12,
                 textColor=HexColor("#FFFFFF") if dark_mode else HexColor("#31333f"),
@@ -650,7 +687,7 @@ def generate_plagiarism_report(
                     ("BACKGROUND", (0, 0), (-1, 0), HexColor("#1E293B")),
                     ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#FFFFFF")),
                     ("TEXTCOLOR", (0, 1), (-1, 1), HexColor("#FFFFFF")),
-                    ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+                    ("FONTNAME", (0, 0), (-1, -1), font_regular),
                     ("FONTSIZE", (0, 0), (-1, -1), 9),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
                     ("TOPPADDING", (0, 0), (-1, -1), 10),
@@ -663,7 +700,7 @@ def generate_plagiarism_report(
                 pair_table_cmds = [
                     ("BACKGROUND", (0, 0), (-1, 0), HexColor("#f9fafb")),
                     ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#111827")),
-                    ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+                    ("FONTNAME", (0, 0), (-1, -1), font_regular),
                     ("FONTSIZE", (0, 0), (-1, -1), 9),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
                     ("TOPPADDING", (0, 0), (-1, -1), 10),
@@ -712,8 +749,8 @@ def generate_plagiarism_report(
 
 def highlight_pdf_matches(
     pdf_source: str | bytes,
-    matching_chunks: List[str],
-    highlight_color: Tuple[float, float, float] = (1.0, 0.85, 0.0),
+    matching_chunks: list[str],
+    highlight_color: tuple[float, float, float] = (1.0, 0.85, 0.0),
 ) -> bytes:
     """Opens an original PDF, searches for matching plagiarized text chunks,
     applies yellow highlight annotations on exact coordinate boxes,
@@ -735,25 +772,24 @@ def highlight_pdf_matches(
             return f.read()
 
     if isinstance(pdf_source, bytes):
-        doc = fitz.open(stream=pdf_source, filetype="pdf")
+        doc_ctx = fitz.open(stream=pdf_source, filetype="pdf")
     else:
-        doc = fitz.open(pdf_source)
+        doc_ctx = fitz.open(pdf_source)
 
-    for page in doc:
-        for chunk in matching_chunks:
-            chunk_clean = str(chunk).strip()
-            if len(chunk_clean) < 3:
-                continue
+    with doc_ctx as doc:
+        for page in doc:
+            for chunk in matching_chunks:
+                chunk_clean = str(chunk).strip()
+                if len(chunk_clean) < 3:
+                    continue
 
-            quad_matches = page.search_for(chunk_clean)
-            for rect in quad_matches:
-                annot = page.add_highlight_annot(rect)
-                annot.set_colors(stroke=highlight_color)
-                annot.update()
+                quad_matches = page.search_for(chunk_clean)
+                for rect in quad_matches:
+                    annot = page.add_highlight_annot(rect)
+                    annot.set_colors(stroke=highlight_color)
+                    annot.update()
 
-    output_bytes = doc.tobytes()
-    doc.close()
-    return output_bytes
+        return doc.tobytes()
 
 
 def generate_audit_summary_html(
@@ -1018,10 +1054,11 @@ def generate_audit_summary_pdf(
     )
 
     styles = getSampleStyleSheet()
+    font_regular, font_bold = _ensure_pdf_fonts()
     title_style = ParagraphStyle(
         "AuditTitle",
         parent=styles["Heading1"],
-        fontName="Helvetica-Bold",
+        fontName=font_bold,
         fontSize=18,
         leading=22,
         textColor=HexColor("#1e1b4b"),
@@ -1032,7 +1069,7 @@ def generate_audit_summary_pdf(
     heading_style = ParagraphStyle(
         "AuditHeading",
         parent=styles["Heading2"],
-        fontName="Helvetica-Bold",
+        fontName=font_bold,
         fontSize=13,
         leading=16,
         textColor=HexColor("#4f46e5"),
@@ -1044,7 +1081,7 @@ def generate_audit_summary_pdf(
     body_style = ParagraphStyle(
         "AuditBody",
         parent=styles["Normal"],
-        fontName="Helvetica",
+        fontName=font_regular,
         fontSize=9,
         leading=12,
         textColor=HexColor("#334155"),
@@ -1080,7 +1117,7 @@ def generate_audit_summary_pdf(
             [
                 ("BACKGROUND", (0, 0), (0, -1), HexColor("#F1F5F9")),
                 ("BACKGROUND", (2, 0), (2, -1), HexColor("#F1F5F9")),
-                ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+                ("FONTNAME", (0, 0), (-1, -1), font_bold),
                 ("FONTSIZE", (0, 0), (-1, -1), 9),
                 ("TEXTCOLOR", (1, 0), (1, -1), HexColor("#4F46E5")),
                 ("TEXTCOLOR", (3, 0), (3, -1), HexColor("#DC2626")),
@@ -1135,7 +1172,7 @@ def generate_audit_summary_pdf(
             [
                 ("BACKGROUND", (0, 0), (-1, 0), HexColor("#1E293B")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#FFFFFF")),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTNAME", (0, 0), (-1, 0), font_bold),
                 ("FONTSIZE", (0, 0), (-1, -1), 8),
                 ("ALIGN", (0, 0), (0, -1), "CENTER"),
                 ("ALIGN", (3, 0), (-1, -1), "CENTER"),

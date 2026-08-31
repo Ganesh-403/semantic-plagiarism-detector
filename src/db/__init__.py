@@ -2,6 +2,7 @@ from .auth import (
     AuthRepository,
     add_user,
     auth_repo,
+    clear_revocation_cache,
     delete_user,
     disable_2fa,
     enable_2fa,
@@ -13,7 +14,10 @@ from .auth import (
     get_user_last_login,
     get_user_role,
     init_db,
+    is_token_revoked,
     is_user_active,
+    revoke_token,
+    revoke_all_user_refresh_tokens,
     set_password_change_required,
     set_user_active_status,
     store_sso_state,
@@ -23,6 +27,7 @@ from .auth import (
     verify_sso_state,
     verify_user,
 )
+
 from .base import BaseRepository
 from .common import get_read_connection
 from .connection import create_connection, get_connection
@@ -43,6 +48,8 @@ from .corpus_db import (
     get_total_document_count,
     get_unique_class_sections,
     init_corpus_db,
+    restore_document,
+    soft_delete_document,
 )
 from .incidents import (
     IncidentsRepository,
@@ -50,6 +57,9 @@ from .incidents import (
     get_incidents_repo,
     get_recent_incidents,
     log_incident,
+    bulk_update_incident_status,
+    add_false_positive,
+    dismiss_incident,
 )
 
 __all__ = [
@@ -71,6 +81,7 @@ __all__ = [
     "add_user",
     "delete_user",
     "update_password",
+    "revoke_all_user_refresh_tokens",
     "update_user_profile",
     "get_2fa_status",
     "enable_2fa",
@@ -85,6 +96,8 @@ __all__ = [
     "add_document",
     "get_document_by_hash",
     "get_all_documents",
+    "soft_delete_document",
+    "restore_document",
     "get_total_document_count",
     "get_deleted_documents_count",
     "get_documents_by_class",
@@ -93,12 +106,19 @@ __all__ = [
     "get_all_embeddings",
     "delete_document",
     "clear_all_data",
+    "clear_revocation_cache",
+    "is_token_revoked",
+    "revoke_token",
     "get_document_chunks_count",
     "get_unique_class_sections",
     "get_incidents_by_assignment",
     "get_recent_incidents",
     "log_incident",
+    "bulk_update_incident_status",
+    "add_false_positive",
+    "dismiss_incident",
 ]
+
 
 from .migrations import AUTH_SCHEMA_VERSION as AUTH_SCHEMA_VERSION  # noqa: F401
 from .migrations import CORPUS_SCHEMA_VERSION as CORPUS_SCHEMA_VERSION

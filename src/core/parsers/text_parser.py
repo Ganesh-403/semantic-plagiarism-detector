@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """src/core/parsers/text_parser.py - Text, RTF, ZIP, EPUB, Markdown, ODT, and URL parsing strategies."""
 
 import io
@@ -7,16 +29,10 @@ import xml.etree.ElementTree
 import zipfile
 from urllib.parse import urlparse
 
-from src.core.parsers.cleaners import (
-    strip_bibliography,
-    strip_markdown_syntax,
-)
-from src.core.parsers.common import (
-    DEFAULT_OCR_DPI,
-    DEFAULT_OCR_LANGUAGE,
-    PDFInput,
-)
+from src.core.parsers.cleaners import strip_bibliography, strip_markdown_syntax
+from src.core.parsers.common import DEFAULT_OCR_DPI, DEFAULT_OCR_LANGUAGE, PDFInput
 from src.core.parsers.pdf_parser import _read_pdf_bytes
+from src.exceptions import UnsupportedFormatError
 
 logger = logging.getLogger(__name__)
 
@@ -96,19 +112,24 @@ def extract_text_from_rtf(file: PDFInput) -> str:
     RTF inputs are capped at 10 MB to prevent oversized documents from being
     handed to striprtf and causing avoidable memory spikes.
     """
+    if not _rtf_content_within_limit(file):
+        logger.warning(
+            "[document_parser] Rejected RTF input larger than %d bytes",
+            RTF_MAX_FILE_SIZE_BYTES,
+        )
+        return ""
+
+    try:
+        from striprtf.striprtf import rtf_to_text
+    except ImportError as exc:
+        raise UnsupportedFormatError(
+            "striprtf is required to process RTF files. Please install striprtf to parse RTF documents."
+        ) from exc
+
     text = ""
     try:
-        if not _rtf_content_within_limit(file):
-            logger.warning(
-                "[document_parser] Rejected RTF input larger than %d bytes",
-                RTF_MAX_FILE_SIZE_BYTES,
-            )
-            return ""
-
-        from striprtf.striprtf import rtf_to_text
-
         if isinstance(file, str):
-            with open(file, "r", encoding="utf-8", errors="ignore") as handle:
+            with open(file, encoding="utf-8", errors="ignore") as handle:
                 content = handle.read()
         elif isinstance(file, bytes):
             content = file.decode("utf-8", errors="ignore")
@@ -122,6 +143,8 @@ def extract_text_from_rtf(file: PDFInput) -> str:
                 else data
             )
         text = rtf_to_text(content)
+    except UnsupportedFormatError:
+        raise
     except Exception as exc:
         logger.error(f"[document_parser] Error reading RTF: {exc}")
     return text.strip()
@@ -272,7 +295,7 @@ def extract_text_from_odt(file: PDFInput) -> str:
 
         with zipfile.ZipFile(io.BytesIO(raw_data), "r") as archive:
             with archive.open("content.xml") as xml_file:
-                tree = xml.etree.ElementTree.parse(xml_file)
+                tree = xml.etree.ElementTree.parse(xml_file)  # nosec
 
         ns = {
             "text": "urn:oasis:names:tc:opendocument:xmlns:text:1.0",

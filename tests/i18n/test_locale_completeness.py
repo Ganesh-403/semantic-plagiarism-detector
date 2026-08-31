@@ -85,11 +85,12 @@ def test_locale_placeholders_match_english(code):
     """
     mismatches = placeholder_mismatches(code)
 
-    assert (
-        not mismatches
-    ), f"{code}.json placeholders diverge from English: " + ", ".join(
-        f"{key}: expected {expected}, found {found}"
-        for key, (expected, found) in sorted(mismatches.items())
+    assert not mismatches, (
+        f"{code}.json placeholders diverge from English: "
+        + ", ".join(
+            f"{key}: expected {expected}, found {found}"
+            for key, (expected, found) in sorted(mismatches.items())
+        )
     )
 
 

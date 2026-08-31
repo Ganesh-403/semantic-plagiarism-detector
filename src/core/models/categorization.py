@@ -42,8 +42,6 @@ class TagCategory(str, Enum):
     GRADE_LEVEL = "grade_level"
     DOCUMENT_TYPE = "document_type"
     CUSTOM = "custom"
-
-
 @dataclass
 class DocumentTag:
     """Represents a semantic tag assigned to a document or text chunk.
@@ -51,10 +49,6 @@ class DocumentTag:
     This model captures not just the tag name, but also its origin,
     confidence level (for AI-generated tags), and categorization.
 
-    
-    This model captures not just the tag name, but also its origin,
-    confidence level (for AI-generated tags), and categorization.
-    
     Attributes:
         name: The display name of the tag (e.g., "Machine Learning").
         source: How the tag was generated (manual, AI, etc.).
@@ -72,20 +66,17 @@ class DocumentTag:
     created_at: datetime = field(default_factory=datetime.utcnow)
     metadata: dict = field(default_factory=dict)
 
-    
     def __post_init__(self):
         """Validate tag attributes after initialization."""
         # Clean and normalize the tag name
         self.name = self._normalize_name(self.name)
 
-        
         # Validate confidence bounds
         if not (0.0 <= self.confidence <= 1.0):
             raise ValueError(
                 f"Tag confidence must be between 0.0 and 1.0, got {self.confidence}"
             )
 
-            
         # Ensure source and category are proper Enum instances
         if isinstance(self.source, str):
             self.source = TagSource(self.source.lower())
@@ -96,11 +87,6 @@ class DocumentTag:
     def _normalize_name(name: str) -> str:
         """Normalize tag name by stripping whitespace and converting to title case.
 
-            
-    @staticmethod
-    def _normalize_name(name: str) -> str:
-        """Normalize tag name by stripping whitespace and converting to title case.
-        
         Removes special characters except hyphens and underscores, and
         ensures consistent casing for database storage and UI display.
         """
@@ -127,27 +113,6 @@ class DocumentTag:
         Args:
             threshold: The minimum confidence level required. Defaults to 0.6.
 
-            
-        # Strip leading/trailing whitespace
-        cleaned = name.strip()
-        
-        # Remove invalid characters (keep alphanumeric, spaces, hyphens, underscores)
-        cleaned = re.sub(r'[^\w\s\-]', '', cleaned)
-        
-        # Collapse multiple spaces
-        cleaned = re.sub(r'\s+', ' ', cleaned)
-        
-        if not cleaned:
-            raise ValueError("Tag name contains only invalid characters")
-            
-        return cleaned.title()
-        
-    def is_low_confidence(self, threshold: float = 0.6) -> bool:
-        """Check if the tag confidence is below the verification threshold.
-        
-        Args:
-            threshold: The minimum confidence level required. Defaults to 0.6.
-            
         Returns:
             True if confidence is below threshold, False otherwise.
         """
@@ -156,22 +121,14 @@ class DocumentTag:
     def get_css_classes(self) -> str:
         """Generate CSS class string for UI rendering based on tag properties.
 
-        
-    def get_css_classes(self) -> str:
-        """Generate CSS class string for UI rendering based on tag properties.
-        
         Returns space-separated CSS classes that can be applied to HTML
         elements to style the tag according to its source and confidence.
         """
         classes = ["tag-badge"]
-        
+
         # Add source-specific classes
         classes.append(f"tag-source-{self.source.value}")
 
-        
-        # Add source-specific classes
-        classes.append(f"tag-source-{self.source.value}")
-        
         # Add confidence-based classes
         if self.is_low_confidence():
             classes.append("tag-low-confidence")
@@ -207,9 +164,6 @@ class DocumentTag:
 
         return f'<span class="{classes}">{inner_html}</span>'
 
-            
-        return " ".join(classes)
-        
     def to_dict(self) -> dict:
         """Serialize the tag to a dictionary for JSON storage or API responses."""
         data = asdict(self)
@@ -224,11 +178,6 @@ class DocumentTag:
     def from_dict(cls, data: dict) -> DocumentTag:
         """Deserialize a dictionary into a DocumentTag instance.
 
-        
-    @classmethod
-    def from_dict(cls, data: dict) -> DocumentTag:
-        """Deserialize a dictionary into a DocumentTag instance.
-        
         Handles conversion of ISO datetime strings and string enums
         back into their proper Python types.
         """
@@ -242,13 +191,6 @@ class DocumentTag:
         """Make DocumentTag hashable for use in sets and as dict keys."""
         return hash((self.name.lower(), self.source, self.category))
 
-            
-        return cls(**data)
-        
-    def __hash__(self) -> int:
-        """Make DocumentTag hashable for use in sets and as dict keys."""
-        return hash((self.name.lower(), self.source, self.category))
-        
     def __eq__(self, other: object) -> bool:
         """Define equality based on name, source, and category."""
         if not isinstance(other, DocumentTag):
@@ -270,12 +212,6 @@ class TagCollection:
 
     tags: List[DocumentTag] = field(default_factory=list)
 
-    
-    Provides a higher-level abstraction over a simple list of tags, enabling
-    easy filtering by source, category, or confidence level.
-    """
-    tags: List[DocumentTag] = field(default_factory=list)
-    
     def add(self, tag: DocumentTag) -> None:
         """Add a tag to the collection, preventing duplicates."""
         if tag not in self.tags:
@@ -283,7 +219,6 @@ class TagCollection:
         else:
             logger.debug("Tag '%s' already exists in collection. Skipping.", tag.name)
 
-            
     def remove(self, tag_name: str) -> bool:
         """Remove a tag by name. Returns True if removed, False if not found."""
         initial_count = len(self.tags)
@@ -310,27 +245,6 @@ class TagCollection:
         """Serialize the entire collection to a list of dictionaries."""
         return [tag.to_dict() for tag in self.tags]
 
-        
-    def filter_by_source(self, source: TagSource) -> List[DocumentTag]:
-        """Return all tags matching the specified source."""
-        return [t for t in self.tags if t.source == source]
-        
-    def filter_by_category(self, category: TagCategory) -> List[DocumentTag]:
-        """Return all tags matching the specified category."""
-        return [t for t in self.tags if t.category == category]
-        
-    def get_low_confidence_tags(self, threshold: float = 0.6) -> List[DocumentTag]:
-        """Return all tags with confidence below the specified threshold."""
-        return [t for t in self.tags if t.is_low_confidence(threshold)]
-        
-    def get_ai_generated_tags(self) -> List[DocumentTag]:
-        """Return all tags generated by the AI model."""
-        return self.filter_by_source(TagSource.AI_GENERATED)
-        
-    def to_list(self) -> List[dict]:
-        """Serialize the entire collection to a list of dictionaries."""
-        return [tag.to_dict() for tag in self.tags]
-        
     @classmethod
     def from_list(cls, data: List[dict]) -> TagCollection:
         """Deserialize a list of dictionaries into a TagCollection."""
@@ -340,9 +254,5 @@ class TagCollection:
     def __len__(self) -> int:
         return len(self.tags)
 
-        
-    def __len__(self) -> int:
-        return len(self.tags)
-        
     def __iter__(self):
         return iter(self.tags)

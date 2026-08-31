@@ -14,6 +14,7 @@ descriptive feedback and to enforce stricter business logic rules.
 """
 
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Union
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 # This should match or be slightly less than the server.maxUploadSize in config.toml
 # to ensure our application-level check catches it before the server does,
 # allowing us to return a friendly error message.
-MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
+MAX_FILE_SIZE_BYTES = int(os.getenv("MAX_UPLOAD_SIZE_MB", "50")) * 1024 * 1024
 
 # Allowed file extensions for document processing.
 # These correspond to the formats supported by src/core/document_parser.py
@@ -39,6 +40,7 @@ ALLOWED_EXTENSIONS = {
     ".rtf",
     ".odt",
     ".csv",
+    ".epub",
 }
 
 # Magic byte signatures for common document formats.
@@ -50,6 +52,7 @@ MAGIC_SIGNATURES = {
     ".doc": b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",  # OLE2 Compound Document
     ".rtf": b"{\\rtf",
     ".odt": b"PK\x03\x04",  # ZIP archive
+    ".epub": b"PK\x03\x04",  # ZIP archive (EPUB is a ZIP)
     ".png": b"\x89PNG\r\n\x1a\n",
     ".jpg": b"\xff\xd8\xff",
     ".jpeg": b"\xff\xd8\xff",
@@ -59,13 +62,14 @@ MAGIC_SIGNATURES = {
 @dataclass
 class ValidationResult:
     """Represents the result of a file validation check.
-    
+
     Attributes:
         is_valid: True if the file passed all validation checks.
         filename: The name of the file that was validated.
         error_message: A descriptive error message if validation failed, else None.
         error_code: A machine-readable error code for UI/API handling.
     """
+
     is_valid: bool
     filename: str
     error_message: Optional[str] = None
@@ -74,92 +78,115 @@ class ValidationResult:
 
 class FileValidator:
     """Validates uploaded files for size, extension, and content integrity.
-    
+
     This class provides a centralized validation mechanism that can be used
     by both the Streamlit UI and the FastAPI backend to ensure files are
     safe and supported before processing.
+
+    By default a magic-byte mismatch is logged but tolerated. Pass
+    ``strict_mode=True`` to make such mismatches a hard failure with
+    ``error_code="MAGIC_BYTE_MISMATCH"`` (Issue #3201).
     """
-    
+
     def __init__(
         self,
         max_size_bytes: int = MAX_FILE_SIZE_BYTES,
-        allowed_extensions: Optional[set] = None
+        allowed_extensions: Optional[set] = None,
     ):
         """Initialize the FileValidator with configurable limits.
-        
+
         Args:
             max_size_bytes: Maximum allowed file size in bytes.
             allowed_extensions: Set of allowed file extensions (e.g., {'.pdf', '.txt'}).
+            strict_mode: When True, a magic-byte/extension mismatch fails
+                validation with ``MAGIC_BYTE_MISMATCH`` instead of logging a
+                warning and passing (Issue #3201). Off by default so existing
+                callers keep the permissive behaviour.
         """
         self.max_size_bytes = max_size_bytes
         self.allowed_extensions = allowed_extensions or ALLOWED_EXTENSIONS
-        
+
     def validate(
-        self,
-        file_data: Union[bytes, bytearray],
-        filename: str
+        self, file_data: Union[bytes, bytearray], filename: str
     ) -> ValidationResult:
         """Perform comprehensive validation on a file.
-        
+
         This method checks the file size, extension, and magic bytes to ensure
         the file is safe and supported. It returns a ValidationResult object
         containing the status and any error details.
-        
+
         Args:
             file_data: The raw bytes of the uploaded file.
             filename: The original name of the file.
-            
+
         Returns:
             A ValidationResult object indicating success or failure.
         """
+        if "\x00" in filename:
+            return ValidationResult(
+                is_valid=False,
+                filename=filename,
+                error_message="Filename contains invalid characters.",
+                error_code="INVALID_FILENAME_CHARACTERS"
+            )
+
         logger.debug("Validating file: %s", filename)
-        
+
         # 1. Check file size
         size_result = self._check_size(file_data, filename)
         if not size_result.is_valid:
             return size_result
-            
+
         # 2. Check file extension
         ext_result = self._check_extension(filename)
         if not ext_result.is_valid:
             return ext_result
-            
+
         # 3. Check magic bytes (content verification)
         magic_result = self._check_magic_bytes(file_data, filename)
         if not magic_result.is_valid:
-            # Log a warning for magic byte mismatch, but don't fail hard
-            # unless it's a known dangerous signature. Some valid files
-            # might have unusual headers.
+            # In strict mode a mismatch is a hard failure: an executable
+            # renamed to .pdf must not reach the processing pipeline
+            # (Issue #3201).
+            if self.strict_mode:
+                logger.error(
+                    "Magic byte mismatch for %s (strict mode). Expected %s, got %s",
+                    filename, magic_result.error_message, file_data[:8]
+                )
+                return magic_result
+
+            # Permissive default: log the mismatch and let the file through,
+            # because some valid files carry unusual headers.
             logger.warning(
                 "Magic byte mismatch for %s. Expected %s, got %s",
-                filename, magic_result.error_message, file_data[:8]
+                filename,
+                magic_result.error_message,
+                file_data[:8],
             )
             # For now, we allow it but log it. In high-security environments,
             # this could be changed to return the invalid result.
-            
+
         logger.info("File validation passed for %s", filename)
         return ValidationResult(is_valid=True, filename=filename)
-        
+
     def _check_size(
-        self,
-        file_data: Union[bytes, bytearray],
-        filename: str
+        self, file_data: Union[bytes, bytearray], filename: str
     ) -> ValidationResult:
         """Verify the file size does not exceed the maximum limit.
-        
+
         Args:
             file_data: The raw bytes of the file.
             filename: The name of the file.
-            
+
         Returns:
             ValidationResult indicating if the size is acceptable.
         """
         file_size = len(file_data)
-        
+
         if file_size > self.max_size_bytes:
             max_mb = self.max_size_bytes / (1024 * 1024)
             error_msg = (
-                f"File '{filename}' is too large ({file_size / (1024*1024):.2f} MB). "
+                f"File '{filename}' is too large ({file_size / (1024 * 1024):.2f} MB). "
                 f"Maximum allowed size is {max_mb:.0f} MB."
             )
             logger.warning(error_msg)
@@ -167,9 +194,9 @@ class FileValidator:
                 is_valid=False,
                 filename=filename,
                 error_message=error_msg,
-                error_code="FILE_TOO_LARGE"
+                error_code="FILE_TOO_LARGE",
             )
-            
+
         if file_size == 0:
             error_msg = f"File '{filename}' is empty (0 bytes)."
             logger.warning(error_msg)
@@ -177,22 +204,22 @@ class FileValidator:
                 is_valid=False,
                 filename=filename,
                 error_message=error_msg,
-                error_code="FILE_EMPTY"
+                error_code="FILE_EMPTY",
             )
-            
+
         return ValidationResult(is_valid=True, filename=filename)
-        
+
     def _check_extension(self, filename: str) -> ValidationResult:
         """Verify the file extension is in the allowed list.
-        
+
         Args:
             filename: The name of the file.
-            
+
         Returns:
             ValidationResult indicating if the extension is supported.
         """
         ext = Path(filename).suffix.lower()
-        
+
         if not ext:
             error_msg = f"File '{filename}' has no extension."
             logger.warning(error_msg)
@@ -200,9 +227,9 @@ class FileValidator:
                 is_valid=False,
                 filename=filename,
                 error_message=error_msg,
-                error_code="MISSING_EXTENSION"
+                error_code="MISSING_EXTENSION",
             )
-            
+
         if ext not in self.allowed_extensions:
             error_msg = (
                 f"File extension '{ext}' is not supported. "
@@ -213,38 +240,36 @@ class FileValidator:
                 is_valid=False,
                 filename=filename,
                 error_message=error_msg,
-                error_code="UNSUPPORTED_EXTENSION"
+                error_code="UNSUPPORTED_EXTENSION",
             )
-            
+
         return ValidationResult(is_valid=True, filename=filename)
-        
+
     def _check_magic_bytes(
-        self,
-        file_data: Union[bytes, bytearray],
-        filename: str
+        self, file_data: Union[bytes, bytearray], filename: str
     ) -> ValidationResult:
         """Verify the file's magic bytes match its extension.
-        
+
         This prevents malicious files disguised as documents (e.g., an
         executable renamed to .pdf) from being processed.
-        
+
         Args:
             file_data: The raw bytes of the file.
             filename: The name of the file.
-            
+
         Returns:
             ValidationResult indicating if the magic bytes match.
         """
         ext = Path(filename).suffix.lower()
-        
+
         if ext not in MAGIC_SIGNATURES:
             # No magic signature defined for this extension (e.g., .txt, .md)
             # Plain text files don't have standard magic bytes, so we skip.
             return ValidationResult(is_valid=True, filename=filename)
-            
+
         expected_signature = MAGIC_SIGNATURES[ext]
-        actual_header = file_data[:len(expected_signature)]
-        
+        actual_header = file_data[: len(expected_signature)]
+
         if actual_header != expected_signature:
             error_msg = (
                 f"File content does not match extension '{ext}'. "
@@ -254,22 +279,23 @@ class FileValidator:
                 is_valid=False,
                 filename=filename,
                 error_message=error_msg,
-                error_code="MAGIC_BYTE_MISMATCH"
+                error_code="MAGIC_BYTE_MISMATCH",
             )
-            
+
         return ValidationResult(is_valid=True, filename=filename)
 
 
 # Global validator instance for convenience
 default_validator = FileValidator()
 
+
 def validate_upload(file_data: bytes, filename: str) -> ValidationResult:
     """Convenience function to validate a file using the default validator.
-    
+
     Args:
         file_data: The raw bytes of the uploaded file.
         filename: The original name of the file.
-        
+
     Returns:
         A ValidationResult object.
     """

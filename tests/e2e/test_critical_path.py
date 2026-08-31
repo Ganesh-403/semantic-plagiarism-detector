@@ -17,6 +17,7 @@ Critical path exercised:
 A second test asserts the negative path — uploading two unrelated
 documents yields no significant matches (no false positives).
 """
+
 from __future__ import annotations
 
 import re

@@ -26,9 +26,9 @@ def test_dockerignore_exists_and_contains_required_patterns():
     required_patterns = [".env", ".git/", ".venv/", "*.sqlite"]
 
     for pattern in required_patterns:
-        assert (
-            pattern in lines
-        ), f"Required pattern '{pattern}' must be explicitly present in .dockerignore"
+        assert pattern in lines, (
+            f"Required pattern '{pattern}' must be explicitly present in .dockerignore"
+        )
 
 
 def test_dockerignore_excludes_bytecode_and_secrets():
@@ -53,6 +53,6 @@ def test_dockerignore_excludes_bytecode_and_secrets():
     ]
 
     for exclusion in expected_exclusions:
-        assert (
-            exclusion in lines
-        ), f"Expected pattern '{exclusion}' should be in .dockerignore"
+        assert exclusion in lines, (
+            f"Expected pattern '{exclusion}' should be in .dockerignore"
+        )

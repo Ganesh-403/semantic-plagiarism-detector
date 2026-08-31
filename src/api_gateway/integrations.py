@@ -18,13 +18,13 @@ class IntegrationService:
     def __init__(self) -> None:
         self._integrations: dict[str, IntegrationRecord] = {}
         self._connectors: dict[str, ServiceConnector] = {}
-        self._connector_registry: dict[str, Type[ServiceConnector]] = {
+        self._connector_registry: dict[str, type[ServiceConnector]] = {
             "github": GitHubConnector,
             "slack": SlackConnector,
         }
 
     def register_connector_class(
-        self, provider: str, connector_cls: Type[ServiceConnector]
+        self, provider: str, connector_cls: type[ServiceConnector]
     ) -> None:
         """Register custom ServiceConnector class for provider."""
         self._connector_registry[provider.lower()] = connector_cls

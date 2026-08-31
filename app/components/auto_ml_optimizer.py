@@ -128,10 +128,10 @@ class AutoMLOptimizer:
 
     def __init__(self, config: Optional[OptimizationConfig] = None):
         self.config = config or OptimizationConfig()
-        self.metrics_history: List[OptimizationMetrics] = []
-        self.feedback_history: List[UserFeedback] = []
-        self.threshold_history: List[float] = []
-        self.pattern_profiles: Dict[str, PatternProfile] = {}
+        self.metrics_history: list[OptimizationMetrics] = []
+        self.feedback_history: list[UserFeedback] = []
+        self.threshold_history: list[float] = []
+        self.pattern_profiles: dict[str, PatternProfile] = {}
         self.best_threshold = 0.75
         self.current_strategy = "balanced"  # balanced, conservative, aggressive
 
@@ -144,7 +144,7 @@ class AutoMLOptimizer:
         self.total_optimizations = 0
         self.improvement_count = 0
         self.last_optimization_time = 0
-        self.performance_scores: List[float] = []
+        self.performance_scores: list[float] = []
 
         # Initialize
         self._initialize_models()
@@ -426,7 +426,7 @@ class AutoMLOptimizer:
 
     def analyze_patterns(
         self, similarity_data: pd.DataFrame
-    ) -> Dict[str, PatternProfile]:
+    ) -> dict[str, PatternProfile]:
         """
         Analyze patterns in documents.
 
@@ -496,7 +496,7 @@ class AutoMLOptimizer:
         """Estimate readability score."""
         return random.uniform(40, 70)
 
-    def get_optimal_threshold(self, context: Dict[str, Any] = None) -> float:
+    def get_optimal_threshold(self, context: dict[str, Any] = None) -> float:
         """
         Get optimal threshold based on current context.
 
@@ -537,7 +537,7 @@ class AutoMLOptimizer:
 
         return self.best_threshold
 
-    def get_performance_trend(self) -> Dict[str, List[float]]:
+    def get_performance_trend(self) -> dict[str, list[float]]:
         """
         Get performance trends over time.
 
@@ -557,7 +557,7 @@ class AutoMLOptimizer:
             "accuracy": [m.accuracy for m in recent],
         }
 
-    def get_optimization_summary(self) -> Dict[str, Any]:
+    def get_optimization_summary(self) -> dict[str, Any]:
         """Get summary of optimization results."""
         if not self.metrics_history:
             return {
@@ -595,12 +595,12 @@ class AutoOptimizationIntegration:
 
     def __init__(self):
         self.optimizer = AutoMLOptimizer()
-        self.pipeline_metrics: List[Dict] = []
+        self.pipeline_metrics: list[dict] = []
         self.optimization_runs: int = 0
 
     def optimize_pipeline(
         self, similarity_data: pd.DataFrame, current_threshold: float
-    ) -> Tuple[float, Dict]:
+    ) -> tuple[float, dict]:
         """
         Optimize the pipeline parameters.
 
@@ -659,7 +659,7 @@ class AutoOptimizationIntegration:
 
     def _calculate_pipeline_metrics(
         self, similarity_data: pd.DataFrame, threshold: float
-    ) -> Dict:
+    ) -> dict:
         """
         Calculate pipeline performance metrics.
 
@@ -725,7 +725,7 @@ class AutoOptimizationIntegration:
             "true_negatives": int(tn),
         }
 
-    def get_optimization_dashboard_data(self) -> Dict:
+    def get_optimization_dashboard_data(self) -> dict:
         """
         Get data for optimization dashboard.
 

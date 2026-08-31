@@ -27,7 +27,7 @@ def _columns():
 
 
 def test_matched_chunk_is_rendered_in_copyable_code_block():
-    matched_chunk = "This sentence is the exact FAISS match that should " "be copyable."
+    matched_chunk = "This sentence is the exact FAISS match that should be copyable."
     results = [
         (
             MockRecord(

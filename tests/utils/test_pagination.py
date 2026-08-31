@@ -341,6 +341,107 @@ class TestPaginationPageEq:
         assert len(page_set) == 2  # page1 and page2 are duplicates
 
 
+class TestPaginationPageHash:
+    """Tests for PaginationPage.__hash__ (Issue #3221).
+
+    ``@dataclass(frozen=True)`` generates a hash over every field, and
+    ``items`` is a ``list``, so an explicit __hash__ tuples the items before
+    feeding them to ``hash()``. These tests pin down that contract:
+
+    * equal pages hash identically,
+    * pages carrying unhashable items (dicts — the shape ``warning_list``
+      builds) raise ``TypeError`` instead of silently corrupting a set,
+    * equality itself keeps working for such pages, because __eq__ compares
+      the lists directly.
+    """
+
+    def make_page(self, items=None, **overrides):
+        """Build a page with sensible defaults and optional overrides."""
+        kwargs = dict(
+            items=[1, 2, 3] if items is None else items,
+            page=1,
+            total_pages=2,
+            total_items=10,
+            per_page=5,
+        )
+        kwargs.update(overrides)
+        return PaginationPage(**kwargs)
+
+    def test_equal_pages_hash_identically_across_construction_paths(self):
+        """Pages equal via __eq__ must hash equally however they were built."""
+        constructed = self.make_page(
+            items=[0, 1, 2],
+            total_items=3,
+            total_pages=1,
+            start_index=1,
+            end_index=3,
+        )
+        created = PaginationPage.create(
+            items=[0, 1, 2],
+            page=1,
+            per_page=5,
+            total_items=3,
+        )
+        paginated = paginate_items([0, 1, 2], page=1, page_size=5)
+
+        # The hash contract covers every compared field — including the
+        # start_index / end_index defaults that differ between paths above.
+        assert constructed == created
+        assert hash(constructed) == hash(created)
+        assert constructed == paginated
+        assert hash(constructed) == hash(paginated)
+
+    def test_hash_is_stable_across_repeated_calls(self):
+        """The same instance must not change its hash within a process."""
+        page = self.make_page()
+
+        first = hash(page)
+        assert hash(page) == first
+        assert hash(page) == first
+
+    def test_pages_with_tuple_items_are_usable_as_dict_keys(self):
+        """Hashable item payloads keep the frozen-dataclass promise."""
+        keyed = {self.make_page(items=(1, 2)): "value"}
+
+        assert keyed[self.make_page(items=(1, 2))] == "value"
+
+    def test_unhashable_items_raise_type_error(self):
+        """A page of dicts is unhashable — the ordinary Python contract."""
+        page = self.make_page(items=[{"id": 1}, {"id": 2}])
+
+        with pytest.raises(TypeError):
+            hash(page)
+
+    def test_unhashable_items_error_message_names_the_offender(self):
+        """The raised error should explain what could not be hashed."""
+        page = self.make_page(items=[{"id": 1}])
+
+        with pytest.raises(TypeError, match="unhashable type"):
+            hash(page)
+
+    def test_dict_item_pages_still_compare_equal(self):
+        """__eq__ compares the raw lists, so dict-backed pages stay equal."""
+        items = [{"id": 1}, {"id": 2}]
+        page1 = self.make_page(items=list(items))
+        page2 = self.make_page(items=list(items))
+
+        assert page1 == page2
+
+    def test_dict_item_pages_are_rejected_from_sets(self):
+        """A set membership attempt surfaces the same TypeError."""
+        page = self.make_page(items=[{"id": 1}])
+
+        with pytest.raises(TypeError, match="unhashable type"):
+            {page}
+
+    def test_unequal_pages_are_valid_set_members_together(self):
+        """Distinct pages may share a set; equal ones collapse to one."""
+        page_a = self.make_page(items=[1])
+        page_b = self.make_page(items=[2])
+
+        assert len({page_a, page_b}) == 2
+
+
 class TestPaginationPageFactory:
     """Test suite for PaginationPage.create() factory method."""
 
@@ -421,18 +522,20 @@ class TestPaginationPageNavigation:
         assert page.has_previous() is False
 
     def test_next_page_returns_correct_number(self):
-        """Verify next_page() returns page + 1 when available."""
+        """Verify next_page returns page + 1 when available."""
         page = PaginationPage(
             items=[1], page=2, total_pages=5, total_items=10, per_page=5
         )
-        assert page.next_page() == 3
+        assert page.next_page == 3
+        assert page.next_page_number() == 3
 
     def test_next_page_returns_none_on_last_page(self):
-        """Verify next_page() returns None on last page."""
+        """Verify next_page returns None on last page."""
         page = PaginationPage(
             items=[1], page=5, total_pages=5, total_items=10, per_page=5
         )
-        assert page.next_page() is None
+        assert page.next_page is None
+        assert page.next_page_number() is None
 
     def test_previous_page_returns_correct_number(self):
         """Verify previous_page() returns page - 1 when available."""
@@ -440,6 +543,7 @@ class TestPaginationPageNavigation:
             items=[1], page=3, total_pages=5, total_items=10, per_page=5
         )
         assert page.previous_page() == 2
+        assert page.prev_page == 2
 
     def test_previous_page_returns_none_on_first_page(self):
         """Verify previous_page() returns None on first page."""
@@ -447,6 +551,7 @@ class TestPaginationPageNavigation:
             items=[1], page=1, total_pages=5, total_items=10, per_page=5
         )
         assert page.previous_page() is None
+        assert page.prev_page is None
 
 
 class TestPaginationPageSerialization:
@@ -707,3 +812,101 @@ class TestPaginationPageIndexFields:
         )
 
         assert first != second
+
+
+class TestPaginationPageWasClamped:
+    """``was_clamped`` distinguishes clamped requests from genuine ones (#3218).
+
+    ``paginate_items`` deliberately never raises for an out-of-range page,
+    which left API callers unable to tell "the user asked for the last page"
+    from "an out-of-range request was silently pulled back". The flag makes
+    that distinction visible on the returned page.
+    """
+
+    def make_page(self, **overrides):
+        """Build a page with sensible defaults and optional overrides."""
+        kwargs = dict(
+            items=[1, 2, 3],
+            page=1,
+            total_pages=2,
+            total_items=10,
+            per_page=5,
+        )
+        kwargs.update(overrides)
+        return PaginationPage(**kwargs)
+
+    def test_page_beyond_the_end_is_flagged(self):
+        page = paginate_items([1, 2, 3, 4, 5], page=9999, page_size=2)
+
+        assert page.page == 3
+        assert page.was_clamped is True
+
+    def test_page_zero_is_flagged(self):
+        page = paginate_items([1, 2, 3, 4, 5], page=0, page_size=2)
+
+        assert page.page == 1
+        assert page.was_clamped is True
+
+    def test_negative_page_is_flagged(self):
+        page = paginate_items([1, 2, 3, 4, 5], page=-7, page_size=2)
+
+        assert page.page == 1
+        assert page.was_clamped is True
+
+    def test_in_range_request_is_not_flagged(self):
+        page = paginate_items(list(range(23)), page=2, page_size=10)
+
+        assert page.page == 2
+        assert page.was_clamped is False
+
+    def test_last_page_requested_exactly_is_not_flagged(self):
+        page = paginate_items([1, 2, 3, 4, 5], page=3, page_size=2)
+
+        assert page.page == 3
+        assert page.was_clamped is False
+
+    def test_default_page_request_is_not_flagged(self):
+        page = paginate_items(list(range(50)))
+
+        assert page.page == 1
+        assert page.was_clamped is False
+
+    def test_non_numeric_page_coerces_without_a_clamp_flag(self):
+        # "abc" falls back to the default (a coercion), not a clamp.
+        page = paginate_items(list(range(23)), page="abc", page_size=10)
+
+        assert page.page == 1
+        assert page.was_clamped is False
+
+    def test_empty_sequence_with_out_of_range_page_is_flagged(self):
+        page = paginate_items([], page=5, page_size=10)
+
+        assert page.items == []
+        assert page.total_pages == 1
+        assert page.was_clamped is True
+
+    def test_field_defaults_to_false_for_direct_construction(self):
+        page = self.make_page()
+
+        assert page.was_clamped is False
+
+    def test_to_dict_exposes_the_flag(self):
+        clamped = paginate_items([], page=5, page_size=10).to_dict()
+        exact = paginate_items([], page=1, page_size=10).to_dict()
+
+        assert clamped["was_clamped"] is True
+        assert exact["was_clamped"] is False
+
+    def test_pages_differing_only_by_the_flag_are_unequal(self):
+        clamped = self.make_page(was_clamped=True)
+        plain = self.make_page()
+
+        assert clamped != plain
+
+    def test_hash_covers_the_flag_consistently_with_equality(self):
+        clamped = self.make_page(was_clamped=True)
+        plain = self.make_page()
+        same_clamp = self.make_page(was_clamped=True)
+
+        assert hash(clamped) != hash(plain)
+        assert hash(clamped) == hash(same_clamp)

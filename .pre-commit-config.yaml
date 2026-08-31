@@ -1,6 +1,7 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
+  # General file cleanup hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
@@ -8,21 +9,195 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-added-large-files
+        args: [--maxkb=1000]
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: detect-private-key
+      - id: fix-encoding-pragma
+        args: [--remove]
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: requirements-txt-fixer
+      - id: sort-simple-yaml
 
+  # Python import sorting
   - repo: https://github.com/pycqa/isort
     rev: 5.13.2
     hooks:
       - id: isort
-        args: ["--profile", "black"]
+        name: isort (python)
+        args: ["--profile", "black", "--line-length=88"]
 
+  # Python code formatting (Black)
+  - repo: https://github.com/psf/black
+    rev: 24.1.0
+    hooks:
+      - id: black
+        name: black (python)
+        language_version: python3
+        args: ["--line-length=88", "--target-version=py38", "--target-version=py39", "--target-version=py310", "--target-version=py311"]
+
+  # Python linting (Ruff)
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.2.1
     hooks:
       - id: ruff
+        name: ruff (lint)
+        args: ["--fix", "--exit-non-zero-on-fix"]
       - id: ruff-format
+        name: ruff (format)
         stages: [pre-commit]
       - id: ruff
         alias: ruff-fix
         name: ruff (fix, local only)
         args: ["--fix"]
         stages: [manual]
+
+  # Python syntax upgrades
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.15.0
+    hooks:
+      - id: pyupgrade
+        name: pyupgrade (python)
+        args: ["--py38-plus"]
+
+  # Security linter
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        name: bandit (security)
+        args: ["-c", "pyproject.toml", "-r", "src"]
+        additional_dependencies: ["bandit[toml]"]
+        files: ^src/
+
+  # Secrets detection
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        name: detect-secrets (secrets)
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: package-lock\.json
+
+  # Debug statement checker
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        name: flake8 (style)
+        args: ["--max-line-length=88", "--extend-ignore=E203,W503"]
+        additional_dependencies:
+          - flake8-bugbear
+          - flake8-comprehensions
+          - flake8-simplify
+          - flake8-return
+          - flake8-unused-arguments
+
+  # Check for debug statements
+  - repo: https://github.com/psf/black
+    rev: 24.1.0
+    hooks:
+      - id: black
+        name: black (check debug)
+        stages: [manual]
+
+  # Validate Python files
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        name: mypy (type check)
+        args: ["--ignore-missing-imports", "--follow-imports=skip"]
+        additional_dependencies: ["types-requests", "types-PyYAML"]
+        files: ^src/
+
+  # Check for broken symlinks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: forbid-new-submodules
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.38.0
+    hooks:
+      - id: markdownlint
+        name: markdownlint (docs)
+        args: ["--fix", "--disable=MD013,MD033,MD041"]
+
+  # YAML linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        name: yamllint (configs)
+        args: ["--strict", "-c", ".yamllint.yaml"]
+
+  # Shell script formatting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        name: shellcheck (scripts)
+        files: ^.*\.(sh|bash)$
+
+  # Dockerfile linting
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint
+        name: hadolint (dockerfile)
+        files: Dockerfile.*|Dockerfile
+
+  # Commit message validation
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.1.0
+    hooks:
+      - id: conventional-pre-commit
+        name: conventional (commit msg)
+        stages: [commit-msg]
+        args: []
+
+  # AWS/Cloud security
+  - repo: https://github.com/bridgecrewio/checkov
+    rev: '3.1.45'
+    hooks:
+      - id: checkov
+        name: checkov (security)
+        files: .*\.(tf|yml|yaml|json)$
+
+  # Python docstring validation
+  - repo: https://github.com/econchick/interrogate
+    rev: 1.5.0
+    hooks:
+      - id: interrogate
+        name: interrogate (docstrings)
+        args: ["-v", "--fail-under=50", "src"]
+        pass_filenames: false
+
+  # Check for forbidden files
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.4
+    hooks:
+      - id: insert-license
+        name: insert-license (headers)
+        files: \.(py)$
+        args:
+          - --license-filepath
+          - LICENSE
+          - --use-current-year
+
+  # Remove Python bytecode files
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: fix-byte-order-marker
+      - id: forbid-submodules
+      - id: no-commit-to-branch
+        args: [--branch, main, --branch, master, --branch, develop]

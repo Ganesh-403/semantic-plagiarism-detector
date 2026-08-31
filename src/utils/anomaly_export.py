@@ -21,14 +21,19 @@ class AnomalyExporter:
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
 
-    def export_json(self, result: Dict, filename: str = "anomaly_results.json") -> str:
+    def export_json(self, result: dict, filename: str = "anomaly_results.json") -> str:
         path = os.path.join(self.output_dir, filename)
         with open(path, "w", encoding="utf-8") as f:
-            json.dump({"exported_at": datetime.now().isoformat(), "result": result}, f, indent=2, default=str)
+            json.dump(
+                {"exported_at": datetime.now().isoformat(), "result": result},
+                f,
+                indent=2,
+                default=str,
+            )
         logger.info(f"Exported JSON: {path}")
         return path
 
-    def export_csv(self, anomalies: List[Dict], filename: str = "anomalies.csv") -> str:
+    def export_csv(self, anomalies: list[dict], filename: str = "anomalies.csv") -> str:
         if not anomalies:
             return ""
         path = os.path.join(self.output_dir, filename)
@@ -40,16 +45,21 @@ class AnomalyExporter:
         logger.info(f"Exported CSV: {path}")
         return path
 
-    def export_summary(self, result: Dict, filename: str = "anomaly_summary.txt") -> str:
+    def export_summary(
+        self, result: Dict, filename: str = "anomaly_summary.txt"
+    ) -> str:
         path = os.path.join(self.output_dir, filename)
         summary = result.get("summary", {})
         lines = [
-            "=" * 50, "ANOMALY DETECTION SUMMARY", "=" * 50,
+            "=" * 50,
+            "ANOMALY DETECTION SUMMARY",
+            "=" * 50,
             f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             f"Total Anomalies: {summary.get('total_anomalies', 0)}",
             f"High Priority: {summary.get('high_priority_count', 0)}",
             f"Documents Analyzed: {summary.get('documents_analyzed', 0)}",
-            "", "=" * 50
+            "",
+            "=" * 50,
         ]
         with open(path, "w") as f:
             f.write("\n".join(lines))

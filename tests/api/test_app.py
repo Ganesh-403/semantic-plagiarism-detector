@@ -353,6 +353,41 @@ def test_scope_enforcement_clear_endpoint(tmp_path):
     assert res.status_code == 403
 
 
+def test_clear_corpus_audit_logging(tmp_path):
+    """Verify that successful /api/v1/clear logs a security event with event_type='CORPUS_CLEARED'."""
+    from fastapi.testclient import TestClient
+    from src.api.app import app
+    from src.db.auth import add_user, configure_db_path, init_db, get_security_audit_logs
+
+    db_file = tmp_path / "test_clear_audit.db"
+    configure_db_path(db_file)
+    init_db()
+    
+    try:
+        add_user("admin_user", "password123", role="admin")
+    except ValueError:
+        pass
+
+    client = TestClient(app)
+
+    # 1. Execute clear
+    res = client.post(
+        "/api/v1/clear?username=admin_user",
+        headers={"Authorization": "Bearer test-admin-token"},
+    )
+    assert res.status_code == 200
+
+    # 2. Query logs to verify the event is logged
+    logs = get_security_audit_logs(username="admin_user", event_type="CORPUS_CLEARED")
+    assert len(logs) > 0
+    event = logs[0]
+    assert event["event_type"] == "CORPUS_CLEARED"
+    assert event["username"] == "admin_user"
+    assert "Client IP:" in event["details"]
+    assert "Timestamp:" in event["details"]
+
+
+
 # ── Asynchronous Background Scan Job Queue Tests (#1372) ─────────────────────
 
 
@@ -427,6 +462,44 @@ def test_async_scan_empty_file_returns_400():
 
     assert response.status_code == 400
     assert "empty" in response.json()["detail"].lower()
+
+
+def test_cancel_async_scan_job_success():
+    """Verify DELETE /api/v1/scan/jobs/{job_id} cancels an async scan job."""
+    client = TestClient(app)
+
+    files = {"file": ("cancel_test.txt", b"Content for job cancellation test.")}
+    headers_write = {"Authorization": "Bearer test-write-token"}
+    headers_read = {"Authorization": "Bearer test-read-token"}
+
+    # 1. Enqueue job
+    post_res = client.post("/api/v1/scan/async", files=files, headers=headers_write)
+    assert post_res.status_code == 202
+    job_id = post_res.json()["job_id"]
+
+    # 2. Cancel job via DELETE /api/v1/scan/jobs/{job_id}
+    cancel_res = client.delete(f"/api/v1/scan/jobs/{job_id}", headers=headers_write)
+    assert cancel_res.status_code == 200
+    cancel_data = cancel_res.json()
+    assert cancel_data["job_id"] == job_id
+    assert cancel_data["status"] == "cancelled"
+
+    # 3. Verify status endpoint reports job as cancelled
+    status_res = client.get(f"/api/v1/scan/status/{job_id}", headers=headers_read)
+    assert status_res.status_code == 200
+    status_data = status_res.json()
+    assert status_data["status"] == "cancelled"
+    assert "cancelled" in status_data["error"].lower()
+
+
+def test_cancel_async_scan_job_invalid_id_returns_404():
+    """Verify DELETE /api/v1/scan/jobs/{job_id} returns 404 for unknown job IDs."""
+    client = TestClient(app)
+    headers = {"Authorization": "Bearer test-write-token"}
+
+    response = client.delete("/api/v1/scan/jobs/nonexistent_job_123", headers=headers)
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()
 
 
 # ── Global Exception Handler Tests (#1500) ────────────────────────────────────
@@ -851,6 +924,31 @@ def test_api_usage_endpoint():
     assert data["total_scans"] == initial_scans + 1
 
 
+def test_total_scans_persistence():
+    """Verify that total_scans persists in the database / Redis across resets."""
+    from src.db.corpus_db import get_total_scans, increment_total_scans
+    import sqlite3
+    from src.core.app_config import CORPUS_DB_PATH
+
+    initial = get_total_scans()
+    incremented = increment_total_scans()
+    assert incremented == initial + 1
+
+    # Read from database to verify persistence
+    conn = sqlite3.connect(str(CORPUS_DB_PATH))
+    try:
+        cursor = conn.execute("SELECT metric_value FROM system_metrics WHERE metric_name = 'total_scans'")
+        row = cursor.fetchone()
+        assert row is not None
+    except sqlite3.OperationalError:
+        # If running in environment where Redis is used or system_metrics table is initialized differently
+        pass
+    finally:
+        conn.close()
+
+    assert get_total_scans() == incremented
+
+
 def test_hsts_security_header_options():
     """Verify HSTS Strict-Transport-Security header behavior when ENABLE_HSTS is configured."""
     import os
@@ -1029,25 +1127,27 @@ def test_custom_http_exception_handler_dictionary_detail():
     from starlette.exceptions import HTTPException as StarletteHTTPException
 
     from src.api.app import custom_http_exception_handler
-    
+
     mock_request = Mock()
     mock_request.method = "GET"
     mock_request.url.path = "/test"
-    
+
     dict_detail = {"key": "value", "reason": "invalid request"}
     exc = StarletteHTTPException(status_code=400, detail=dict_detail)
-    
+
     response = asyncio.run(custom_http_exception_handler(mock_request, exc))
-    
+
     import json
+
     body = json.loads(response.body)
-    
+
     assert response.status_code == 400
     assert body["error"] is True
     assert body["code"] == 400
     assert body["message"] == dict_detail
     assert body["message"]["key"] == "value"
     assert "timestamp" not in body
+
 
 def test_custom_http_exception_handler_string_detail():
     import asyncio
@@ -1056,18 +1156,18 @@ def test_custom_http_exception_handler_string_detail():
     from starlette.exceptions import HTTPException as StarletteHTTPException
 
     from src.api.app import custom_http_exception_handler
-    
+
     mock_request = Mock()
     mock_request.method = "GET"
     mock_request.url.path = "/test"
-    
+
     exc = StarletteHTTPException(status_code=400, detail="string error")
-    
+
     response = asyncio.run(custom_http_exception_handler(mock_request, exc))
-    
+
     import json
+
     body = json.loads(response.body)
-    
+
     assert response.status_code == 400
     assert body["message"] == "string error"
-

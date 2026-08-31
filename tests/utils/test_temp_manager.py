@@ -298,8 +298,9 @@ def test_get_temp_directory_size_bytes_handles_nonexistent_dir():
 
 def test_get_temp_directory_size_bytes_handles_non_dir():
     """If temp path is not a directory, return 0."""
-    with patch("src.utils.temp_manager.os.path.exists", return_value=True), patch(
-        "src.utils.temp_manager.os.path.isdir", return_value=False
+    with (
+        patch("src.utils.temp_manager.os.path.exists", return_value=True),
+        patch("src.utils.temp_manager.os.path.isdir", return_value=False),
     ):
         result = get_temp_directory_size_bytes()
         assert result == 0
@@ -694,4 +695,3 @@ def test_managed_ocr_temp_dir_restores_environment_and_tempdir():
 
     assert tempfile.tempdir == orig_tempdir
     assert os.environ.get("TMPDIR") == orig_tmpdir_env
-
