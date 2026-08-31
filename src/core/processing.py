@@ -22,6 +22,7 @@ from src.core.config import PLAGIARISM_THRESHOLD, severity_from_score
 from src.core.document_parser import extract_text
 from src.core.embedding_model import embed_documents
 from src.core.faiss_index import ChunkRecord, build_index
+from src.core.ast_engine import calculate_ast_similarity
 from src.core.similarity import document_similarity_matrix, flag_plagiarism
 from src.core.text_chunking import chunk_documents
 from src.utils.tracing import get_tracer
@@ -123,6 +124,19 @@ def run_full_pipeline(
 
         with tracer.start_as_current_span("pipeline.similarity_scoring") as sim_span:
             sim_df = document_similarity_matrix(embeddings)
+            
+            # Apply AST similarity to sim_df for source code
+            names = list(embeddings.keys())
+            for i, na in enumerate(names):
+                for j, nb in enumerate(names):
+                    if j > i:
+                        if (na.endswith('.py') or na.endswith('.cpp') or na.endswith('.java')) and (nb.endswith('.py') or nb.endswith('.cpp') or nb.endswith('.java')):
+                            ast_sim = calculate_ast_similarity(raw_texts[na], na, raw_texts[nb], nb)
+                            current_sim = sim_df.iloc[i, j]
+                            combined_sim = 0.6 * current_sim + 0.4 * ast_sim
+                            sim_df.iloc[i, j] = combined_sim
+                            sim_df.iloc[j, i] = combined_sim
+
 
             names = list(embeddings.keys())
             n = len(names)

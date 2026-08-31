@@ -81,3 +81,33 @@ def render_document_comparison():
             )
     elif doc_a.strip() or doc_b.strip():
         st.info("Please paste content into both inputs to run side-by-side comparison.")
+
+
+import streamlit as st
+import ast
+from difflib import SequenceMatcher
+
+def render_ast_diff_viewer(doc_a_name, doc_b_name, text_a, text_b):
+    st.subheader("🧬 AST Structural Diff Viewer")
+    st.write("Highlights structural and logical similarities while ignoring superficial differences (like variable renaming).")
+    
+    col1, col2 = st.columns(2)
+    
+    from src.core.ast_engine import get_ast_footprint
+    ast_a = get_ast_footprint(text_a, doc_a_name)
+    ast_b = get_ast_footprint(text_b, doc_b_name)
+    
+    matcher = SequenceMatcher(None, ast_a.split(), ast_b.split())
+    matches = matcher.get_matching_blocks()
+    
+    with col1:
+        st.markdown(f"**{doc_a_name}**")
+        st.info(f"AST Tokens: {len(ast_a.split())}")
+        st.code(text_a[:1000] + ('...' if len(text_a) > 1000 else ''))
+        
+    with col2:
+        st.markdown(f"**{doc_b_name}**")
+        st.info(f"AST Tokens: {len(ast_b.split())}")
+        st.code(text_b[:1000] + ('...' if len(text_b) > 1000 else ''))
+
+    st.success(f"Structural overlap detected in {len(matches)-1} AST regions.")
