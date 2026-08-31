@@ -49,7 +49,9 @@ def render_adversarial_watermark_dashboard():
 
     with col1:
         st.subheader("Text Snippet for Watermark Hypothesis Test")
-        doc_title = st.text_input("Document Title", value="LLM Generated Physics Summary")
+        doc_title = st.text_input(
+            "Document Title", value="LLM Generated Physics Summary"
+        )
         text_content = st.text_area(
             "Input Text Content",
             value="Quantum mechanics is a fundamental theory in physics that provides a description of the physical properties of nature at the scale of atoms and subatomic particles. It is the foundation of all quantum physics including quantum chemistry, quantum field theory, quantum technology, and quantum information science.",
@@ -58,8 +60,20 @@ def render_adversarial_watermark_dashboard():
 
     with col2:
         st.subheader("Statistical Hyperparameters")
-        gamma = st.slider("Green-List Ratio (gamma)", min_value=0.10, max_value=0.90, value=0.50, step=0.05)
-        z_thresh = st.slider("z-Score Detection Threshold", min_value=1.5, max_value=6.0, value=4.0, step=0.1)
+        gamma = st.slider(
+            "Green-List Ratio (gamma)",
+            min_value=0.10,
+            max_value=0.90,
+            value=0.50,
+            step=0.05,
+        )
+        z_thresh = st.slider(
+            "z-Score Detection Threshold",
+            min_value=1.5,
+            max_value=6.0,
+            value=4.0,
+            step=0.1,
+        )
 
     if st.button("Run Statistical Watermark Detection", use_container_width=True):
         match = AdversarialWatermarkEngine.analyze_text(
@@ -77,7 +91,9 @@ def render_adversarial_watermark_dashboard():
                 f"Watermark Detected! z-score: {match.z_score} (Confidence: {match.watermark_confidence_percentage}%)"
             )
         else:
-            st.success(f"No Watermark Detected. z-score: {match.z_score} (Unwatermarked / Human text)")
+            st.success(
+                f"No Watermark Detected. z-score: {match.z_score} (Unwatermarked / Human text)"
+            )
 
     if st.session_state["watermark_matches"]:
         st.markdown("### Detection Audit Results")

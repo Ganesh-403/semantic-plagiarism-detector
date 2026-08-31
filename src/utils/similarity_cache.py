@@ -2,7 +2,9 @@ from pathlib import Path
 from typing import Union
 
 
-def build_similarity_cache_key(session_id: str | Path, *, use_hybrid: bool) -> str:
+def build_similarity_cache_key(
+    session_id: Union[str, Path], *, use_hybrid: bool
+) -> str:
     """Build a mode-specific analysis cache key.
 
     Lexical and Hybrid scoring produce different result spaces. Keeping the

@@ -62,6 +62,7 @@ class MatchResult(DictLikeModel):
     date_flagged: Optional[str] = None
     last_seen: Optional[str] = None
     threshold_at_time_of_flag: Optional[float] = None
+    times_flagged: int = 1
 
     @property
     def doc_a(self) -> str:

@@ -17,9 +17,7 @@ def _assert_citation(citation, *, author, year, title):
 
 def test_apa_citation():
     """APA bibliography entries extract author, year, title, and hash."""
-    citations = extract_citations(
-        "Smith, J. A. (2020). A study. Journal."
-    )
+    citations = extract_citations("Smith, J. A. (2020). A study. Journal.")
 
     assert len(citations) == 1
     _assert_citation(
@@ -32,9 +30,7 @@ def test_apa_citation():
 
 def test_ieee_citation():
     """IEEE bibliography entries extract author, year, title, and hash."""
-    citations = extract_citations(
-        '[1] J. Smith, "A study," Journal, 2020.'
-    )
+    citations = extract_citations('[1] J. Smith, "A study," Journal, 2020.')
 
     assert len(citations) == 1
     _assert_citation(
@@ -47,9 +43,7 @@ def test_ieee_citation():
 
 def test_mla_citation():
     """MLA bibliography entries extract author, year, title, and hash."""
-    citations = extract_citations(
-        'Smith, John. "A study." Journal, 2020.'
-    )
+    citations = extract_citations('Smith, John. "A study." Journal, 2020.')
 
     assert len(citations) == 1
     _assert_citation(

@@ -78,9 +78,7 @@ def massive_identical_text(draw):
     Produces strings of length 1..5000 by repeating a small alphabetic
     seed. Used to stress-test the upper bound and the lexical caches.
     """
-    seed = draw(
-        st.text(alphabet=string.ascii_letters, min_size=1, max_size=10)
-    )
+    seed = draw(st.text(alphabet=string.ascii_letters, min_size=1, max_size=10))
     repeats = draw(st.integers(min_value=1, max_value=500))
     return seed * repeats
 
@@ -265,9 +263,7 @@ class TestHybridScoreEdgeCases:
     @settings(max_examples=100, deadline=None)
     def test_empty_strings(self, method, semantic_score, alpha):
         scorer = HybridScorer(HybridConfig(alpha=alpha, lexical_method=method))
-        score = scorer.compute_hybrid_similarity(
-            "", "", semantic_score=semantic_score
-        )
+        score = scorer.compute_hybrid_similarity("", "", semantic_score=semantic_score)
         scorer.clear_cache()
         assert 0.0 <= score <= 1.0
 
@@ -340,8 +336,10 @@ class TestHybridScoreClamping:
         text_a=ascii_text,
         text_b=ascii_text,
         semantic_score=st.floats(
-            min_value=-1000.0, max_value=1000.0,
-            allow_nan=False, allow_infinity=False,
+            min_value=-1000.0,
+            max_value=1000.0,
+            allow_nan=False,
+            allow_infinity=False,
         ),
         alpha=unit_float,
     )
@@ -378,9 +376,7 @@ class TestHybridScoreBlendProperties:
         deadline=None,
         suppress_health_check=[HealthCheck.function_scoped_fixture],
     )
-    def test_alpha_zero_uses_lexical_only(
-        self, text_a, text_b, semantic_score, alpha
-    ):
+    def test_alpha_zero_uses_lexical_only(self, text_a, text_b, semantic_score, alpha):
         """With alpha=0, hybrid score must equal the (clamped) lexical score."""
         scorer = HybridScorer(HybridConfig(alpha=alpha, lexical_method="jaccard"))
         lexical = scorer._compute_lexical_score(text_a, text_b, "jaccard")
@@ -404,9 +400,7 @@ class TestHybridScoreBlendProperties:
         deadline=None,
         suppress_health_check=[HealthCheck.function_scoped_fixture],
     )
-    def test_alpha_one_uses_semantic_only(
-        self, text_a, text_b, semantic_score, alpha
-    ):
+    def test_alpha_one_uses_semantic_only(self, text_a, text_b, semantic_score, alpha):
         """With alpha=1, hybrid score must equal the (clamped) semantic score."""
         scorer = HybridScorer(HybridConfig(alpha=alpha, lexical_method="jaccard"))
         hybrid = scorer.compute_hybrid_similarity(
@@ -442,3 +436,85 @@ class TestHybridScoreBlendProperties:
         # Pre-clamp: 0.3 * s + 0.7 * lex + 0.7 * s + 0.3 * lex = s + lex
         # Post-clamp: each term is in [0, 1] so sum is in [0, 2]
         assert 0.0 <= h_low + h_high <= 2.0
+def test_hybrid_score_decomposition_reproduces_final_score():
+    from src.core.hybrid_scorer import HybridConfig, HybridScorer
+
+    scorer = HybridScorer(
+        HybridConfig(
+            alpha=0.7,
+            lexical_method="jaccard",
+        )
+    )
+
+    evidence = scorer.compute_hybrid_score(
+        "machine learning algorithms process data",
+        "machine learning algorithms analyze data",
+        semantic_score=0.80,
+        threshold=0.59,
+    )
+
+    expected = (
+        evidence.semantic_contribution
+        + evidence.lexical_contribution
+    )
+
+    assert evidence.hybrid_score == pytest.approx(expected)
+    assert evidence.semantic_contribution == pytest.approx(
+        evidence.alpha * evidence.semantic_score
+    )
+    assert evidence.lexical_contribution == pytest.approx(
+        (1.0 - evidence.alpha) * evidence.lexical_score
+    )
+
+
+def test_hybrid_score_threshold_margin_and_severity():
+    from src.core.hybrid_scorer import HybridConfig, HybridScorer
+
+    scorer = HybridScorer(
+        HybridConfig(
+            alpha=0.7,
+            lexical_method="jaccard",
+        )
+    )
+
+    evidence = scorer.compute_hybrid_score(
+        "machine learning algorithms process data",
+        "machine learning algorithms process data",
+        semantic_score=0.95,
+        threshold=0.59,
+    )
+
+    assert evidence.is_flagged is True
+    assert evidence.threshold_margin == pytest.approx(
+        evidence.hybrid_score - 0.59
+    )
+    assert evidence.severity == "High"
+
+
+def test_compute_hybrid_similarity_uses_same_decomposition():
+    from src.core.hybrid_scorer import HybridConfig, HybridScorer
+
+    scorer = HybridScorer(
+        HybridConfig(
+            alpha=0.6,
+            lexical_method="jaccard",
+        )
+    )
+
+    evidence = scorer.compute_hybrid_score(
+        "natural language processing",
+        "natural language processing models",
+        semantic_score=0.82,
+        alpha=0.6,
+        threshold=0.59,
+    )
+
+    score = scorer.compute_hybrid_similarity(
+        "natural language processing",
+        "natural language processing models",
+        semantic_score=0.82,
+        alpha=0.6,
+        lexical_method="jaccard",
+    )
+
+    assert score == pytest.approx(evidence.hybrid_score)

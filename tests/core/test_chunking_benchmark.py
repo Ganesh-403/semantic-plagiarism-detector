@@ -10,9 +10,9 @@ def test_text_chunking_performance_benchmark():
     repeat_count = (100000 // len(sample_paragraph)) + 1
     synthetic_text = (sample_paragraph * repeat_count)[:100000]
 
-    assert (
-        len(synthetic_text) == 100000
-    ), "Synthetic text must be exactly 100,000 characters."
+    assert len(synthetic_text) == 100000, (
+        "Synthetic text must be exactly 100,000 characters."
+    )
 
     # Measure execution time of chunk_documents
     start_time = time.perf_counter()
@@ -25,7 +25,7 @@ def test_text_chunking_performance_benchmark():
     elapsed_time = time.perf_counter() - start_time
 
     # Assert execution time is strictly less than 1.0 second
-    assert (
-        elapsed_time < 1.0
-    ), f"Chunking took {elapsed_time:.4f} seconds, exceeding the 1.0 second threshold."
+    assert elapsed_time < 1.0, (
+        f"Chunking took {elapsed_time:.4f} seconds, exceeding the 1.0 second threshold."
+    )
     assert len(chunks) > 0, "Chunks should be successfully generated."

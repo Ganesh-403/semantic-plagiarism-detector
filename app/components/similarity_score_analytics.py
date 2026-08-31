@@ -726,8 +726,8 @@ def render_similarity_score_analytics() -> None:
         f"""
         <div style="font-size: 0.85rem; color: var(--secondary-text-color, #64748B); margin-top: 10px; margin-bottom: 20px;">
             ℹ️ Outlier detection is based on the Interquartile Range (IQR).
-            <b>Q1</b> = {outliers_info['q1']:.4f}, <b>Q3</b> = {outliers_info['q3']:.4f}, <b>IQR</b> = {outliers_info['iqr']:.4f}.<br>
-            Thresholds: Lower bound = {outliers_info['lower_bound']:.4f}, Upper bound = {outliers_info['upper_bound']:.4f}.
+            <b>Q1</b> = {outliers_info["q1"]:.4f}, <b>Q3</b> = {outliers_info["q3"]:.4f}, <b>IQR</b> = {outliers_info["iqr"]:.4f}.<br>
+            Thresholds: Lower bound = {outliers_info["lower_bound"]:.4f}, Upper bound = {outliers_info["upper_bound"]:.4f}.
         </div>
         """,
         unsafe_allow_html=True,

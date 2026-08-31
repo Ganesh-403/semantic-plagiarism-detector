@@ -187,22 +187,26 @@ class TimingUIRenderer:
     @staticmethod
     def _generate_css(is_dark_mode: bool) -> str:
         """Generates appropriate CSS variables for light or dark themes."""
-        if is_dark_mode:
-            return """
-            <style>
-                .timing-table { width: 100%; border-collapse: collapse; color: #FAFAFA; }
-                .timing-table th, .timing-table td { padding: 8px; text-align: left; border-bottom: 1px solid #444; }
-                .timing-table th { background-color: #333; }
-            </style>
-            """
-        else:
-            return """
-            <style>
-                .timing-table { width: 100%; border-collapse: collapse; color: #333; }
-                .timing-table th, .timing-table td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
-                .timing-table th { background-color: #f5f5f5; }
-            </style>
-            """
+        # The is_dark_mode parameter is kept for backward compatibility with callers,
+        # but Streamlit's native CSS variables now handle the theme seamlessly.
+        return """
+        <style>
+            .timing-table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                background-color: var(--background-color, #ffffff);
+                color: var(--text-color, #111827); 
+            }
+            .timing-table th, .timing-table td { 
+                padding: 8px; 
+                text-align: left; 
+                border-bottom: 1px solid var(--border-color, #ddd); 
+            }
+            .timing-table th { 
+                background-color: var(--secondary-background-color, #f5f5f5); 
+            }
+        </style>
+        """
 
     @classmethod
     def render_debug_expander(

@@ -183,6 +183,6 @@ def test_cross_lingual_document_level_similarity(mock_embedding_model):
     )
 
     # Cross-lingual document similarity should be > 0.75
-    assert (
-        sim_score > 0.75
-    ), f"Document-level cross-lingual similarity {sim_score:.4f} is below threshold 0.75"
+    assert sim_score > 0.75, (
+        f"Document-level cross-lingual similarity {sim_score:.4f} is below threshold 0.75"
+    )

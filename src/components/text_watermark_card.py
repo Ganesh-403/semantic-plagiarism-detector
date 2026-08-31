@@ -34,7 +34,7 @@ def render_watermark_card(match: dict[str, Any]) -> str:
                 padding: 4px 12px;
                 border-radius: 9999px;
             ">
-                Signature: {match.get('model_generator_signature')}
+                Signature: {match.get("model_generator_signature")}
             </span>
             <span style="
                 background: {badge_color}20;
@@ -50,7 +50,7 @@ def render_watermark_card(match: dict[str, Any]) -> str:
         </div>
         
         <h4 style="color: white; font-weight: 900; margin: 0 0 8px 0;">
-            Document: {match.get('document_title')} ({match.get('detection_id')})
+            Document: {match.get("document_title")} ({match.get("detection_id")})
         </h4>
         
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 16px;">
@@ -60,11 +60,11 @@ def render_watermark_card(match: dict[str, Any]) -> str:
             </div>
             <div style="background: rgba(2, 6, 23, 0.6); padding: 12px; border-radius: 12px; border: 1px solid rgba(30, 41, 59, 1);">
                 <span style="color: #94A3B8; font-size: 11px;">Green-List Token Ratio:</span>
-                <div style="color: #10B981; font-weight: 800; font-size: 16px;">{int(token_dist.get('observed_green_ratio', 0.0) * 100)}%</div>
+                <div style="color: #10B981; font-weight: 800; font-size: 16px;">{int(token_dist.get("observed_green_ratio", 0.0) * 100)}%</div>
             </div>
             <div style="background: rgba(2, 6, 23, 0.6); padding: 12px; border-radius: 12px; border: 1px solid rgba(30, 41, 59, 1);">
                 <span style="color: #94A3B8; font-size: 11px;">p-Value Probability:</span>
-                <div style="color: #6366F1; font-weight: 800; font-size: 16px;">{match.get('p_value')}</div>
+                <div style="color: #6366F1; font-weight: 800; font-size: 16px;">{match.get("p_value")}</div>
             </div>
         </div>
     </div>

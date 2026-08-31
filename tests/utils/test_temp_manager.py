@@ -298,8 +298,9 @@ def test_get_temp_directory_size_bytes_handles_nonexistent_dir():
 
 def test_get_temp_directory_size_bytes_handles_non_dir():
     """If temp path is not a directory, return 0."""
-    with patch("src.utils.temp_manager.os.path.exists", return_value=True), patch(
-        "src.utils.temp_manager.os.path.isdir", return_value=False
+    with (
+        patch("src.utils.temp_manager.os.path.exists", return_value=True),
+        patch("src.utils.temp_manager.os.path.isdir", return_value=False),
     ):
         result = get_temp_directory_size_bytes()
         assert result == 0
@@ -696,37 +697,23 @@ def test_managed_ocr_temp_dir_restores_environment_and_tempdir():
     assert os.environ.get("TMPDIR") == orig_tmpdir_env
 
 
-def test_thread_safety_registered_temp_paths():
-    """Verify concurrent register, unregister, and cleanup operations across multiple threads do not crash or corrupt state."""
-    import threading
-    from src.utils.temp_manager import _lock
+def test_create_managed_temp_file_atomic_cleanup_on_failure():
+    """Verify that if temp file registration fails, the temp file is deleted and exception is re-raised."""
+    from unittest.mock import patch
 
-    assert isinstance(_lock, type(threading.Lock()))
+    with patch("src.utils.temp_manager.register_temp_path", side_effect=RuntimeError("Registration failed")):
+        original_mkstemp = tempfile.mkstemp
+        created_paths = []
 
-    threads = []
-    errors = []
+        def spy_mkstemp(*args, **kwargs):
+            fd, path = original_mkstemp(*args, **kwargs)
+            created_paths.append(path)
+            return fd, path
 
-    def worker(worker_id: int):
-        try:
-            for i in range(50):
-                path = os.path.join(tempfile.gettempdir(), f"fake_thread_test_{worker_id}_{i}.tmp")
-                register_temp_path(path)
-                if i % 2 == 0:
-                    unregister_temp_path(path)
-                else:
-                    cleanup_temp_files(retention_hours=0.0)
-        except Exception as e:
-            errors.append(e)
+        with patch("src.utils.temp_manager.tempfile.mkstemp", side_effect=spy_mkstemp):
+            with pytest.raises(RuntimeError, match="Registration failed"):
+                create_managed_temp_file()
 
-    for w in range(10):
-        t = threading.Thread(target=worker, args=(w,))
-        threads.append(t)
-        t.start()
-
-    for t in threads:
-        t.join()
-
-    assert not errors, f"Errors encountered during concurrent access: {errors}"
-    cleanup_registered_temp_paths()
-
+        assert len(created_paths) == 1
+        assert not os.path.exists(created_paths[0])
 

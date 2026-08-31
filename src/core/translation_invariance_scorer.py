@@ -89,6 +89,10 @@ def score_translation_invariance(original: str, translated: str) -> Dict[str, fl
     Returns:
         Dictionary containing drift metrics and an overall invariance score.
     """
+    normalized_original = re.sub(r"\s+", " ", original.strip()).lower()
+    normalized_translated = re.sub(r"\s+", " ", translated.strip()).lower()
+    is_identical_back_translation = normalized_original == normalized_translated
+
     lexical_drift = compute_lexical_drift(original, translated)
     structural_var = compute_structural_variance(original, translated)
 
@@ -102,4 +106,9 @@ def score_translation_invariance(original: str, translated: str) -> Dict[str, fl
         "structural_variance": round(structural_var, 4),
         "invariance_score": round(invariance_score, 4),
         "is_obfuscated": invariance_score < 0.6,  # Threshold for flagging
+        "warning": (
+            "Back-translation output is identical to the original text."
+            if is_identical_back_translation
+            else None
+        ),
     }

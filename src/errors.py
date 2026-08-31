@@ -97,7 +97,10 @@ __all__ = [
     "EVENT_MISSING_FIELD",
     "EVENT_UNKNOWN_TYPE",
     "EventSchemaError",
+    "SSOConfigurationError",
+    "PDFEncryptedError",
 ]
+
 # Authentication Errors
 AUTH_USERNAME_EMPTY = "Username cannot be empty."
 AUTH_PASSWORD_TOO_SHORT = "Password must be at least 6 characters long."
@@ -287,3 +290,28 @@ class EventSchemaError(ValueError):
     """Raised when a webhook event payload violates the schema definition."""
 
     pass
+
+
+class SSOConfigurationError(ValueError):
+    """Raised when required SSO provider environment configuration (e.g. client ID or secret) is missing.
+
+    Acceptance Criteria (Issue #2583):
+    Subclasses ValueError so existing exception handlers and tests work seamlessly while providing
+    a dedicated exception type for UI layers to catch and display as a graceful Streamlit error.
+    """
+
+    pass
+
+
+class PDFEncryptedError(ValueError):
+    """Raised when a PDF file is encrypted and password authentication fails or is not provided."""
+
+    def __init__(
+        self,
+        message: str = "PDF is encrypted and password was not provided or invalid.",
+    ):
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return self.message

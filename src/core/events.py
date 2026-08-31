@@ -205,7 +205,9 @@ def deserialize_event(payload: str) -> WebhookEvent:
 
     if not isinstance(data, dict):
         raise EventSchemaError(
-            EVENT_MALFORMED_PAYLOAD.format(error="top-level JSON value must be an object")
+            EVENT_MALFORMED_PAYLOAD.format(
+                error="top-level JSON value must be an object"
+            )
         )
 
     for required_field in _ENVELOPE_KEY_ORDER:

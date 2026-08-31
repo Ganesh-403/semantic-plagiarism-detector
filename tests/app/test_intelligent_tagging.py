@@ -35,8 +35,12 @@ def _load_module(monkeypatch):
     for name in ("plotly", "plotly.graph_objects", "plotly.express"):
         monkeypatch.setitem(sys.modules, name, types.ModuleType(name))
 
-    module_path = Path(__file__).parents[2] / "app" / "components" / "IntelligentTagging_Doc.py"
-    spec = importlib.util.spec_from_file_location("intelligent_tagging_doc", module_path)
+    module_path = (
+        Path(__file__).parents[2] / "app" / "components" / "IntelligentTagging_Doc.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "intelligent_tagging_doc", module_path
+    )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module, fake_streamlit

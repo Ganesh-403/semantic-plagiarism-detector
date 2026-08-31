@@ -170,6 +170,7 @@ try:
         SIDEBAR_USER_BADGE,
         SIM_PILL,
         WELCOME_BANNER,
+        spd_root_css_variables,
     )
 except ImportError:
     # Fallbacks for isolated testing
@@ -191,6 +192,24 @@ except ImportError:
 
 
 # ── Theme Definitions ──────────────────────────────────────────────────────────
+HIGH_CONTRAST_THEME = {
+    "background": "#000000",
+    "surface": "#000000",
+    "card": "#000000",
+    "ink": "#ffffff",
+    "muted": "#ffffff",
+    "accent": "#ffff00",
+    "border": "#ffff00",
+    "input": "#000000",
+    "danger": "#ffff00",
+    "danger_soft": "#000000",
+    "warning": "#ffff00",
+    "warning_soft": "#000000",
+    "success": "#ffff00",
+    "success_soft": "#000000",
+    "neutral_soft": "#000000",
+}
+
 THEMES = {
     "Light": {
         "background": "#FFFFFF",
@@ -226,6 +245,7 @@ THEMES = {
         "success_soft": "#052E16",
         "neutral_soft": "#1E293B",
     },
+    "Accessible High Contrast": HIGH_CONTRAST_THEME,
 }
 
 # Backward-compatible default palette used by existing tests and callers.
@@ -272,10 +292,16 @@ def initialize_theme() -> None:
     try:
         if "theme" not in st.session_state:
             query_theme = st.query_params.get("theme")
-            if query_theme and query_theme.lower() == "dark":
-                st.session_state.theme = "Dark"
-            elif query_theme and query_theme.lower() == "light":
-                st.session_state.theme = "Light"
+            if query_theme:
+                match = next(
+                    (
+                        name
+                        for name in THEMES
+                        if name.lower() == str(query_theme).lower()
+                    ),
+                    None,
+                )
+                st.session_state.theme = match or "Light"
             else:
                 st.session_state.theme = "Light"
 
@@ -351,6 +377,11 @@ def inject_css() -> None:
     """
     colors = sanitize_theme_colors(get_colors())
     accent_hex = get_theme_accent_color()
+
+    # Issue #3762: namespaced "--spd-*" CSS custom properties, generated from
+    # the same colors used for the generic :root block below, so both stay
+    # in sync when the theme is switched.
+    spd_root_css = spd_root_css_variables(colors, accent_hex)
 
     main_css = f"""
         @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
@@ -1011,7 +1042,7 @@ def inject_css() -> None:
 
     .stFileUploader [data-testid="stFileUploaderDropzone"]:hover {{
         border-color: var(--accent-color) !important;
-        background-color: {colors['neutral_soft']} !important;
+        background-color: {colors["neutral_soft"]} !important;
         cursor: pointer !important;
     }}
 
@@ -1395,7 +1426,7 @@ def render_notification_badge(count: int) -> str:
     if count <= 0:
         return ""
 
-    return '<span class="notification-badge">' f"{count}" "</span>"
+    return f'<span class="notification-badge">{count}</span>'
 
 
 # ── UI helpers ────────────────────────────────────────────────────────────────
@@ -1467,7 +1498,9 @@ def pipeline_progress_html(
     except ImportError:
         duration = f"{estimated_seconds}s"
 
-    eta = f'<div class="{PIPELINE_ETA}">Estimated processing time: about {duration}</div>'
+    eta = (
+        f'<div class="{PIPELINE_ETA}">Estimated processing time: about {duration}</div>'
+    )
     return f"{progress}{eta}"
 
 
@@ -1842,11 +1875,11 @@ def generate_sidebar_theme_stylesheet(
     section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"][aria-selected="true"],
     section[data-testid="stSidebar"] button[aria-selected="true"],
     .stButton button[data-selected="true"] {{
-        border-left: {template['border_width']} {template['border_style']} {border} !important;
-        border-radius: {template['border_radius']} !important;
-        box-shadow: {template['shadow']} !important;
-        background-color: {colors.get('neutral_soft', '#F1F5F9')} !important;
-        color: {colors.get('accent', '#0D9488')} !important;
+        border-left: {template["border_width"]} {template["border_style"]} {border} !important;
+        border-radius: {template["border_radius"]} !important;
+        box-shadow: {template["shadow"]} !important;
+        background-color: {colors.get("neutral_soft", "#F1F5F9")} !important;
+        color: {colors.get("accent", "#0D9488")} !important;
         font-weight: 700 !important;
     }}
     """

@@ -2,6 +2,7 @@
 
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -90,48 +91,57 @@ def extract_text(
         return ""
     file = file_bytes
 
-    extension = filename.rsplit(".", 1)[-1].lower()
+    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    start_time = time.perf_counter()
+    try:
+        if extension == "pdf":
+            raw = extract_text_from_pdf(file, ocr_language=ocr_language, ocr_dpi=ocr_dpi)
+        elif extension == "docx":
+            raw = extract_text_from_docx(file)
+        elif extension == "doc":
+            raw = extract_text_from_doc(file)
+        elif extension in ("md", "markdown", "mdown"):
+            raw = extract_text_from_md(file)
+        elif extension in ("zip", "7z", "tar", "gz"):
+            raw = extract_text_from_zip(file, ocr_language=ocr_language, ocr_dpi=ocr_dpi)
+        elif extension == "rtf":
+            raw = extract_text_from_rtf(file)
+        elif extension == "epub":
+            raw = extract_text_from_epub(file)
+        elif extension in ("png", "jpg", "jpeg"):
+            raw = extract_text_from_image(file, ocr_language=ocr_language)
+        elif extension == "odt":
+            raw = extract_text_from_odt(file)
+        else:
+            raw = extract_text_from_txt(file)
 
-    if extension == "pdf":
-        raw = extract_text_from_pdf(file, ocr_language=ocr_language, ocr_dpi=ocr_dpi)
-    elif extension == "docx":
-        raw = extract_text_from_docx(file)
-    elif extension == "doc":
-        raw = extract_text_from_doc(file)
-    elif extension in ("md", "markdown", "mdown"):
-        raw = extract_text_from_md(file)
-    elif extension in ("zip", "7z", "tar", "gz"):
-        raw = extract_text_from_zip(file, ocr_language=ocr_language, ocr_dpi=ocr_dpi)
-    elif extension == "rtf":
-        raw = extract_text_from_rtf(file)
-    elif extension == "epub":
-        raw = extract_text_from_epub(file)
-    elif extension in ("png", "jpg", "jpeg"):
-        raw = extract_text_from_image(file, ocr_language=ocr_language)
-    elif extension == "odt":
-        raw = extract_text_from_odt(file)
-    else:
-        raw = extract_text_from_txt(file)
+        # ParsedDocxText is an internal structured result; the public extraction
+        # API continues to return plain text.
+        if isinstance(raw, ParsedDocxText):
+            raw = raw.text
 
-    # ParsedDocxText is an internal structured result; the public extraction
-    # API continues to return plain text.
-    if isinstance(raw, ParsedDocxText):
-        raw = raw.text
+        raw = strip_bibliography(raw)
+        raw = normalize_unicode_spaces(raw)
+        raw = normalize_extended_punctuation(raw)
+        raw = normalize_unicode_nfc(raw)
+        raw = sanitize_zero_width_characters(raw, filename=filename)
+        lang_code = detect_text_language(raw)
 
-    raw = strip_bibliography(raw)
-    raw = normalize_unicode_spaces(raw)
-    raw = normalize_extended_punctuation(raw)
-    raw = normalize_unicode_nfc(raw)
-    raw = sanitize_zero_width_characters(raw, filename=filename)
-    lang_code = detect_text_language(raw)
+        if to_lowercase:
+            raw = raw.lower()
 
-    if to_lowercase:
-        raw = raw.lower()
+        logger.info(
+            f"[document_parser] Detected language for document '{filename}': {lang_code}"
+        )
+        return raw
+    finally:
+        elapsed = time.perf_counter() - start_time
+        try:
+            from src.core.metrics import spd_doc_parse_seconds
 
-    logger.info(
-        f"[document_parser] Detected language for document '{filename}': {lang_code}"
-    )
-    return raw
+            spd_doc_parse_seconds.labels(extension=extension).observe(elapsed)
+        except Exception:
+            pass
 
 
 def _extract_text_from_file_path(file_path: Path) -> tuple[str, str]:

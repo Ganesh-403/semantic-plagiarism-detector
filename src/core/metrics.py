@@ -14,10 +14,20 @@ import threading
 import time
 from typing import Any, Callable
 
-from prometheus_client import Counter, Gauge, Histogram
+from prometheus_client import REGISTRY, Counter, Gauge, Histogram
 from prometheus_client import generate_latest as _prometheus_generate_latest
 
 logger = logging.getLogger(__name__)
+
+# Configurable environment variable to completely disable metrics collection.
+# If set to False, no metrics will be registered with the global collector
+# and the /metrics endpoints will return a 404 Not Found error.
+PROMETHEUS_METRICS_ENABLED = os.environ.get('PROMETHEUS_METRICS_ENABLED', 'True').lower() in ('true', '1', 't', 'yes')
+
+# The registry controls exposure. If enabled, it binds to the global prometheus REGISTRY.
+# If disabled, it binds to None, keeping metrics isolated and hidden from HTTP scrape endpoints.
+_registry = REGISTRY if PROMETHEUS_METRICS_ENABLED else None
+
 
 # ── Counters ───────────────────────────────────────────────────────────────────
 
@@ -26,11 +36,13 @@ documents_total = Counter(
     "Cumulative number of documents ingested since process start. "
     "Monotonic: use rate()/increase() on this. For the current corpus size "
     "see the corpus_documents gauge.",
+    registry=_registry,
 )
 
 flagged_incidents_total = Counter(
     "spd_flagged_incidents_total",
     "Total number of flagged plagiarism incidents",
+    registry=_registry,
 )
 
 plagiarism_incidents_total = Counter(
@@ -43,6 +55,7 @@ uploads_total = Counter(
     "spd_uploads_total",
     "Total number of file upload batches processed",
     labelnames=["status"],
+    registry=_registry,
 )
 
 cache_hits_total = Counter(
@@ -68,22 +81,26 @@ ocr_invocations_total = Counter(
 corpus_size_gauge = Gauge(
     "spd_corpus_size_bytes",
     "Total size on disk of the corpus database",
+    registry=_registry,
 )
 
 index_size_gauge = Gauge(
     "spd_index_size_bytes",
     "Total size on disk of the FAISS index file",
+    registry=_registry,
 )
 
 corpus_documents_gauge = Gauge(
     "spd_corpus_documents",
     "Current number of documents in the corpus. Goes down when documents are "
     "deleted, which is why this is a gauge and not documents_total.",
+    registry=_registry,
 )
 
 active_users_gauge = Gauge(
     "spd_active_users",
     "Current number of active users",
+    registry=_registry,
 )
 
 active_threads_gauge = Gauge(
@@ -102,6 +119,7 @@ pipeline_duration_seconds = Histogram(
     "Duration of each pipeline stage in seconds",
     labelnames=["stage"],
     buckets=(0.01, 0.05, 0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0),
+    registry=_registry,
 )
 
 spd_scan_duration_seconds = Histogram(
@@ -110,10 +128,19 @@ spd_scan_duration_seconds = Histogram(
     ["stage"],
 )
 
+spd_doc_parse_seconds = Histogram(
+    "spd_doc_parse_seconds",
+    "Document parsing time in seconds",
+    ["extension"],
+)
+
+doc_parse_seconds = spd_doc_parse_seconds
+
 query_response_time_seconds = Histogram(
     "spd_query_response_time_seconds",
     "Duration of similarity search queries in seconds",
     buckets=(0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0),
+    registry=_registry,
 )
 
 # ── Timed decorator ────────────────────────────────────────────────────────────
@@ -158,6 +185,8 @@ def generate_latest(*args: Any, **kwargs: Any) -> bytes:
 
 def generate_metrics_json() -> dict[str, Any]:
     """Return all metrics as a JSON-serialisable dict for non-Prometheus consumers."""
+    if not PROMETHEUS_METRICS_ENABLED:
+        return {}
     from prometheus_client.parser import text_string_to_metric_families
 
     raw = generate_latest().decode("utf-8")
@@ -169,11 +198,13 @@ def generate_metrics_json() -> dict[str, Any]:
         for sample in family.samples:
             samples.append(
                 {
+                    "name": sample.name,
                     "labels": sample.labels,
                     "value": sample.value,
                 }
             )
         metrics[family.name] = {
+            "name": family.name,
             "type": family.type,
             "help": family.documentation,
             "metrics": samples,

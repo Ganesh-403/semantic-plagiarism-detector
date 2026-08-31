@@ -18,13 +18,15 @@ import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 
 from src.core.ai_detector import detect_documents_ai_probability
-from src.core.config import PLAGIARISM_THRESHOLD, severity_from_score
+from src.core.config import INCREMENTAL_INDEX_ENABLED, PLAGIARISM_THRESHOLD, severity_from_score
 from src.core.document_parser import extract_text
 from src.core.embedding_model import embed_documents
-from src.core.faiss_index import ChunkRecord, build_index
+from src.core.faiss_index import ChunkRecord, build_index, add_vectors_incremental
+from src.core.faiss_index_metadata import FAISSIndexMetadata
+from src.core.language_similarity_config import build_language_metadata
 from src.core.similarity import document_similarity_matrix, flag_plagiarism
-from src.core.text_chunking import chunk_documents
-from src.utils.tracing import get_tracer
+from src.core.corpus_duplicate_filter import detect_and_store_duplicates
+from src.core.config import CORPUS_NEAR_DUPLICATE_THRESHOLDfrom src.core.text_chunking import chunk_documentsfrom src.utils.tracing import get_tracer
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,10 @@ class PipelineResult(NamedTuple):
     registry: list[ChunkRecord]
     ai_probabilities: dict[str, dict[str, Any]]
     flags: list[dict[str, Any]]
+    language_metadata: dict[str, dict[str, Any]]
+    def is_incremental_update(self) -> bool:
+        """Check if this result is from incremental index update vs full rebuild."""
+        return hasattr(self, "_is_incremental") and self._is_incremental
 
 
 def run_full_pipeline(
@@ -54,6 +60,9 @@ def run_full_pipeline(
     ignore_phrases: Optional[str] = None,
     url_text: Optional[str] = None,
     url_filename: Optional[str] = None,
+    existing_index: Any = None,
+    existing_registry: Dict[str, ChunkRecord] = None,
+    use_incremental: bool = INCREMENTAL_INDEX_ENABLED,
 ) -> PipelineResult:
     """Execute the full document upload pipeline outside of Streamlit.
 
@@ -85,7 +94,10 @@ def run_full_pipeline(
                     continue
                 try:
                     raw_texts[name] = extract_text(
-                        io.BytesIO(data), name, ocr_language=ocr_language, ocr_dpi=ocr_dpi
+                        io.BytesIO(data),
+                        name,
+                        ocr_language=ocr_language,
+                        ocr_dpi=ocr_dpi,
                     )
                 except Exception as exc:
                     failed_files.append(name)
@@ -107,23 +119,47 @@ def run_full_pipeline(
                 }
             parse_span.set_attribute("parsed.count", len(raw_texts))
 
+        language_metadata = build_language_metadata(raw_texts)
+
         with tracer.start_as_current_span("pipeline.chunk") as chunk_span:
             chunked_docs = chunk_documents(
                 raw_texts, chunk_size=chunk_size, chunk_overlap=chunk_overlap
-            )
-            total_chunks = sum(len(chunks) for chunks in chunked_docs.values())
+            )            total_chunks = sum(len(chunks) for chunks in chunked_docs.values())
             chunk_span.set_attribute("chunk.count", total_chunks)
 
         with tracer.start_as_current_span("pipeline.embed") as embed_span:
             embeddings = embed_documents(chunked_docs)
             first_emb = next(iter(embeddings.values()), None)
             embed_span.set_attribute(
-                "embedding.dims", first_emb.shape[1] if first_emb is not None and first_emb.size else 0
+                "embedding.dims",
+                first_emb.shape[1] if first_emb is not None and first_emb.size else 0,
+            )
+        with tracer.start_as_current_span(
+            "pipeline.corpus_duplicate_filter"
+        ) as duplicate_span:
+            duplicate_pairs = detect_and_store_duplicates(
+                raw_texts,
+                threshold=CORPUS_NEAR_DUPLICATE_THRESHOLD,
             )
 
+            duplicate_span.set_attribute(
+                "duplicate.pairs",
+                len(duplicate_pairs),
+            )
         with tracer.start_as_current_span("pipeline.similarity_scoring") as sim_span:
-            sim_df = document_similarity_matrix(embeddings)
+            document_names = list(embeddings.keys())
 
+            scoring_pairs = {
+                tuple(sorted((a, b)))
+                for i, a in enumerate(document_names)
+                for b in document_names[i + 1 :]
+                if tuple(sorted((a, b))) not in duplicate_pairs
+            }
+
+            sim_df = document_similarity_matrix(
+                embeddings,
+                candidate_pairs=scoring_pairs,
+            )
             names = list(embeddings.keys())
             n = len(names)
             chunk_mat = np.zeros((n, n))
@@ -157,9 +193,38 @@ def run_full_pipeline(
                 logger.debug("System memory usage check failed: %s", exc)
 
         with tracer.start_as_current_span("pipeline.faiss_search") as index_span:
-            faiss_index, registry = build_index(embeddings, chunked_docs)
-            index_span.set_attribute("faiss.index_size", len(registry))
-
+            if use_incremental and existing_index is not None:
+                metadata_mgr = FAISSIndexMetadata()
+                faiss_index = existing_index
+                registry = existing_registry if existing_registry else {}
+                
+                # Add new documents incrementally
+                for doc_name, emb_list in embeddings.items():
+                    if doc_name not in registry:
+                        chunks = chunked_docs.get(doc_name, [])
+                        texts = [
+                            c.text if hasattr(c, "text") else c for c in chunks
+                        ]
+                        faiss_index, _ = add_vectors_incremental(
+                            faiss_index,
+                            emb_list,
+                            doc_name,
+                            list(range(len(chunks))),
+                            texts,
+                            metadata_mgr,
+                        )
+                        for i, chunk in enumerate(chunks):
+                            chunk_obj = chunk if isinstance(chunk, ChunkRecord) else ChunkRecord(
+                                doc_name=doc_name,
+                                chunk_index=i,
+                                chunk_text=chunk.text if hasattr(chunk, "text") else chunk,
+                            )
+                            registry[f"{doc_name}_{i}"] = chunk_obj
+                logger.info("Used incremental index update for %d documents", len(embeddings))
+            else:
+                faiss_index, registry = build_index(embeddings, chunked_docs)
+            
+            index_span.set_attribute("faiss.index_size", faiss_index.ntotal)
         ai_probabilities = detect_documents_ai_probability(chunked_docs)
 
         flags = flag_plagiarism(
@@ -167,10 +232,20 @@ def run_full_pipeline(
             threshold=threshold,
             chunked_docs=chunked_docs,
             embeddings=embeddings,
-        )
-
-        with tracer.start_as_current_span("pipeline.incident_sync"):
+            candidate_pairs=scoring_pairs,
+        )        with tracer.start_as_current_span("pipeline.incident_sync"):
             pass
+
+        # Enrich flags with evidence if available
+        enriched_flags = flags
+        if chunked_docs and embeddings:
+            for flag in enriched_flags:
+                if "evidence" not in flag:
+                    logger.debug(
+                        "Flag for %s vs %s has no evidence attached",
+                        flag.get("doc_a"),
+                        flag.get("doc_b"),
+                    )
 
         return PipelineResult(
             raw_texts=raw_texts,
@@ -182,8 +257,8 @@ def run_full_pipeline(
             registry=registry,
             ai_probabilities=ai_probabilities,
             flags=flags,
+            language_metadata=language_metadata,
         )
-
 
 # ── Scheduled / continuous rescan pipeline ──────────────────────────────────
 #
@@ -341,10 +416,18 @@ def rescan_recent_documents(
     # skipped for this pass; they'll be picked up on a later tick once
     # their chunks/embeddings are durably persisted.
     recent_chunked_docs = {name: texts for name, (texts, _emb) in recent_chunks.items()}
-    recent_embeddings = {name: emb for name, (_texts, emb) in recent_chunks.items()}
+    recent_embeddings = {
+        name: emb
+        for name, (_texts, emb) in recent_chunks.items()
+    }
 
-    new_incidents: list[dict[str, Any]] = []
-    all_flags: list[dict[str, Any]] = []
+    from src.core.corpus_duplicate_filter import get_duplicate_pairs
+
+    duplicate_pairs = get_duplicate_pairs(
+        recent_filenames
+    )
+
+    new_incidents: list[dict[str, Any]] = []    all_flags: list[dict[str, Any]] = []
 
     with faiss_write_lock(lock_path=f"{FAISS_INDEX_PATH}.lock"):
         if not recent_embeddings:
@@ -360,8 +443,23 @@ def rescan_recent_documents(
                 top_k=top_k,
             )
 
-        all_flags = _aggregate_chunk_matches_to_flags(matches, threshold)
+            matches = [
+                match
+                for match in matches
+                if tuple(
+                    sorted(
+                        (
+                            str(match.get("source_doc", "")),
+                            str(match.get("match_doc", "")),
+                        )
+                    )
+                ) not in duplicate_pairs
+            ]
 
+        all_flags = _aggregate_chunk_matches_to_flags(
+            matches,
+            threshold,
+        )
         if all_flags:
             existing_pairs = get_existing_incident_pairs(db_path)
             for flag in all_flags:

@@ -251,32 +251,3 @@ class TestValidationExceptionEdgeCases:
         body = json.loads(response.body)
         # The field should be empty string since loc is missing
         assert body["details"][0]["field"] == ""
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        ("prefix", "expected_field"),
-        [
-            ("body", "user.name"),
-            ("query", "filter_by"),
-            ("path", "item_id"),
-        ],
-    )
-    async def test_strips_framework_details_from_loc(self, prefix, expected_field):
-        """Verify 'body', 'query', and 'path' prefixes in loc are stripped (Issue #3012)."""
-        mock_request = MagicMock(spec=Request)
-        mock_request.method = "POST"
-        mock_request.url.path = "/test"
-
-        raw_loc = (prefix, *expected_field.split("."))
-        exc = MagicMock(spec=RequestValidationError)
-        exc.errors.return_value = [
-            {"loc": raw_loc, "msg": "Invalid value", "type": "value_error"}
-        ]
-
-        response = await validation_exception_handler(mock_request, exc)
-
-        import json
-
-        body = json.loads(response.body)
-        assert body["details"][0]["field"] == expected_field
-

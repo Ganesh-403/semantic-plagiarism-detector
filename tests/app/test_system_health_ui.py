@@ -106,9 +106,9 @@ def test_tab_health_is_inside_admin_role_check():
     source = APP_PATH.read_text(encoding="utf-8")
     admin_pos = source.index('if user_role == "admin":')
     health_pos = source.index("with tab_health:")
-    assert (
-        health_pos > admin_pos
-    ), "System Health tab must appear inside the admin-only section"
+    assert health_pos > admin_pos, (
+        "System Health tab must appear inside the admin-only section"
+    )
 
 
 # ── Size-formatting helper logic (pure Python, no Streamlit) ──────────────────

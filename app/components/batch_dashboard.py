@@ -31,9 +31,9 @@ def render_batch_dashboard(processor: BatchProcessor, history: BatchHistory):
     st.title("📊 Batch Processing Dashboard")
     st.markdown("Manage and monitor large-scale plagiarism detection jobs.")
 
-    tab_create, tab_active, tab_history, tab_analytics = st.tabs([
-        "➕ Create Job", "⚡ Active Jobs", "📜 History", "📈 Analytics"
-    ])
+    tab_create, tab_active, tab_history, tab_analytics = st.tabs(
+        ["➕ Create Job", "⚡ Active Jobs", "📜 History", "📈 Analytics"]
+    )
 
     with tab_create:
         _render_create_job(processor)
@@ -55,7 +55,9 @@ def _render_create_job(processor: BatchProcessor):
     with st.form("batch_create"):
         col1, col2 = st.columns(2)
         with col1:
-            job_name = st.text_input("Job Name", placeholder="e.g., Q3 Assignment Check")
+            job_name = st.text_input(
+                "Job Name", placeholder="e.g., Q3 Assignment Check"
+            )
             priority = st.selectbox("Priority", ["low", "normal", "high", "urgent"])
         with col2:
             threshold = st.slider("Similarity Threshold", 0.50, 0.99, 0.59, 0.01)
@@ -65,21 +67,22 @@ def _render_create_job(processor: BatchProcessor):
             "Upload PDFs for batch processing",
             type=["pdf"],
             accept_multiple_files=True,
-            help="Upload multiple PDF files for batch analysis"
+            help="Upload multiple PDF files for batch analysis",
         )
 
-        submitted = st.form_submit_button("🚀 Create Batch Job", use_container_width=True, type="primary")
+        submitted = st.form_submit_button(
+            "🚀 Create Batch Job", use_container_width=True, type="primary"
+        )
 
         if submitted and uploaded_files:
             config = BatchConfig(
-                max_workers=max_workers,
-                similarity_threshold=threshold
+                max_workers=max_workers, similarity_threshold=threshold
             )
             job = processor.create_job(
                 name=job_name or f"Batch-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
                 document_paths=[f.name for f in uploaded_files],
                 priority=BatchPriority(priority),
-                metadata={"uploaded_count": len(uploaded_files)}
+                metadata={"uploaded_count": len(uploaded_files)},
             )
             st.success(f"✅ Created job **{job.job_id}**: {job.name}")
             st.json(job.to_dict())
@@ -104,7 +107,10 @@ def _render_active_jobs(processor: BatchProcessor):
         return
 
     for job in jobs:
-        with st.expander(f"{'🟢' if job.status == BatchStatus.COMPLETED else '🟡' if job.status == BatchStatus.PROCESSING else '⚪'} {job.name} ({job.job_id})", expanded=(job.status == BatchStatus.PROCESSING)):
+        with st.expander(
+            f"{'🟢' if job.status == BatchStatus.COMPLETED else '🟡' if job.status == BatchStatus.PROCESSING else '⚪'} {job.name} ({job.job_id})",
+            expanded=(job.status == BatchStatus.PROCESSING),
+        ):
             col1, col2, col3 = st.columns(3)
             col1.write(f"**Status:** {job.status.value}")
             col2.write(f"**Priority:** {job.priority.value}")
@@ -136,7 +142,9 @@ def _render_history(history: BatchHistory):
         with col1:
             search_query = st.text_input("Search by name", key="hist_search")
         with col2:
-            status_filter = st.selectbox("Status", ["All", "completed", "failed", "cancelled"], key="hist_status")
+            status_filter = st.selectbox(
+                "Status", ["All", "completed", "failed", "cancelled"], key="hist_status"
+            )
         with col3:
             limit = st.number_input("Max results", 10, 100, 20, key="hist_limit")
 
@@ -144,7 +152,7 @@ def _render_history(history: BatchHistory):
             records = history.search_jobs(
                 query=search_query or None,
                 status=status_filter if status_filter != "All" else None,
-                limit=limit
+                limit=limit,
             )
         else:
             records = history.get_recent_jobs(limit=limit)
@@ -157,9 +165,14 @@ def _render_history(history: BatchHistory):
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total Jobs", len(records))
-    col2.metric("Total Documents", df['document_count'].sum())
-    col3.metric("Total Flagged", df['flagged_count'].sum())
-    col4.metric("Avg Duration", f"{df['duration_seconds'].mean():.1f}s" if df['duration_seconds'].mean() else "N/A")
+    col2.metric("Total Documents", df["document_count"].sum())
+    col3.metric("Total Flagged", df["flagged_count"].sum())
+    col4.metric(
+        "Avg Duration",
+        f"{df['duration_seconds'].mean():.1f}s"
+        if df["duration_seconds"].mean()
+        else "N/A",
+    )
 
     st.dataframe(df, use_container_width=True)
 
@@ -186,7 +199,12 @@ def _render_analytics(history: BatchHistory):
             values=list(by_status.values()),
             names=list(by_status.keys()),
             title="Jobs by Status",
-            color_discrete_map={"completed": "#22c55e", "failed": "#ef4444", "pending": "#94a3b8", "processing": "#60a5fa"}
+            color_discrete_map={
+                "completed": "#22c55e",
+                "failed": "#ef4444",
+                "pending": "#94a3b8",
+                "processing": "#60a5fa",
+            },
         )
         st.plotly_chart(fig_status, use_container_width=True)
 
@@ -194,5 +212,10 @@ def _render_analytics(history: BatchHistory):
     daily = history.get_daily_summary(days=14)
     if daily:
         df_daily = pd.DataFrame(daily)
-        fig_daily = px.bar(df_daily, x="date", y=["jobs", "documents"], title="Daily Activity (Last 14 Days)")
+        fig_daily = px.bar(
+            df_daily,
+            x="date",
+            y=["jobs", "documents"],
+            title="Daily Activity (Last 14 Days)",
+        )
         st.plotly_chart(fig_daily, use_container_width=True)

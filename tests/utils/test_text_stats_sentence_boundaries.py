@@ -145,6 +145,32 @@ class TestExistingBehaviourIsPreserved:
         assert get_sentence_count(text) == count_sentences(text)
 
 
+class TestSpacedEllipsis:
+    """Spaced ellipses such as '. . .' are masked and do not inflate sentence count."""
+
+    @pytest.mark.parametrize(
+        "text,expected",
+        [
+            ("Wait . . . what happened?", 1),
+            ("She paused . . . and then spoke.", 1),
+            ("To be continued . . .", 1),
+            ("Hello . . .", 1),
+            ("Hello .  .  .", 1),
+            ("Hello . . . .", 1),
+            ("Hello. . . World.", 1),
+            ("First sentence . . . Second sentence.", 1),
+            ("Wait . . . What?! Really.", 2),
+            ("Is it real . . . or is it fake?", 1),
+        ],
+    )
+    def test_spaced_ellipsis_does_not_inflate_count(self, text, expected):
+        assert count_sentences(text) == expected
+
+    def test_spaced_ellipsis_with_alias(self):
+        text = "Thinking . . . done."
+        assert get_sentence_count(text) == count_sentences(text)
+
+
 class TestDownstreamMetrics:
     """The sentence count feeds readability, so it must reach those callers."""
 

@@ -22,7 +22,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Union
 
 from src.core.app_config import DATA_DIR
 
@@ -464,18 +464,4 @@ def fail_job(
     """Compatibility wrapper around mark_failed."""
     return mark_failed(job_id, error_message, db_path=db_path)
 
-
-# ── Helpers ────────────────────────────────────────────────────
-
-def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
-    d = dict(row)
-    # Parse JSON fields.
-    for key in ("payload", "result"):
-        v = d.get(key)
-        if v and isinstance(v, str):
-            try:
-                d[key] = json.loads(v)
-            except (json.JSONDecodeError, TypeError):
-                pass
-    return d
 

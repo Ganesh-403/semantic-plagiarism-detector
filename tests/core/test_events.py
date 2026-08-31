@@ -27,7 +27,11 @@ FIXED_TIMESTAMP = "2026-01-15T09:30:00+00:00"
 def make_event(**overrides) -> WebhookEvent:
     kwargs = dict(
         event_type=WebhookEventType.PLAGIARISM_DETECTED,
-        payload={"document_a": "essay_a.pdf", "document_b": "essay_b.pdf", "similarity_score": 0.93},
+        payload={
+            "document_a": "essay_a.pdf",
+            "document_b": "essay_b.pdf",
+            "similarity_score": 0.93,
+        },
         workspace_id="workspace-1",
         event_id=FIXED_EVENT_ID,
         occurred_at=FIXED_TIMESTAMP,
@@ -96,10 +100,18 @@ class TestSerializeEventDeterminism:
     def test_payload_key_order_does_not_affect_output(self):
         """Callers may build the payload dict in any key order; output must match."""
         event_a = make_event(
-            payload={"similarity_score": 0.93, "document_b": "essay_b.pdf", "document_a": "essay_a.pdf"}
+            payload={
+                "similarity_score": 0.93,
+                "document_b": "essay_b.pdf",
+                "document_a": "essay_a.pdf",
+            }
         )
         event_b = make_event(
-            payload={"document_a": "essay_a.pdf", "document_b": "essay_b.pdf", "similarity_score": 0.93}
+            payload={
+                "document_a": "essay_a.pdf",
+                "document_b": "essay_b.pdf",
+                "similarity_score": 0.93,
+            }
         )
         assert serialize_event(event_a) == serialize_event(event_b)
 

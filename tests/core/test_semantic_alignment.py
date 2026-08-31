@@ -210,4 +210,3 @@ class TestMemoryAllocationGuard:
 
         alignment = align_semantic_sequences(chunks_a, chunks_b, emb_a, emb_b)
         assert len(alignment) > 0
-        

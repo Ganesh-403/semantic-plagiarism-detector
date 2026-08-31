@@ -38,7 +38,7 @@ for i in range(3):
         buf = generate_plagiarism_report(**INPUTS)
     h = hashlib.sha256(buf.getvalue()).hexdigest()
     hashes.append(h)
-    print(f"Run {i+1}: {h}", flush=True)
+    print(f"Run {i + 1}: {h}", flush=True)
 
 print(f"Deterministic: {len(set(hashes)) == 1}", flush=True)
 

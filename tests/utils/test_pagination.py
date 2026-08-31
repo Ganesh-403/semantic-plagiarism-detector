@@ -522,18 +522,20 @@ class TestPaginationPageNavigation:
         assert page.has_previous() is False
 
     def test_next_page_returns_correct_number(self):
-        """Verify next_page() returns page + 1 when available."""
+        """Verify next_page returns page + 1 when available."""
         page = PaginationPage(
             items=[1], page=2, total_pages=5, total_items=10, per_page=5
         )
-        assert page.next_page() == 3
+        assert page.next_page == 3
+        assert page.next_page_number() == 3
 
     def test_next_page_returns_none_on_last_page(self):
-        """Verify next_page() returns None on last page."""
+        """Verify next_page returns None on last page."""
         page = PaginationPage(
             items=[1], page=5, total_pages=5, total_items=10, per_page=5
         )
-        assert page.next_page() is None
+        assert page.next_page is None
+        assert page.next_page_number() is None
 
     def test_previous_page_returns_correct_number(self):
         """Verify previous_page() returns page - 1 when available."""
@@ -541,6 +543,7 @@ class TestPaginationPageNavigation:
             items=[1], page=3, total_pages=5, total_items=10, per_page=5
         )
         assert page.previous_page() == 2
+        assert page.prev_page == 2
 
     def test_previous_page_returns_none_on_first_page(self):
         """Verify previous_page() returns None on first page."""
@@ -548,6 +551,7 @@ class TestPaginationPageNavigation:
             items=[1], page=1, total_pages=5, total_items=10, per_page=5
         )
         assert page.previous_page() is None
+        assert page.prev_page is None
 
 
 class TestPaginationPageSerialization:

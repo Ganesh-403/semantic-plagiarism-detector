@@ -346,6 +346,8 @@ def test_batch_legacy_bcrypt_users_migration_simulation():
 
     # Assert all migrated to Argon2
     with _connect() as conn:
-        rows = conn.execute("SELECT username, password FROM users WHERE username IN ('user1', 'user2', 'user3')").fetchall()
+        rows = conn.execute(
+            "SELECT username, password FROM users WHERE username IN ('user1', 'user2', 'user3')"
+        ).fetchall()
         for u, h in rows:
             assert h.startswith("$argon2")

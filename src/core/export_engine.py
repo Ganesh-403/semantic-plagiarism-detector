@@ -9,7 +9,51 @@ from typing import Any
 from src.utils.html_report import generate_html_report
 
 logger = logging.getLogger(__name__)
+def export_evidence_for_flags(
+    flags: list[dict],
+    output_format: str = "json",
+) -> str:
+    """
+    Export plagiarism evidence for all flags.
 
+    Args:
+        flags: List of flag dicts with 'evidence' key.
+        output_format: 'json' or 'csv'.
+
+    Returns:
+        Serialized evidence string.
+    """
+    import json
+
+    if output_format == "json":
+        evidence_list = [f.get("evidence") for f in flags if "evidence" in f]
+        return json.dumps(evidence_list, indent=2)
+    elif output_format == "csv":
+        import csv
+        from io import StringIO
+
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(
+            ["doc_a", "doc_b", "final_score", "severity", "matched_chunks_count"]
+        )
+
+        for flag in flags:
+            if "evidence" in flag:
+                ev = flag["evidence"]
+                writer.writerow(
+                    [
+                        ev.get("doc_a"),
+                        ev.get("doc_b"),
+                        ev.get("final_score"),
+                        ev.get("final_severity"),
+                        len(ev.get("matched_chunks", [])),
+                    ]
+                )
+
+        return output.getvalue()
+
+    raise ValueError(f"Unsupported format: {output_format}")
 import csv
 import io
 import json
@@ -55,9 +99,7 @@ class LMSExportEngine:
             return None
 
         try:
-            return generate_html_report(
-                incidents, min_match_length=min_match_length
-            )
+            return generate_html_report(incidents, min_match_length=min_match_length)
         except Exception as exception:
             logger.error("Failed to format incident data as HTML: %s", exception)
             return None
@@ -165,7 +207,8 @@ class LMSExportEngine:
         """
         if min_match_length > 0:
             incidents = [
-                i for i in incidents
+                i
+                for i in incidents
                 if int(i.get("matched_length", 0) or 0) >= min_match_length
             ]
 

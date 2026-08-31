@@ -30,6 +30,7 @@ def test_truncate_filename_custom_max_len():
 
 # ── Edge Case Tests (Issue #2252) ────────────────────────────────────────────
 
+
 def test_truncate_filename_empty_string():
     """Empty string should be returned unchanged."""
     assert truncate_filename("", max_len=35) == ""

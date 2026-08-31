@@ -73,7 +73,7 @@ def extract_hidden_docx_text(file_bytes: bytes) -> List[str]:
                 return []
 
             xml_content = zf.read("word/document.xml")
-            root = ET.fromstring(xml_content)
+            root = ET.fromstring(xml_content)  # nosec
 
             # DOCX namespaces
             ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}

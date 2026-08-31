@@ -68,6 +68,7 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
 
             # Lazy load fallback model to avoid circular import issues
             from src.core.embedding_model import get_document_embedding
+
             return get_document_embedding(doc)
 
         raise TypeError("Document must be a string or a numpy array of embeddings.")
@@ -161,6 +162,7 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
             emb = query
 
         from src.core.faiss_index import search_similar_chunks
+
         return search_similar_chunks(
             emb,
             self.faiss_index,
@@ -221,9 +223,7 @@ class LexicalSimilarityEngine(BaseSimilarityEngine):
                     calculate_lexical_similarity,
                 )
 
-                return calculate_lexical_similarity(
-                    doc1, doc2, self.custom_stopwords
-                )
+                return calculate_lexical_similarity(doc1, doc2, self.custom_stopwords)
 
         elif self.algorithm == "jaccard":
             from src.core.lexical_similarity import jaccard_similarity
@@ -308,9 +308,7 @@ class LexicalSimilarityEngine(BaseSimilarityEngine):
                     if i == j:
                         matrix[i][j] = 1.0
                     else:
-                        sim = self.compute_pairwise_similarity(
-                            doc_list[i], doc_list[j]
-                        )
+                        sim = self.compute_pairwise_similarity(doc_list[i], doc_list[j])
                         matrix[i][j] = sim
                         matrix[j][i] = sim
             return matrix
@@ -355,9 +353,7 @@ class HybridSimilarityEngine(BaseSimilarityEngine):
     ) -> float:
         # Check if lexical computation is possible (e.g. requires string inputs)
         try:
-            lex_sim = self.lexical_engine.compute_pairwise_similarity(
-                doc1, doc2
-            )
+            lex_sim = self.lexical_engine.compute_pairwise_similarity(doc1, doc2)
             has_lex = True
         except (TypeError, ValueError):
             lex_sim = 0.0

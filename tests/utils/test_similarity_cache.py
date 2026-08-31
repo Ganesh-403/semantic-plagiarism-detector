@@ -1,7 +1,9 @@
 import importlib.util
 from pathlib import Path
 
-_MODULE_PATH = Path(__file__).resolve().parents[2] / "src" / "utils" / "similarity_cache.py"
+_MODULE_PATH = (
+    Path(__file__).resolve().parents[2] / "src" / "utils" / "similarity_cache.py"
+)
 _SPEC = importlib.util.spec_from_file_location("similarity_cache", _MODULE_PATH)
 _MODULE = importlib.util.module_from_spec(_SPEC)
 assert _SPEC.loader is not None
