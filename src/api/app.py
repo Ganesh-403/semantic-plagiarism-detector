@@ -368,6 +368,8 @@ app.include_router(auth_router)
 app.include_router(analysis_router)
 app.include_router(corpus_router)
 app.include_router(admin_router)
+from src.api.routers.lti_router import router as lti_router
+app.include_router(lti_router)
 
 # ── Audit Events Endpoint (Issue #2732) ───────────────────────────────────────
 
@@ -483,3 +485,5 @@ def get_audit_events_api(
         }
     }
 app.include_router(admin_router)
+from src.api.routers.lti_router import router as lti_router
+app.include_router(lti_router)
