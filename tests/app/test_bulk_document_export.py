@@ -13,7 +13,10 @@ from src.db.corpus_db import (
     configure_db_path,
     init_corpus_db,
 )
-from src.utils.bulk_export import create_documents_bulk_zip_archive
+from src.utils.bulk_export import (
+    create_bulk_export_zip,
+    create_documents_bulk_zip_archive,
+)
 
 
 @pytest.fixture
@@ -74,22 +77,22 @@ def temp_corpus_db(tmp_path):
 
 
 def test_create_documents_bulk_zip_archive(temp_corpus_db):
-    """Verify zip creation for selected documents containing contents and manifest CSV."""
+    """Verify zip creation for selected documents containing contents and manifest CSV with hierarchy preserved."""
     selected_files = ["essay_01.pdf", "assignment_2.docx"]
-    zip_bytes = create_documents_bulk_zip_archive(selected_files)
+    zip_bytes = create_bulk_export_zip(selected_files, preserve_hierarchy=True)
 
     assert isinstance(zip_bytes, bytes)
     assert len(zip_bytes) > 0
 
-    # Inspect zip contents
+    # Inspect zip contents - structured as {class_section}/{assignment_title}/{filename}
     with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
         namelist = zf.namelist()
-        assert "essay_01.pdf" in namelist
-        assert "assignment_2.docx" in namelist
+        assert "CS101/Ethics_Essay/essay_01.pdf" in namelist
+        assert "CS101/Research_Paper/assignment_2.docx" in namelist
         assert "export_manifest.csv" in namelist
 
         # Verify content of essay_01.pdf
-        doc1_content = zf.read("essay_01.pdf").decode("utf-8")
+        doc1_content = zf.read("CS101/Ethics_Essay/essay_01.pdf").decode("utf-8")
         assert "Academic integrity is fundamental" in doc1_content
         assert "Plagiarism violates core ethical guidelines." in doc1_content
 
@@ -101,9 +104,21 @@ def test_create_documents_bulk_zip_archive(temp_corpus_db):
         assert "assignment_2.docx" in df_manifest["filename"].values
 
 
+def test_create_bulk_export_zip_flattened(temp_corpus_db):
+    """Verify zip creation with preserve_hierarchy=False flattens files into root."""
+    selected_files = ["essay_01.pdf", "assignment_2.docx"]
+    zip_bytes = create_bulk_export_zip(selected_files, preserve_hierarchy=False)
+
+    with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+        namelist = zf.namelist()
+        assert "essay_01.pdf" in namelist
+        assert "assignment_2.docx" in namelist
+        assert "export_manifest.csv" in namelist
+
+
 def test_create_documents_bulk_zip_empty(temp_corpus_db):
     """Verify zip archive creation with an empty file list."""
-    zip_bytes = create_documents_bulk_zip_archive([])
+    zip_bytes = create_bulk_export_zip([])
     assert isinstance(zip_bytes, bytes)
     with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
         assert len(zf.namelist()) == 0
@@ -111,7 +126,7 @@ def test_create_documents_bulk_zip_empty(temp_corpus_db):
 
 def test_create_documents_bulk_zip_single_file(temp_corpus_db):
     """Verify zip archive creation with a single document."""
-    zip_bytes = create_documents_bulk_zip_archive(["essay_01.pdf"])
+    zip_bytes = create_documents_bulk_zip_archive(["essay_01.pdf"], preserve_hierarchy=False)
     with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
         namelist = zf.namelist()
         assert "essay_01.pdf" in namelist

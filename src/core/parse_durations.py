@@ -17,7 +17,7 @@ import threading
 from typing import Dict, Optional
 
 _lock = threading.Lock()
-_durations: Dict[str, float] = {}
+_durations: dict[str, float] = {}
 
 
 def record_parse_duration(filename: str, duration_sec: float) -> None:
@@ -45,7 +45,7 @@ def get_parse_duration(filename: str) -> Optional[float]:
         return _durations.get(filename)
 
 
-def get_all_parse_durations() -> Dict[str, float]:
+def get_all_parse_durations() -> dict[str, float]:
     """Return a snapshot copy of all recorded durations."""
     with _lock:
         return dict(_durations)

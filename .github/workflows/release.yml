@@ -1,13 +1,11 @@
-# Automated Release Generation Workflow
+# Automated Release Generation & Multi-Arch Container Publication Workflow
 #
 # This workflow is triggered automatically whenever a semantic version tag
-# (e.g., v1.2.0, v2.0.1-beta) is pushed to the repository. It performs a checkout,
-# extracts release notes based on the git commit history, and leverages the
-# softprops/action-gh-release action to create a GitHub Release draft.
-#
-# This establishes a standardized and automated release process, reducing manual overhead.
+# (e.g., v1.2.0, v2.0.1-beta) is pushed or when a GitHub Release is created/published.
+# It creates a GitHub Release draft and builds/pushes multi-architecture Docker
+# images (linux/amd64 and linux/arm64) to GitHub Container Registry (ghcr.io).
 
-name: Release Draft Generator
+name: Release & Multi-Arch Docker Build
 
 on:
   workflow_dispatch:
@@ -18,15 +16,19 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+-*'
       - '[0-9]+.[0-9]+.[0-9]+'
       - '[0-9]+.[0-9]+.[0-9]+-*'
+  release:
+    types: [published, created]
 
-# Require write permissions to create a release in the repository
+# Require write permissions to create a release and push packages to ghcr.io
 permissions:
   contents: write
+  packages: write
 
 jobs:
   create-draft-release:
     name: Create GitHub Draft Release
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout repository
@@ -47,8 +49,6 @@ jobs:
           echo "Processing release for tag: $TAG_NAME"
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
 
-
-
       - name: Create Release Draft
         uses: softprops/action-gh-release@v2
         with:
@@ -60,3 +60,48 @@ jobs:
         env:
           # GitHub token is provided automatically by Actions
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker-build-push:
+    name: Build & Push Multi-Arch Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=tag
+            type=ref,event=release
+            type=raw,value=latest,enable=${{ !github.event.release.prerelease }}
+
+      - name: Build and Push Multi-Arch Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -24,9 +24,10 @@ def _resolve_color(theme_colors: dict | None, key: str, default: str) -> str:
     """Resolve a theme color with a fallback to the default color."""
     return theme_colors.get(key, default) if theme_colors else default
 
+
 def plot_similarity_trend_line(
-    history_data: List[Dict],
-    theme_colors: Optional[Dict] = None,
+    history_data: list[dict],
+    theme_colors: Optional[dict] = None,
 ) -> go.Figure:
     """Generate a line chart showing average and max similarity trends over time.
 
@@ -107,8 +108,8 @@ def plot_similarity_trend_line(
 
 
 def plot_flagged_documents_bar(
-    history_data: List[Dict],
-    theme_colors: Optional[Dict] = None,
+    history_data: list[dict],
+    theme_colors: Optional[dict] = None,
 ) -> go.Figure:
     """Generate a bar chart showing the number of flagged documents per scan.
 

@@ -6,7 +6,7 @@ import streamlit as st
 from src.utils.processing_time import StageTiming
 
 
-def render_time_breakdown(stage_timings: List[StageTiming]) -> None:
+def render_time_breakdown(stage_timings: list[StageTiming]) -> None:
     """Render a Plotly bar chart of stage timings.
     If no timings are provided, displays an informational message.
     """

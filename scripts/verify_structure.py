@@ -100,10 +100,10 @@ REQUIRED_FILES = [
 
 def verify_project_structure(
     root_dir: Path,
-    check_dirs: List[str],
-    check_inits: List[str],
-    check_files: List[str],
-) -> Tuple[bool, List[str], List[str]]:
+    check_dirs: list[str],
+    check_inits: list[str],
+    check_files: list[str],
+) -> tuple[bool, list[str], list[str]]:
     """
     Verify that all required directories, __init__.py files, and critical
     files exist in the project structure.
@@ -164,7 +164,7 @@ def verify_project_structure(
 
 
 def format_text_report(
-    is_valid: bool, missing_paths: List[str], found_paths: List[str]
+    is_valid: bool, missing_paths: list[str], found_paths: list[str]
 ) -> str:
     """Format verification results as human-readable text."""
     lines = []
@@ -203,7 +203,7 @@ def format_text_report(
 
 
 def format_json_report(
-    is_valid: bool, missing_paths: List[str], found_paths: List[str]
+    is_valid: bool, missing_paths: list[str], found_paths: list[str]
 ) -> str:
     """Format verification results as JSON for CI/CD consumption (Issue #2021).
 

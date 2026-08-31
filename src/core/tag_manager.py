@@ -18,7 +18,7 @@ class TagManager:
     """
 
     @staticmethod
-    def normalize_tags(raw_input: str) -> List[str]:
+    def normalize_tags(raw_input: str) -> list[str]:
         """
         Parses a comma-separated or space-separated string of tags into a sorted
         list of individual normalized tags.
@@ -52,7 +52,7 @@ class TagManager:
         # Split by comma or space using regex to handle multiple spaces/commas gracefully
         tokens = re.split(r"[,\s]+", raw_input)
 
-        normalized_tags: Set[str] = set()
+        normalized_tags: set[str] = set()
 
         for token in tokens:
             token = token.strip().lower()
@@ -105,7 +105,7 @@ class TagManager:
         return ",".join(TagManager.normalize_tags(raw_input))
 
     @staticmethod
-    def extract_unique_tags(db_tags_column: List[str]) -> List[str]:
+    def extract_unique_tags(db_tags_column: list[str]) -> list[str]:
         """
         Takes a list of raw tag strings from the DB (e.g. ["#hw1,#final", "#hw1,#draft"])
         and returns a sorted list of unique individual tags across the entire corpus.
@@ -150,7 +150,7 @@ class TagManager:
         return filter_tag in TagManager._split_tags(doc_tags_str)
 
     @classmethod
-    def apply_tag(cls, document_ids: List[str], tag: str) -> None:
+    def apply_tag(cls, document_ids: list[str], tag: str) -> None:
         """
         Applies one or more tags to a list of documents.
         Documents that already carry every requested tag are left untouched.
@@ -183,7 +183,7 @@ class TagManager:
             update_document_tags(doc_id, ",".join(merged))
 
     @classmethod
-    def remove_tag(cls, document_ids: List[str], tag: str) -> None:
+    def remove_tag(cls, document_ids: list[str], tag: str) -> None:
         """
         Removes one or more tags from a list of documents.
         Documents that carry none of the requested tags are left untouched.
@@ -210,7 +210,7 @@ class TagManager:
             update_document_tags(doc_id, ",".join(remaining))
 
     @staticmethod
-    def _split_tags(tags_str: str) -> List[str]:
+    def _split_tags(tags_str: str) -> list[str]:
         """Split a stored tags column into its individual, trimmed entries."""
         if not tags_str or not isinstance(tags_str, str):
             return []

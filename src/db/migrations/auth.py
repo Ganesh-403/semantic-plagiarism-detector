@@ -1,12 +1,12 @@
 """Versioned migrations for users.db."""
 
-from __future__ import annotations
-
+import inspect
 import sqlite3
+import sys
 
 from .common import column_exists, run_migrations
 
-AUTH_SCHEMA_VERSION = 16
+AUTH_SCHEMA_VERSION = 17
 
 
 def migration_001_create_users(
@@ -180,18 +180,7 @@ def migration_013_create_password_history_table(
         """)
 
 
-def migration_014_add_must_change_password(
-    connection: sqlite3.Connection,
-) -> None:
-    """Add must_change_password flag to force password reset on next login."""
-    if not column_exists(connection, "users", "must_change_password"):
-        connection.execute("""
-            ALTER TABLE users
-            ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0
-            """)
-
-
-def migration_013_add_user_status(
+def migration_014_add_user_status(
     connection: sqlite3.Connection,
 ) -> None:
     """Add account status field and migrate the legacy is_active flag."""
@@ -210,7 +199,18 @@ def migration_013_add_user_status(
         """)
 
 
-def migration_015_add_audit_log_indexes(
+def migration_015_add_must_change_password(
+    connection: sqlite3.Connection,
+) -> None:
+    """Add must_change_password flag to force password reset on next login."""
+    if not column_exists(connection, "users", "must_change_password"):
+        connection.execute("""
+            ALTER TABLE users
+            ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0
+            """)
+
+
+def migration_016_add_audit_log_indexes(
     connection: sqlite3.Connection,
 ) -> None:
     """Create indexes on security_audit_log(username) and security_audit_log(event_type)."""
@@ -224,24 +224,72 @@ def migration_015_add_audit_log_indexes(
         """)
 
 
-AUTH_MIGRATIONS = {
-    1: migration_001_create_users,
-    2: migration_002_add_onboarding_state,
-    3: migration_003_add_two_factor_fields,
-    4: migration_004_add_role_index,
-    5: migration_005_add_preferences,
-    6: migration_006_add_active_flag,
-    7: migration_007_add_theme_preference,
-    8: migration_008_create_security_audit_log,
-    9: migration_009_add_last_login_at,
-    10: migration_010_add_password_changed_at,
-    11: migration_011_add_version_column,
-    12: migration_012_create_revoked_tokens_table,
-    13: migration_013_add_user_status,
-    14: migration_013_create_password_history_table,
-    15: migration_014_add_must_change_password,
-    16: migration_015_add_audit_log_indexes,
-}
+def migration_017_drop_is_active(
+    connection: sqlite3.Connection,
+) -> None:
+    """Drop deprecated is_active column using the table rebuild pattern."""
+    if not column_exists(connection, "users", "is_active"):
+        return
+
+    connection.execute("""
+        CREATE TABLE users_temp (
+            id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+            username              TEXT UNIQUE NOT NULL,
+            password              TEXT NOT NULL,
+            role                  TEXT NOT NULL DEFAULT 'teacher',
+            tour_completed        INTEGER NOT NULL DEFAULT 0,
+            otp_secret            TEXT DEFAULT NULL,
+            two_factor_enabled    INTEGER NOT NULL DEFAULT 0,
+            preferences           TEXT DEFAULT '{}',
+            theme                 TEXT NOT NULL DEFAULT 'light',
+            last_login_at         TEXT DEFAULT NULL,
+            password_changed_at   TEXT DEFAULT NULL,
+            version               INTEGER DEFAULT 1,
+            status                TEXT NOT NULL DEFAULT 'active',
+            must_change_password  INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+
+    connection.execute("""
+        INSERT INTO users_temp (
+            id, username, password, role, tour_completed, otp_secret,
+            two_factor_enabled, preferences, theme, last_login_at,
+            password_changed_at, version, status, must_change_password
+        )
+        SELECT
+            id, username, password, role,
+            COALESCE(tour_completed, 0),
+            otp_secret,
+            COALESCE(two_factor_enabled, 0),
+            COALESCE(preferences, '{}'),
+            COALESCE(theme, 'light'),
+            last_login_at,
+            password_changed_at,
+            COALESCE(version, 1),
+            COALESCE(status, 'active'),
+            COALESCE(must_change_password, 0)
+        FROM users
+    """)
+
+    connection.execute("DROP TABLE users")
+    connection.execute("ALTER TABLE users_temp RENAME TO users")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)")
+
+
+def _discover_migrations() -> dict[int, callable]:
+    """Dynamically discover migration functions starting with 'migration_' sorted numerically."""
+    current_module = sys.modules[__name__]
+    migration_funcs = [
+        func
+        for name, func in inspect.getmembers(current_module, inspect.isfunction)
+        if name.startswith("migration_")
+    ]
+    # Sort by function name to ensure ascending numeric order (e.g. migration_001, migration_002, ...)
+    migration_funcs.sort(key=lambda f: f.__name__)
+    return {idx + 1: func for idx, func in enumerate(migration_funcs)}
+
+
+AUTH_MIGRATIONS = _discover_migrations()
 
 
 def _drop_column_if_exists(
@@ -249,7 +297,9 @@ def _drop_column_if_exists(
 ) -> None:
     if column_exists(connection, table_name, column_name):
         try:
-            connection.execute(f'ALTER TABLE "{table_name}" DROP COLUMN "{column_name}"')
+            connection.execute(
+                f'ALTER TABLE "{table_name}" DROP COLUMN "{column_name}"'
+            )
         except sqlite3.OperationalError:
             pass
 
@@ -306,13 +356,13 @@ def down_012_create_revoked_tokens_table(connection: sqlite3.Connection) -> None
     connection.execute("DROP TABLE IF EXISTS revoked_tokens")
 
 
-def down_013_add_user_status(connection: sqlite3.Connection) -> None:
-    _drop_column_if_exists(connection, "users", "status")
-
-
-def down_014_create_password_history_table(connection: sqlite3.Connection) -> None:
+def down_013_create_password_history_table(connection: sqlite3.Connection) -> None:
     connection.execute("DROP INDEX IF EXISTS idx_password_history_username")
     connection.execute("DROP TABLE IF EXISTS password_history")
+
+
+def down_014_add_user_status(connection: sqlite3.Connection) -> None:
+    _drop_column_if_exists(connection, "users", "status")
 
 
 def down_015_add_must_change_password(connection: sqlite3.Connection) -> None:
@@ -322,6 +372,14 @@ def down_015_add_must_change_password(connection: sqlite3.Connection) -> None:
 def down_016_add_audit_log_indexes(connection: sqlite3.Connection) -> None:
     connection.execute("DROP INDEX IF EXISTS idx_audit_log_username")
     connection.execute("DROP INDEX IF EXISTS idx_audit_log_event_type")
+
+
+def down_017_drop_is_active(connection: sqlite3.Connection) -> None:
+    if not column_exists(connection, "users", "is_active"):
+        connection.execute("""
+            ALTER TABLE users
+            ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1
+        """)
 
 
 AUTH_DOWN_MIGRATIONS = {
@@ -337,10 +395,11 @@ AUTH_DOWN_MIGRATIONS = {
     10: down_010_add_password_changed_at,
     11: down_011_add_version_column,
     12: down_012_create_revoked_tokens_table,
-    13: down_013_add_user_status,
-    14: down_014_create_password_history_table,
+    13: down_013_create_password_history_table,
+    14: down_014_add_user_status,
     15: down_015_add_must_change_password,
     16: down_016_add_audit_log_indexes,
+    17: down_017_drop_is_active,
 }
 
 
@@ -353,3 +412,4 @@ def migrate_auth_database(
         migrations=AUTH_MIGRATIONS,
         target_version=AUTH_SCHEMA_VERSION,
     )
+

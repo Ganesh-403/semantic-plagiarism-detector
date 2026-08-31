@@ -18,5 +18,5 @@ def test_pipeline_progress_html_displays_eta_under_indicator():
 
     assert 'class="pipeline-steps"' in result
     assert 'class="pipeline-eta"' in result
-    assert ("Estimated processing time: about " "1 minute 15 seconds") in result
+    assert ("Estimated processing time: about 1 minute 15 seconds") in result
     assert result.index("pipeline-steps") < result.index("pipeline-eta")

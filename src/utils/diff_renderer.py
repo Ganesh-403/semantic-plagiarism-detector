@@ -119,7 +119,7 @@ _CSS_DARK = """
 
 
 def render_semantic_diff_html(
-    alignment_map: List[Dict[str, Any]],
+    alignment_map: list[dict[str, Any]],
     theme: str = "light",
 ) -> str:
     """Convert a semantic alignment map into a responsive HTML/CSS diff string.

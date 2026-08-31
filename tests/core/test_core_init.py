@@ -28,4 +28,3 @@ def test_invalid_attribute_raises_attribute_error():
 
     with pytest.raises(AttributeError, match="has no attribute"):
         _ = core.nonexistent_function_xyz
-

@@ -5,7 +5,7 @@ import streamlit as st
 from src.core.tag_manager import TagManager
 
 
-def render_bulk_tag_actions(selected_documents: List[str]):
+def render_bulk_tag_actions(selected_documents: list[str]):
     """
     Renders the Bulk Tag Actions UI.
 

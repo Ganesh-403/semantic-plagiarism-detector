@@ -28,10 +28,26 @@ Recent Fixes (Issue #3045):
 - Restored the keyword-only ``page`` / ``page_size`` / ``max_page_size``
   contract that ``src/utils/warning_list.py`` calls, along with the
   ``_coerce_integer`` helper and the ``start_index`` / ``end_index`` fields.
+
+Recent Additions (Issue #3215):
+- Added ``CursorPaginationPage`` and ``paginate_by_cursor`` for cursor-based
+  pagination. Offset pagination (``paginate_items`` / ``PaginationPage``)
+  requires the database to scan and discard every skipped row, which gets
+  slow once a table (e.g. the incidents table) reaches tens of thousands of
+  rows. Cursor pagination instead resumes from an opaque token derived from
+  the last row of the previous page, so a query can use ``WHERE (sort_key)
+  > (cursor)`` instead of ``OFFSET n``.  
+
+Recent Additions (Issue #3218):
+- ``PaginationPage.was_clamped`` records whether ``paginate_items`` had to
+  pull an out-of-range page number back into range, so API callers can tell
+  a genuine last-page response from a clamped one.
 """
 
+import base64
+import json
 from dataclasses import dataclass, field
-from typing import Generic, List, Optional, Sequence, Tuple, TypeVar
+from typing import Any, Callable, Generic, List, Optional, Sequence, Tuple, TypeVar
 
 T = TypeVar("T")
 
@@ -62,6 +78,9 @@ class PaginationPage(Generic[T]):
             page within the full sequence. ``0`` when the page is empty.
         end_index: One-based inclusive position of the last item on this
             page within the full sequence. ``0`` when the page is empty.
+        was_clamped: True when a helper had to adjust an out-of-range page
+            number to produce this page (Issue #3218). Pages built directly,
+            or sliced from an in-range request, are False.
 
     Recent Additions (Issue #1998):
         Custom __repr__ truncates large item lists for readability.
@@ -73,13 +92,14 @@ class PaginationPage(Generic[T]):
         helper's vocabulary rather than the dataclass's.
     """
 
-    items: List[T]
+    items: list[T]
     page: int
     total_pages: int
     total_items: int
     per_page: int
     start_index: int = field(default=0)
     end_index: int = field(default=0)
+    was_clamped: bool = field(default=False)
 
     @property
     def page_size(self) -> int:
@@ -138,8 +158,9 @@ class PaginationPage(Generic[T]):
 
         Two PaginationPage instances are equal if and only if all their
         fields (items, page, total_pages, total_items, per_page, start_index,
-        end_index) are equal. This is automatically handled by the @dataclass
-        decorator when frozen=True, but we document it explicitly for clarity.
+        end_index, was_clamped) are equal. This is automatically handled by
+        the @dataclass decorator when frozen=True, but we document it
+        explicitly for clarity.
 
         Args:
             other: Another object to compare against.
@@ -163,6 +184,7 @@ class PaginationPage(Generic[T]):
             and self.per_page == other.per_page
             and self.start_index == other.start_index
             and self.end_index == other.end_index
+            and self.was_clamped == other.was_clamped
         )
 
     def __hash__(self) -> int:
@@ -193,13 +215,14 @@ class PaginationPage(Generic[T]):
                 self.per_page,
                 self.start_index,
                 self.end_index,
+                self.was_clamped,
             )
         )
 
     @classmethod
     def create(
         cls,
-        items: List[T],
+        items: list[T],
         page: int,
         per_page: int,
         total_items: int,
@@ -255,6 +278,14 @@ class PaginationPage(Generic[T]):
         """
         return self.page < self.total_pages
 
+    @property
+    def next_page(self) -> Optional[int]:
+        return self.page + 1 if self.has_next() else None
+
+    @property
+    def prev_page(self) -> Optional[int]:
+        return self.page - 1 if self.has_previous() else None
+
     def has_previous(self) -> bool:
         """Check if there is a previous page available.
 
@@ -263,21 +294,21 @@ class PaginationPage(Generic[T]):
         """
         return self.page > 1
 
-    def next_page(self) -> Optional[int]:
-        """Get the next page number if available.
-
-        Returns:
-            Next page number or None if on last page
-        """
-        return self.page + 1 if self.has_next() else None
-
     def previous_page(self) -> Optional[int]:
         """Get the previous page number if available.
 
         Returns:
             Previous page number or None if on first page
         """
-        return self.page - 1 if self.has_previous() else None
+        return self.prev_page
+
+    def next_page_number(self) -> Optional[int]:
+        """Get the next page number if available.
+
+        Returns:
+            Next page number or None if on last page
+        """
+        return self.next_page
 
     def to_dict(self) -> dict:
         """Convert to dictionary representation for JSON serialization.
@@ -293,10 +324,11 @@ class PaginationPage(Generic[T]):
             "per_page": self.per_page,
             "start_index": self.start_index,
             "end_index": self.end_index,
+            "was_clamped": self.was_clamped,
             "has_next": self.has_next(),
             "has_previous": self.has_previous(),
-            "next_page": self.next_page(),
-            "previous_page": self.previous_page(),
+            "next_page": self.next_page,
+            "previous_page": self.prev_page,
         }
 
 
@@ -330,7 +362,7 @@ def _coerce_integer(value: object, default: int) -> int:
         return default
 
 
-def _bounds_for(*, page: int, per_page: int, item_count: int) -> Tuple[int, int]:
+def _bounds_for(*, page: int, per_page: int, item_count: int) -> tuple[int, int]:
     """Return the one-based inclusive ``(start, end)`` positions of a page.
 
     Args:
@@ -367,6 +399,12 @@ def paginate_items(
     * ``page`` is clamped into ``[1, total_pages]``, so a bookmarked
       ``?page=9999`` lands on the last page instead of an empty one.
 
+    The returned page carries ``was_clamped=True`` whenever that last rule
+    fired, so API callers can distinguish "the user really asked for the
+    last page" from "an out-of-range request was pulled back into range"
+    (Issue #3218). A non-numeric ``page`` is a coercion to the default, not
+    an out-of-range adjustment, and therefore leaves the flag False.
+
     Args:
         items: The full sequence to paginate. Not mutated.
         page: One-based page number requested by the caller.
@@ -383,6 +421,10 @@ def paginate_items(
         [5]
         >>> paginate_items([1, 2, 3, 4, 5], page=9999, page_size=2).page
         3
+        >>> paginate_items([1, 2, 3, 4, 5], page=9999, page_size=2).was_clamped
+        True
+        >>> paginate_items([1, 2, 3, 4, 5], page=2, page_size=2).was_clamped
+        False
         >>> paginate_items([], page=1, page_size=10).total_pages
         1
     """
@@ -395,6 +437,7 @@ def paginate_items(
     total_pages = max(1, -(-total_items // safe_page_size))
 
     safe_page = _coerce_integer(page, 1)
+    was_clamped = safe_page < 1 or safe_page > total_pages
     safe_page = min(max(1, safe_page), total_pages)
 
     start = (safe_page - 1) * safe_page_size
@@ -414,4 +457,150 @@ def paginate_items(
         per_page=safe_page_size,
         start_index=start_index,
         end_index=end_index,
+        was_clamped=was_clamped,
+    )
+
+def encode_cursor(value: Any) -> str:
+    """Encode a sort-key value into an opaque cursor string.
+
+    The cursor is a base64url-encoded JSON representation of *value*. It is
+    deliberately opaque to callers: cursors should be treated as tokens to
+    pass back verbatim, not decoded or constructed by hand.
+
+    Args:
+        value: The sort-key value to encode. Typically a scalar
+            (``str``/``int``/``float``) or a small tuple/list of scalars for
+            composite sort keys (e.g. ``(date_flagged, incident_id)``).
+
+    Returns:
+        An opaque, URL-safe cursor string.
+
+    Examples:
+        >>> cursor = encode_cursor(("2026-08-01T00:00:00Z", 42))
+        >>> decode_cursor(cursor)
+        ['2026-08-01T00:00:00Z', 42]
+    """
+    payload = json.dumps(value, separators=(",", ":"))
+    return base64.urlsafe_b64encode(payload.encode("utf-8")).decode("ascii")
+
+
+def decode_cursor(cursor: str) -> Any:
+    """Decode a cursor string produced by :func:`encode_cursor`.
+
+    Args:
+        cursor: The opaque cursor string.
+
+    Returns:
+        The original sort-key value (or ``None`` if *cursor* is falsy).
+
+    Raises:
+        ValueError: If *cursor* is not a valid cursor produced by
+            :func:`encode_cursor` (malformed base64 or JSON).
+    """
+    if not cursor:
+        return None
+    try:
+        payload = base64.urlsafe_b64decode(cursor.encode("ascii")).decode("utf-8")
+        return json.loads(payload)
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Invalid pagination cursor: {cursor!r}") from exc
+
+
+@dataclass(frozen=True)
+class CursorPaginationPage(Generic[T]):
+    """Represents a single page of cursor-paginated results.
+
+    Unlike :class:`PaginationPage`, this does not carry a total item/page
+    count — computing those for a large table requires the same expensive
+    ``COUNT(*)``/``OFFSET`` scan cursor pagination exists to avoid. Callers
+    that need a "page 3 of 40"-style UI should use :class:`PaginationPage`
+    instead; cursor pagination is for "load more" / infinite-scroll style
+    interfaces over large or frequently-changing tables.
+
+    Attributes:
+        items: List of items on the current page, in the query's sort order.
+        next_cursor: Opaque token to fetch the next page, or ``None`` if this
+            is the last page.
+        prev_cursor: Opaque token to fetch the previous page, or ``None`` if
+            this is the first page.
+        has_more: ``True`` if at least one more item exists after ``items``.
+    """
+
+    items: list[T]
+    next_cursor: Optional[str]
+    prev_cursor: Optional[str]
+    has_more: bool
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary representation for JSON serialization.
+
+        Returns:
+            Dictionary with all cursor-pagination fields.
+        """
+        return {
+            "items": self.items,
+            "next_cursor": self.next_cursor,
+            "prev_cursor": self.prev_cursor,
+            "has_more": self.has_more,
+        }
+
+
+def paginate_by_cursor(
+    items: Sequence[T],
+    *,
+    cursor_key: Callable[[T], Any],
+    limit: int = DEFAULT_PAGE_SIZE,
+    prev_cursor: Optional[str] = None,
+) -> CursorPaginationPage[T]:
+    """Build a :class:`CursorPaginationPage` from an over-fetched query result.
+
+    This is the cursor-pagination counterpart to :func:`paginate_items`. It
+    does not itself query a database — callers are expected to fetch
+    ``limit + 1`` rows ordered by their cursor column(s) (optionally with a
+    ``WHERE (sort_key) > (decode_cursor(cursor))`` clause instead of
+    ``OFFSET``), and pass that raw result in as *items*. Fetching one extra
+    row lets this function determine ``has_more`` without a separate
+    ``COUNT(*)`` query.
+
+    Args:
+        items: The over-fetched sequence, containing up to ``limit + 1``
+            items in cursor sort order. Not mutated.
+        cursor_key: Callable that extracts the sort-key value from an item,
+            used to build ``next_cursor`` from the last item kept on the
+            page (e.g. ``lambda incident: (incident.date_flagged,
+            incident.incident_id)`` for a composite sort key).
+        limit: Maximum number of items to return on this page.
+        prev_cursor: The cursor that was used to fetch *this* page, echoed
+            back unchanged so the caller can request the previous page.
+            ``None`` on the first page.
+
+    Returns:
+        A :class:`CursorPaginationPage` holding at most ``limit`` items.
+
+    Examples:
+        >>> rows = [{"id": 1}, {"id": 2}, {"id": 3}]  # limit=2, one extra row
+        >>> page = paginate_by_cursor(rows, cursor_key=lambda r: r["id"], limit=2)
+        >>> page.items
+        [{'id': 1}, {'id': 2}]
+        >>> page.has_more
+        True
+        >>> decode_cursor(page.next_cursor)
+        2
+    """
+    safe_limit = max(1, _coerce_integer(limit, DEFAULT_PAGE_SIZE))
+
+    has_more = len(items) > safe_limit
+    page_items = list(items[:safe_limit])
+
+    next_cursor = (
+        encode_cursor(cursor_key(page_items[-1]))
+        if has_more and page_items
+        else None
+    )
+
+    return CursorPaginationPage(
+        items=page_items,
+        next_cursor=next_cursor,
+        prev_cursor=prev_cursor,
+        has_more=has_more,
     )

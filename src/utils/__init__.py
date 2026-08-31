@@ -25,3 +25,16 @@ __all__ = [
     "apply_asyncio_patches",
     "get_os_platform",
 ]
+
+
+"""
+Utilities module for the Semantic Plagiarism Detector
+"""
+
+from .file_validators import FileValidator, validate_file, validate_filename, get_safe_filename
+from .text_processor import TextProcessor, process_text
+
+__all__ = [
+    'FileValidator', 'validate_file', 'validate_filename', 'get_safe_filename',
+    'TextProcessor', 'process_text'
+]

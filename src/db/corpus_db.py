@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 corpus_db.py
 ------------
@@ -12,7 +34,7 @@ import os
 import sqlite3
 import threading
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -29,11 +51,13 @@ logger = logging.getLogger(__name__)
 # Seed the corpus DB path from the centralized app_config.
 import atexit
 import weakref
+
 _DB_PATH = os.path.abspath(str(CORPUS_DB_PATH))
 
 _connection_pool = threading.local()
-_all_connections = weakref.WeakSet()
+_all_connections = set()
 _pool_lock = threading.Lock()
+
 
 def _cleanup_all_connections():
     with _pool_lock:
@@ -43,6 +67,7 @@ def _cleanup_all_connections():
             except Exception:
                 pass
         _all_connections.clear()
+
 
 atexit.register(_cleanup_all_connections)
 
@@ -56,6 +81,22 @@ class CorpusRepository(BaseRepository):
     def init_corpus_db(self) -> None:
         """Create or upgrade corpus.db without deleting persisted data."""
         init_corpus_db()
+
+    def soft_delete_document(self, filename: str) -> bool:
+        """Soft delete a document by filename."""
+        return soft_delete_document(filename)
+
+    def restore_document(self, filename: str) -> bool:
+        """Restore a soft-deleted document by filename."""
+        return restore_document(filename)
+
+    def get_all_documents(self, include_deleted: bool = False) -> list:
+        """Return all indexed documents, optionally including soft-deleted ones."""
+        return get_all_documents(include_deleted=include_deleted)
+
+    def get_corpus_stats(self) -> dict:
+        """Return high-level statistics about the stored corpus."""
+        return get_corpus_stats()
 
 
 corpus_repo = CorpusRepository(_DB_PATH)
@@ -72,6 +113,12 @@ def configure_db_path(db_path: str | os.PathLike) -> None:
 def get_corpus_db_path() -> Path:
     """Return the configured corpus SQLite database path."""
     return Path(_DB_PATH)
+
+
+class WeakConnection(sqlite3.Connection):
+    """Subclass of sqlite3.Connection that supports weak references."""
+
+    pass
 
 
 def _pool() -> dict[str, sqlite3.Connection]:
@@ -95,7 +142,7 @@ def _connect():
 
     pool = _pool()
     conn = pool.get(path)
-    
+
     # Check if the connection is closed. If so, discard it.
     if conn is not None:
         try:
@@ -105,11 +152,15 @@ def _connect():
 
     if conn is None:
         try:
-            conn = sqlite3.connect(path, check_same_thread=False)
+            conn = sqlite3.connect(
+                path, check_same_thread=False, factory=WeakConnection, timeout=15.0
+            )
         except sqlite3.OperationalError:
             path = str(FALLBACK_CORPUS_DB_PATH)
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            conn = sqlite3.connect(path, check_same_thread=False)
+            conn = sqlite3.connect(
+                path, check_same_thread=False, factory=WeakConnection, timeout=15.0
+            )
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA journal_mode=WAL")
         pool[path] = conn
@@ -145,7 +196,8 @@ def init_corpus_db() -> None:
     """Create or upgrade corpus.db without deleting persisted data."""
     with _connect() as conn:
         # 1. ALWAYS CREATE TABLES FIRST
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS documents (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 filename TEXT UNIQUE NOT NULL,
@@ -164,9 +216,11 @@ def init_corpus_db() -> None:
                 deleted_at TEXT,
                 created_at TEXT
             )
-            """)
+            """
+        )
 
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS chunks (
                 vector_id INTEGER PRIMARY KEY,
                 filename TEXT NOT NULL,
@@ -177,9 +231,11 @@ def init_corpus_db() -> None:
                 REFERENCES documents(filename)
                 ON DELETE CASCADE
             )
-            """)
+            """
+        )
 
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS deleted_chunks (
                 vector_id INTEGER PRIMARY KEY,
                 filename TEXT NOT NULL,
@@ -188,9 +244,11 @@ def init_corpus_db() -> None:
                 embedding BLOB NOT NULL,
                 deleted_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
-            """)
+            """
+        )
 
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS plagiarism_incidents (
                 incident_id TEXT PRIMARY KEY,
                 document_a TEXT NOT NULL,
@@ -198,23 +256,29 @@ def init_corpus_db() -> None:
                 similarity_score REAL NOT NULL,
                 severity_rank TEXT NOT NULL,
                 review_status TEXT NOT NULL DEFAULT 'Pending'
-                    CHECK (review_status IN ('Pending', 'Resolved')),
+                    CHECK (review_status IN ('Pending', 'Resolved', 'Dismissed')),
                 date_flagged TEXT NOT NULL,
                 last_seen TEXT NOT NULL,
                 threshold_at_time_of_flag REAL DEFAULT 0.0
             )
-            """)
+            """
+        )
 
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS false_positives (
                 document_a TEXT,
                 document_b TEXT,
                 date_dismissed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                dismissed_by TEXT DEFAULT 'admin',
+                dismissal_reason TEXT,
                 PRIMARY KEY (document_a, document_b)
             )
-            """)
+            """
+        )
 
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS scan_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TEXT NOT NULL,
@@ -224,7 +288,8 @@ def init_corpus_db() -> None:
                 flagged_count INTEGER NOT NULL,
                 threshold_used REAL NOT NULL
             )
-            """)
+            """
+        )
 
         # 2. RUN SCHEMA MIGRATIONS / ALTER TABLES AFTER CREATION
         columns_to_ensure = [
@@ -262,7 +327,8 @@ def init_corpus_db() -> None:
         # search. Also created by migration_012, but we create it here too
         # so that ``init_corpus_db()`` (which doesn't call
         # ``migrate_corpus_database()``) still sets up FTS.
-        conn.execute("""
+        conn.execute(
+            """
             CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
                 filename,
                 student_name,
@@ -270,27 +336,34 @@ def init_corpus_db() -> None:
                 content='documents',
                 content_rowid='id'
             )
-            """)
-        conn.execute("""
+            """
+        )
+        conn.execute(
+            """
             CREATE TRIGGER IF NOT EXISTS documents_ai AFTER INSERT ON documents BEGIN
                 INSERT INTO documents_fts(rowid, filename, student_name, assignment_title)
                 VALUES (new.id, new.filename, new.student_name, new.assignment_title);
             END
-            """)
-        conn.execute("""
+            """
+        )
+        conn.execute(
+            """
             CREATE TRIGGER IF NOT EXISTS documents_ad AFTER DELETE ON documents BEGIN
                 INSERT INTO documents_fts(documents_fts, rowid, filename, student_name, assignment_title)
                 VALUES ('delete', old.id, old.filename, old.student_name, old.assignment_title);
             END
-            """)
-        conn.execute("""
+            """
+        )
+        conn.execute(
+            """
             CREATE TRIGGER IF NOT EXISTS documents_au AFTER UPDATE ON documents BEGIN
                 INSERT INTO documents_fts(documents_fts, rowid, filename, student_name, assignment_title)
                 VALUES ('delete', old.id, old.filename, old.student_name, old.assignment_title);
                 INSERT INTO documents_fts(rowid, filename, student_name, assignment_title)
                 VALUES (new.id, new.filename, new.student_name, new.assignment_title);
             END
-            """)
+            """
+        )
         # Backfill any existing rows into the FTS index
         try:
             conn.execute("INSERT INTO documents_fts(documents_fts) VALUES ('rebuild')")
@@ -301,6 +374,119 @@ def init_corpus_db() -> None:
             os.chmod(_DB_PATH, 0o600)
         except OSError:
             pass
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS system_metrics (
+                metric_name TEXT PRIMARY KEY,
+                metric_value INTEGER DEFAULT 0
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO system_metrics (metric_name, metric_value)
+            VALUES ('total_scans', 0)
+            """
+        )
+
+
+_in_memory_total_scans = 0
+
+
+def increment_total_scans() -> int:
+    """Increment the total scan count in Redis (if available) or SQLite system_metrics."""
+    # 1. Try Redis first
+    try:
+        from src.utils.redis_cache import get_cache
+
+        cache = get_cache()
+        if cache.is_available():
+            val = cache._client.incr("spd:v1:metrics:total_scans")
+            return int(val)
+    except Exception as e:
+        logger.warning(
+            f"Failed to increment total_scans in Redis: {e}. Falling back to SQLite."
+        )
+
+    # 2. Fallback to SQLite system_metrics table
+    try:
+        with _connect() as conn:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO system_metrics (metric_name, metric_value)
+                VALUES ('total_scans', 0)
+                """
+            )
+            conn.execute(
+                """
+                UPDATE system_metrics
+                SET metric_value = metric_value + 1
+                WHERE metric_name = 'total_scans'
+                """
+            )
+            conn.commit()
+
+            row = conn.execute(
+                "SELECT metric_value FROM system_metrics WHERE metric_name = 'total_scans'"
+            )
+            res = row.fetchone()
+            if res:
+                return int(res[0])
+    except Exception as e:
+        logger.error(f"Failed to increment total_scans in SQLite: {e}")
+
+    # 3. Fallback to in-memory
+    global _in_memory_total_scans
+    _in_memory_total_scans += 1
+    return _in_memory_total_scans
+
+
+def get_total_scans() -> int:
+    """Get the total scan count from Redis (if available) or SQLite system_metrics."""
+    # 1. Try Redis first
+    try:
+        from src.utils.redis_cache import get_cache
+
+        cache = get_cache()
+        if cache.is_available():
+            val = cache._client.get("spd:v1:metrics:total_scans")
+            if val is not None:
+                return int(val)
+    except Exception as e:
+        logger.warning(
+            f"Failed to get total_scans from Redis: {e}. Falling back to SQLite."
+        )
+
+    # 2. Fallback to SQLite system_metrics table
+    try:
+        with _connect() as conn:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO system_metrics (metric_name, metric_value)
+                VALUES ('total_scans', 0)
+                """
+            )
+            row = conn.execute(
+                "SELECT metric_value FROM system_metrics WHERE metric_name = 'total_scans'"
+            )
+            res = row.fetchone()
+            if res:
+                val = int(res[0])
+                try:
+                    from src.utils.redis_cache import get_cache
+
+                    cache = get_cache()
+                    if cache.is_available():
+                        cache._client.set("spd:v1:metrics:total_scans", val)
+                except Exception:
+                    pass
+                return val
+    except Exception as e:
+        logger.error(f"Failed to get total_scans from SQLite: {e}")
+
+    # 3. Fallback to in-memory
+    return _in_memory_total_scans
 
 
 @with_sqlite_retry
@@ -376,7 +562,7 @@ def get_all_documents(include_deleted: bool = False) -> list:
 
     query = (
         "SELECT filename, file_hash, upload_date, class_section, student_name, "
-        "assignment_title, pdf_author, pdf_creation_date, pdf_title, detected_language "
+        "assignment_title, pdf_author, pdf_creation_date, pdf_title, detected_language, deleted_at "
         "FROM documents"
     )
     if not include_deleted:
@@ -397,9 +583,43 @@ def get_all_documents(include_deleted: bool = False) -> list:
                 pdf_creation_date=r[7],
                 pdf_title=r[8],
                 detected_language=r[9],
+                deleted_at=r[10],
             )
             for r in rows
         ]
+
+
+def get_corpus_stats() -> dict[str, Any]:
+    """Return high-level statistics about the stored corpus."""
+    with _connect() as conn:
+        doc_row = conn.execute(
+            "SELECT COUNT(1) FROM documents WHERE is_deleted IS NULL OR is_deleted = 0"
+        ).fetchone()
+        total_documents = doc_row[0] if doc_row else 0
+
+        chunk_row = conn.execute("SELECT COUNT(1) FROM chunks").fetchone()
+        total_chunks = chunk_row[0] if chunk_row else 0
+
+        emb_row = conn.execute(
+            "SELECT COUNT(1) FROM chunks WHERE embedding IS NOT NULL"
+        ).fetchone()
+        total_embeddings = emb_row[0] if emb_row else 0
+
+        latest_row = conn.execute(
+            "SELECT MAX(upload_date) FROM documents WHERE is_deleted IS NULL OR is_deleted = 0"
+        ).fetchone()
+        last_updated = (
+            latest_row[0]
+            if (latest_row and latest_row[0])
+            else datetime.now(timezone.utc).isoformat()
+        )
+
+        return {
+            "total_documents": total_documents,
+            "total_chunks": total_chunks,
+            "total_embeddings": total_embeddings,
+            "last_updated": last_updated,
+        }
 
 
 @with_sqlite_retry
@@ -409,17 +629,60 @@ def add_chunks(chunks_to_add: list) -> None:
     mem_before = process.memory_info().rss / (1024 * 1024)
     logger.info("Memory usage before batch chunk insertion: %.2f MB", mem_before)
 
+    from src.core.embedding_compatibility import get_embedding_model_metadata
+
     formatted_chunks = []
+    generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
     for vid, fname, idx, text, emb in chunks_to_add:
-        emb_blob = emb.astype(np.float32).tobytes()
-        formatted_chunks.append((vid, fname, idx, text, emb_blob))
+        emb_array = np.asarray(emb, dtype=np.float32)
+
+        if emb_array.ndim != 1:
+            raise ValueError("Each stored embedding must be a 1-dimensional vector.")
+
+        metadata = get_embedding_model_metadata(
+            emb_array.shape[0],
+            generated_at=generated_at,
+        )
+
+        emb_blob = emb_array.tobytes()
+
+        formatted_chunks.append(
+            (
+                vid,
+                fname,
+                idx,
+                text,
+                emb_blob,
+                metadata.model_identifier,
+                metadata.model_version,
+                metadata.dimension,
+                metadata.normalization_strategy,
+                metadata.generated_at,
+                metadata.vector_schema_version,
+            )
+        )
 
     with _connect() as conn:
         conn.executemany(
-            "INSERT OR REPLACE INTO chunks (vector_id, filename, chunk_index, chunk_text, embedding) VALUES (?, ?, ?, ?, ?)",
+            """
+            INSERT OR REPLACE INTO chunks (
+                vector_id,
+                filename,
+                chunk_index,
+                chunk_text,
+                embedding,
+                model_identifier,
+                model_version,
+                embedding_dimension,
+                normalization_strategy,
+                embedding_generated_at,
+                vector_schema_version
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
             formatted_chunks,
         )
-
     mem_after = process.memory_info().rss / (1024 * 1024)
     logger.info("Memory usage after batch chunk insertion: %.2f MB", mem_after)
 
@@ -437,18 +700,143 @@ def get_chunk_registry() -> list:
 
 def get_all_embeddings() -> np.ndarray:
     """Load all chunk embeddings from the database to rebuild the FAISS index."""
+    from src.core.embedding_compatibility import (
+        ensure_compatible_metadata,
+        get_active_embedding_metadata,
+        metadata_from_row,
+    )
+
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT embedding FROM chunks ORDER BY vector_id ASC"
+            """
+            SELECT
+                embedding,
+                model_identifier,
+                model_version,
+                embedding_dimension,
+                normalization_strategy,
+                embedding_generated_at,
+                vector_schema_version
+            FROM chunks
+            ORDER BY vector_id ASC
+            """
         ).fetchall()
 
     if not rows:
-        return np.empty((0, 384), dtype=np.float32)
+        return np.empty((0, 0), dtype=np.float32)
 
-    embeddings = [np.frombuffer(r[0], dtype=np.float32) for r in rows]
+    expected = get_active_embedding_metadata()
+    embeddings = []
+
+    for row in rows:
+        actual = metadata_from_row(row)
+        ensure_compatible_metadata(expected, actual)
+
+        vector = np.frombuffer(
+            row["embedding"],
+            dtype=np.float32,
+        )
+
+        if vector.shape[0] != actual.dimension:
+            raise ValueError(
+                "Stored embedding dimension does not match its metadata: "
+                f"{vector.shape[0]} != {actual.dimension}"
+            )
+
+        embeddings.append(vector)
+
     return np.vstack(embeddings)
+@with_sqlite_retry
+def update_document_embeddings(
+    filename: str,
+    embeddings: np.ndarray,
+    *,
+    model_identifier: str,
+    model_version: str,
+    normalization_strategy: str,
+    vector_schema_version: int,
+    generated_at: str,
+) -> int:
+    """Replace one document's embeddings while preserving document metadata."""
+    if embeddings.ndim != 2:
+        raise ValueError("Embeddings must be a 2-dimensional matrix.")
 
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT vector_id, chunk_index
+            FROM chunks
+            WHERE filename = ?
+            ORDER BY chunk_index ASC
+            """,
+            (filename,),
+        ).fetchall()
 
+        if len(rows) != embeddings.shape[0]:
+            raise ValueError(
+                f"Embedding/chunk count mismatch for {filename}: "
+                f"{embeddings.shape[0]} != {len(rows)}"
+            )
+
+        for row, vector in zip(rows, embeddings):
+            vector = np.asarray(vector, dtype=np.float32)
+
+            if vector.ndim != 1:
+                raise ValueError("Each embedding must be one-dimensional.")
+
+            if vector.shape[0] != embeddings.shape[1]:
+                raise ValueError("Inconsistent embedding dimensions.")
+            conn.execute(
+                """
+                UPDATE chunks
+                SET
+                    embedding = ?,
+                    model_identifier = ?,
+                    model_version = ?,
+                    embedding_dimension = ?,
+                    normalization_strategy = ?,
+                    embedding_generated_at = ?,
+                    vector_schema_version = ?
+                WHERE vector_id = ?
+                """,
+                (
+                    vector.tobytes(),
+                    model_identifier,
+                    model_version,
+                    embeddings.shape[1],
+                    normalization_strategy,
+                    generated_at,
+                    vector_schema_version,
+                    row["vector_id"],
+                ),
+            )
+
+        return len(rows)
+def get_document_embeddings_for_migration(
+    filename: str,
+) -> tuple[list[str], np.ndarray]:
+    """Load one document's chunk text for controlled re-embedding."""
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT chunk_text, embedding
+            FROM chunks
+            WHERE filename = ?
+            ORDER BY chunk_index ASC
+            """,
+            (filename,),
+        ).fetchall()
+
+    texts = [row["chunk_text"] for row in rows]
+    if not rows:
+        return [], np.empty((0, 0), dtype=np.float32)
+
+    vectors = [
+        np.frombuffer(row["embedding"], dtype=np.float32)
+        for row in rows
+    ]
+
+    return texts, np.vstack(vectors)
 @with_sqlite_retry
 def delete_document(filename: str) -> None:
     """Delete a document and all its associated chunks (cascade)."""
@@ -466,13 +854,15 @@ def delete_document(filename: str) -> None:
 
 
 @with_sqlite_retry
-def soft_delete_document(filename: str) -> None:
+def soft_delete_document(filename: str) -> bool:
     """Soft delete a document by setting is_deleted=1 and moving chunks to deleted_chunks."""
     with _connect() as conn:
-        conn.execute(
-            "UPDATE documents SET is_deleted = 1, deleted_at = ? WHERE filename = ?",
+        cursor = conn.execute(
+            "UPDATE documents SET is_deleted = 1, deleted_at = ? WHERE filename = ? AND (is_deleted IS NULL OR is_deleted = 0)",
             (datetime.now().isoformat(), filename),
         )
+        if cursor.rowcount == 0:
+            return False
         conn.execute(
             """
             INSERT INTO deleted_chunks (vector_id, filename, chunk_index, chunk_text, embedding)
@@ -484,6 +874,7 @@ def soft_delete_document(filename: str) -> None:
         )
         conn.execute("DELETE FROM chunks WHERE filename = ?", (filename,))
         _compact_vector_ids()
+        return True
 
 
 def get_deleted_documents() -> list:
@@ -521,13 +912,15 @@ def get_deleted_documents_count() -> int:
 
 
 @with_sqlite_retry
-def restore_document(filename: str) -> None:
+def restore_document(filename: str) -> bool:
     """Restore a soft-deleted document by setting is_deleted=0 and moving chunks back."""
     with _connect() as conn:
-        conn.execute(
-            "UPDATE documents SET is_deleted = 0, deleted_at = NULL WHERE filename = ?",
+        cursor = conn.execute(
+            "UPDATE documents SET is_deleted = 0, deleted_at = NULL WHERE filename = ? AND is_deleted = 1",
             (filename,),
         )
+        if cursor.rowcount == 0:
+            return False
         restored = conn.execute(
             "SELECT filename, chunk_index, chunk_text, embedding FROM deleted_chunks WHERE filename = ?",
             (filename,),
@@ -543,6 +936,7 @@ def restore_document(filename: str) -> None:
             )
         conn.execute("DELETE FROM deleted_chunks WHERE filename = ?", (filename,))
         _compact_vector_ids()
+        return True
 
 
 @with_sqlite_retry
@@ -587,7 +981,7 @@ def batch_soft_delete_documents(doc_ids: list[int]) -> int:
 
     with _connect() as conn:
         conn.execute(
-            f"""
+            f"""  # nosec
             INSERT INTO deleted_chunks (vector_id, filename, chunk_index, chunk_text, embedding)
             SELECT vector_id, filename, chunk_index, chunk_text, embedding
             FROM chunks
@@ -596,14 +990,14 @@ def batch_soft_delete_documents(doc_ids: list[int]) -> int:
             tuple(doc_ids),
         )
         conn.execute(
-            f"""
+            f"""  # nosec
             DELETE FROM chunks
             WHERE filename IN (SELECT filename FROM documents WHERE id IN ({placeholders}))
             """,
             tuple(doc_ids),
         )
         cursor = conn.execute(
-            f"UPDATE documents SET is_deleted = 1, deleted_at = ? WHERE id IN ({placeholders})",
+            f"UPDATE documents SET is_deleted = 1, deleted_at = ? WHERE id IN ({placeholders})",  # nosec
             (now, *doc_ids),
         )
         rowcount = cursor.rowcount
@@ -639,7 +1033,7 @@ def batch_permanently_delete_documents(doc_ids: list[int]) -> int:
         filenames = [
             row[0]
             for row in conn.execute(
-                f"SELECT filename FROM documents WHERE id IN ({placeholders})",
+                f"SELECT filename FROM documents WHERE id IN ({placeholders})",  # nosec
                 doc_id_tuple,
             ).fetchall()
         ]
@@ -656,7 +1050,7 @@ def batch_permanently_delete_documents(doc_ids: list[int]) -> int:
             conn.execute("DELETE FROM deleted_chunks WHERE filename = ?", (filename,))
 
         cursor = conn.execute(
-            f"DELETE FROM documents WHERE id IN ({placeholders})",
+            f"DELETE FROM documents WHERE id IN ({placeholders})",  # nosec
             doc_id_tuple,
         )
         rowcount = cursor.rowcount
@@ -791,7 +1185,7 @@ def get_chunks_for_documents(
     placeholders = ",".join("?" for _ in filenames)
     with _connect() as conn:
         rows = conn.execute(
-            f"""
+            f"""  # nosec
             SELECT filename, chunk_text, embedding
             FROM chunks
             WHERE filename IN ({placeholders})
@@ -808,7 +1202,10 @@ def get_chunks_for_documents(
 
     result: dict[str, tuple[list[str], np.ndarray]] = {}
     for filename, (texts, vectors) in grouped.items():
-        result[filename] = (texts, np.vstack(vectors) if vectors else np.empty((0, 384), dtype=np.float32))
+        result[filename] = (
+            texts,
+            np.vstack(vectors) if vectors else np.empty((0, 384), dtype=np.float32),
+        )
     return result
 
 
@@ -1001,6 +1398,19 @@ def check_database_integrity() -> list[str]:
         return [f"Error: {e}"]
 
 
+def vacuum_corpus_database() -> None:
+    """Reclaim unused SQLite pages after bulk corpus deletions."""
+    close_connections(all_threads=True)
+
+    path = get_corpus_db_path()
+    conn = sqlite3.connect(os.path.abspath(path), timeout=15.0)
+    conn.isolation_level = None
+    try:
+        conn.execute("VACUUM")
+    finally:
+        conn.close()
+
+
 @with_sqlite_retry
 def optimize_database() -> dict[str, any]:
     """Executes SQLite VACUUM to reclaim database storage space."""
@@ -1008,7 +1418,7 @@ def optimize_database() -> dict[str, any]:
     try:
         size_before = path.stat().st_size if path.exists() else 0
 
-        conn = sqlite3.connect(os.path.abspath(path))
+        conn = sqlite3.connect(os.path.abspath(path), timeout=15.0)
         conn.isolation_level = None
         try:
             conn.execute("VACUUM")
@@ -1227,3 +1637,67 @@ def get_scan_history(
     except Exception as exc:
         logger.error("Failed to retrieve scan history: %s", exc)
         return []
+
+
+def get_embedding_storage_footprint() -> dict[str, int | float]:
+    """Calculate and return the vector embedding storage usage.
+
+    Queries the SQLite database to compute the total size in bytes of the
+    'embedding' column across all rows in the 'chunks' table, and compares
+    it against the actual file size of the database.
+
+    Returns:
+        A dictionary containing:
+        - 'embedding_bytes' (int): Total bytes used by embeddings in the chunks table.
+        - 'database_bytes' (int): Total size of the corpus database file on disk.
+        - 'embedding_percentage' (float): Percentage of DB size used by embeddings (0.0 to 100.0).
+        - 'chunk_count' (int): Total number of chunks analyzed.
+    """
+    path = get_corpus_db_path()
+    try:
+        database_bytes = path.stat().st_size if path.exists() else 0
+    except OSError:
+        database_bytes = 0
+
+    embedding_bytes = 0
+    chunk_count = 0
+
+    try:
+        with _connect() as conn:
+            # Calculate sum of lengths of BLOBs, handling empty table case safely
+            row = conn.execute(
+                "SELECT SUM(LENGTH(embedding)), COUNT(1) FROM chunks"
+            ).fetchone()
+            if row:
+                embedding_bytes = int(row[0]) if row[0] is not None else 0
+                chunk_count = int(row[1]) if row[1] is not None else 0
+    except Exception as e:
+        logger.error("Failed to calculate embedding footprint: %s", e)
+        # We can still proceed returning whatever info we successfully gathered
+
+    percentage = 0.0
+    if database_bytes > 0:
+        percentage = (embedding_bytes / database_bytes) * 100.0
+        # Guard against anomalies where sum of columns > file size (e.g., WAL file missing from calculation but containing data)
+        percentage = min(percentage, 100.0)
+
+    return {
+        "embedding_bytes": embedding_bytes,
+        "database_bytes": database_bytes,
+        "embedding_percentage": float(percentage),
+        "chunk_count": chunk_count,
+    }
+
+def get_documents_with_embeddings() -> list[str]:
+    """Return documents that have persisted chunk embeddings."""
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT filename
+            FROM chunks
+            WHERE embedding IS NOT NULL
+            ORDER BY filename ASC
+            """
+        ).fetchall()
+
+    return [row["filename"] for row in rows]

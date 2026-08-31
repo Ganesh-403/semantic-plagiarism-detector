@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlagiarismDetectorExportReport",
+  "description": "Official JSON schema for exported plagiarism analysis reports.",
+  "type": "object",
+  "required": [
+    "metadata",
+    "data"
+  ],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": [
+        "exported_at"
+      ],
+      "properties": {
+        "exported_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 UTC timestamp when report was generated"
+        },
+        "version": {
+          "type": "string"
+        },
+        "report_type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "data": {
+      "description": "Main report payload body"
+    }
+  },
+  "additionalProperties": true
+}

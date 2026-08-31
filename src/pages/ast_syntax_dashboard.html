@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise AST Syntax Tree Plagiarism Dashboard | Semantic Plagiarism Detector</title>
+    <meta name="description" content="Abstract Syntax Tree (AST) structural similarity and fuzzy syntax tree alignment engine for code clone and structural plagiarism detection.">
+    <link rel="stylesheet" href="styles/ast_syntax_dashboard.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <!-- Header Architecture Comment: AST Structural Plagiarism & Tree Isomorphism Analytics Dashboard -->
+    <!-- Design Pattern: Glassmorphic Modular Dashboard with Real-time AST Subtree Matching Metrics -->
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar-navigation" id="sidebar-nav">
+            <div class="brand-header">
+                <div class="brand-logo">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="16 18 22 12 16 6"></polyline>
+                        <polyline points="8 6 2 12 8 18"></polyline>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h2>ASTShield</h2>
+                    <span>Syntax Tree Engine v3.8</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#overview" class="nav-item active" id="nav-overview">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span>Tree Matrix</span>
+                </a>
+                <a href="#ast-visualizer" class="nav-item" id="nav-ast-visualizer">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"></circle><circle cx="6" cy="19" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="12" y1="8" x2="6" y2="16"></line><line x1="12" y1="8" x2="18" y2="16"></line></svg>
+                    <span>Subtree Isomorphism</span>
+                </a>
+                <a href="#code-corpus" class="nav-item" id="nav-code-corpus">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    <span>Code Repository</span>
+                </a>
+                <a href="#tree-diff" class="nav-item" id="nav-tree-diff">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    <span>Node Edit Distance</span>
+                </a>
+                <a href="#settings" class="nav-item" id="nav-settings">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>Parser Tuning</span>
+                </a>
+            </nav>
+
+            <div class="system-status-widget glass-card">
+                <div class="status-indicator online"></div>
+                <div class="status-info">
+                    <span class="status-title">AST Parser Online</span>
+                    <span class="status-subtitle">Tree-sitter Active</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Surface -->
+        <main class="main-content">
+            <!-- Top Header Controls -->
+            <header class="top-header glass-card">
+                <div class="header-search">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="ast-search-input" placeholder="Search function hash, AST subtree, or source file..." aria-label="Search AST files">
+                </div>
+
+                <div class="header-actions">
+                    <div class="filter-dropdown">
+                        <select id="ast-algorithm-select" class="styled-select">
+                            <option value="tree-edit-distance">Zhang-Shasha Tree Edit Distance</option>
+                            <option value="subtree-isomorphism">Subtree Isomorphism Hashing</option>
+                            <option value="token-sequence">Abstracted Token Sequence (Type-2)</option>
+                            <option value="control-flow">Control Flow Graph Overlap</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-secondary" id="btn-sync-ast-tree">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        <span>Sync AST Nodes</span>
+                    </button>
+
+                    <button class="btn btn-primary" id="btn-run-ast-audit">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                        <span>Run Tree Alignment Audit</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Content Body -->
+            <div class="dashboard-body">
+                <!-- Summary Metrics Banner -->
+                <section class="metrics-grid">
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon blue-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Parsed AST Nodes</span>
+                            <span class="metric-value" id="val-ast-nodes">8,412,900</span>
+                            <span class="metric-trend positive">+18.5% parsed</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon red-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Isomorphic Subtrees</span>
+                            <span class="metric-value" id="val-isomorphic-clones">3,120</span>
+                            <span class="metric-trend negative">4.8% high risk</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon purple-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"></circle><circle cx="6" cy="19" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="12" y1="8" x2="6" y2="16"></line><line x1="12" y1="8" x2="18" y2="16"></line></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Avg Tree Depth</span>
+                            <span class="metric-value" id="val-avg-depth">14.2 levels</span>
+                            <span class="metric-trend neutral">Structural depth</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon green-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Parsing Velocity</span>
+                            <span class="metric-value" id="val-parse-speed">1.8 ms/file</span>
+                            <span class="metric-trend positive">Parallel Tree-sitter</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Analytics Section Grid -->
+                <section class="analytics-section-grid">
+                    <!-- AST Edit Distance Distribution -->
+                    <div class="analytics-card glass-card span-col-2">
+                        <div class="card-header">
+                            <div class="title-group">
+                                <h3>AST Subtree Similarity Distribution</h3>
+                                <p class="card-subtitle">Node isomorphism spectrum across analyzed source files</p>
+                            </div>
+                            <div class="card-actions">
+                                <span class="badge badge-accent" id="badge-ast-cutoff">Cutoff: 80%</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="vector-graph-container" id="ast-graph-visual">
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 20%;"></div>
+                                    <span class="graph-label">0-20%</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 55%;"></div>
+                                    <span class="graph-label">21-40%</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 82%;"></div>
+                                    <span class="graph-label">41-60%</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 38%;"></div>
+                                    <span class="graph-label">61-80%</span>
+                                </div>
+                                <div class="graph-bar-wrapper danger-zone">
+                                    <div class="graph-bar danger" style="height: 24%;"></div>
+                                    <span class="graph-label">81-100%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Parser Tuning Control Panel -->
+                    <div class="analytics-card glass-card">
+                        <div class="card-header">
+                            <h3>AST Sensitivity Controls</h3>
+                        </div>
+                        <div class="card-body controls-form">
+                            <div class="form-group">
+                                <label for="range-ast-cutoff">Tree Similarity Threshold: <span id="lbl-ast-cutoff">80%</span></label>
+                                <input type="range" id="range-ast-cutoff" min="50" max="99" value="80" class="styled-range">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="range-min-nodes">Min Subtree Node Count: <span id="lbl-min-nodes">12 nodes</span></label>
+                                <input type="range" id="range-min-nodes" min="4" max="64" value="12" step="2" class="styled-range">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="select-ast-language">Target Parser Language</label>
+                                <select id="select-ast-language" class="styled-select">
+                                    <option value="python">Python 3.11 AST</option>
+                                    <option value="javascript">JavaScript / TypeScript ESM</option>
+                                    <option value="java">Java 17 OpenJDK AST</option>
+                                    <option value="cpp">C++20 Clang AST</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group toggle-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="chk-ignore-identifiers" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label">Ignore Variable/Function Renaming (Type-2)</span>
+                            </div>
+
+                            <button class="btn btn-primary btn-full" id="btn-reparse-ast">
+                                <span>Re-Build AST Graph Index</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- AST Telemetry Table -->
+                <section class="table-section glass-card">
+                    <div class="card-header">
+                        <div class="title-group">
+                            <h3>AST Code Clone Match Matrix</h3>
+                            <p class="card-subtitle">Syntactic subtree alignment and edit distance metrics</p>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-sm btn-secondary" id="btn-export-ast-csv">Export AST Metrics</button>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="data-table" id="ast-telemetry-table">
+                            <thead>
+                                <tr>
+                                    <th>Match ID</th>
+                                    <th>Primary File</th>
+                                    <th>Comparison File</th>
+                                    <th>Tree Similarity</th>
+                                    <th>Edit Distance</th>
+                                    <th>Clone Class</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ast-table-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="../src/services/ast_syntax_engine.js"></script>
+</body>
+</html>

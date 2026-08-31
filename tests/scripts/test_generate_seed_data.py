@@ -27,16 +27,14 @@ class TestGenerateSeedData:
         seed_dir = tmp_path / "seeds"
         assert not seed_dir.exists()
 
-        with patch("generate_seed_data.init_db"), patch(
-            "generate_seed_data.init_corpus_db"
-        ), patch("generate_seed_data.init_incident_db"), patch(
-            "generate_seed_data.add_user"
-        ), patch(
-            "generate_seed_data.add_document"
-        ), patch(
-            "generate_seed_data.record_plagiarism_incident"
+        with (
+            patch("generate_seed_data.init_db"),
+            patch("generate_seed_data.init_corpus_db"),
+            patch("generate_seed_data.init_incident_db"),
+            patch("generate_seed_data.add_user"),
+            patch("generate_seed_data.add_document"),
+            patch("generate_seed_data.record_plagiarism_incident"),
         ):
-
             generate_seed_data.generate_seed_data(seed_dir, dry_run=False)
 
         assert seed_dir.exists()

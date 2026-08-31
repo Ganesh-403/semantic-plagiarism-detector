@@ -107,7 +107,7 @@ For a given text, the function:
 {
     "ai_probability": 0.82,
     "confidence_tier": "high",
-    "classification_tier": "high",   # kept for API compatibility
+    "classification_tier": "high",  # kept for API compatibility
     "perplexity_score": 18.4,
     "burstiness_score": 0.12,
     "ngram_repetitiveness": 0.35,

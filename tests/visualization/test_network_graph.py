@@ -713,16 +713,11 @@ def test_export_network_centrality_csv():
     csv_str = export_network_centrality_csv(graph)
 
     lines = csv_str.strip().splitlines()
-    assert lines[0] == (
-        "Document_Name,Degree,Centrality_Score,PageRank_Score"
-    )
+    assert lines[0] == ("Document_Name,Degree,Centrality_Score,PageRank_Score")
     assert len(lines) == 4  # Header + 3 nodes
 
     rows = [line.split(",") for line in lines[1:]]
-    row_dict = {
-        row[0]: (int(row[1]), float(row[2]), float(row[3]))
-        for row in rows
-    }
+    row_dict = {row[0]: (int(row[1]), float(row[2]), float(row[3])) for row in rows}
 
     assert "doc1" in row_dict
     assert row_dict["doc1"][0] == 2
@@ -748,9 +743,7 @@ def test_export_network_centrality_csv_star_graph_center_ranks_highest():
     csv_str = export_network_centrality_csv(graph)
     lines = csv_str.strip().splitlines()
 
-    assert lines[0] == (
-        "Document_Name,Degree,Centrality_Score,PageRank_Score"
-    )
+    assert lines[0] == ("Document_Name,Degree,Centrality_Score,PageRank_Score")
 
     rows = [line.split(",") for line in lines[1:]]
     values = {
@@ -766,9 +759,7 @@ def test_export_network_centrality_csv_star_graph_center_ranks_highest():
 
     assert center["degree"] == 4
     assert center["centrality"] == 1.0
-    assert center["pagerank"] == max(
-        item["pagerank"] for item in values.values()
-    )
+    assert center["pagerank"] == max(item["pagerank"] for item in values.values())
     assert center["pagerank"] > values["leaf1"]["pagerank"]
 
 
@@ -1101,6 +1092,7 @@ def test_plot_plagiarism_network_graph_accepts_max_nodes():
     assert len(fig.data[1].customdata) == 2
     assert "3 nodes hidden" in fig.layout.annotations[0].text
 
+
 def test_get_cluster_count_returns_two_for_two_disjoint_pairs():
     """Verify get_cluster_count counts connected components correctly."""
     graph = nx.Graph()
@@ -1112,6 +1104,8 @@ def test_get_cluster_count_returns_two_for_two_disjoint_pairs():
     )
 
     assert get_cluster_count(graph) == 2
+
+
 def test_export_network_to_gexf_valid_xml():
     """Verify GEXF export returns well-formed XML with a GEXF root."""
     data = {
@@ -1131,8 +1125,6 @@ def test_export_network_to_gexf_valid_xml():
     root = ET.fromstring(gexf_bytes)
 
     assert root.tag.endswith("gexf")
-
-
 
 
 # ── Issue #2350: Empty state rendering for plot_plagiarism_network_graph ────
@@ -1185,7 +1177,9 @@ def test_issue_2350_empty_state_has_fallback_annotation():
     assert any(
         "No documents" in ann.text or "No data" in ann.text
         for ann in fig.layout.annotations
-    ), f"Expected fallback annotation, got: {[ann.text for ann in fig.layout.annotations]}"
+    ), (
+        f"Expected fallback annotation, got: {[ann.text for ann in fig.layout.annotations]}"
+    )
 
 
 def test_issue_2350_empty_state_does_not_raise():
@@ -1201,6 +1195,3 @@ def test_issue_2350_empty_state_does_not_raise():
         pytest.fail(
             f"plot_plagiarism_network_graph raised an exception on empty input: {exc}"
         )
-
-
-

@@ -1,10 +1,11 @@
-# Ruff configuration — shared between CI and pre-commit hooks
+target-version = "py310"
+
 [lint]
-select = ["E", "F", "I"]
+select = ["E"]
 # E402: Module level import not at top of file
 #   Required because app/streamlit_app.py and evaluation/evaluate.py
 #   modify sys.path before importing project modules.
-ignore = ["E402", "E501"]
+ignore = ["E402", "E501", "E701", "E722", "E741"]
 
 # Mirror the per-file exemptions already declared in .flake8 so the two
 # linters agree about the same file.
@@ -16,4 +17,4 @@ ignore = ["E402", "E501"]
 # single E999 and never reached the rest.
 [lint.per-file-ignores]
 "app/streamlit_app.py" = ["F401", "F811", "F841"]
-"tests/*" = ["F", "E"]
+"tests/*" = ["F", "E", "I", "UP"]

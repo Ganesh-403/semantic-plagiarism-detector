@@ -3,8 +3,10 @@
 import html
 import random
 import time
+import xml.etree.ElementTree as ET
 
-from src.utils.diff_highlighter import MARK_OPEN_TAG, highlight_overlap
+import src.utils.diff_highlighter as diff_highlighter
+from src.utils.diff_highlighter import MARK_OPEN_TAG, _tokenize, highlight_overlap
 
 
 def test_no_overlap():
@@ -109,6 +111,29 @@ def test_marks_never_nest():
     for result in (result_a, result_b):
         assert result.count("<mark") == 1
         assert result.count("</mark>") == 1
+
+
+def test_highlighted_output_is_balanced_and_xml_parseable():
+    """Opened <mark> tags must close, and the HTML fragment must parse."""
+    cases = [
+        ("alpha beta gamma delta", "alpha beta gamma delta"),
+        (
+            "alpha beta gamma delta epsilon zeta eta theta",
+            "alpha beta gamma delta epsilon zeta eta theta",
+        ),
+        ("<b>alpha beta gamma delta</b>", "<b>alpha beta gamma delta</b>"),
+        ("alpha beta gamma delta café 🎓", "alpha beta gamma delta café 🎓"),
+        (
+            "alpha beta gamma delta filler words here kappa lambda mu nu",
+            "alpha beta gamma delta other bridging text kappa lambda mu nu",
+        ),
+    ]
+
+    for text_a, text_b in cases:
+        result_a, result_b = highlight_overlap(text_a, text_b)
+        for result in (result_a, result_b):
+            assert result.count("<mark") == result.count("</mark>")
+            ET.fromstring(f"<root>{result}</root>")
 
 
 def test_output_stays_escaped_around_a_match():
@@ -294,3 +319,120 @@ def test_large_identical_documents_complete_quickly():
     assert "<mark" in result_a
     assert "<mark" in result_b
     assert elapsed < 2.0, f"highlight_overlap took {elapsed:.2f}s for 3000 words"
+
+
+# --- CJK tokenization (Issue #3213) -----------------------------------------
+
+
+def test_tokenize_splits_cjk_characters_individually():
+    """Each Han/Kana character is its own token; latin words stay whole."""
+    assert _tokenize("你好世界") == ["你", "好", "世", "界"]
+    assert _tokenize("hello 世界") == ["hello", "世", "界"]
+    assert _tokenize("カタカナ") == list("カタカナ")
+    assert _tokenize("ひらがな") == list("ひらがな")
+
+
+def test_identical_chinese_sentences_are_fully_highlighted():
+    """Identical CJK documents mark their shared text like latin ones do."""
+    text = "这是一段用于检测抄袭的中文句子"
+    result_a, result_b = highlight_overlap(text, text)
+
+    assert "<mark" in result_a
+    assert "<mark" in result_b
+    assert text in result_a
+    assert text in result_b
+
+
+def test_shared_cjk_run_inside_different_sentences_is_found():
+    """The reported symptom: whole-sentence tokens used to hide this run.
+
+    Both sentences tokenize to a single opaque token under the old
+    word-boundary scanner, so the eight-character shared middle could
+    never match.
+    """
+    text_a = "前半部分这段文字完全相同其余不同"
+    text_b = "别的内容这段文字完全相同另一段"
+
+    result_a, result_b = highlight_overlap(text_a, text_b, min_match_length=4)
+
+    assert "<mark" in result_a
+    assert "<mark" in result_b
+    assert "这段文字完全相同" in result_a
+    assert "这段文字完全相同" in result_b
+
+
+def test_cjk_prefix_share_is_now_visible():
+    """A long shared prefix across divergent sentences gets marked."""
+    result_a, result_b = highlight_overlap(
+        "今天我们讨论数据库设计",
+        "今天我们讨论了别的主题",
+        min_match_length=4,
+    )
+
+    assert "<mark" in result_a
+    assert "<mark" in result_b
+    assert "今天我们讨论" in result_a
+    assert "今天我们讨论" in result_b
+
+
+def test_short_cjk_run_below_threshold_is_not_highlighted():
+    """Fewer than min_match_length shared characters must stay clean."""
+    text_a = "甲乙丙丁相同字戊己庚辛"
+    text_b = "子丑寅卯相同字辰巳午未"
+
+    result_a, result_b = highlight_overlap(text_a, text_b, min_match_length=4)
+
+    assert "<mark" not in result_a
+    assert "<mark" not in result_b
+
+
+def test_japanese_kana_document_highlights_and_preserves_text():
+    """Hiragana/Katakana (U+3040-U+30FF) follow the same character path."""
+    text = "プログラムを書くのが好きです"
+    tokens = _tokenize(text)
+
+    assert len(tokens) == len(text)
+    assert "".join(tokens) == text.lower()
+
+    result_a, result_b = highlight_overlap(text, text)
+
+    assert "<mark" in result_a
+    assert text in result_a
+
+
+def test_mixed_script_documents_keep_original_characters():
+    """English words and CJK characters interleave without breaking spans."""
+    text_a = "Report says 数据完全一致 in section 3."
+    text_b = "Other report: 数据完全一致 elsewhere."
+
+    result_a, result_b = highlight_overlap(text_a, text_b, min_match_length=4)
+
+    assert "<mark" in result_a
+    assert "数据完全一致" in result_a
+    assert "数据完全一致" in result_b
+    # Unshared latin context survives untouched around the marks.
+    assert "Report says" in result_a
+    assert "in section 3." in result_a
+
+
+def test_cjk_matching_does_not_break_escaping():
+    """XSS escaping guarantees hold for CJK payloads too."""
+    payload = "<b>这一段文字完全相同</b> 尾部"
+
+    result_a, _ = highlight_overlap(payload, payload)
+
+    stripped = result_a.replace(MARK_OPEN_TAG, "").replace("</mark>", "")
+    assert "<b>" not in stripped
+    assert "&lt;b&gt;" in stripped
+
+
+def test_latin_tokenization_unchanged_by_cjk_support():
+    """Pure-latin documents tokenize exactly as before the change."""
+    assert _tokenize("Hello, World! Don't stop.") == [
+        "hello",
+        "world",
+        "don",
+        "t",
+        "stop",
+    ]
+    assert _tokenize("!!! ??? ...") == []

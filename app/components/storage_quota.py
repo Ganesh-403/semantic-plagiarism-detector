@@ -9,8 +9,8 @@ from typing import Any, Dict
 
 import streamlit as st
 
+from src.core.app_config import DATA_DIR
 from src.utils.storage_metrics import calculate_storage_usage
-
 STORAGE_LIMIT_GB = 10.0
 
 
@@ -23,8 +23,7 @@ def get_total_corpus_storage_bytes() -> int:
     usage = calculate_storage_usage()
     total_bytes = usage.get("total_bytes", 0)
 
-    base_dir = Path(__file__).resolve().parents[2]
-    data_dir = base_dir / "data"
+    data_dir = DATA_DIR
     if data_dir.exists():
         for p in data_dir.glob("**/*"):
             if p.is_file() and p.suffix not in (".db", ".index"):
@@ -35,7 +34,7 @@ def get_total_corpus_storage_bytes() -> int:
     return total_bytes
 
 
-def render_storage_quota_progress(limit_gb: float = 10.0) -> Dict[str, Any]:
+def render_storage_quota_progress(limit_gb: float = 10.0) -> dict[str, Any]:
     """Render st.progress bar in Settings tab displaying percentage of storage limit consumed.
 
     Args:

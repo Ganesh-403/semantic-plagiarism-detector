@@ -55,8 +55,8 @@ class TestChunkTextDynamicMinWords:
         chunks = chunk_text(text, chunk_size=50, chunk_overlap=0, min_words=5)
 
         # The "Short." chunk (1 word) should be discarded
-        assert all(count_words(c) >= 5 for c in chunks)
-        assert "Short." not in chunks
+        assert all(count_words(c.text) >= 5 for c in chunks)
+        assert all("Short." not in c.text for c in chunks)
 
     def test_keeps_chunks_meeting_threshold(self):
         """Verify chunks meeting the min_words threshold are retained."""
@@ -65,7 +65,7 @@ class TestChunkTextDynamicMinWords:
         chunks = chunk_text(text, chunk_size=100, chunk_overlap=0, min_words=5)
 
         assert len(chunks) > 0
-        assert all(count_words(c) >= 5 for c in chunks)
+        assert all(count_words(c.text) >= 5 for c in chunks)
 
     def test_min_words_zero_keeps_all(self):
         """Verify min_words=0 retains all chunks regardless of size."""
@@ -88,8 +88,8 @@ class TestChunkTextDynamicMinWords:
         chunks = chunk_text(text, chunk_size=100, chunk_overlap=0, min_words=5)
 
         # Page numbers "1" and "2" should not appear as standalone chunks
-        assert "1" not in chunks
-        assert "2" not in chunks
+        assert all("1" not in c.text for c in chunks)
+        assert all("2" not in c.text for c in chunks)
 
     def test_headers_discarded_if_too_short(self):
         """Verify short headers are discarded if they fall below min_words."""
@@ -98,7 +98,7 @@ class TestChunkTextDynamicMinWords:
         chunks = chunk_text(text, chunk_size=50, chunk_overlap=0, min_words=5)
 
         # "Chapter 1" is only 2 words, should be discarded
-        assert "Chapter 1" not in chunks
+        assert all("Chapter 1" not in c.text for c in chunks)
 
     def test_overlap_does_not_create_invalid_chunks(self):
         """Verify overlapping windows don't generate invalid small chunks."""
@@ -106,7 +106,7 @@ class TestChunkTextDynamicMinWords:
 
         chunks = chunk_text(text, chunk_size=50, chunk_overlap=25, min_words=5)
 
-        assert all(count_words(c) >= 5 for c in chunks)
+        assert all(count_words(c.text) >= 5 for c in chunks)
 
     def test_entire_text_too_small_returns_empty(self):
         """Verify if the entire text is below min_words, an empty list is returned."""
@@ -126,7 +126,7 @@ class TestChunkTextDynamicMinWords:
         chunks = chunk_text(text, chunk_size=100, chunk_overlap=0, min_words=5)
 
         # All resulting chunks should still meet the min_words requirement
-        assert all(count_words(c) >= 5 for c in chunks)
+        assert all(count_words(c.text) >= 5 for c in chunks)
 
 
 class TestChunkBySentencesMinWords:
@@ -141,7 +141,7 @@ class TestChunkBySentencesMinWords:
         chunks = chunk_by_sentences(text, max_chunk_size=100, min_words=5)
 
         # "Short." should be discarded
-        assert all(count_words(c) >= 5 for c in chunks)
+        assert all(count_words(c.text) >= 5 for c in chunks)
 
     def test_combines_short_sentences_to_meet_threshold(self):
         """Verify short sentences are combined to meet the min_words threshold."""
@@ -150,7 +150,7 @@ class TestChunkBySentencesMinWords:
         chunks = chunk_by_sentences(text, max_chunk_size=1000, min_words=5)
 
         # Should combine sentences until each chunk has >= 5 words
-        assert all(count_words(c) >= 5 for c in chunks)
+        assert all(count_words(c.text) >= 5 for c in chunks)
 
     def test_empty_text_returns_empty_list(self):
         """Verify empty text returns an empty list."""

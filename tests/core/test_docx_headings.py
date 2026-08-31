@@ -29,7 +29,9 @@ def test_docx_headings_extraction_and_chunking():
 
     # Extract text
     parsed_text = extract_text_from_docx(file_bytes)
-    assert hasattr(parsed_text, "word_headings")
+    assert parsed_text.text
+    assert parsed_text.headings
+    assert len(parsed_text.headings) == len(parsed_text.text.split())
 
     # Chunk text
     chunks = chunk_text(parsed_text, chunk_size=30, chunk_overlap=5)
@@ -49,7 +51,7 @@ def test_docx_headings_extraction_and_chunking():
         elif "deeply nested third section" in chunk:
             assert chunk.metadata.get("section_title") == "### Heading 3 Title"
             found_heading_3 = True
-            
+
     assert found_heading_2
     assert found_heading_3
 
@@ -86,6 +88,7 @@ def test_extract_text_from_docx_with_tables():
     from src.core.parsers.docx_parser import (
         extract_text_from_docx as parser_extract_docx,
     )
+
     # Create an in-memory DOCX file with a 2x2 table
     doc = docx.Document()
     table = doc.add_table(rows=2, cols=2)
@@ -103,10 +106,10 @@ def test_extract_text_from_docx_with_tables():
 
     # Extract using the main document parser version
     parsed_text_1 = extract_text_from_docx(file_bytes)
-    assert "Cell 1,1 Text" in parsed_text_1
-    assert "Cell 1,2 Text" in parsed_text_1
-    assert "Cell 2,1 Text" in parsed_text_1
-    assert "Cell 2,2 Text" in parsed_text_1
+    assert "Cell 1,1 Text" in parsed_text_1.text
+    assert "Cell 1,2 Text" in parsed_text_1.text
+    assert "Cell 2,1 Text" in parsed_text_1.text
+    assert "Cell 2,2 Text" in parsed_text_1.text
 
     # Extract using the parsers package version
     parsed_text_2 = parser_extract_docx(file_bytes)
@@ -114,5 +117,3 @@ def test_extract_text_from_docx_with_tables():
     assert "Cell 1,2 Text" in parsed_text_2
     assert "Cell 2,1 Text" in parsed_text_2
     assert "Cell 2,2 Text" in parsed_text_2
-
-        

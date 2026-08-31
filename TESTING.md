@@ -16,14 +16,38 @@ The core database layers (`src.db.corpus_db`, `src.db.auth`, `src.db.incidents`)
 
 ## Running Tests
 
-We provide a robust testing framework designed to enforce code coverage and execute targeted subsets.
+We provide a robust testing framework designed to enforce code coverage and execute targeted subsets across multiple CPU cores.
+
+### Parallel Test Execution (`pytest-xdist`)
+The test suite is pre-configured in `pytest.ini` to run in parallel using `pytest-xdist`:
+- **`-n auto`**: Automatically detects the number of available CPU cores and spawns worker processes accordingly.
+- **`--dist=loadscope`**: Groups test functions by module and test methods by class, sending each group to the same worker process. This guarantees that tests sharing database fixtures (`mock_db`, `mock_auth_db`), mock states, or temporary resources run sequentially on one worker, preventing concurrency issues and race conditions.
+
+```bash
+# Run all tests in parallel (auto-detects CPU cores via pytest.ini)
+pytest
+
+# Explicitly specify parallel workers
+pytest -n auto
+pytest -n 4
+
+# Run a specific test marker in parallel
+pytest -m unit -n auto
+pytest -m integration -n auto
+
+# Disable parallel execution for debugging/serial tracing
+pytest -n 0
+```
 
 ### Automated Test Runner
-Instead of calling `pytest` directly, use the provided `scripts/run_tests.py` automation script. It handles configuration parsing, coverage aggregation, and Docker container provisioning.
+Instead of calling `pytest` directly, you can also use the provided `scripts/run_tests.py` automation script. It handles configuration parsing, coverage aggregation, and Docker container provisioning.
 
 ```bash
 # Run the entire test suite and generate an HTML coverage report
 python scripts/run_tests.py --all
+
+# Run the test suite with parallel execution explicitly enabled
+python scripts/run_tests.py --all --parallel
 
 # Run only isolated unit tests (excludes network/DB-heavy operations)
 python scripts/run_tests.py --unit

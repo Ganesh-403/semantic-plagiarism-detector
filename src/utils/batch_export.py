@@ -13,12 +13,15 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from src.utils.export_sanitizer import sanitize_spreadsheet_value
+
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class ExportConfig:
     """Configuration for export operations."""
+
     output_dir: str = "exports"
     include_details: bool = True
     include_metadata: bool = True
@@ -38,9 +41,7 @@ class BatchExporter:
         os.makedirs(self.config.output_dir, exist_ok=True)
 
     def export_json(
-        self,
-        results: Dict[str, Any],
-        filename: str = "batch_results.json"
+        self, results: Dict[str, Any], filename: str = "batch_results.json"
     ) -> str:
         """
         Export results to JSON format.
@@ -53,19 +54,14 @@ class BatchExporter:
             Path to exported file
         """
         output_path = os.path.join(self.config.output_dir, filename)
-        export_data = {
-            "exported_at": datetime.now().isoformat(),
-            "results": results
-        }
+        export_data = {"exported_at": datetime.now().isoformat(), "results": results}
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(export_data, f, indent=2, default=str, ensure_ascii=False)
         logger.info(f"Exported JSON to {output_path}")
         return output_path
 
     def export_csv(
-        self,
-        data: List[Dict[str, Any]],
-        filename: str = "batch_results.csv"
+        self, data: List[Dict[str, Any]], filename: str = "batch_results.csv"
     ) -> str:
         """
         Export results to CSV format.
@@ -87,7 +83,7 @@ class BatchExporter:
         with open(output_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=headers)
             writer.writeheader()
-            writer.writerows(data[:self.config.max_results])
+            writer.writerows(data[: self.config.max_results])
         logger.info(f"Exported CSV to {output_path}")
         return output_path
 
@@ -95,7 +91,7 @@ class BatchExporter:
         self,
         flagged_pairs: List[Dict[str, Any]],
         summary: Dict[str, Any],
-        filename: str = "plagiarism_report.json"
+        filename: str = "plagiarism_report.json",
     ) -> str:
         """
         Export a comprehensive plagiarism report.
@@ -118,8 +114,8 @@ class BatchExporter:
                 "high_severity": summary.get("high_severity", 0),
                 "avg_similarity": summary.get("avg_similarity", 0),
             },
-            "flagged_pairs": flagged_pairs[:self.config.max_results],
-            "metadata": summary.get("metadata", {})
+            "flagged_pairs": flagged_pairs[: self.config.max_results],
+            "metadata": summary.get("metadata", {}),
         }
 
         output_path = os.path.join(self.config.output_dir, filename)
@@ -129,9 +125,7 @@ class BatchExporter:
         return output_path
 
     def export_batch_summary(
-        self,
-        jobs: List[Dict[str, Any]],
-        filename: str = "batch_summary.csv"
+        self, jobs: List[Dict[str, Any]], filename: str = "batch_summary.csv"
     ) -> str:
         """
         Export batch job summary to CSV.
@@ -148,23 +142,22 @@ class BatchExporter:
 
         summary_data = []
         for job in jobs:
-            summary_data.append({
-                "job_id": job.get("job_id", ""),
-                "name": job.get("name", ""),
-                "status": job.get("status", ""),
-                "documents": job.get("total_documents", 0),
-                "flagged": job.get("flagged_pairs", 0),
-                "progress": job.get("progress", 0),
-                "created_at": job.get("created_at", ""),
-                "duration": job.get("duration_seconds", ""),
-            })
+            summary_data.append(
+                {
+                    "job_id": job.get("job_id", ""),
+                    "name": job.get("name", ""),
+                    "status": job.get("status", ""),
+                    "documents": job.get("total_documents", 0),
+                    "flagged": job.get("flagged_pairs", 0),
+                    "progress": job.get("progress", 0),
+                    "created_at": job.get("created_at", ""),
+                    "duration": job.get("duration_seconds", ""),
+                }
+            )
 
         return self.export_csv(summary_data, filename)
 
-    def generate_text_summary(
-        self,
-        results: Dict[str, Any]
-    ) -> str:
+    def generate_text_summary(self, results: Dict[str, Any]) -> str:
         """
         Generate a human-readable text summary.
 
@@ -198,7 +191,7 @@ class BatchExporter:
         results: Dict[str, Any],
         flagged_pairs: List[Dict[str, Any]],
         jobs: List[Dict[str, Any]],
-        base_name: str = "batch_export"
+        base_name: str = "batch_export",
     ) -> Dict[str, str]:
         """
         Export all results in multiple formats.
@@ -214,7 +207,9 @@ class BatchExporter:
         """
         exports = {}
         exports["json"] = self.export_json(results, f"{base_name}.json")
-        exports["report"] = self.export_plagiarism_report(flagged_pairs, results, f"{base_name}_report.json")
+        exports["report"] = self.export_plagiarism_report(
+            flagged_pairs, results, f"{base_name}_report.json"
+        )
         if jobs:
             exports["csv"] = self.export_batch_summary(jobs, f"{base_name}_jobs.csv")
         exports["text"] = ""
@@ -255,16 +250,11 @@ class ReportFormatter:
             "pending": "⏳",
             "failed": "❌",
             "cancelled": "🚫",
-            "paused": "⏸️"
+            "paused": "⏸️",
         }.get(status, "❓")
 
     @staticmethod
     def format_priority(priority: str) -> str:
         """Format priority with color."""
-        colors = {
-            "urgent": "🔴",
-            "high": "🟠",
-            "normal": "🟡",
-            "low": "🟢"
-        }
+        colors = {"urgent": "🔴", "high": "🟠", "normal": "🟡", "low": "🟢"}
         return f"{colors.get(priority, '⚪')} {priority.title()}"

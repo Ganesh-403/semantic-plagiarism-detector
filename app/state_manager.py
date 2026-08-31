@@ -12,6 +12,9 @@ import os
 import threading
 import time
 import traceback
+import uuid
+import os
+import multiprocessing
 from datetime import datetime
 
 import streamlit as st
@@ -29,6 +32,9 @@ from src.utils.redis_cache import (
 logger = logging.getLogger(__name__)
 
 TIMEOUT_LIMIT = 15 * 60  # 15 minutes in seconds
+
+# Module-level lock to ensure thread-safe daemon initialization
+_daemon_init_lock = threading.Lock()
 
 
 def ui_exception_handler(component_name: str):
@@ -80,9 +86,7 @@ def get_active_sessions_count() -> int:
         if cache.is_available():
             try:
                 raw_keys = list(
-                    cache._client.scan_iter(
-                        match="spd:v1:session:*:last_interaction"
-                    )
+                    cache._client.scan_iter(match="spd:v1:session:*:last_interaction")
                 )
                 keys = [
                     k.decode("utf-8") if isinstance(k, bytes) else k for k in raw_keys
@@ -94,11 +98,11 @@ def get_active_sessions_count() -> int:
         try:
             fallback_dict = getattr(cache, "fallback_cache", {})
             if fallback_dict is not None:
-                # FIXED: Wrap in list() to avoid dictionary changed size during iteration (Thread-safe)
                 fallback_keys = [
                     k
                     for k in list(fallback_dict.keys())
-                    if k.startswith("spd:v1:session:") and k.endswith(":last_interaction")
+                    if k.startswith("spd:v1:session:")
+                    and k.endswith(":last_interaction")
                 ]
                 for k in fallback_keys:
                     if k not in keys:
@@ -138,40 +142,45 @@ def get_active_sessions_count() -> int:
 def _start_api_server():
     import uvicorn
 
+    from starlette.middleware.base import BaseHTTPMiddleware
+
     from src.api.app import app as fastapi_app
+
+    class ActivityMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            if request.url.path not in ("/health", "/healthz"):
+                update_global_activity()
+            return await call_next(request)
+
+    fastapi_app.add_middleware(ActivityMiddleware)
+
+    from src.core.app_config import API_PORT
 
     uvicorn.run(
         fastapi_app,
         host=os.getenv("API_HOST", "0.0.0.0"),
-        port=int(os.getenv("API_PORT", 8000)),
+        port=API_PORT,
         log_level="warning",
     )
 
-
 def init_api_server_daemon():
-    """Ensure background REST API server is started once."""
+    """Ensure background REST API server is started once in a thread-safe manner."""
     import src.core.app_config as app_config
 
     if not getattr(app_config, "_api_server_started", False):
         app_config._api_server_started = True
 
-        from starlette.middleware.base import BaseHTTPMiddleware
-
-        from src.api.app import app as fastapi_app
-
-        class ActivityMiddleware(BaseHTTPMiddleware):
-            async def dispatch(self, request, call_next):
-                if request.url.path not in ("/health", "/healthz"):
-                    update_global_activity()
-                return await call_next(request)
-
-        fastapi_app.add_middleware(ActivityMiddleware)
-        threading.Thread(target=_start_api_server, daemon=True).start()
+        app_config.api_server_process = multiprocessing.Process(
+            target=_start_api_server,
+            daemon=True,
+        )
+        app_config.api_server_process.start()
 
 
 def _run_backup_daemon():
     """Background loop to create backups after inactivity."""
     last_backup_time = 0.0
+    daemon_start_time = time.time()
 
     try:
         cache = get_cache()
@@ -183,6 +192,13 @@ def _run_backup_daemon():
 
     logger.info("Database backup daemon started.")
 
+    try:
+        cache = get_cache()
+        if cache.get("spd:v1:global:last_activity") is None:
+            cache.set("spd:v1:global:last_activity", time.time())
+    except Exception:
+        pass
+
     while True:
         time.sleep(30)
 
@@ -190,15 +206,25 @@ def _run_backup_daemon():
             from src.core.app_config import get_backup_idle_timeout
 
             cache = get_cache()
-
             timeout = get_backup_idle_timeout()
+            now = time.time()
+            
+            # Establish a safe startup state: wait for at least one timeout interval
+            # after daemon startup before allowing ANY backups to trigger.
+            # We track this explicit condition rather than using an arbitrary sleep/continue.
+            is_startup_phase = (now - daemon_start_time) < timeout
 
             last_activity = cache.get("spd:v1:global:last_activity")
             if last_activity is None:
-                last_activity = time.time()
+                last_activity = now
                 cache.set("spd:v1:global:last_activity", last_activity)
+            else:
+                try:
+                    last_activity = float(last_activity)
+                except (ValueError, TypeError):
+                    last_activity = now
+                    cache.set("spd:v1:global:last_activity", last_activity)
 
-            now = time.time()
             idle = now - last_activity
 
             active_sessions = get_active_sessions_count()
@@ -213,6 +239,7 @@ def _run_backup_daemon():
                 active_sessions == 0
                 and idle >= timeout
                 and last_activity > last_backup_time
+                and not is_startup_phase
             ):
                 from src.core.app_config import get_backup_dir
                 from src.db.database_backup import (
@@ -245,21 +272,23 @@ def _run_backup_daemon():
 
 
 def init_backup_daemon():
-    """Ensure database backup daemon thread is running."""
+    """Ensure database backup daemon thread is running in a thread-safe manner."""
     import src.core.app_config as app_config
 
-    if not getattr(app_config, "_backup_daemon_started", False):
-        app_config._backup_daemon_started = True
-        threading.Thread(
-            target=_run_backup_daemon,
-            daemon=True,
-        ).start()
+    with _daemon_init_lock:
+        if not getattr(app_config, "_backup_daemon_started", False):
+            app_config._backup_daemon_started = True
+            threading.Thread(
+                target=_run_backup_daemon,
+                daemon=True,
+            ).start()
 
 
 def init_session_state():
     """Initialize session state keys and global background services."""
-    from app.session_manager import initialize_and_verify_session
-    st.session_state[SessionKeys.SESSION_ID] = initialize_and_verify_session()
+    import app.session_manager as sm
+
+    st.session_state[SessionKeys.SESSION_ID] = sm.initialize_and_verify_session()
 
     if SessionKeys.AUTHENTICATED not in st.session_state:
         st.session_state[SessionKeys.AUTHENTICATED] = False
@@ -336,3 +365,98 @@ def save_preferences_callback():
             "theme": st.session_state.get("theme_selector", "Light"),
         }
         update_user_preferences(st.session_state[SessionKeys.USERNAME], prefs)
+
+
+def reset_analysis_data() -> None:
+    """Clear document analysis and scan results from session state while preserving authentication and theme preferences."""
+    preserved_keys = {
+        SessionKeys.AUTHENTICATED,
+        SessionKeys.USERNAME,
+        SessionKeys.ROLE,
+        SessionKeys.SESSION_ID,
+        SessionKeys.LANG,
+        SessionKeys.SESSION_START_TIME,
+        SessionKeys.MODEL_LOAD_TIME,
+        SessionKeys.LAST_INTERACTION,
+        SessionKeys.ACCENT_COLOR,
+        SessionKeys.COMPACT_VIEW,
+        SessionKeys.FORCE_DARK_CHARTS,
+        SessionKeys.PDF_PASSWORDS,
+        "authenticated",
+        "username",
+        "role",
+        "session_id",
+        "lang",
+        "session_start_time",
+        "model_load_time",
+        "last_interaction",
+        "accent_color",
+        "compact_view",
+        "force_dark_charts",
+        "pdf_passwords",
+        "theme_selector",
+        "theme",
+        "active_session_token",
+        "raw_session_uuid",
+    }
+
+    target_keys = {
+        SessionKeys.ANALYSIS_RESULTS,
+        SessionKeys.ANALYSIS_FILE_SIGNATURE,
+        SessionKeys.DRIVE_FILES_DICT,
+        SessionKeys.FAILED_DOCUMENTS,
+        SessionKeys.SELECTED_DOCUMENT_ID,
+        SessionKeys.SCANNING,
+        SessionKeys.AUDIT_REPORT_GENERATED,
+        SessionKeys.SENT_ALERTS,
+        SessionKeys.WARNING_PAGE,
+        "analysis_results",
+        "analysis_file_signature",
+        "drive_files_dict",
+        "failed_documents",
+        "selected_document_id",
+        "scanning",
+        "scanned_documents",
+        "uploaded_files",
+        "current_document",
+        "analysis_data",
+    }
+
+    for key in list(st.session_state.keys()):
+        key_str = str(key)
+        if key in preserved_keys or key_str in preserved_keys:
+            continue
+        if (
+            key in target_keys
+            or key_str in target_keys
+            or key_str.startswith("file_uploader")
+            or key_str.startswith("doc_")
+            or key_str.startswith("scan_")
+            or key_str.startswith("analysis_")
+        ):
+            del st.session_state[key]
+
+
+def reset_analysis_state() -> None:
+    """Alias for reset_analysis_data() to preserve authentication state while clearing document analysis."""
+    reset_analysis_data()
+
+
+def reset_analysis_session_state() -> None:
+    """Reset document lists, matrices, and scan flags for a new analysis.
+
+    Keeps SessionKeys.THEME and SessionKeys.SESSION_ID.
+    """
+    for key in (
+        SessionKeys.FAILED_DOCUMENTS,
+        SessionKeys.DRIVE_FILES_DICT,
+        SessionKeys.SELECTED_DOCUMENT_ID,
+        SessionKeys.ANALYSIS_RESULTS,
+        SessionKeys.ANALYSIS_FILE_SIGNATURE,
+        SessionKeys.SCANNING,
+        SessionKeys.AUDIT_REPORT_GENERATED,
+        SessionKeys.SENT_ALERTS,
+    ):
+        if key in st.session_state:
+            del st.session_state[key]
+

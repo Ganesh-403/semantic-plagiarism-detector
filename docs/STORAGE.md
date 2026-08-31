@@ -36,7 +36,9 @@ AUTH_DB_PATH: Final[Path] = _REPO_ROOT / "users.db"
 FAISS_INDEX_PATH: Final[Path] = _REPO_ROOT / "corpus.index"
 HEALTHZ_DB_PATHS: Final[tuple[Path, ...]] = (CORPUS_DB_PATH, AUTH_DB_PATH)
 
-FALLBACK_DATA_DIR: Final[Path] = Path(tempfile.gettempdir()) / "semantic_plagiarism_detector" / "data"
+FALLBACK_DATA_DIR: Final[Path] = (
+    Path(tempfile.gettempdir()) / "semantic_plagiarism_detector" / "data"
+)
 FALLBACK_CORPUS_DB_PATH: Final[Path] = FALLBACK_DATA_DIR / "corpus.db"
 ```
 

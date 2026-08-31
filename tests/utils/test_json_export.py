@@ -31,8 +31,10 @@ from src.utils.json_export import (
     generate_export_checksum,
     get_export_timestamp,
     json_serializer_fallback,
+    load_plagiarism_report_schema,
     parse_export_json,
     validate_json_export_schema,
+    validate_report_json,
 )
 
 # ISO 8601 UTC Regex Pattern: e.g., 2026-07-31T07:25:00Z
@@ -43,9 +45,9 @@ def test_get_export_timestamp_format():
     """Verify that get_export_timestamp() returns a valid ISO 8601 UTC timestamp string ending with Z."""
     ts = get_export_timestamp()
     assert isinstance(ts, str)
-    assert ISO_8601_UTC_PATTERN.match(
-        ts
-    ), f"Timestamp '{ts}' does not match ISO 8601 UTC pattern YYYY-MM-DDTHH:MM:SSZ"
+    assert ISO_8601_UTC_PATTERN.match(ts), (
+        f"Timestamp '{ts}' does not match ISO 8601 UTC pattern YYYY-MM-DDTHH:MM:SSZ"
+    )
 
 
 def test_export_to_json_includes_exported_at_timestamp():
@@ -287,6 +289,51 @@ def test_validate_json_export_schema():
 
     assert validate_json_export_schema(None) is False
     assert validate_json_export_schema("not a dict") is False
+
+
+def test_validate_report_json():
+    """Verify validate_report_json() validates against jsonschema definition."""
+    valid_report = {
+        "metadata": {
+            "exported_at": "2026-08-24T12:00:00Z",
+            "report_type": "plagiarism_analysis",
+            "version": "1.0",
+        },
+        "data": {
+            "similarity_score": 0.85,
+            "matches": [{"source": "doc1.txt", "target": "doc2.txt"}],
+        },
+    }
+    assert validate_report_json(valid_report) is True
+
+    # Test report exported by export_report_to_json
+    report_json_str = export_report_to_json({"summary": "test analysis"})
+    parsed_report = parse_export_json(report_json_str)
+    assert validate_report_json(parsed_report) is True
+
+    # Missing metadata
+    assert validate_report_json({"data": {}}) is False
+
+    # Missing data key
+    assert validate_report_json({"metadata": {"exported_at": "2026-08-24T12:00:00Z"}}) is False
+
+    # Missing exported_at inside metadata
+    assert validate_report_json({"metadata": {"report_type": "test"}, "data": {}}) is False
+
+    # Non-dict inputs
+    assert validate_report_json(None) is False
+    assert validate_report_json("string") is False
+    assert validate_report_json([1, 2, 3]) is False
+
+
+def test_load_plagiarism_report_schema():
+    """Verify load_plagiarism_report_schema() loads official JSON schema."""
+    schema = load_plagiarism_report_schema()
+    assert isinstance(schema, dict)
+    assert schema.get("title") == "PlagiarismDetectorExportReport"
+    assert "metadata" in schema["properties"]
+    assert "data" in schema["properties"]
+
 
 
 def test_generate_export_checksum():

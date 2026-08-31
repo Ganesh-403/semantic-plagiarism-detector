@@ -1,4 +1,3 @@
-
 with open("src/db/incidents.py", "r") as f:
     lines = f.readlines()
 

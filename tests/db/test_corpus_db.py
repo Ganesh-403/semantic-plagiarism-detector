@@ -17,11 +17,13 @@ from src.db.corpus_db import (
     get_document_chunks_count,
     get_document_count_by_user,
     get_document_count_fast,
+    get_document_word_counts,
     get_documents_by_class,
     get_unique_class_sections,
     purge_stale_trash,
     restore_document,
     soft_delete_document,
+    CorpusRepository,
 )
 
 
@@ -716,9 +718,9 @@ def test_deleted_chunks_has_deleted_at_column():
     conn = sqlite3.connect(corpus_db._DB_PATH)
     try:
         columns = [
-            row[1] for row in conn.execute("PRAGMA table_info(deleted_chunks)").fetchall()
+            row[1]
+            for row in conn.execute("PRAGMA table_info(deleted_chunks)").fetchall()
         ]
         assert "deleted_at" in columns
     finally:
         conn.close()
-

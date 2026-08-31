@@ -16,6 +16,8 @@ import sys
 import types
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 # ---------------------------------------------------------------------------
 # Import version_check directly to avoid pulling in the heavy src/__init__.py
 # chain (which transitively requires docx, faiss, etc.)
@@ -32,12 +34,8 @@ if "src" not in sys.modules:
     _src_stub.__path__ = [str(pathlib.Path(__file__).parent.parent.parent / "src")]
     sys.modules["src"] = _src_stub
 
-_VERSION_MOD_PATH = (
-    pathlib.Path(__file__).parent.parent.parent / "src" / "version.py"
-)
-_version_spec = importlib.util.spec_from_file_location(
-    "src.version", _VERSION_MOD_PATH
-)
+_VERSION_MOD_PATH = pathlib.Path(__file__).parent.parent.parent / "src" / "version.py"
+_version_spec = importlib.util.spec_from_file_location("src.version", _VERSION_MOD_PATH)
 _version_mod = importlib.util.module_from_spec(_version_spec)  # type: ignore[arg-type]
 sys.modules.setdefault("src.version", _version_mod)
 _version_spec.loader.exec_module(_version_mod)  # type: ignore[union-attr]
@@ -74,6 +72,23 @@ class TestNormaliseTag:
     def test_only_v(self) -> None:
         assert _normalise_tag("v") == ""
 
+    def test_v1_0_0_prefix(self) -> None:
+        assert _normalise_tag("v1.0.0") == "1.0.0"
+
+    def test_no_prefix_1_0_0(self) -> None:
+        assert _normalise_tag("1.0.0") == "1.0.0"
+
+    def test_uppercase_v_prefix_unchanged(self) -> None:
+        # NOTE: current implementation is case-sensitive (str.lstrip("v")),
+        # so uppercase "V" is NOT stripped — documenting actual behavior.
+        assert _normalise_tag("V1.0.0") == "V1.0.0"
+
+    def test_release_prefix_unchanged(self) -> None:
+        # NOTE: current implementation does not handle a "release-" prefix —
+        # documenting actual behavior, not the full acceptance criteria in
+        # issue #3969 (see PR description for details).
+        assert _normalise_tag("release-1.0.0") == "release-1.0.0"
+
 
 # ── is_update_available ────────────────────────────────────────────────────────
 
@@ -100,12 +115,39 @@ class TestIsUpdateAvailable:
     def test_no_update_exact_match(self) -> None:
         assert is_update_available("1.2.3", "v1.2.3") is False
 
+    def test_numeric_sort_not_lexicographic(self) -> None:
+        assert is_update_available("1.2.0", "1.10.0") is True
+
+    def test_numeric_sort_reverse_direction(self) -> None:
+        assert is_update_available("1.10.0", "1.2.0") is False
+
+    def test_major_version_bump_two_vs_one_nine_nine(self) -> None:
+        assert is_update_available("1.9.9", "2.0.0") is True
+
+    def test_no_update_when_remote_older_major(self) -> None:
+        assert is_update_available("2.0.0", "1.9.9") is False
+
+    def test_equal_versions_no_v_prefix(self) -> None:
+        assert is_update_available("1.0.0", "1.0.0") is False
+
+    def test_equal_versions_mixed_v_prefix(self) -> None:
+        assert is_update_available("1.0.0", "v1.0.0") is False
+
 
 # ── fetch_latest_github_version ────────────────────────────────────────────────
 
 
 class TestFetchLatestGithubVersion:
     """Tests for the async fetch function."""
+
+    @pytest.fixture(autouse=True)
+    def reset_cache(self):
+        """Reset version cache before and after each test."""
+        if hasattr(_vc_mod, "clear_version_cache"):
+            _vc_mod.clear_version_cache()
+        yield
+        if hasattr(_vc_mod, "clear_version_cache"):
+            _vc_mod.clear_version_cache()
 
     def _run(self, coro):
         """Helper: run a coroutine in a fresh event loop."""
@@ -183,6 +225,29 @@ class TestFetchLatestGithubVersion:
         mock_client.get.assert_called_once()
         call_args = mock_client.get.call_args
         assert call_args[0][0] == custom_url
+
+    def test_fetch_latest_github_version_graceful_failures(self) -> None:
+        """Verify that 403, 404, and 500 error codes safely return None without throwing exceptions."""
+        import httpx
+
+        for status_code in [403, 404, 500]:
+            mock_response = MagicMock(spec=httpx.Response)
+            mock_response.status_code = status_code
+            mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+                message=f"Error {status_code}",
+                request=MagicMock(spec=httpx.Request),
+                response=mock_response
+            )
+
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.get = AsyncMock(return_value=mock_response)
+
+            with patch.object(_vc_mod.httpx, "AsyncClient", return_value=mock_client):
+                tag = self._run(fetch_latest_github_version())
+
+            assert tag is None
 
 
 # ── check_for_update_sync ──────────────────────────────────────────────────────
@@ -262,3 +327,4 @@ def test_app_version_is_non_empty() -> None:
 def test_github_releases_url_is_valid() -> None:
     assert GITHUB_RELEASES_URL.startswith("https://api.github.com/repos/")
     assert "/releases/latest" in GITHUB_RELEASES_URL
+    

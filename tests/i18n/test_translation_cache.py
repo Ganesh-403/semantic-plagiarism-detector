@@ -240,4 +240,4 @@ def test_existing_html_safe_formatting_is_preserved(
     assert translator.get_text(
         "welcome",
         name="<script>alert(1)</script>",
-    ) == ("Welcome, " "&lt;script&gt;alert(1)&lt;/script&gt;!")
+    ) == ("Welcome, &lt;script&gt;alert(1)&lt;/script&gt;!")

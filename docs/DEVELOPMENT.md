@@ -74,23 +74,30 @@ sudo apt install -y tesseract-ocr poppler-utils libtesseract-dev
 ---
 
 ## 🧪 Step 4: Running Tests
-
-The test suite uses `pytest` for unit and integration testing.
-
-### Run All Tests
+ 
+The test suite uses `pytest` and `pytest-xdist` for fast, parallel unit and integration testing across CPU cores.
+ 
+### Run All Tests (Parallel)
 ```bash
 pytest
+# or explicitly:
+pytest -n auto
 ```
-
+ 
 ### Run Tests in a Specific File
 ```bash
 pytest tests/db/test_database_backup.py
 ```
-
-### Run Tests Bypassing Default Coverage (Local Quick Run)
-If you have config options causing coverage failures locally:
+ 
+### Run Specific Marker in Parallel
 ```bash
-pytest -o addopts="" tests/db/test_database_backup.py
+pytest -m unit -n auto
+```
+ 
+### Run Tests Bypassing Default Options (Local Quick Run)
+If you have config options causing coverage failures locally or want single-process debugging:
+```bash
+pytest -n 0 -o addopts="" tests/db/test_database_backup.py
 ```
 
 ### Generate and View the HTML Coverage Report

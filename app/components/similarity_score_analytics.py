@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 @st.cache_data(ttl=60)
-def _load_incidents_data() -> List[Any]:
+def _load_incidents_data() -> list[Any]:
     """Fetch all plagiarism incidents from the database, cached for performance."""
     try:
         from src.db.incidents import get_all_incidents
@@ -59,7 +59,7 @@ def _safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
-def _compute_statistics(scores: pd.Series) -> Dict[str, float | int]:
+def _compute_statistics(scores: pd.Series) -> dict[str, float | int]:
     """Compute statistical metrics for the similarity scores."""
     if scores.empty:
         return {
@@ -94,7 +94,7 @@ def _compute_statistics(scores: pd.Series) -> Dict[str, float | int]:
     }
 
 
-def _compute_percentiles(scores: pd.Series) -> Dict[str, float]:
+def _compute_percentiles(scores: pd.Series) -> dict[str, float]:
     """Compute percentile values for the similarity scores."""
     if scores.empty:
         return {
@@ -118,7 +118,7 @@ def _compute_percentiles(scores: pd.Series) -> Dict[str, float]:
     }
 
 
-def _detect_outliers(scores: pd.Series) -> Dict[str, Any]:
+def _detect_outliers(scores: pd.Series) -> dict[str, Any]:
     """Detect outliers in the scores using the Interquartile Range (IQR) method."""
     if scores.empty or len(scores) < 4:
         return {
@@ -159,7 +159,7 @@ def _detect_outliers(scores: pd.Series) -> Dict[str, Any]:
     }
 
 
-def _prepare_dataframe(incidents: List[Any]) -> pd.DataFrame:
+def _prepare_dataframe(incidents: list[Any]) -> pd.DataFrame:
     """Convert raw incidents list into a clean Pandas DataFrame with similarity scores."""
     if not incidents:
         return pd.DataFrame(columns=["similarity_score"])
@@ -228,7 +228,7 @@ def _render_metric_card(
 
 
 def _apply_plotly_theme(
-    fig: go.Figure, title: str, theme_colors: Dict[str, str], margin_left: int = 50
+    fig: go.Figure, title: str, theme_colors: dict[str, str], margin_left: int = 50
 ) -> None:
     """Style Plotly figures layout to match active light or dark themes."""
     fig.update_layout(
@@ -340,7 +340,7 @@ def _render_boxplot(scores: pd.Series) -> None:
     st.plotly_chart(fig, use_container_width=True)
 
 
-def _render_percentile_table(percentiles: Dict[str, float]) -> None:
+def _render_percentile_table(percentiles: dict[str, float]) -> None:
     """Render a styled Streamlit table showing percentiles."""
     df = pd.DataFrame(
         [
@@ -355,7 +355,7 @@ def _render_percentile_table(percentiles: Dict[str, float]) -> None:
     st.table(df)
 
 
-def _render_outlier_summary(outliers_info: Dict[str, Any]) -> None:
+def _render_outlier_summary(outliers_info: dict[str, Any]) -> None:
     """Render the outlier analysis summary metrics."""
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -422,7 +422,7 @@ def _render_heatmap_data_summary(df: pd.DataFrame) -> None:
 
 
 def _render_download_buttons(
-    stats: Dict[str, Any], percentiles: Dict[str, float]
+    stats: dict[str, Any], percentiles: dict[str, float]
 ) -> None:
     """Render download buttons for statistics and percentiles."""
     # Prepare statistics data
@@ -726,8 +726,8 @@ def render_similarity_score_analytics() -> None:
         f"""
         <div style="font-size: 0.85rem; color: var(--secondary-text-color, #64748B); margin-top: 10px; margin-bottom: 20px;">
             ℹ️ Outlier detection is based on the Interquartile Range (IQR).
-            <b>Q1</b> = {outliers_info['q1']:.4f}, <b>Q3</b> = {outliers_info['q3']:.4f}, <b>IQR</b> = {outliers_info['iqr']:.4f}.<br>
-            Thresholds: Lower bound = {outliers_info['lower_bound']:.4f}, Upper bound = {outliers_info['upper_bound']:.4f}.
+            <b>Q1</b> = {outliers_info["q1"]:.4f}, <b>Q3</b> = {outliers_info["q3"]:.4f}, <b>IQR</b> = {outliers_info["iqr"]:.4f}.<br>
+            Thresholds: Lower bound = {outliers_info["lower_bound"]:.4f}, Upper bound = {outliers_info["upper_bound"]:.4f}.
         </div>
         """,
         unsafe_allow_html=True,

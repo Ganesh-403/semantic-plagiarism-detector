@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Multimodal PDF OCR Plagiarism Suite | Semantic Plagiarism Detector</title>
+    <meta name="description" content="Enterprise Multimodal PDF & Scanned Document OCR Plagiarism Engine for extracting text, visual layout bounding boxes, and figure similarity telemetry.">
+    <link rel="stylesheet" href="styles/multimodal_pdf_ocr_dashboard.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <!-- Header Architecture Comment: Multimodal PDF Layout & OCR Vision-Language Plagiarism Dashboard -->
+    <!-- Design Pattern: Glassmorphic Modular Dashboard with Real-time PDF Bounding Box Visualizer & Tesseract/CLIP Engine -->
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar-navigation" id="sidebar-nav">
+            <div class="brand-header">
+                <div class="brand-logo">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h2>OCRVisionShield</h2>
+                    <span>Multimodal Engine v6.0</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#overview" class="nav-item active" id="nav-overview">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span>OCR Vision Matrix</span>
+                </a>
+                <a href="#pdf-bounding-box" class="nav-item" id="nav-pdf-bounding-box">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><rect x="8" y="12" width="8" height="6"></rect></svg>
+                    <span>Layout Bounding Boxes</span>
+                </a>
+                <a href="#scanned-documents" class="nav-item" id="nav-scanned-documents">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    <span>Scanned PDF Corpus</span>
+                </a>
+                <a href="#figure-similarity" class="nav-item" id="nav-figure-similarity">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+                    <span>Figure Image Matches</span>
+                </a>
+                <a href="#settings" class="nav-item" id="nav-settings">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>OCR Engine Tuning</span>
+                </a>
+            </nav>
+
+            <div class="system-status-widget glass-card">
+                <div class="status-indicator online"></div>
+                <div class="status-info">
+                    <span class="status-title">Tesseract & CLIP Engine</span>
+                    <span class="status-subtitle">CUDA LayoutLMv3 Active</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Surface -->
+        <main class="main-content">
+            <!-- Top Controls Bar -->
+            <header class="top-header glass-card">
+                <div class="header-search">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="pdf-search-input" placeholder="Search PDF hash, extracted OCR text, or diagram key..." aria-label="Search PDF OCR">
+                </div>
+
+                <div class="header-actions">
+                    <div class="filter-dropdown">
+                        <select id="ocr-engine-select" class="styled-select">
+                            <option value="layoutlmv3">LayoutLMv3 Multimodal Transformer</option>
+                            <option value="paddle-ocr">PaddleOCR High-Speed Scan Engine</option>
+                            <option value="tesseract-5">Tesseract 5.3 LSTM Neural OCR</option>
+                            <option value="clip-vision">CLIP ViT-L/14 Diagram Matching</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-secondary" id="btn-sync-ocr-telemetry">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        <span>Sync Telemetry</span>
+                    </button>
+
+                    <button class="btn btn-primary" id="btn-run-ocr-scan">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                        <span>Execute Multimodal PDF Scan</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Body -->
+            <div class="dashboard-body">
+                <!-- Metrics Grid -->
+                <section class="metrics-grid">
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon blue-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Parsed PDF Pages</span>
+                            <span class="metric-value" id="val-ocr-pages">142,900</span>
+                            <span class="metric-trend positive">+16.4% pages</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon red-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Flagged Layout Clones</span>
+                            <span class="metric-value" id="val-flagged-layouts">2,310</span>
+                            <span class="metric-trend negative">3.9% high risk</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon purple-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">OCR Character Accuracy</span>
+                            <span class="metric-value" id="val-ocr-accuracy">98.9%</span>
+                            <span class="metric-trend positive">Near exact</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon green-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">OCR Processing Speed</span>
+                            <span class="metric-value" id="val-ocr-speed">8.6 ms/page</span>
+                            <span class="metric-trend positive">CUDA Accelerated</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Analytics Section Grid -->
+                <section class="analytics-section-grid">
+                    <!-- PDF Layout Similarity Spectrum -->
+                    <div class="analytics-card glass-card span-col-2">
+                        <div class="card-header">
+                            <div class="title-group">
+                                <h3>Multimodal Layout & Diagram Match Spectrum</h3>
+                                <p class="card-subtitle">Visual bounding box and OCR text overlap similarity spectrum</p>
+                            </div>
+                            <div class="card-actions">
+                                <span class="badge badge-accent" id="badge-ocr-cutoff">Visual Cutoff: 82%</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="vector-graph-container" id="ocr-graph-visual">
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 14%;"></div>
+                                    <span class="graph-label">0-20%</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 48%;"></div>
+                                    <span class="graph-label">21-40%</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 80%;"></div>
+                                    <span class="graph-label">41-60%</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 35%;"></div>
+                                    <span class="graph-label">61-80%</span>
+                                </div>
+                                <div class="graph-bar-wrapper danger-zone">
+                                    <div class="graph-bar danger" style="height: 22%;"></div>
+                                    <span class="graph-label">81-100%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- OCR Sensitivity Controls -->
+                    <div class="analytics-card glass-card">
+                        <div class="card-header">
+                            <h3>OCR Sensitivity Controls</h3>
+                        </div>
+                        <div class="card-body controls-form">
+                            <div class="form-group">
+                                <label for="range-ocr-cutoff">Layout Overlap Cutoff: <span id="lbl-ocr-cutoff">82%</span></label>
+                                <input type="range" id="range-ocr-cutoff" min="50" max="99" value="82" class="styled-range">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="range-dpi-resolution">Target Scan Resolution: <span id="lbl-dpi">300 DPI</span></label>
+                                <input type="range" id="range-dpi-resolution" min="150" max="600" value="300" step="50" class="styled-range">
+                            </div>
+
+                            <div class="form-group toggle-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="chk-extract-figures" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label">Enable Diagram & Figure Embeddings</span>
+                            </div>
+
+                            <button class="btn btn-primary btn-full" id="btn-reindex-ocr">
+                                <span>Re-Process PDF OCR Index</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- PDF OCR Telemetry Table -->
+                <section class="table-section glass-card">
+                    <div class="card-header">
+                        <div class="title-group">
+                            <h3>Multimodal PDF OCR Flagged Matches</h3>
+                            <p class="card-subtitle">Layout bounding box and OCR text similarity matrix</p>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-sm btn-secondary" id="btn-export-ocr-csv">Export OCR CSV</button>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="data-table" id="ocr-telemetry-table">
+                            <thead>
+                                <tr>
+                                    <th>Match ID</th>
+                                    <th>Primary PDF Document</th>
+                                    <th>Candidate Scanned File</th>
+                                    <th>OCR Text Sim</th>
+                                    <th>Visual Layout Sim</th>
+                                    <th>Risk Category</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ocr-table-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="../src/services/multimodal_pdf_ocr_engine.js"></script>
+</body>
+</html>

@@ -27,9 +27,9 @@ def test_openapi_schema_responses():
         "ErrorResponse",
     ]
     for schema_name in expected_schemas:
-        assert (
-            schema_name in schemas
-        ), f"Schema {schema_name} missing from OpenAPI specification"
+        assert schema_name in schemas, (
+            f"Schema {schema_name} missing from OpenAPI specification"
+        )
 
     paths = openapi.get("paths", {})
 

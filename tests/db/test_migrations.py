@@ -90,7 +90,8 @@ def test_fresh_auth_database_reaches_latest_version(tmp_path):
         assert column_exists(connection, "users", "tour_completed")
         assert column_exists(connection, "users", "otp_secret")
         assert column_exists(connection, "users", "two_factor_enabled")
-        assert column_exists(connection, "users", "is_active")
+        assert not column_exists(connection, "users", "is_active")
+        assert column_exists(connection, "users", "status")
         assert index_exists(connection, "idx_users_role")
         assert index_exists(connection, "idx_audit_log_username")
         assert index_exists(connection, "idx_audit_log_event_type")
@@ -462,8 +463,19 @@ def test_migration_005_still_creates_false_positives_table(tmp_path):
         migrate_corpus_database(connection)
 
         assert table_exists(connection, "false_positives")
-        for col in ("document_a", "document_b", "date_dismissed"):
+        for col in ("document_a", "document_b", "date_dismissed", "dismissed_by", "dismissal_reason"):
             assert column_exists(connection, "false_positives", col)
+
+
+def test_migration_018_adds_false_positives_audit_columns(tmp_path):
+    """Verify migration_018_add_false_positives_audit_columns adds dismissed_by and dismissal_reason columns."""
+    with connect(tmp_path / "false-positives-audit-corpus.db") as connection:
+        migrate_corpus_database(connection)
+
+        assert table_exists(connection, "false_positives")
+        for col in ("document_a", "document_b", "date_dismissed", "dismissed_by", "dismissal_reason"):
+            assert column_exists(connection, "false_positives", col)
+
 
 
 def test_check_table_exists():
@@ -835,3 +847,49 @@ def test_issue_1770_rollback_duration_logging(tmp_path, caplog):
         ), f"Rollback log does not match required format: {record.message!r}"
     finally:
         connection.close()
+
+
+def test_migration_rollback_on_failure(tmp_path):
+    """
+    Verifies that a database transaction rolls back completely during a
+    failed migration step, leaving the schema_version at its previous number.
+    """
+    connection = sqlite3.connect(str(tmp_path / "rollback_test.db"))
+    try:
+        assert get_user_version(connection) == 0
+
+        # Define migration 1: successfully creates a table
+        def up_v1(conn: sqlite3.Connection) -> None:
+            conn.execute("CREATE TABLE valid_table (id INTEGER)")
+
+        # Run migration 1
+        run_migrations(
+            connection,
+            migrations={1: up_v1},
+            target_version=1,
+        )
+        assert get_user_version(connection) == 1
+        assert table_exists(connection, "valid_table")
+
+        # Define migration 2: has a syntax error
+        def up_v2(conn: sqlite3.Connection) -> None:
+            conn.execute("CREATE TABLE another_table (id INTEGER)")
+            conn.execute("ALTER TABLE another_table ADD COLUMN;")  # Syntax error
+
+        # Run migration 2, it should raise sqlite3.OperationalError and rollback
+        with pytest.raises(sqlite3.OperationalError):
+            run_migrations(
+                connection,
+                migrations={1: up_v1, 2: up_v2},
+                target_version=2,
+            )
+
+        # Assert that the schema version remains at 1
+        assert get_user_version(connection) == 1
+        # Assert that another_table does NOT exist (rolled back)
+        assert not table_exists(connection, "another_table")
+        # Assert that valid_table still exists
+        assert table_exists(connection, "valid_table")
+    finally:
+        connection.close()
+
