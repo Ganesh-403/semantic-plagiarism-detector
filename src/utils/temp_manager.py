@@ -130,8 +130,19 @@ def create_managed_temp_file(
 ) -> str:
     """Creates a temporary file on disk and registers it for automatic deletion on exit."""
     fd, temp_path = tempfile.mkstemp(suffix=suffix, prefix=prefix)
-    os.close(fd)
-    register_temp_path(temp_path)
+    try:
+        os.close(fd)
+        register_temp_path(temp_path)
+    except Exception:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
+        raise
     return temp_path
 
 

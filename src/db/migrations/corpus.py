@@ -470,7 +470,7 @@ def migration_020_add_embedding_metadata(
         ON chunks(model_identifier, model_version)
         """
     )
-    def migration_021_add_corpus_duplicate_detection(
+def migration_021_add_corpus_duplicate_detection(
     connection: sqlite3.Connection,
 ) -> None:
     """Create persistent corpus-level duplicate/fingerprint metadata."""
@@ -686,7 +686,7 @@ def down_020_add_embedding_metadata(
             _drop_column_if_exists(connection, table, column_name)
 
     connection.execute("DROP INDEX IF EXISTS idx_chunks_embedding_model")
-    def down_020_add_corpus_duplicate_detection(
+def down_020_add_corpus_duplicate_detection(
     connection: sqlite3.Connection,
 ) -> None:
     """Remove corpus duplicate-detection metadata."""
@@ -727,6 +727,19 @@ CORPUS_DOWN_MIGRATIONS = {
     19: down_019_add_times_flagged,
     20: down_020_add_corpus_duplicate_detection,
 }
+
+
+def _corpus_db_file_path(connection: sqlite3.Connection) -> Path | None:
+    """Return the on-disk path of the connection's "main" database.
+
+    Returns ``None`` for in-memory or temporary databases (no file to
+    back up).
+    """
+    for _, name, filename in connection.execute("PRAGMA database_list"):
+        if name == "main" and filename:
+            return Path(filename)
+    return None
+
 
 def migrate_corpus_database(
     connection: sqlite3.Connection,

@@ -27,7 +27,7 @@ from src.core.language_similarity_config import (
 )
 from src.core.plagiarism_evidence import build_plagiarism_evidence
 from src.core.threshold_calibration import (compute_calibration_metrics,
-                                            find_optimal_threshold)                                            find_optimal_threshold)
+                                            find_optimal_threshold)
 
 logger = logging.getLogger(__name__)
 
@@ -735,7 +735,8 @@ def flag_plagiarism(
     cross_encoder_model: str = DEFAULT_CROSS_ENCODER_MODEL,
     cross_encoder_top_k: int = DEFAULT_CROSS_ENCODER_TOP_K,
     language_metadata: Optional[dict[str, dict[str, Any]]] = None,
-) -> list[dict]:    """Identify document pairs whose similarity reaches the threshold.
+) -> list[dict]:
+    """Identify document pairs whose similarity reaches the threshold.
 
     Flagging uses the configurable plagiarism threshold. Severity uses the
     central fixed boundaries: Medium at 0.75 and High at 0.90.
@@ -784,7 +785,9 @@ def flag_plagiarism(
 
         effective_threshold = threshold
 
-        if is_plagiarism(score, effective_threshold):            doc_b = doc_names[j]
+        if is_plagiarism(score, effective_threshold):
+            doc_a = doc_names[i]
+            doc_b = doc_names[j]
             matched_length = 0
             chunk_pair_texts = None
 
@@ -880,43 +883,43 @@ def flag_plagiarism(
                     target_length=target_length,
                 )
 
-            flag_dict = {
-                "doc_a": doc_a,
-                "doc_b": doc_b,
-                "similarity": round(score, 4),
-                "threshold_at_time_of_flag": float(effective_threshold),
-                "matched_length": matched_length,
-                "severity": severity_from_score(
-                    score,
-                    DEFAULT_THRESHOLDS,
-                ),
-                "language_pair": {
-                    "source": language_policy.source_language,
-                    "target": language_policy.target_language,
-                    "same_language": language_policy.same_language,
-                    "cross_lingual": language_policy.cross_lingual,
-                    "detection_confident": language_policy.detection_confident,
-                    "lexical_processing_available": (
-                        language_policy.lexical_processing_available
+                flag_dict = {
+                    "doc_a": doc_a,
+                    "doc_b": doc_b,
+                    "similarity": round(score, 4),
+                    "threshold_at_time_of_flag": float(effective_threshold),
+                    "matched_length": matched_length,
+                    "severity": severity_from_score(
+                        score,
+                        DEFAULT_THRESHOLDS,
                     ),
-                    "embedding_compatible": (
-                        language_policy.embedding_compatible
-                    ),
-                },
-                                "chunk_matches": [
-                        match.to_dict() for match in chunk_matches
-                    ],
-                    "plagiarism_segments": [
-                        segment.to_dict() for segment in segments
-                    ],
-                    "plagiarism_coverage": round(
-                        consolidated_target_coverage(
-                            segments,
-                            target_length,
+                    "language_pair": {
+                        "source": language_policy.source_language,
+                        "target": language_policy.target_language,
+                        "same_language": language_policy.same_language,
+                        "cross_lingual": language_policy.cross_lingual,
+                        "detection_confident": language_policy.detection_confident,
+                        "lexical_processing_available": (
+                            language_policy.lexical_processing_available
                         ),
-                        4,
-                    ),
-                }
+                        "embedding_compatible": (
+                            language_policy.embedding_compatible
+                        ),
+                    },
+                    "chunk_matches": [
+                            match.to_dict() for match in chunk_matches
+                        ],
+                        "plagiarism_segments": [
+                            segment.to_dict() for segment in segments
+                        ],
+                        "plagiarism_coverage": round(
+                            consolidated_target_coverage(
+                                segments,
+                                target_length,
+                            ),
+                            4,
+                        ),
+                    }
             else:
                 flag_dict = {
                     "doc_a": doc_a,

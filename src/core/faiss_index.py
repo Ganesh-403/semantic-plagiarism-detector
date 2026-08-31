@@ -18,7 +18,8 @@ from src.core.embedding_compatibility import (
     get_active_embedding_metadata,
     get_embedding_model_metadata,
 )
-from src.core.faiss_index_metadata import FAISSIndexMetadatafrom src.core.metrics import faiss_vectors_gauge
+from src.core.faiss_index_metadata import FAISSIndexMetadata
+from src.core.metrics import faiss_vectors_gauge
 from src.core.text_chunking import ChunkString
 
 logger = logging.getLogger(__name__)
@@ -111,7 +112,8 @@ class FaissIndexManager:
             raise ValueError(
                 "Embedding dimension is incompatible with this FAISS index: "
                 f"{arr.shape[1]} != {self.dimension}"
-            )        norms = np.linalg.norm(arr, axis=1, keepdims=True)
+            )
+        norms = np.linalg.norm(arr, axis=1, keepdims=True)
         norms = np.where(norms == 0, 1.0, norms)
         arr = arr / norms
         self.index.add(arr)
@@ -186,7 +188,8 @@ def build_index(
             raise ValueError(
                 "Embedding dimension mismatch across documents: "
                 f"{emb.shape[1]} != {dim}"
-            )        for i, (vec, chunk) in enumerate(zip(emb, chunks)):
+            )
+        for i, (vec, chunk) in enumerate(zip(emb, chunks)):
             all_vectors.append(vec.astype("float32"))
             if isinstance(chunk, ChunkString):
                 registry.append(
@@ -198,7 +201,8 @@ def build_index(
     if not all_vectors:
         active_metadata = get_active_embedding_metadata()
         faiss_vectors_gauge.set(0)
-        return faiss.IndexFlatIP(active_metadata.dimension), registry    matrix = np.vstack(all_vectors)
+        return faiss.IndexFlatIP(active_metadata.dimension), registry
+    matrix = np.vstack(all_vectors)
     norms = np.linalg.norm(matrix, axis=1, keepdims=True)
     norms = np.where(norms == 0, 1.0, norms)
     matrix = matrix / norms
