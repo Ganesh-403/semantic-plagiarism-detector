@@ -102,14 +102,14 @@ def test_cli_scan_success_csv_format(
 
     # Filter out commented metadata lines for parsing validation, or inspect metadata explicitly
     lines = [line for line in captured.out.strip().split("\n") if line.strip()]
-    
+
     # Verify metadata header lines start with '#'
     assert lines[0].startswith("#")
     assert any("Threshold Used: 0.8" in line for line in lines)
 
     # Find the row index where standard CSV headers begin
     header_idx = next(i for i, line in enumerate(lines) if not line.startswith("#"))
-    
+
     assert lines[header_idx] == "doc_a,doc_b,similarity_score"
     assert lines[header_idx + 1] == "doc1.txt,doc2.txt,1.0"
 
@@ -135,7 +135,6 @@ def test_cli_scan_empty_folder(tmp_path, capsys):
     report = json.loads(captured.out)
     assert report["documents_processed"] == 0
     assert len(report["matches"]) == 0
-
 
 
 @patch(
@@ -197,7 +196,6 @@ def test_cli_prewarm_no_documents(mock_docs, capsys):
     assert "No documents found. Exiting.\n" in captured.out
 
 
-
 @patch(
     "src.core.embedding_model.get_embedding_model_info",
     return_value=("all-MiniLM-L6-v2", 384),
@@ -242,7 +240,6 @@ def test_cli_scan_default_threshold(temp_assignments_dir):
             )
 
 
-
 def test_cli_main_invalid_command():
     """Test main function with an invalid subcommand/command."""
     with patch("sys.argv", ["cli.py", "invalid_cmd", "./assignments"]):
@@ -273,6 +270,21 @@ def test_cli_main_scan_format(
         captured = capsys.readouterr()
         report = json.loads(captured.out)
         assert report["documents_processed"] == 2
+
+
+def test_cli_main_invalid_output_format(temp_assignments_dir, capsys):
+    """Test main function with an invalid output format argument (xml)."""
+    with patch(
+        "sys.argv",
+        ["cli.py", "scan", str(temp_assignments_dir), "--output-format", "xml"],
+    ):
+        with pytest.raises(SystemExit) as excinfo:
+            main()
+        # argparse exits with code 2 for invalid choices
+        assert excinfo.value.code == 2
+        
+    captured = capsys.readouterr()
+    assert "invalid choice: 'xml'" in captured.err
 
 
 def _normalized_sql(sql: str | None) -> str:
@@ -388,9 +400,7 @@ def test_seed_data_database_matches_active_corpus_schema(tmp_path):
     )
 
     assert result.returncode == 0, (
-        "Seed generation failed.\n"
-        f"STDOUT:\n{result.stdout}\n"
-        f"STDERR:\n{result.stderr}"
+        f"Seed generation failed.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
     )
 
     generated_db = generated_dir / "corpus.db"
@@ -580,6 +590,7 @@ def test_cli_main_verify_schema_success(tmp_path, capsys):
     captured = capsys.readouterr()
     assert "PASSED" in captured.out
 
+
 @patch(
     "src.core.embedding_model.get_embedding_model_info",
     return_value=("all-MiniLM-L6-v2", 384),
@@ -588,9 +599,7 @@ def test_cli_main_verify_schema_success(tmp_path, capsys):
     "src.core.embedding_model.embed_chunks",
     side_effect=MockDataFactory.embed_chunks,
 )
-def test_cli_scan_recursive(
-    mock_embed, mock_model_info, temp_assignments_dir, capsys
-):
+def test_cli_scan_recursive(mock_embed, mock_model_info, temp_assignments_dir, capsys):
     """Test scanning documents in nested subdirectories."""
     nested_dir = temp_assignments_dir / "student_1" / "assignment"
     nested_dir.mkdir(parents=True)
@@ -651,6 +660,7 @@ def test_cli_main_verify_schema_cannot_combine_with_subcommand(tmp_path):
         # argparse exits with 2 for argument errors
         assert excinfo.value.code == 2
 
+
 def test_cli_main_scan_recursive(temp_assignments_dir):
     """Test the --recursive CLI flag."""
     with patch("src.cli.run_scan") as mock_run_scan:
@@ -706,3 +716,298 @@ class TestNaturalSorting:
         """Verify behaviour matches lexicographical order for non-numeric names."""
         files = ["readme.md", "report.pdf", "notes.txt"]
         assert sorted(files, key=_natural_sort_key) == sorted(files)
+
+
+
+def test_cli_scan_permission_error(temp_assignments_dir, capsys):
+    """
+    Test that the CLI handles a PermissionError gracefully during directory scanning
+    when os.scandir is mocked to raise a PermissionError.
+
+    Specifically, this test simulates a scenario where the operating system prevents
+    the application from scanning the contents of the target folder.
+    
+    Verifies that:
+    1. The CLI exits with code 1.
+    2. An appropriate error message indicating read failure is written to stderr.
+    3. The application does not crash with an unhandled exception trace.
+    """
+    with patch("os.scandir") as mock_scandir:
+        # Simulate OS PermissionError (Errno 13 - Permission Denied)
+        mock_scandir.side_effect = PermissionError(13, "Permission denied")
+
+        with patch("sys.argv", ["cli.py", "scan", str(temp_assignments_dir)]):
+            with pytest.raises(SystemExit) as excinfo:
+                main()
+
+            # The CLI is expected to return status code 1 on directory read failures
+            assert excinfo.value.code == 1
+
+    captured = capsys.readouterr()
+    assert "Error reading folder contents" in captured.err
+    assert "Permission denied" in captured.err
+
+
+def test_cli_scan_permission_error_iterdir(temp_assignments_dir, capsys):
+    """
+    Verify that if Path.iterdir itself throws a PermissionError when scanned
+    (non-recursively), the main CLI tool intercepts the exception, prints
+    the custom "Error reading folder contents" diagnostic to stderr, and exits
+    with status code 1.
+    
+    This is another entry point for directory listings using pathlib instead of
+    raw os.scandir, which is the default in non-recursive scan modes.
+    """
+    with patch("pathlib.Path.iterdir") as mock_iterdir:
+        mock_iterdir.side_effect = PermissionError(13, "Permission denied")
+
+        with patch("sys.argv", ["cli.py", "scan", str(temp_assignments_dir)]):
+            with pytest.raises(SystemExit) as excinfo:
+                main()
+
+            assert excinfo.value.code == 1
+
+    captured = capsys.readouterr()
+    assert "Error reading folder contents" in captured.err
+    assert "Permission denied" in captured.err
+
+
+def test_cli_scan_permission_error_rglob(temp_assignments_dir, capsys):
+    """
+    Verify that if Path.rglob throws a PermissionError when scanning recursively,
+    the main CLI tool intercepts the exception, prints the custom diagnostic
+    to stderr, and exits with status code 1.
+
+    This ensures that recursive folder scans are equally protected against
+    unreadable subdirectories or files.
+    """
+    with patch("pathlib.Path.rglob") as mock_rglob:
+        mock_rglob.side_effect = PermissionError(13, "Permission denied")
+
+        with patch("sys.argv", ["cli.py", "scan", str(temp_assignments_dir), "--recursive"]):
+            with pytest.raises(SystemExit) as excinfo:
+                main()
+
+            assert excinfo.value.code == 1
+
+    captured = capsys.readouterr()
+    assert "Error reading folder contents" in captured.err
+    assert "Permission denied" in captured.err
+
+
+@patch(
+    "src.core.embedding_model.get_embedding_model_info",
+    return_value=("all-MiniLM-L6-v2", 384),
+)
+@patch(
+    "src.core.embedding_model.embed_chunks",
+    side_effect=MockDataFactory.embed_chunks,
+)
+def test_cli_scan_file_permission_error_single(mock_embed, mock_model_info, temp_assignments_dir, capsys):
+    """
+    Verify that a file-level PermissionError during document loading is handled
+    gracefully. It should print a warning or error to stderr for the unreadable
+    file but continue processing the remaining readable documents.
+    If at least two valid documents are successfully processed, the pipeline
+    runs and the CLI exits with code 0.
+    
+    This matches production requirements where single file access failures should not
+    prevent checking the rest of the available submissions.
+    """
+    # Create an additional file that we will mock as unreadable
+    unreadable_file = temp_assignments_dir / "unreadable_doc.txt"
+    unreadable_file.write_text("This file should trigger a PermissionError.")
+
+    original_open = builtins.open
+
+    def mocked_open(file, *args, **kwargs):
+        if str(file).endswith("unreadable_doc.txt"):
+            raise PermissionError(13, "Permission denied")
+        return original_open(file, *args, **kwargs)
+
+    with patch("builtins.open", side_effect=mocked_open):
+        with patch("sys.argv", ["cli.py", "scan", str(temp_assignments_dir)]):
+            with pytest.raises(SystemExit) as excinfo:
+                main()
+
+            assert excinfo.value.code == 0
+
+    captured = capsys.readouterr()
+    assert "Error processing unreadable_doc.txt" in captured.err
+    assert "Permission denied" in captured.err
+
+
+def test_cli_scan_file_permission_error_all_fail(temp_assignments_dir, capsys):
+    """
+    Verify that if ALL files in the scanned directory fail to open due to
+    PermissionError, the CLI does not crash with an unhandled exception,
+    but instead prints the diagnostic and exit code 1 because no valid
+    documents were found to process.
+    """
+    with patch("builtins.open", side_effect=PermissionError(13, "Permission denied")):
+        with patch("sys.argv", ["cli.py", "scan", str(temp_assignments_dir)]):
+            with pytest.raises(SystemExit) as excinfo:
+                main()
+
+            assert excinfo.value.code == 1
+
+    captured = capsys.readouterr()
+    assert "Error processing" in captured.err
+    assert "Permission denied" in captured.err
+    assert "Error: No valid documents found to process" in captured.err
+
+
+def test_cli_prewarm_permission_error(temp_assignments_dir, capsys):
+    """
+    Verify that when running the prewarm command with a folder path, if the directory
+    cannot be scanned due to a PermissionError, the error is handled gracefully.
+    The CLI must output the diagnostic message to stderr and return exit code 1.
+    
+    This ensures prewarming is protected against unreadable source directories.
+    """
+    with patch("os.scandir") as mock_scandir:
+        mock_scandir.side_effect = PermissionError(13, "Permission denied")
+
+        with patch("sys.argv", ["cli.py", "prewarm", "--folder", str(temp_assignments_dir)]):
+            with pytest.raises(SystemExit) as excinfo:
+                main()
+
+            assert excinfo.value.code == 1
+
+    captured = capsys.readouterr()
+    assert "Error reading folder contents" in captured.err
+    assert "Permission denied" in captured.err
+
+
+def test_cli_db_status_permission_error(tmp_path, capsys):
+    """
+    Verify that the db-status command handles database permission errors gracefully.
+    If the migration status checker cannot read the database file due to a
+    PermissionError (represented as OSError), the CLI should report the error
+    to stderr and exit with code 1.
+    """
+    db_path = tmp_path / "protected_corpus.db"
+    db_path.touch()
+
+    # Mock get_migration_status to raise PermissionError
+    with patch("src.db.migrations.get_migration_status") as mock_status:
+        mock_status.side_effect = PermissionError(13, "Permission denied")
+
+        with patch("sys.argv", ["cli.py", "db-status", str(db_path)]):
+            with pytest.raises(SystemExit) as excinfo:
+                main()
+
+            assert excinfo.value.code == 1
+
+    captured = capsys.readouterr()
+    assert "Error" in captured.err
+    assert "Permission denied" in captured.err
+
+
+def test_cli_db_downgrade_permission_error(tmp_path, capsys):
+    """
+    Verify that the db downgrade command handles database permission/connection
+    errors gracefully. If connecting to or reading the database raises a
+    PermissionError/OSError, the CLI must report the failure to downgrade
+    on stderr and return exit code 1.
+    """
+    db_path = tmp_path / "protected_rollback.db"
+    db_path.touch()
+
+    # Mock sqlite3.connect to raise PermissionError
+    with patch("sqlite3.connect") as mock_connect:
+        mock_connect.side_effect = PermissionError(13, "Permission denied")
+
+        with patch("sys.argv", ["cli.py", "db", "downgrade", "--database", str(db_path)]):
+            with pytest.raises(SystemExit) as excinfo:
+                main()
+
+            assert excinfo.value.code == 1
+
+    captured = capsys.readouterr()
+    assert "Error: Failed to downgrade database" in captured.err
+    assert "Permission denied" in captured.err
+
+
+def test_cli_verify_schema_permission_error(tmp_path, capsys):
+    """
+    Verify that the --verify-schema command handles permission errors during
+    integrity check. If verify_schema_integrity raises a PermissionError,
+    the CLI must print the error to stderr and exit with code 1.
+    """
+    db_path = tmp_path / "protected_schema.db"
+    db_path.touch()
+
+    # Mock verify_schema_integrity to raise PermissionError
+    with patch("src.db.migrations.common.verify_schema_integrity") as mock_verify:
+        mock_verify.side_effect = PermissionError(13, "Permission denied")
+
+        with patch("sys.argv", ["cli.py", "--verify-schema", str(db_path)]):
+            with pytest.raises(SystemExit) as excinfo:
+                main()
+
+            assert excinfo.value.code == 1
+
+    captured = capsys.readouterr()
+    assert "Error during schema verification" in captured.err
+    assert "Permission denied" in captured.err
+
+
+def test_cli_database_optimization_permission_error(tmp_path, capsys):
+    """
+    Verify that the --optimize database subcommand handles permission/write errors
+    gracefully. If optimization fails due to file permissions (returning False
+    from optimize_database), the CLI writes an error message to stderr and exits
+    with code 1.
+    """
+    db_path = tmp_path / "protected_opt.db"
+
+    # Mock optimize_database to return False, simulating a failure (e.g. read-only db)
+    with patch("src.cli.optimize_database", return_value=False):
+        with patch("sys.argv", ["cli.py", "--optimize", str(db_path)]):
+            with pytest.raises(SystemExit) as excinfo:
+                main()
+
+            assert excinfo.value.code == 1
+
+    captured = capsys.readouterr()
+    assert "Error: Database optimization failed" in captured.err
+
+
+def test_cli_sync_index_permission_error(capsys):
+    """
+    Verify that the sync-index command handles FAISS index and DB synchronization
+    errors gracefully. If the synchronization check raises a PermissionError (or any
+    other exception due to file system permission issues), it writes the error message
+    to stderr and exits with code 1.
+    """
+    # Mock verify_and_repair_index to raise PermissionError
+    with patch("src.cli.verify_and_repair_index") as mock_sync:
+        mock_sync.side_effect = PermissionError(13, "Permission denied")
+
+        with patch("sys.argv", ["cli.py", "sync-index"]):
+            with pytest.raises(SystemExit) as excinfo:
+                main()
+
+            assert excinfo.value.code == 1
+
+    captured = capsys.readouterr()
+    assert "Error during synchronization" in captured.err
+    assert "Permission denied" in captured.err
+
+
+def test_cli_purge_cache_permission_error():
+    """
+    Verify that the purge-cache command correctly propagates a PermissionError
+    if the translation cache database initialization fails due to insufficient
+    file permissions.
+    """
+    with patch("src.cli.initialize_cache_db") as mock_init:
+        mock_init.side_effect = PermissionError(13, "Permission denied")
+
+        with patch("sys.argv", ["cli.py", "purge-cache"]):
+            with pytest.raises(PermissionError) as excinfo:
+                main()
+
+            assert "Permission denied" in str(excinfo.value)
+        

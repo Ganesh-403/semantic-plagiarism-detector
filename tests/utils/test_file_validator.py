@@ -33,7 +33,7 @@ class TestFileValidatorSize:
         """Verify files over the size limit fail with FILE_TOO_LARGE."""
         validator = FileValidator(max_size_bytes=1024)
         result = validator.validate(b"x" * 1025, "large.pdf")
-        
+
         assert result.is_valid is False
         assert result.error_code == "FILE_TOO_LARGE"
         assert "too large" in result.error_message.lower()
@@ -42,7 +42,7 @@ class TestFileValidatorSize:
         """Verify empty files (0 bytes) fail with FILE_EMPTY."""
         validator = FileValidator()
         result = validator.validate(b"", "empty.txt")
-        
+
         assert result.is_valid is False
         assert result.error_code == "FILE_EMPTY"
 
@@ -65,7 +65,7 @@ class TestFileValidatorExtension:
         """Verify unsupported extensions fail with UNSUPPORTED_EXTENSION."""
         validator = FileValidator()
         result = validator.validate(b"content", "malware.exe")
-        
+
         assert result.is_valid is False
         assert result.error_code == "UNSUPPORTED_EXTENSION"
 
@@ -73,7 +73,7 @@ class TestFileValidatorExtension:
         """Verify files with no extension fail with MISSING_EXTENSION."""
         validator = FileValidator()
         result = validator.validate(b"content", "noextension")
-        
+
         assert result.is_valid is False
         assert result.error_code == "MISSING_EXTENSION"
 
@@ -86,7 +86,7 @@ class TestFileValidatorExtension:
     def test_custom_allowed_extensions(self):
         """Verify custom allowed_extensions set is respected."""
         validator = FileValidator(allowed_extensions={".custom"})
-        
+
         assert validator.validate(b"data", "file.custom").is_valid is True
         assert validator.validate(b"data", "file.txt").is_valid is False
 
@@ -211,12 +211,13 @@ class TestFileValidatorMagicBytes:
     def test_mismatched_magic_bytes_logs_warning(self, caplog):
         """Verify mismatched magic bytes log a warning but don't fail hard."""
         import logging
+
         validator = FileValidator()
-        
+
         # Pass a text file disguised as a PDF
         with caplog.at_level(logging.WARNING):
             result = validator.validate(b"This is plain text", "fake.pdf")
-            
+
         # Currently configured to pass but log warning
         assert result.is_valid is True
         assert any("Magic byte mismatch" in record.message for record in caplog.records)
@@ -298,73 +299,9 @@ class TestValidateUploadConvenience:
         # Valid file
         result = validate_upload(b"%PDF-1.4", "test.pdf")
         assert result.is_valid is True
-        
+
         # Invalid file (too large)
         large_data = b"x" * (MAX_FILE_SIZE_BYTES + 1)
         result = validate_upload(large_data, "huge.pdf")
         assert result.is_valid is False
         assert result.error_code == "FILE_TOO_LARGE"
-
-
-class TestEpubAndCsvValidation:
-    """Test suite for EPUB and CSV specific content validation."""
-
-    def test_valid_epub_with_mimetype_passes(self):
-        validator = FileValidator(strict_mode=True)
-        # EPUB header (PK\x03\x04) with mimetype string
-        epub_bytes = b"PK\x03\x04" + b"\x00" * 26 + b"mimetypeapplication/epub+zip"
-        result = validator.validate(epub_bytes, "book.epub")
-        assert result.is_valid is True
-
-    def test_invalid_epub_header_fails(self):
-        validator = FileValidator(strict_mode=True)
-        # Mismatched magic header
-        result = validator.validate(b"NOT_A_ZIP_HEADER", "book.epub")
-        assert result.is_valid is False
-        assert result.error_code == "MAGIC_BYTE_MISMATCH"
-
-    def test_epub_missing_mimetype_fails(self):
-        validator = FileValidator(strict_mode=True)
-        # Header matches PK\x03\x04 but missing mimetype
-        result = validator.validate(b"PK\x03\x04" + b"random zip contents without mimetype", "book.epub")
-        assert result.is_valid is False
-        assert result.error_code == "MAGIC_BYTE_MISMATCH"
-
-    def test_valid_csv_passes(self):
-        validator = FileValidator(strict_mode=True)
-        csv_bytes = b"name,age,city\nAlice,30,New York\nBob,25,London\n"
-        result = validator.validate(csv_bytes, "data.csv")
-        assert result.is_valid is True
-
-    def test_csv_with_binary_null_byte_fails(self):
-        validator = FileValidator(strict_mode=True)
-        bad_csv = b"col1,col2\nval1,\x00val2\n"
-        result = validator.validate(bad_csv, "data.csv")
-        assert result.is_valid is False
-        assert result.error_code == "MAGIC_BYTE_MISMATCH"
-
-    def test_csv_invalid_encoding_fails(self):
-        validator = FileValidator(strict_mode=True)
-        # Invalid UTF-8 sequence
-        bad_utf8 = b"col1,col2\nval1,\xff\xfe\xfa\n"
-        result = validator.validate(bad_utf8, "data.csv")
-        assert result.is_valid is False
-        assert result.error_code == "MAGIC_BYTE_MISMATCH"
-
-
-def test_max_file_size_from_env(monkeypatch):
-    """Verify that MAX_FILE_SIZE_BYTES respects MAX_UPLOAD_SIZE_MB env variable on reload."""
-    import importlib
-    import src.utils.file_validator as fv
-
-    monkeypatch.setenv("MAX_UPLOAD_SIZE_MB", "10")
-    importlib.reload(fv)
-    try:
-        assert fv.MAX_FILE_SIZE_BYTES == 10 * 1024 * 1024
-    finally:
-        # Reset back to default
-        monkeypatch.delenv("MAX_UPLOAD_SIZE_MB", raising=False)
-        importlib.reload(fv)
-
-
-

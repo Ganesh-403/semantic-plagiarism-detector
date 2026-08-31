@@ -222,9 +222,7 @@ def test_embedding_model_manager_raises_descriptive_error_when_all_models_fail(
     def fail_every_model(model_name, cache_folder=None):
         raise RuntimeError(f"failed to load {model_name}")
 
-    monkeypatch.setattr(
-        embedding_model, "SentenceTransformer", fail_every_model
-    )
+    monkeypatch.setattr(embedding_model, "SentenceTransformer", fail_every_model)
 
     manager = EmbeddingModelManager.get_instance()
 
@@ -249,6 +247,7 @@ def test_embedding_model_device_logging(caplog, monkeypatch):
 
     mock_model_obj = MagicMock()
     mock_model_obj.device = "cpu"
+    mock_model_obj.get_sentence_embedding_dimension.return_value = 384
 
     monkeypatch.setattr(
         embedding_model, "SentenceTransformer", MagicMock(return_value=mock_model_obj)
@@ -260,12 +259,11 @@ def test_embedding_model_device_logging(caplog, monkeypatch):
 
     assert model is mock_model_obj
     expected_log = (
-        "SentenceTransformer model [paraphrase-multilingual-MiniLM-L12-v2] "
-        "running on device [cpu]"
+        "Initialized Embedding Model: paraphrase-multilingual-MiniLM-L12-v2 | Dimensions: 384 | Target Device: cpu"
     )
-    assert any(
-        expected_log in record.message for record in caplog.records
-    ), f"Expected device log message not found in: {[r.message for r in caplog.records]}"
+    assert any(expected_log in record.message for record in caplog.records), (
+        f"Expected device log message not found in: {[r.message for r in caplog.records]}"
+    )
 
 
 def test_detect_device_helper():
@@ -769,3 +767,92 @@ class TestModelCacheFolderConfig:
             EmbeddingModelManager.get_instance(quantize_model=False).get_model()
 
         assert "Model cache target: default (~/.cache/huggingface)" in caplog.text
+
+
+def test_warmup_embedding_model_success():
+    """Verify that warmup_embedding_model returns True when embed_chunks executes successfully."""
+    with patch("src.core.embedding_model.embed_chunks", return_value=np.ones((1, 384))) as mock_embed:
+        result = embedding_model.warmup_embedding_model()
+        assert result is True
+        mock_embed.assert_called_once_with(["Warmup"])
+
+
+def test_warmup_embedding_model_failure():
+    """Verify that warmup_embedding_model catches exceptions and returns False."""
+    with patch("src.core.embedding_model.embed_chunks", side_effect=Exception("Model loading error")) as mock_embed:
+        result = embedding_model.warmup_embedding_model()
+        assert result is False
+        mock_embed.assert_called_once_with(["Warmup"])
+
+
+# ─── Configurable Batch Size Tests (Issue #4010) ───────────────────────────────
+
+
+class TestConfigurableEmbeddingBatchSize:
+    """Test suite for configurable EMBEDDING_BATCH_SIZE from environment (Issue #4010)."""
+
+    def test_default_batch_size_is_32_when_env_not_set(self, mock_model, monkeypatch):
+        """When EMBEDDING_BATCH_SIZE is not set, batch size defaults to 32."""
+        monkeypatch.delenv("EMBEDDING_BATCH_SIZE", raising=False)
+        chunks = [f"chunk_{i}" for i in range(65)]
+
+        embed_chunks(chunks)
+
+        # 65 chunks / 32 batch size = 3 calls (32 + 32 + 1)
+        assert mock_model.encode.call_count == 3
+        for call_args in mock_model.encode.call_args_list:
+            assert call_args.kwargs.get("batch_size") == 32
+
+    def test_batch_size_from_env_variable(self, mock_model, monkeypatch):
+        """When EMBEDDING_BATCH_SIZE is set, embed_chunks respects it and forwards to encode."""
+        monkeypatch.setenv("EMBEDDING_BATCH_SIZE", "128")
+        chunks = [f"chunk_{i}" for i in range(200)]
+
+        embed_chunks(chunks)
+
+        # 200 chunks / 128 batch size = 2 calls (128 + 72)
+        assert mock_model.encode.call_count == 2
+        for call_args in mock_model.encode.call_args_list:
+            assert call_args.kwargs.get("batch_size") == 128
+
+    def test_explicit_batch_size_overrides_env_variable(self, mock_model, monkeypatch):
+        """Explicit batch_size parameter overrides EMBEDDING_BATCH_SIZE environment variable."""
+        monkeypatch.setenv("EMBEDDING_BATCH_SIZE", "128")
+        chunks = [f"chunk_{i}" for i in range(50)]
+
+        embed_chunks(chunks, batch_size=10)
+
+        # 50 chunks / 10 batch size = 5 calls
+        assert mock_model.encode.call_count == 5
+        for call_args in mock_model.encode.call_args_list:
+            assert call_args.kwargs.get("batch_size") == 10
+
+    @pytest.mark.parametrize("invalid_val", ["invalid", "-5", "0", ""])
+    def test_invalid_env_batch_size_falls_back_to_32(self, mock_model, monkeypatch, invalid_val):
+        """Invalid or non-positive EMBEDDING_BATCH_SIZE falls back safely to default (32)."""
+        monkeypatch.setenv("EMBEDDING_BATCH_SIZE", invalid_val)
+        chunks = [f"chunk_{i}" for i in range(64)]
+
+        embed_chunks(chunks)
+
+        # 64 chunks / 32 batch size = 2 calls
+        assert mock_model.encode.call_count == 2
+        for call_args in mock_model.encode.call_args_list:
+            assert call_args.kwargs.get("batch_size") == 32
+
+    def test_embed_documents_uses_env_batch_size(self, mock_model, monkeypatch):
+        """embed_documents respects EMBEDDING_BATCH_SIZE when batch_size is None."""
+        monkeypatch.setenv("EMBEDDING_BATCH_SIZE", "64")
+        docs = {
+            "doc1": [f"chunk_a_{i}" for i in range(50)],
+            "doc2": [f"chunk_b_{i}" for i in range(50)],
+        }
+
+        embed_documents(docs)
+
+        # 100 total chunks / 64 batch size = 2 calls
+        assert mock_model.encode.call_count == 2
+        for call_args in mock_model.encode.call_args_list:
+            assert call_args.kwargs.get("batch_size") == 64
+
+

@@ -60,6 +60,7 @@ def test_language_mapping_matches_issue_scope():
         "ita": "Italian",
     }
 
+
 def test_dpi_bounds_match_issue_scope():
     assert MIN_OCR_DPI == 150
     assert MAX_OCR_DPI == 400
@@ -76,7 +77,9 @@ def test_validate_ocr_languages_against_mocked_tesseract():
         installed_languages = pytesseract.get_languages()
         for code in SUPPORTED_OCR_LANGUAGES:
             assert len(code) == 3, f"Language code '{code}' must be a 3-letter ISO code"
-            assert code in installed_languages, f"Language code '{code}' is not recognized by Tesseract"
+            assert code in installed_languages, (
+                f"Language code '{code}' is not recognized by Tesseract"
+            )
 
 
 def test_validate_ocr_languages_against_tesseract_binary():
@@ -90,7 +93,9 @@ def test_validate_ocr_languages_against_tesseract_binary():
 
     for code in SUPPORTED_OCR_LANGUAGES:
         assert len(code) == 3, f"Language code '{code}' must be a 3-letter ISO code"
-        assert code in installed_languages, f"Language code '{code}' is not recognized by Tesseract binary"
+        assert code in installed_languages, (
+            f"Language code '{code}' is not recognized by Tesseract binary"
+        )
 
 
 def test_multi_language_ocr_support():
@@ -117,5 +122,3 @@ def test_common_parser_multi_language_support():
     assert common_validate("eng+spa") == "eng+spa"
     assert common_validate(" eng + spa ") == "eng+spa"
     assert common_validate("eng+xyz") == "eng"
-
-

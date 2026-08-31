@@ -70,29 +70,35 @@ class TestClusterAnalyzer:
     """Tests for cluster analysis."""
 
     def setup_method(self):
-        self.config = AnomalyConfig(cluster_min_size=2, cluster_similarity_threshold=0.8)
+        self.config = AnomalyConfig(
+            cluster_min_size=2, cluster_similarity_threshold=0.8
+        )
         self.analyzer = ClusterAnalyzer(self.config)
 
     def test_find_clusters(self):
         """Test cluster finding."""
         doc_names = ["a", "b", "c", "d"]
-        sim_matrix = np.array([
-            [1.0, 0.9, 0.3, 0.3],
-            [0.9, 1.0, 0.3, 0.3],
-            [0.3, 0.3, 1.0, 0.9],
-            [0.3, 0.3, 0.9, 1.0],
-        ])
+        sim_matrix = np.array(
+            [
+                [1.0, 0.9, 0.3, 0.3],
+                [0.9, 1.0, 0.3, 0.3],
+                [0.3, 0.3, 1.0, 0.9],
+                [0.3, 0.3, 0.9, 1.0],
+            ]
+        )
         clusters = self.analyzer.find_similarity_clusters(doc_names, sim_matrix)
         assert len(clusters) >= 1
 
     def test_no_clusters(self):
         """Test when no clusters exist."""
         doc_names = ["a", "b", "c"]
-        sim_matrix = np.array([
-            [1.0, 0.3, 0.3],
-            [0.3, 1.0, 0.3],
-            [0.3, 0.3, 1.0],
-        ])
+        sim_matrix = np.array(
+            [
+                [1.0, 0.3, 0.3],
+                [0.3, 1.0, 0.3],
+                [0.3, 0.3, 1.0],
+            ]
+        )
         clusters = self.analyzer.find_similarity_clusters(doc_names, sim_matrix)
         assert len(clusters) == 0
 
@@ -144,9 +150,12 @@ class TestAnomalyDetector:
 
     def setup_method(self):
         self.config = AnomalyConfig(
-            z_score_threshold=2.0, cluster_min_size=2,
-            cluster_similarity_threshold=0.8, enable_statistical=True,
-            enable_cluster=True, enable_pattern=True
+            z_score_threshold=2.0,
+            cluster_min_size=2,
+            cluster_similarity_threshold=0.8,
+            enable_statistical=True,
+            enable_cluster=True,
+            enable_pattern=True,
         )
         self.detector = AnomalyDetector(self.config)
 
@@ -164,12 +173,14 @@ class TestAnomalyDetector:
     def test_with_similarity_matrix(self):
         """Test with similarity matrix."""
         docs = {"a": "text a", "b": "text b", "c": "text c", "d": "text d"}
-        sim_matrix = np.array([
-            [1.0, 0.9, 0.3, 0.3],
-            [0.9, 1.0, 0.3, 0.3],
-            [0.3, 0.3, 1.0, 0.9],
-            [0.3, 0.3, 0.9, 1.0],
-        ])
+        sim_matrix = np.array(
+            [
+                [1.0, 0.9, 0.3, 0.3],
+                [0.9, 1.0, 0.3, 0.3],
+                [0.3, 0.3, 1.0, 0.9],
+                [0.3, 0.3, 0.9, 1.0],
+            ]
+        )
         result = self.detector.detect(docs, similarity_matrix=sim_matrix)
         assert isinstance(result, AnomalyResult)
 
@@ -193,10 +204,15 @@ class TestAnomalyDataClasses:
     def test_anomaly_to_dict(self):
         """Test anomaly serialization."""
         anomaly = Anomaly(
-            anomaly_id="T-001", anomaly_type=AnomalyType.PATTERN,
-            severity=AnomalySeverity.HIGH, title="Test", description="Test desc",
-            affected_documents=["a.pdf"], confidence=0.9,
-            evidence={"key": "val"}, detected_at="2026-01-01T00:00:00Z"
+            anomaly_id="T-001",
+            anomaly_type=AnomalyType.PATTERN,
+            severity=AnomalySeverity.HIGH,
+            title="Test",
+            description="Test desc",
+            affected_documents=["a.pdf"],
+            confidence=0.9,
+            evidence={"key": "val"},
+            detected_at="2026-01-01T00:00:00Z",
         )
         d = anomaly.to_dict()
         assert d["anomaly_id"] == "T-001"
@@ -204,7 +220,13 @@ class TestAnomalyDataClasses:
 
     def test_result_to_dict(self):
         """Test result serialization."""
-        result = AnomalyResult(anomalies=[], summary={}, statistics={}, recommendations=[], processing_time=0.5)
+        result = AnomalyResult(
+            anomalies=[],
+            summary={},
+            statistics={},
+            recommendations=[],
+            processing_time=0.5,
+        )
         d = result.to_dict()
         assert "anomalies" in d
         assert d["processing_time"] == 0.5

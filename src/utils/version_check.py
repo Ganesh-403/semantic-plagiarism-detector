@@ -28,6 +28,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import time
 from typing import Optional
 
 import httpx
@@ -46,6 +48,15 @@ GITHUB_RELEASES_URL: str = (
 # Timeout (seconds) for the outbound HTTP request. Kept short so a slow/absent
 # network doesn't block the UI render.
 _REQUEST_TIMEOUT: float = 5.0
+
+# ── In-memory response cache ──────────────────────────────────────────────────
+_CACHE_TTL_SECONDS: float = 3600.0  # 1 hour
+_version_cache: dict[str, tuple[float, Optional[str]]] = {}
+
+
+def clear_version_cache() -> None:
+    """Clear the in-memory GitHub version check response cache."""
+    _version_cache.clear()
 
 
 def _normalise_tag(tag: str) -> str:
@@ -67,8 +78,13 @@ def _normalise_tag(tag: str) -> str:
 async def fetch_latest_github_version(
     url: str = GITHUB_RELEASES_URL,
     timeout: float = _REQUEST_TIMEOUT,
+    use_cache: bool = True,
 ) -> Optional[str]:
     """Return the tag name of the latest GitHub release, or ``None`` on failure.
+
+    Supports token authentication via ``GITHUB_TOKEN`` or ``GH_TOKEN`` env vars
+    to increase GitHub API rate limits up to 5,000 requests/hour. Responses are
+    cached in memory for 1 hour to prevent redundant requests during Streamlit re-runs.
 
     The request is fire-and-forget from the UI's perspective: any network
     error, timeout, or unexpected API response is logged at DEBUG level and
@@ -77,9 +93,11 @@ async def fetch_latest_github_version(
     Parameters
     ----------
     url:
-        The GitHub releases API endpoint to query.  Override in tests.
+        The GitHub releases API endpoint to query. Override in tests.
     timeout:
         HTTP request timeout in seconds.
+    use_cache:
+        Whether to check and update the 1-hour in-memory cache.
 
     Returns
     -------
@@ -87,6 +105,20 @@ async def fetch_latest_github_version(
         The raw tag string (e.g. ``"v1.2.0"``), or ``None`` if the request
         failed or the response did not contain a ``tag_name`` field.
     """
+    now = time.time()
+    if use_cache and url in _version_cache:
+        cached_time, cached_tag = _version_cache[url]
+        if now - cached_time < _CACHE_TTL_SECONDS:
+            return cached_tag
+
+    headers = {"Accept": "application/vnd.github+json"}
+    token = (os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or "").strip()
+    if token:
+        if token.startswith("Bearer ") or token.startswith("token "):
+            headers["Authorization"] = token
+        else:
+            headers["Authorization"] = f"Bearer {token}"
+
     try:
         custom_headers = {
             "User-Agent": f"SemanticPlagiarismDetector/{APP_VERSION}",
@@ -95,6 +127,10 @@ async def fetch_latest_github_version(
         async with httpx.AsyncClient(headers=custom_headers, timeout=timeout) as client:
             response = await client.get(
                 url,
+ chore/github-api-user-agent
+
+                headers=headers,
+ main
                 follow_redirects=True,
             )
             response.raise_for_status()
@@ -104,9 +140,13 @@ async def fetch_latest_github_version(
                 logger.debug(
                     "GitHub releases API response missing 'tag_name': %s", data
                 )
+            if use_cache:
+                _version_cache[url] = (now, tag)
             return tag
     except Exception as exc:  # noqa: BLE001 – network errors are non-fatal
         logger.debug("Version check request failed: %s", exc)
+        if use_cache:
+            _version_cache[url] = (now, None)
         return None
 
 
@@ -144,6 +184,7 @@ def check_for_update_sync(
     local_version: str = APP_VERSION,
     url: str = GITHUB_RELEASES_URL,
     timeout: float = _REQUEST_TIMEOUT,
+    use_cache: bool = True,
 ) -> Optional[str]:
     """Synchronous wrapper around :func:`fetch_latest_github_version`.
 
@@ -162,6 +203,8 @@ def check_for_update_sync(
         GitHub releases API endpoint override (useful for testing).
     timeout:
         HTTP request timeout in seconds.
+    use_cache:
+        Whether to check and update the 1-hour in-memory cache.
 
     Returns
     -------
@@ -170,7 +213,7 @@ def check_for_update_sync(
     """
     try:
         remote_tag = asyncio.run(
-            fetch_latest_github_version(url=url, timeout=timeout)
+            fetch_latest_github_version(url=url, timeout=timeout, use_cache=use_cache)
         )
     except Exception as exc:  # noqa: BLE001
         logger.debug("check_for_update_sync failed: %s", exc)

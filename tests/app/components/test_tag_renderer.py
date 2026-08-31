@@ -90,6 +90,12 @@ class TestRenderTag:
             'class="tag-badge tag-source-ai_generated tag-low-confidence"' in html_out
         )
 
+    def test_tag_badge_has_aria_button_attrs(self):
+        tag = DocumentTag(name="Machine Learning", confidence=0.9)
+        html_out = render_tag(tag)
+        assert 'role="button"' in html_out
+        assert 'aria-label="Machine Learning"' in html_out
+
 
 class TestRenderTagCollection:
     """Test suite for rendering collections of tags in Streamlit."""

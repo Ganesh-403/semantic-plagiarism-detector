@@ -45,6 +45,12 @@ from src.exceptions import ModelInitializationError
 
 logger = logging.getLogger(__name__)
 
+try:
+    import optimum.onnxruntime
+    _ONNX_AVAILABLE = True
+except ImportError:
+    _ONNX_AVAILABLE = False
+
 # ── Singleton model loader ─────────────────────────────────────────────────────
 _DEFAULT_MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 _model: SentenceTransformer | None = None
@@ -229,11 +235,17 @@ class EmbeddingModelManager:
 
         try:
             _repair_corrupted_model_cache(_resolve_cache_root(), primary)
-            loaded_model = SentenceTransformer(primary, cache_folder=cache_dir)
+            kwargs = {}
+            if _ONNX_AVAILABLE:
+                kwargs["backend"] = "onnx"
+                logger.info("[embedding_model] optimum[onnxruntime] detected. Enabling ONNX backend for 2x-3x CPU speedup.")
+            
+            loaded_model = SentenceTransformer(primary, cache_folder=cache_dir, **kwargs)
             device = _detect_device(loaded_model)
             logger.info(
-                "SentenceTransformer model [%s] running on device [%s]",
+                "Initialized Embedding Model: %s | Dimensions: %d | Target Device: %s",
                 primary,
+                loaded_model.get_sentence_embedding_dimension(),
                 device,
             )
             logger.info("[embedding_model] Model loaded successfully.")
@@ -244,7 +256,10 @@ class EmbeddingModelManager:
                 fallback,
             )
             try:
-                loaded_model = SentenceTransformer(fallback, cache_folder=cache_dir)
+                kwargs_fallback = {}
+                if _ONNX_AVAILABLE:
+                    kwargs_fallback["backend"] = "onnx"
+                loaded_model = SentenceTransformer(fallback, cache_folder=cache_dir, **kwargs_fallback)
             except Exception as fallback_exc:
                 raise ModelInitializationError(
                     "Unable to initialize the embedding model. Both the configured "
@@ -264,8 +279,9 @@ class EmbeddingModelManager:
                 ) from fallback_exc
             device = _detect_device(loaded_model)
             logger.info(
-                "SentenceTransformer model [%s] running on device [%s]",
+                "Initialized Fallback Embedding Model: %s | Dimensions: %d | Target Device: %s",
                 fallback,
+                loaded_model.get_sentence_embedding_dimension(),
                 device,
             )
 
@@ -290,6 +306,7 @@ def _get_model() -> SentenceTransformer:
 # breaking when HuggingFace ships new weight formats (e.g. GGUF, ONNX)
 # under different filenames.
 _MODEL_WEIGHT_EXTENSIONS = (".bin", ".safetensors", ".onnx", ".gguf")
+
 
 def _resolve_cache_root() -> Path:
     """Resolve the HuggingFace hub cache root used for model downloads."""
@@ -419,9 +436,22 @@ def release_large_batch_memory(batch_size: int) -> None:
         torch.cuda.empty_cache()
 
 
+_DEFAULT_BATCH_SIZE = 32
+
+
+def _get_embedding_batch_size() -> int:
+    """Return the configured batch size for chunk embeddings from environment."""
+    raw = os.getenv("EMBEDDING_BATCH_SIZE", str(_DEFAULT_BATCH_SIZE))
+    try:
+        val = int(raw)
+        return val if val > 0 else _DEFAULT_BATCH_SIZE
+    except (ValueError, TypeError):
+        return _DEFAULT_BATCH_SIZE
+
+
 def embed_chunks(
     chunks: list[str],
-    batch_size: int = 32,
+    batch_size: int | None = None,
     cancel_callback: Optional[Callable[[], bool]] = None,
 ) -> np.ndarray:
     """
@@ -435,7 +465,8 @@ def embed_chunks(
 
     Args:
         chunks: List of text strings to embed.
-        batch_size: Number of texts encoded per forward pass. Defaults to 32
+        batch_size: Number of texts encoded per forward pass. Defaults to None,
+                    which resolves to EMBEDDING_BATCH_SIZE from environment (default: 32)
                     to balance throughput and memory consumption.
         cancel_callback: Optional callback returning True if processing should be cancelled.
 
@@ -444,7 +475,11 @@ def embed_chunks(
         empty array of shape (0, 384) if the input list is empty.
     """
     if not chunks:
-        return np.empty((0, 384), dtype=np.float32)
+        model = _get_model()
+        dimension = model.get_sentence_embedding_dimension()
+        return np.empty((0, dimension), dtype=np.float32)
+    if batch_size is None:
+        batch_size = _get_embedding_batch_size()
 
     model = _get_model()
     all_embeddings: list[np.ndarray] = []
@@ -472,6 +507,7 @@ def embed_chunks(
         # normalize_embeddings=True ensures L2-normalisation (cosine sim = dot product)
         batch_embeddings = model.encode(
             batch,
+            batch_size=batch_size,
             show_progress_bar=False,
             normalize_embeddings=True,
         )
@@ -491,7 +527,7 @@ def embed_chunks(
 
 
 def embed_documents(
-    chunked_docs: dict[str, list[str]], batch_size: int = 32
+    chunked_docs: dict[str, list[str]], batch_size: int | None = None
 ) -> dict[str, np.ndarray]:
     """
     Embed all chunks across multiple documents using optimized mini-batching.
@@ -503,7 +539,8 @@ def embed_documents(
 
     Args:
         chunked_docs: Dict mapping document name → list of chunk strings.
-        batch_size: Batch size forwarded to embed_chunks(). Defaults to 32.
+        batch_size: Batch size forwarded to embed_chunks(). Defaults to None,
+                    which resolves to EMBEDDING_BATCH_SIZE from environment (default: 32).
 
     Returns:
         Dict mapping document name → numpy array of embeddings (shape: N×384).
@@ -515,9 +552,14 @@ def embed_documents(
     doc_names: list[str] = []
 
     # Initialize all documents with empty arrays to ensure consistent return types
-    for doc_name in chunked_docs.keys():
-        embeddings[doc_name] = np.empty((0, 384), dtype=np.float32)
+    model = _get_model()
+    embedding_dimension = model.get_sentence_embedding_dimension()
 
+    for doc_name in chunked_docs.keys():
+        embeddings[doc_name] = np.empty(
+            (0, embedding_dimension),
+            dtype=np.float32,
+        )
     # Flatten all chunks while tracking document boundaries
     for doc_name, chunks in chunked_docs.items():
         if not chunks:
@@ -533,11 +575,15 @@ def embed_documents(
         logger.info("[embedding_model] No chunks to embed across all documents.")
         return embeddings
 
+    effective_batch_size = (
+        batch_size if batch_size is not None else _get_embedding_batch_size()
+    )
+
     logger.info(
         "[embedding_model] Embedding %d total chunks across %d documents with batch_size=%d",
         len(all_chunks),
         len(doc_names),
-        batch_size,
+        effective_batch_size,
     )
 
     # Call embed_chunks once for the entire flattened batch of chunks
@@ -568,3 +614,19 @@ def get_document_embedding(doc_embedding: np.ndarray) -> np.ndarray:
     if doc_embedding.ndim == 1:
         return doc_embedding  # Already a single embedding
     return np.mean(doc_embedding, axis=0)
+
+
+def warmup_embedding_model() -> bool:
+    """Executes a dummy inference pass on startup to pre-load weights
+    and trigger JIT compilation, eliminating first-request latency overhead.
+    """
+    logger.info("Initializing embedding model warmup routine...")
+    try:
+        dummy_text = "Warmup"
+        _ = embed_chunks([dummy_text])
+        logger.info("Embedding model warmup completed successfully. JIT layers compiled.")
+        return True
+    except Exception as e:
+        logger.error(f"Embedding model warmup failed: {str(e)}", exc_info=True)
+        # Fail gracefully to avoid blocking the main runtime setup if the network/device drops
+        return False

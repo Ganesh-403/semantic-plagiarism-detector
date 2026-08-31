@@ -78,8 +78,8 @@ class TestNormalizeEncoding:
         "garbled,expected",
         [
             ("Wordâ€”Word", "Word—Word"),  # Em dash
-            ("10â€“20", "10–20"),          # En dash
-            ("Waitâ€¦", "Wait…"),         # Ellipsis
+            ("10â€“20", "10–20"),  # En dash
+            ("Waitâ€¦", "Wait…"),  # Ellipsis
         ],
     )
     def test_punctuation_patterns(self, garbled, expected):
@@ -102,7 +102,7 @@ class TestNormalizeEncoding:
         text = "The cafÃ© was beautifÃ»l."
         first_pass = normalize_encoding(text)
         second_pass = normalize_encoding(first_pass)
-        
+
         assert first_pass == "The café was beautifûl."
         assert first_pass == second_pass
 
@@ -111,11 +111,11 @@ class TestNormalizeEncoding:
         # Generate a 10,000 character string with scattered mojibake
         base = "The quick brown fox jumps over the lazy dog. "
         garbled_base = "The quÃ®ck brÃ¸wn fÃ¸x jÃ»mps Ã¸ver the lÃ¥zy dÃ¸g. "
-        
+
         large_text = (garbled_base * 200) + (base * 200)
-        
+
         result = normalize_encoding(large_text)
-        
+
         assert "quîck" in result
         assert "brøwn" in result
         assert len(result) < len(large_text)  # Garbled chars are longer
@@ -131,14 +131,16 @@ class TestDetectMojibake:
 
     def test_heavily_garbled_text_returns_true(self):
         """Verify text with many mojibake patterns is flagged."""
-        text = "The cafÃ© on RÃ©publique street serves crÃ¨me brÃ»lÃ©e and Ã¼ber-dÃ¶ner."
+        text = (
+            "The cafÃ© on RÃ©publique street serves crÃ¨me brÃ»lÃ©e and Ã¼ber-dÃ¶ner."
+        )
         assert detect_mojibake(text) is True
 
     def test_threshold_boundary(self):
         """Verify the threshold parameter controls sensitivity."""
         # 1 garbled char in 100 chars = 1% ratio
         text = "Ã©" + ("a" * 99)
-        
+
         assert detect_mojibake(text, threshold=0.05) is False  # 1% < 5%
         assert detect_mojibake(text, threshold=0.005) is True  # 1% > 0.5%
 

@@ -11,6 +11,7 @@ from src.core.text_chunking import (
     ChunkString,
     _find_sentence_boundary,
     chunk_by_sentences,
+    chunk_document,
     chunk_documents,
     chunk_text,
     chunk_text_dynamic,
@@ -150,6 +151,7 @@ def test_character_fallback_handles_surrogate_pair_larger_than_byte_limit():
     assert len(chunks) == 1
     assert chunks[0].text == "\ud83d\ude80"
 
+
 def test_chunk_overlap_boundaries():
     """Verify consecutive chunks share the exact configured overlap substring."""
     # Use CJK text so chunking is character-based and overlap is a precise substring.
@@ -164,6 +166,17 @@ def test_chunk_overlap_boundaries():
     assert len(chunks) > 1
     overlap = chunks[0].text[-chunk_overlap:]
     assert chunks[1].text.startswith(overlap)
+
+
+def test_chunk_document_overlap_integrity():
+    """Adjacent chunks share the exact specified character overlap (Issue #4005)."""
+    text = "a" * 2000
+    chunks = chunk_document(
+        text, chunk_size=500, chunk_overlap=100, min_words=1
+    )
+    assert len(chunks) > 1
+    for i in range(len(chunks) - 1):
+        assert chunks[i].text[-100:] == chunks[i + 1].text[:100]
 
 
 def test_chunk_by_sentences_cjk_boundaries():
@@ -556,9 +569,9 @@ class TestChunkTextSentencePadding:
         # Verify no chunk ends abruptly without punctuation (unless it's the very last chunk)
         for i, chunk in enumerate(chunks[:-1]):
             # Chunk should end with a sentence terminator or be the end of text
-            assert chunk.text.endswith(
-                (".", "!", "?")
-            ), f"Chunk {i} does not end on sentence boundary: '{chunk.text[-20:]}'"
+            assert chunk.endswith((".", "!", "?")), (
+                f"Chunk {i} does not end on sentence boundary: '{chunk[-20:]}'"
+            )
 
     def test_sentence_padding_respects_hard_cap(self):
         # Create a massive sentence that exceeds 2x chunk_size
@@ -597,9 +610,9 @@ class TestChunkTextSentencePadding:
         for chunk in chunks:
             stripped = chunk.text.strip()
             # First character should be uppercase (start of sentence) or non-alpha
-            assert (
-                stripped[0] == stripped[0].upper() or not stripped[0].isalpha()
-            ), f"Chunk does not start on sentence boundary: '{stripped[:30]}'"
+            assert stripped[0] == stripped[0].upper() or not stripped[0].isalpha(), (
+                f"Chunk does not start on sentence boundary: '{stripped[:30]}'"
+            )
 
     def test_chunks_end_on_sentence_boundaries(self):
         """Acceptance criteria: chunks must end on sentence boundaries when padding is enabled."""

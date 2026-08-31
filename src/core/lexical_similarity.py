@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """lexical_similarity.py
 ---------------------
 Computes lexical similarity between documents using TF-IDF vectorization, Jaccard similarity,
@@ -25,8 +47,9 @@ from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 import numpy as np
 import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+import scipy.sparse as sp
 
 from src.core.stopwords import get_stopword_manager, tokenize_filtered
 
@@ -208,6 +231,7 @@ def _get_base_tokens(text: str) -> list[str]:
 
     try:
         from nltk.tokenize import word_tokenize as _nltk_word_tokenize
+
         raw_tokens = _nltk_word_tokenize(text)
         return [
             tok.lower()
@@ -339,7 +363,15 @@ def n_gram_overlap(
     -------
     float
         Overlap score bounded between 0.0 and 1.0.
+    
+    Raises
+    ------
+    ValueError
+        If n is not between 1 and 10 inclusive.
     """
+    if not (1 <= n <= 10):
+        raise ValueError(f"n must be between 1 and 10, got {n}")
+
     ngrams_a: set[tuple[str, ...]] = get_ngrams(text_a, n=n, stopwords=stopwords)
     ngrams_b: set[tuple[str, ...]] = get_ngrams(text_b, n=n, stopwords=stopwords)
 
@@ -360,7 +392,7 @@ def jaccard_similarity(
     """Compute Jaccard similarity with optional stopword filtering."""
     if not text_a or not text_b:
         return 0.0
-    
+
     if use_stopwords:
         if stopwords is None:
             stopwords = get_stopword_manager().get_stopwords()
@@ -368,14 +400,15 @@ def jaccard_similarity(
         set_b = tokenize_filtered(text_b, stopwords)
     else:
         from src.core.lexical_similarity import tokenize
+
         set_a = tokenize(text_a, stopwords)
         set_b = tokenize(text_b, stopwords)
-    
+
     if not set_a and not set_b:
         return 1.0
     if not set_a or not set_b:
         return 0.0
-    
+
     intersection = len(set_a & set_b)
     union = len(set_a | set_b)
     return intersection / union if union > 0 else 0.0
@@ -831,11 +864,58 @@ def scale_lexical_matrix(
     return softmax_normalize_scores(matrix, steepness=steepness, midpoint=midpoint)
 
 
+def compute_vectorized_jaccard_matrix(documents: list[str]) -> np.ndarray:
+    """Compute pairwise Jaccard similarity for a list of documents using vectorized operations.
+
+    This function leverages SciPy sparse matrices to compute the Jaccard similarity
+    matrix significantly faster than naive Python set intersections, which is
+    essential for processing thousands of documents.
+
+    Parameters
+    ----------
+    documents : list[str]
+        A list of document texts.
+
+    Returns
+    -------
+    np.ndarray
+        A 2D NumPy array of shape (N, N) where N is the number of documents,
+        representing the pairwise Jaccard similarity scores.
+    """
+    if not documents:
+        return np.array([])
+    
+    # Vectorize documents into binary bag-of-words (Boolean arrays)
+    vectorizer = CountVectorizer(binary=True, token_pattern=r"(?u)\b\w+\b")
+    try:
+        X = vectorizer.fit_transform(documents)
+    except ValueError:
+        # Occurs if documents are entirely empty
+        N = len(documents)
+        return np.zeros((N, N))
+
+    # X is shape (N, V). Intersection is dot product of binary matrices
+    intersection = X.dot(X.T).toarray()
+    
+    # Sum across columns to get the number of unique words per document
+    row_sums = X.sum(axis=1).A.flatten()
+    
+    # Union = |A| + |B| - |A ∩ B|
+    # row_sums[:, None] creates a column vector, row_sums[None, :] a row vector
+    union = row_sums[:, None] + row_sums[None, :] - intersection
+    
+    # Avoid division by zero
+    with np.errstate(divide='ignore', invalid='ignore'):
+        jaccard_matrix = np.where(union != 0, intersection / union, 0.0)
+        
+    return jaccard_matrix
+
+
 def compute_char_ngram_similarity(text_a: str, text_b: str, n: int = 5) -> float:
     """Compute character-level sliding n-gram Jaccard similarity between two texts.
 
     Word-level Jaccard similarity misses obfuscations where words are misspelled,
-    hyphenated, or slightly altered. Character-level n-gram overlap (shingling)
+    hyphenated, or slightly altered (e.g., OCR text typos). Character-level n-gram overlap (shingling)
     detects sub-word plagiarism by comparing sequences of `n` consecutive characters.
 
     Mathematical Formula

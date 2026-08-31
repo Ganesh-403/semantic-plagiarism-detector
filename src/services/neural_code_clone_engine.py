@@ -16,9 +16,13 @@ class NeuralCodeCloneDetector:
     and semantic token hashes to identify plagiarized code blocks.
     """
 
-    def __init__(self, similarity_threshold: float = 0.78):
-        self.similarity_threshold = similarity_threshold
-        self.indexed_code_repositories: dict[str, dict[str, Any]] = {}
+    @staticmethod
+    def calculate_token_cosine_similarity(
+        vec1: List[float], vec2: List[float]
+    ) -> float:
+        """Calculates cosine similarity between two vector embeddings."""
+        if not vec1 or not vec2 or len(vec1) != len(vec2):
+            return 0.0
 
     def index_repository_file(
         self, file_id: str, file_path: str, code_content: str, language: str = "python"
@@ -76,12 +80,15 @@ class NeuralCodeCloneDetector:
         query_tokens = self._extract_ast_structural_tokens(query_code)
         query_set = set(query_tokens)
 
-        clone_matches = []
+        # Simulated transformer neural semantic score
+        semantic_sim = round((ast_sim * 0.6) + (token_sim * 0.4), 4)
+        overall_score = round(
+            (ast_sim * 0.4) + (token_sim * 0.3) + (semantic_sim * 0.3), 4
+        )
 
-        for file_id, repo in self.indexed_code_repositories.items():
-            ref_set = repo["astTokenSet"]
-            intersection = len(query_set.intersection(ref_set))
-            union = len(query_set.union(ref_set)) or 1
+        clone_type, obfuscation = cls.classify_clone_type(
+            ast_sim, token_sim, semantic_sim
+        )
 
             jaccard_similarity = round(intersection / union, 4)
 

@@ -19,10 +19,14 @@ def test_docker_compose_override_exists_and_mounts_directories():
     with open(override_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
-    assert isinstance(config, dict), "docker-compose.override.yml must be valid YAML mapping"
+    assert isinstance(config, dict), (
+        "docker-compose.override.yml must be valid YAML mapping"
+    )
     assert "services" in config, "'services' section must be defined"
     assert "app" in config["services"], "'app' service must be defined under services"
-    assert "volumes" in config["services"]["app"], "'volumes' must be defined for app service"
+    assert "volumes" in config["services"]["app"], (
+        "'volumes' must be defined for app service"
+    )
 
     volumes = config["services"]["app"]["volumes"]
     assert isinstance(volumes, list), "volumes must be a list"

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Batch History Tracking and Persistence Layer.
 
@@ -18,6 +40,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class HistoryRecord:
     """A single history record for a batch job."""
+
     job_id: str
     name: str
     status: str
@@ -75,7 +98,8 @@ class BatchHistory:
         """Initialize database schema."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS batch_history (
                 job_id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -92,20 +116,27 @@ class BatchHistory:
                 error_message TEXT,
                 metadata TEXT DEFAULT '{}'
             )
-        """)
-        cursor.execute("""
+        """
+        )
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS batch_results (
                 job_id TEXT PRIMARY KEY,
                 results_json TEXT NOT NULL,
                 FOREIGN KEY (job_id) REFERENCES batch_history(job_id)
             )
-        """)
-        cursor.execute("""
+        """
+        )
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_status ON batch_history(status)
-        """)
-        cursor.execute("""
+        """
+        )
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_created ON batch_history(created_at)
-        """)
+        """
+        )
         conn.commit()
         conn.close()
 
@@ -135,28 +166,31 @@ class BatchHistory:
                 except (ValueError, TypeError):
                     pass
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO batch_history
                 (job_id, name, status, priority, document_count, flagged_count,
                  high_severity_count, progress, created_at, started_at,
                  completed_at, duration_seconds, error_message, metadata)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                job_data.get("job_id"),
-                job_data.get("name", "Unnamed"),
-                job_data.get("status", "pending"),
-                job_data.get("priority", "normal"),
-                job_data.get("total_documents", 0),
-                job_data.get("flagged_pairs", 0),
-                job_data.get("high_severity_count", 0),
-                job_data.get("progress", 0.0),
-                job_data.get("created_at"),
-                job_data.get("started_at"),
-                job_data.get("completed_at"),
-                duration,
-                job_data.get("error_message"),
-                json.dumps(job_data.get("metadata", {}))
-            ))
+            """,
+                (
+                    job_data.get("job_id"),
+                    job_data.get("name", "Unnamed"),
+                    job_data.get("status", "pending"),
+                    job_data.get("priority", "normal"),
+                    job_data.get("total_documents", 0),
+                    job_data.get("flagged_pairs", 0),
+                    job_data.get("high_severity_count", 0),
+                    job_data.get("progress", 0.0),
+                    job_data.get("created_at"),
+                    job_data.get("started_at"),
+                    job_data.get("completed_at"),
+                    duration,
+                    job_data.get("error_message"),
+                    json.dumps(job_data.get("metadata", {})),
+                ),
+            )
             conn.commit()
             conn.close()
             return True
@@ -169,10 +203,13 @@ class BatchHistory:
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO batch_results (job_id, results_json)
                 VALUES (?, ?)
-            """, (job_id, json.dumps(results, default=str)))
+            """,
+                (job_id, json.dumps(results, default=str)),
+            )
             conn.commit()
             conn.close()
             return True
@@ -196,8 +233,7 @@ class BatchHistory:
         conn = self._get_conn()
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT * FROM batch_history ORDER BY created_at DESC LIMIT ?",
-            (limit,)
+            "SELECT * FROM batch_history ORDER BY created_at DESC LIMIT ?", (limit,)
         )
         rows = cursor.fetchall()
         conn.close()
@@ -212,8 +248,8 @@ class BatchHistory:
         end_date: Optional[str] = None,
         min_documents: Optional[int] = None,
         max_documents: Optional[int] = None,
-        limit: int = 50
-    ) -> list[HistoryRecord]:
+        limit: int = 50,
+    ) -> List[HistoryRecord]:
         """
         Search jobs with filters.
 
@@ -256,7 +292,7 @@ class BatchHistory:
             params.append(max_documents)
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
-        query_sql = f"SELECT * FROM batch_history WHERE {where_clause} ORDER BY created_at DESC LIMIT ?"
+        query_sql = f"SELECT * FROM batch_history WHERE {where_clause} ORDER BY created_at DESC LIMIT ?"  # nosec
         params.append(limit)
 
         conn = self._get_conn()
@@ -287,11 +323,15 @@ class BatchHistory:
         cursor.execute("SELECT SUM(flagged_count) FROM batch_history")
         stats["total_flagged"] = cursor.fetchone()[0] or 0
 
-        cursor.execute("SELECT AVG(duration_seconds) FROM batch_history WHERE duration_seconds IS NOT NULL")
+        cursor.execute(
+            "SELECT AVG(duration_seconds) FROM batch_history WHERE duration_seconds IS NOT NULL"
+        )
         avg_duration = cursor.fetchone()[0]
         stats["avg_duration_seconds"] = round(avg_duration, 2) if avg_duration else 0
 
-        cursor.execute("SELECT AVG(progress) FROM batch_history WHERE status = 'completed'")
+        cursor.execute(
+            "SELECT AVG(progress) FROM batch_history WHERE status = 'completed'"
+        )
         avg_progress = cursor.fetchone()[0]
         stats["avg_completion_rate"] = round(avg_progress, 2) if avg_progress else 0
 
@@ -303,7 +343,8 @@ class BatchHistory:
         conn = self._get_conn()
         cursor = conn.cursor()
         since = (datetime.now() - timedelta(days=days)).isoformat()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT DATE(created_at) as day, COUNT(*) as jobs,
                    SUM(document_count) as documents,
                    SUM(flagged_count) as flagged
@@ -311,11 +352,18 @@ class BatchHistory:
             WHERE created_at >= ?
             GROUP BY DATE(created_at)
             ORDER BY day
-        """, (since,))
+        """,
+            (since,),
+        )
         rows = cursor.fetchall()
         conn.close()
         return [
-            {"date": row[0], "jobs": row[1], "documents": row[2] or 0, "flagged": row[3] or 0}
+            {
+                "date": row[0],
+                "jobs": row[1],
+                "documents": row[2] or 0,
+                "flagged": row[3] or 0,
+            }
             for row in rows
         ]
 
@@ -324,7 +372,10 @@ class BatchHistory:
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
         conn = self._get_conn()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM batch_results WHERE job_id IN (SELECT job_id FROM batch_history WHERE created_at < ?)", (cutoff,))
+        cursor.execute(
+            "DELETE FROM batch_results WHERE job_id IN (SELECT job_id FROM batch_history WHERE created_at < ?)",
+            (cutoff,),
+        )
         cursor.execute("DELETE FROM batch_history WHERE created_at < ?", (cutoff,))
         deleted = cursor.rowcount
         conn.commit()
@@ -335,9 +386,18 @@ class BatchHistory:
     def _row_to_record(self, row: tuple) -> HistoryRecord:
         """Convert database row to HistoryRecord."""
         return HistoryRecord(
-            job_id=row[0], name=row[1], status=row[2], priority=row[3],
-            document_count=row[4], flagged_count=row[5],
-            high_severity_count=row[6], progress=row[7],
-            created_at=row[8], started_at=row[9], completed_at=row[10],
-            duration_seconds=row[11], error_message=row[12], metadata=row[13]
+            job_id=row[0],
+            name=row[1],
+            status=row[2],
+            priority=row[3],
+            document_count=row[4],
+            flagged_count=row[5],
+            high_severity_count=row[6],
+            progress=row[7],
+            created_at=row[8],
+            started_at=row[9],
+            completed_at=row[10],
+            duration_seconds=row[11],
+            error_message=row[12],
+            metadata=row[13],
         )

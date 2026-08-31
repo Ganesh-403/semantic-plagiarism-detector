@@ -99,11 +99,14 @@ def test_ai_probability_categorization_consistency():
     for score in test_scores:
         # Mock detect_ai_probability to return the score
         with patch("src.core.ai_detector.detect_ai_probability", return_value=score):
-            res = detect_ai_generated_text("Some text for the classifier pipeline analysis.")
+            res = detect_ai_generated_text(
+                "Some text for the classifier pipeline analysis."
+            )
             tier = res["confidence_tier"]
             category = categorize_ai_probability(score)
-            assert mapping[tier] == category, f"Inconsistent categorization for score {score}: tier={tier}, category={category}"
-
+            assert mapping[tier] == category, (
+                f"Inconsistent categorization for score {score}: tier={tier}, category={category}"
+            )
 
 
 @pytest.fixture(autouse=True)
@@ -155,7 +158,7 @@ def test_detect_documents_ai_probability_empty():
     assert result == {}
 
 
-def test_detect_documents_ai_probability_single_doc():
+def test_detect_documents_ai_probability_single_doc(mock_fast_tokenizer):
     """Test AI detection with a single document."""
     chunked_docs = {
         "test_doc.txt": ["This is a test chunk of text.", "Another test chunk here."]
@@ -206,14 +209,12 @@ def test_detect_ai_generated_text_whitespace():
 
 def test_detect_ai_generated_text_tiers():
     """Verify that confidence categorizations partition correctly with multi-metric scores."""
-    with patch("src.core.ai_detector.detect_ai_probability") as mock_prob, patch(
-        "src.core.ai_detector.calculate_text_perplexity"
-    ) as mock_perp, patch(
-        "src.core.ai_detector._calculate_burstiness"
-    ) as mock_burst, patch(
-        "src.core.ai_detector._calculate_ngram_repetitiveness"
-    ) as mock_ngram:
-
+    with (
+        patch("src.core.ai_detector.detect_ai_probability") as mock_prob,
+        patch("src.core.ai_detector.calculate_text_perplexity") as mock_perp,
+        patch("src.core.ai_detector._calculate_burstiness") as mock_burst,
+        patch("src.core.ai_detector._calculate_ngram_repetitiveness") as mock_ngram,
+    ):
         mock_perp.return_value = 50.0
         mock_burst.return_value = 0.3
         mock_ngram.return_value = 0.2
@@ -269,10 +270,11 @@ AI_TEXT = (
 
 def test_multi_classifier_returns_all_metrics():
     """detect_ai_generated_text must return all four metric fields."""
-    with patch("src.core.ai_detector.detect_ai_probability", return_value=0.7), patch(
-        "src.core.ai_detector.calculate_text_perplexity", return_value=42.0
-    ), patch("src.core.ai_detector._calculate_burstiness", return_value=0.5), patch(
-        "src.core.ai_detector._calculate_ngram_repetitiveness", return_value=0.3
+    with (
+        patch("src.core.ai_detector.detect_ai_probability", return_value=0.7),
+        patch("src.core.ai_detector.calculate_text_perplexity", return_value=42.0),
+        patch("src.core.ai_detector._calculate_burstiness", return_value=0.5),
+        patch("src.core.ai_detector._calculate_ngram_repetitiveness", return_value=0.3),
     ):
         result = detect_ai_generated_text("Some test text for analysis.")
 
@@ -286,10 +288,11 @@ def test_multi_classifier_returns_all_metrics():
 
 def test_multi_classifier_synthetic_human_text():
     """Human-like text (low AI prob, high burstiness) should classify as 'low'."""
-    with patch("src.core.ai_detector.detect_ai_probability", return_value=0.15), patch(
-        "src.core.ai_detector.calculate_text_perplexity", return_value=180.0
-    ), patch("src.core.ai_detector._calculate_burstiness", return_value=0.75), patch(
-        "src.core.ai_detector._calculate_ngram_repetitiveness", return_value=0.1
+    with (
+        patch("src.core.ai_detector.detect_ai_probability", return_value=0.15),
+        patch("src.core.ai_detector.calculate_text_perplexity", return_value=180.0),
+        patch("src.core.ai_detector._calculate_burstiness", return_value=0.75),
+        patch("src.core.ai_detector._calculate_ngram_repetitiveness", return_value=0.1),
     ):
         result = detect_ai_generated_text(HUMAN_TEXT)
 
@@ -302,10 +305,11 @@ def test_multi_classifier_synthetic_human_text():
 
 def test_multi_classifier_synthetic_ai_text():
     """AI-like text (high AI prob, low burstiness, high repetition) should classify as 'high'."""
-    with patch("src.core.ai_detector.detect_ai_probability", return_value=0.88), patch(
-        "src.core.ai_detector.calculate_text_perplexity", return_value=25.0
-    ), patch("src.core.ai_detector._calculate_burstiness", return_value=0.15), patch(
-        "src.core.ai_detector._calculate_ngram_repetitiveness", return_value=0.6
+    with (
+        patch("src.core.ai_detector.detect_ai_probability", return_value=0.88),
+        patch("src.core.ai_detector.calculate_text_perplexity", return_value=25.0),
+        patch("src.core.ai_detector._calculate_burstiness", return_value=0.15),
+        patch("src.core.ai_detector._calculate_ngram_repetitiveness", return_value=0.6),
     ):
         result = detect_ai_generated_text(AI_TEXT)
 
@@ -404,7 +408,7 @@ def test_calculate_text_perplexity_whitespace_only():
     assert result == 0.0
 
 
-def test_calculate_text_perplexity_returns_float():
+def test_calculate_text_perplexity_returns_float(mock_fast_tokenizer):
     """The return type must always be a float."""
     result = calculate_text_perplexity("This is a valid sentence for testing.")
     assert isinstance(result, float)
@@ -539,7 +543,7 @@ def test_calculate_text_perplexity_non_string_input():
     assert calculate_text_perplexity(True) == 0.0
 
 
-def test_calculate_text_perplexity_long_text():
+def test_calculate_text_perplexity_long_text(mock_fast_tokenizer):
     """Very long text should be handled gracefully with truncation."""
     long_text = "This is a sentence. " * 500
     result = calculate_text_perplexity(long_text)
@@ -729,13 +733,19 @@ def test_split_sentences_simple():
     from src.core.ai_detector import _split_sentences_simple
 
     # Basic splitting
-    assert _split_sentences_simple("Hello! World? How are you.") == ["Hello", "World", "How are you"]
+    assert _split_sentences_simple("Hello! World? How are you.") == [
+        "Hello",
+        "World",
+        "How are you",
+    ]
 
     # Trailing punctuation empty strings filtered
-    assert _split_sentences_simple("One sentence... Two sentences!!!") == ["One sentence", "Two sentences"]
+    assert _split_sentences_simple("One sentence... Two sentences!!!") == [
+        "One sentence",
+        "Two sentences",
+    ]
 
     # Empty inputs and invalid types handled gracefully
     assert _split_sentences_simple("") == []
     assert _split_sentences_simple(None) == []
     assert _split_sentences_simple(123) == []  # type: ignore
-    

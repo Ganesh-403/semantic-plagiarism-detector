@@ -14,6 +14,7 @@ Responsibilities
 - Provide a synchronous ``page`` fixture so individual test files stay
   short and focused on the critical path.
 """
+
 from __future__ import annotations
 
 import os
@@ -73,8 +74,10 @@ def _seed_test_user(auth_db_path: Path) -> None:
     import importlib
 
     from src.core import app_config
+
     importlib.reload(app_config)
     from src.db import auth as auth_mod
+
     importlib.reload(auth_mod)
 
     auth_mod.init_db()
@@ -111,13 +114,21 @@ def streamlit_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
 
     proc = subprocess.Popen(
         [
-            sys.executable, "-m", "streamlit", "run",
+            sys.executable,
+            "-m",
+            "streamlit",
+            "run",
             str(REPO_ROOT / "app" / "streamlit_app.py"),
-            "--server.port", str(port),
-            "--server.address", "127.0.0.1",
-            "--server.headless", "true",
-            "--browser.gatherUsageStats", "false",
-            "--global.developmentMode", "false",
+            "--server.port",
+            str(port),
+            "--server.address",
+            "127.0.0.1",
+            "--server.headless",
+            "true",
+            "--browser.gatherUsageStats",
+            "false",
+            "--global.developmentMode",
+            "false",
         ],
         cwd=str(REPO_ROOT),
         env=env,

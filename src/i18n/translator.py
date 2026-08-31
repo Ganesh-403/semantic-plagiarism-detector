@@ -52,7 +52,7 @@ def _load_translation_dictionary(
         loaded = json.load(translation_file)
 
     if not isinstance(loaded, dict):
-        raise ValueError("Translation file must contain a JSON object: " f"{file_path}")
+        raise ValueError(f"Translation file must contain a JSON object: {file_path}")
 
     return {str(key): str(value) for key, value in loaded.items()}
 

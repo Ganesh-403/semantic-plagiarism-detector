@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added `search_index()` function with score threshold filtering support in `src/core/faiss_index.py` and comprehensive test coverage (`tests/core/test_faiss_threshold_filtering_issue_4036.py`).
 - Added `docker-compose.override.yml` mounting `./src` and `./app` into container for live hot-reloading during local development (`docker-compose.override.yml`).
 - Automated fault tolerance test for mid-session Redis connection drop and graceful in-memory failover (`tests/core/test_fault_tolerance.py`, `tests/utils/test_redis_fallback_failover.py`).
 - Added `--recursive` support to the CLI scan command for scanning documents in nested subdirectories.
@@ -18,16 +19,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `reset_analysis_session_state()` clears document lists, matrices, and scan flags while keeping theme and session id (`app/state_manager.py`).
 - Custom low/mid/high color-scale thresholds in `build_similarity_workbook` (`src/utils/excel_export.py`).
 - `show_notification()` toast helper with success/warning/error/info icons (`app/components/notifications.py`).
+- Accessible High Contrast theme (`HIGH_CONTRAST_THEME`) with sidebar theme selector (`app/theme.py`).
 
 ### Fixed
+- Split the two `from` imports that had been welded onto one line in `src/core/processing.py`, un-interleaved `PipelineResult`'s docstring from `is_incremental_update()` and moved the method below the annotated fields where a `NamedTuple` requires it, and separated `run_full_pipeline`'s return annotation from its docstring; the module did not parse, so neither the synchronous upload path nor the background worker could import the pipeline (`src/core/processing.py`).
+- Defined the module-level `logger` that `translate_text_batch()` referenced but never imported; the batch error handler raised `NameError` instead of logging, which left the per-text fallback loop unreachable (`src/core/translator.py`).
+- Handled empty file validation cleanly in `is_executable_upload` by explicitly returning `False` on empty byte payloads (`src/security/mime_validator.py`).
+- Handled Windows reserved device names with extensions (e.g. `NUL.txt`, `CON.pdf`, `COM1.docx`) in `sanitize_filename` by checking base stems against `_WINDOWS_RESERVED_NAMES` (`src/utils/filename.py`).
 - Mobile viewports (<768px): tighter main padding and shorter plotly chart heights (`app/css_constants.py`).
+- Add `role="button"` and `aria-label` on custom HTML tag chips and notification badges (`app/components/`).
+- Fixed a mismatched bracket in the forecast confidence band and a duplicate `yaxis` keyword in the top-flagged-pairs layout that together kept the Trends & Insights page from parsing (`app/pages/9_Trends_Insights.py`).
 - Graceful degradation when reportlab is not installed: badge generator module loads without reportlab and raises a clear error only when PDF generation is requested (`src/utils/badge_generator.py`).
 - Embed bundled DejaVu Sans / Roboto TTF in ReportLab PDF reports so non-ASCII document names render correctly (`src/utils/pdf_report.py`).
 - Graceful degradation when reportlab is not installed: badge generator module loads without reportlab and raises a clear error only when PDF generation is requested (`src/utils/badge_generator.py`).
+- Rewrote the passive-voice counter's generator filter, which used an `if`/`else` conditional where a filter clause belongs and kept the Writing Style Analyzer page from parsing; the empty-token guard it was reaching for is now an `and` term ordered before the subscript (`app/pages/5_Writing_Style_Analyzer.py`).
 - Fixed assertion mismatch in `test_sync_flagged_incidents_bulk_upsert` to verify that `severity_rank` is updated to `"Critical"` and other ranks during bulk upsert (`tests/db/test_incidents.py`, `tests/db/test_incidents_bulk.py`).
 - Fixed unreadable line overflowing for long URLs in ReportLab PDF reports by adding `wordWrap='CJK'` to paragraph styles and inserting zero-width spaces into long URLs (`src/utils/pdf_report.py`).
 - Robust claim parsing in `.github/workflows/ecsoc-automation.yml` using structured hidden HTML comments to prevent breaking on greeting message variations.
+- Imported `timezone` alongside `datetime` so the audit-log CSV export no longer raises `NameError` while building its UTC-stamped filename, which took the whole Audit Logs view down whenever there were rows to show (`app/pages/3_Audit_Logs.py`).
 - Restored broken imports in `badge_generator.py` and kept invalid hex colors falling back to `DEFAULT_BADGE_COLOR`.
+- Rewrote the ten demonstration strings in `_generate_sample_ai_texts` and `_generate_sample_human_texts` as implicit concatenation; they were single-quoted literals wrapped across physical lines, which left the whole module uncompilable (`AI_ADVANCED_Text_Gen.py`).
 
 ### Security
 - Centralize spreadsheet formula sanitization in `export_sanitizer` and apply it across excel, bulk, and batch exports (`src/utils/export_sanitizer.py`).
@@ -36,10 +47,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Explicitly excluded `.env`, `.git/`, `.venv/`, `*.sqlite`, and bytecode caches in `.dockerignore` to prevent leaking secrets and development artifacts into production containers (`.dockerignore`).
 
 ### Changed
+- Optimized `count_unique_words` to populate the word set directly using `re.finditer` generator expressions, eliminating intermediate list allocations on large documents (`src/utils/text_stats.py`).
 - Optimized `clear_session` and `clear_pattern` with Redis pipelining to batch deletions into a single network round-trip (`src/utils/redis_cache.py`).
 - Warning list pagination no longer writes `st.session_state` directly; page updates are applied via a view-layer callback (`src/utils/warning_list.py`).
 - Diff highlighter default match length is configurable via `DEFAULT_DIFF_MIN_MATCH_LENGTH` (`src/core/config.py`, `src/utils/diff_highlighter.py`).
 - Build originality badge SVGs with `xml.etree.ElementTree` instead of f-string interpolation (`src/utils/badge_generator.py`).
+
+### Added
+- Detection and UI warning for high stop-word density in documents. Flags `WARNING_HIGH_STOPWORD_DENSITY` when stop-words exceed 70% of a document's token count and displays a warning in the warning list (`src/utils/warning_list.py`).
 
 ## [1.0.0] - 2026-07-21
 

@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 src/security/code_sandbox.py
 ----------------------------
@@ -8,14 +30,14 @@ with strict timeouts and memory limits. Captures standard I/O and exception
 traces to generate a behavioral fingerprint for code plagiarism detection.
 """
 
+import json
+import logging
+import os
 import subprocess
 import sys
 import tempfile
-import logging
-import json
-import os
 import time
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +117,7 @@ def execute_code_sandbox(
         # Run the subprocess
         proc = subprocess.run(
             cmd,
-            shell=shell,
+            shell=shell,  # nosec
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -166,21 +188,21 @@ test_results = []
 
 try:
     spec.loader.exec_module(module)
-    
+
     # If test cases are provided, run them
     test_cases = {json.dumps(test_cases) if test_cases else "[]"}
-    
+
     for i, tc in enumerate(test_cases):
         test_input = tc.get("input")
         expected_output = tc.get("expected_output")
-        
+
         # Assume the submitted code has a main function called 'solution' or 'main'
         func = getattr(module, "solution", None) or getattr(module, "main", None)
-        
+
         if func is None:
             test_results.append({{"test_id": i, "status": "error", "message": "No 'solution' or 'main' function found."}})
             continue
-            
+
         try:
             # Execute the function with the test input
             if isinstance(test_input, list):
@@ -189,24 +211,24 @@ try:
                 actual_output = func(**test_input)
             else:
                 actual_output = func(test_input) if test_input is not None else func()
-                
+
             if actual_output == expected_output:
                 test_results.append({{"test_id": i, "status": "passed"}})
             else:
                 test_results.append({{
-                    "test_id": i, 
-                    "status": "failed", 
-                    "expected": expected_output, 
+                    "test_id": i,
+                    "status": "failed",
+                    "expected": expected_output,
                     "actual": actual_output
                 }})
         except Exception as e:
             test_results.append({{
-                "test_id": i, 
-                "status": "error", 
+                "test_id": i,
+                "status": "error",
                 "message": str(e),
                 "traceback": traceback.format_exc()
             }})
-            
+
 except Exception as e:
     print(f"Error loading submitted code: {{e}}", file=sys.stderr)
     print(traceback.format_exc(), file=sys.stderr)

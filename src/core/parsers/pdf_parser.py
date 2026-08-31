@@ -127,7 +127,9 @@ def _normalize_whitespace(page_lines: list[list[str]]) -> str:
     return raw_document.strip()
 
 
-def _calculate_image_area_coverage(images: list, page_width: float, page_height: float) -> tuple[float, bool]:
+def _calculate_image_area_coverage(
+    images: list, page_width: float, page_height: float
+) -> tuple[float, bool]:
     """Calculate total bounding box image area ratio relative to page geometry.
 
     Args:
@@ -215,7 +217,6 @@ def _has_meaningful_text(text: str, page=None) -> bool:
     words = text.split()
     alphanumeric_chars = sum(1 for c in text if c.isalnum())
     return len(words) >= MIN_NATIVE_WORDS_PER_PAGE and alphanumeric_chars >= 30
-
 
 
 def _should_use_parallel() -> bool:

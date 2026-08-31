@@ -22,19 +22,20 @@ class CrossLingualExporter:
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
 
-    def export_json(self, result: dict[str, Any], filename: str = "cross_lingual_results.json") -> str:
+    def export_json(
+        self, result: Dict[str, Any], filename: str = "cross_lingual_results.json"
+    ) -> str:
         """Export results to JSON."""
         path = os.path.join(self.output_dir, filename)
-        export_data = {
-            "exported_at": datetime.now().isoformat(),
-            "result": result
-        }
+        export_data = {"exported_at": datetime.now().isoformat(), "result": result}
         with open(path, "w", encoding="utf-8") as f:
             json.dump(export_data, f, indent=2, default=str, ensure_ascii=False)
         logger.info(f"Exported JSON: {path}")
         return path
 
-    def export_matches_csv(self, matches: list[dict], filename: str = "cross_lingual_matches.csv") -> str:
+    def export_matches_csv(
+        self, matches: List[Dict], filename: str = "cross_lingual_matches.csv"
+    ) -> str:
         """Export matches to CSV."""
         if not matches:
             return ""
@@ -46,7 +47,9 @@ class CrossLingualExporter:
         logger.info(f"Exported CSV: {path}")
         return path
 
-    def export_language_report(self, result: dict[str, Any], filename: str = "language_report.txt") -> str:
+    def export_language_report(
+        self, result: Dict[str, Any], filename: str = "language_report.txt"
+    ) -> str:
         """Export human-readable language analysis report."""
         path = os.path.join(self.output_dir, filename)
         summary = result.get("summary", {})
@@ -73,9 +76,11 @@ class CrossLingualExporter:
 
         lines.extend(["", "TOP MATCHES:"])
         for i, match in enumerate(matches[:10], 1):
-            lines.append(f"  #{i} {match.get('source_doc')} ({match.get('source_lang')}) ↔ "
-                        f"{match.get('target_doc')} ({match.get('target_lang')}) — "
-                        f"{match.get('similarity', 0):.1%}")
+            lines.append(
+                f"  #{i} {match.get('source_doc')} ({match.get('source_lang')}) ↔ "
+                f"{match.get('target_doc')} ({match.get('target_lang')}) — "
+                f"{match.get('similarity', 0):.1%}"
+            )
 
         lines.extend(["", "=" * 60, "END OF REPORT", "=" * 60])
 

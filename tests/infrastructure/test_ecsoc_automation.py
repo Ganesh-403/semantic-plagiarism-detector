@@ -18,9 +18,11 @@ def test_ecsoc_automation_contains_hidden_claim_comment():
 
 def test_hidden_comment_regex_is_robust_to_greeting_changes():
     pattern = re.compile(r"<!--\s*ecsoc-claim-user:\s*([a-zA-Z0-9-]+)\s*-->")
-    
+
     # Custom greeting text variations that would break 'Hi @...' matching
-    comment_1 = "Hello there contributor! You got it.\n\n<!-- ecsoc-claim-user: alice-dev -->"
+    comment_1 = (
+        "Hello there contributor! You got it.\n\n<!-- ecsoc-claim-user: alice-dev -->"
+    )
     comment_2 = "Greetings! Assigned.\n<!--   ecsoc-claim-user:  bob_123   -->"
     comment_3 = "Welcome @alice-dev to the team!\n<!-- ecsoc-claim-user: charlie99 -->"
 
@@ -38,4 +40,3 @@ def test_ecsoc_automation_uses_search_api_for_claim_limit():
     content = WORKFLOW_PATH.read_text(encoding="utf-8")
     assert "github.rest.search.issuesAndPullRequests" in content
     assert "is:issue is:open assignee:" in content
-

@@ -20,7 +20,7 @@ from src.core.config import DEFAULT_DIFF_MIN_MATCH_LENGTH
 #: Inline style applied to every highlighted run. Kept as a module constant so
 #: the markup is identical everywhere and testable without a regex.
 MARK_OPEN_TAG = (
-    '<mark style="background-color: #fef08a; ' 'padding: 2px 4px; border-radius: 3px;">'
+    '<mark style="background-color: #fef08a; padding: 2px 4px; border-radius: 3px;">'
 )
 
 #: CJK ranges called out in #3213: Han ideographs plus Hiragana/Katakana.

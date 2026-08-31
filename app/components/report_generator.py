@@ -251,7 +251,9 @@ class PlagiarismReportGenerator:
                 severity = (
                     "High"
                     if pair.get("similarity", 0) > 0.90
-                    else "Medium" if pair.get("similarity", 0) > 0.80 else "Low"
+                    else "Medium"
+                    if pair.get("similarity", 0) > 0.80
+                    else "Low"
                 )
                 pair_table_data.append(
                     [
@@ -412,7 +414,8 @@ class PlagiarismReportGenerator:
                     width: 100%;
                     border-collapse: collapse;
                     margin: 15px 0;
-                    background: white;
+                    background-color: var(--background-color, #ffffff);
+                    color: var(--text-color, #111827);
                     border-radius: 8px;
                     overflow: hidden;
                 }}
@@ -518,13 +521,15 @@ class PlagiarismReportGenerator:
                 severity_class = (
                     "high"
                     if similarity > 0.90
-                    else "medium" if similarity > 0.80 else "low"
+                    else "medium"
+                    if similarity > 0.80
+                    else "low"
                 )
                 html_content += f"""
                             <tr>
                                 <td>{idx}</td>
-                                <td>{pair.get('doc_a', '')[:50]}</td>
-                                <td>{pair.get('doc_b', '')[:50]}</td>
+                                <td>{pair.get("doc_a", "")[:50]}</td>
+                                <td>{pair.get("doc_b", "")[:50]}</td>
                                 <td>{similarity:.1%}</td>
                                 <td><span class="badge badge-{severity_class}">{severity_class.title()}</span></td>
                             </tr>

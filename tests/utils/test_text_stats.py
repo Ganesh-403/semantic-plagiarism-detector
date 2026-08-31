@@ -1,7 +1,14 @@
-from src.utils.text_stats import (count_words,format_text_stats, get_char_count,
-                                   get_reading_time_minutes, get_word_count,
-                                   get_sentence_count, get_syllable_count,
-                                   get_readability_metrics, get_text_stats)
+from src.utils.text_stats import (
+    count_words,
+    format_text_stats,
+    get_char_count,
+    get_reading_time_minutes,
+    get_word_count,
+    get_sentence_count,
+    get_syllable_count,
+    get_readability_metrics,
+    get_text_stats,
+)
 
 """Unit tests for src/utils/text_stats.py.
 
@@ -14,6 +21,7 @@ call -- see ``get_reading_time_minutes`` and ``get_readability_metrics``.
 import pytest
 
 from src.utils.text_stats import (
+    count_syllables,
     count_syllables_in_word,
     count_words,
     format_text_stats,
@@ -33,6 +41,25 @@ def test_count_syllables_in_word():
     assert count_syllables_in_word("the") == 1
 
 
+def test_count_syllables():
+    # Regular words
+    assert count_syllables("apple") == 2
+    assert count_syllables("table") == 2
+    assert count_syllables("make") == 1
+    assert count_syllables("free") == 1
+    assert count_syllables("blue") == 1
+    assert count_syllables("syllable") == 3
+    assert count_syllables("beauty") == 2
+    
+    # Edge cases
+    assert count_syllables("") == 0
+    assert count_syllables("   ") == 0
+    assert count_syllables("123!") == 0
+    assert count_syllables("a") == 1
+    assert count_syllables("me") == 1
+    assert count_syllables("the") == 1
+
+
 def test_count_words():
     assert count_words("This is a test.") == 4
     assert count_words("") == 0
@@ -40,6 +67,10 @@ def test_count_words():
     assert count_words("hello,world") == 2
     assert count_words("hello-world") == 2
     assert count_words("HELLO hello") == 2
+    # CJK word count assertions
+    assert count_words("这是一个测试") == 6
+    assert count_words("Hello, 这是一个测试!") == 7
+    assert count_words("日本語漢字") == 5
 
 
 def test_get_word_count_matches_count_words():

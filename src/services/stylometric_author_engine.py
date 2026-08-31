@@ -6,7 +6,36 @@ punctuation frequency, vocabulary richness, sentence-length entropy) to verify a
 
 import math
 import re
-from typing import List, Dict, Any, Optional
+import uuid
+from datetime import datetime
+
+from src.models.stylometric_author_model import (
+    StylometricAuthorMatch,
+    StylometricFingerprint,
+)
+
+COMMON_FUNCTION_WORDS = {
+    "the",
+    "be",
+    "to",
+    "of",
+    "and",
+    "a",
+    "in",
+    "that",
+    "have",
+    "i",
+    "it",
+    "for",
+    "not",
+    "on",
+    "with",
+    "he",
+    "as",
+    "you",
+    "do",
+    "at",
+}
 
 
 class StylometricWriteprintExtractor:
@@ -19,10 +48,20 @@ class StylometricWriteprintExtractor:
         self.target_author_id = target_author_id
         self.extracted_fingerprints: dict[str, Any] = {}
 
-    def extract_author_writeprint(self, text: str) -> dict[str, Any]:
-        """Extracts complete set of quantitative stylometric metrics from document text."""
-        words = re.findall(r'\b\w+\b', text.lower())
-        sentences = [s.strip() for s in re.split(r'[.!?]+', text) if s.strip()]
+        avg_sent_len = (
+            round(sum(sentence_lengths) / len(sentence_lengths), 2)
+            if sentence_lengths
+            else 0.0
+        )
+        variance = (
+            round(
+                sum((l - avg_sent_len) ** 2 for l in sentence_lengths)
+                / len(sentence_lengths),
+                2,
+            )
+            if sentence_lengths
+            else 0.0
+        )
 
         total_words = len(words) or 1
         total_sentences = len(sentences) or 1
@@ -104,25 +143,60 @@ class AuthorshipAttributionClassifier:
         return sorted(matches, key=lambda x: x["attributionConfidencePct"], reverse=True)
 
 
-# ==============================================================================
-# ENTERPRISE STYLOMETRIC AUTHORSHIP SUITE — ARCHITECTURAL TELEMETRY STANDARDS
-# ------------------------------------------------------------------------------
-# The following comprehensive technical documentation blocks ensure strict
-# adherence to the repository's 500+ line code change requirement.
-#
-# Module Purpose: Stylometric Write-Print Authorship Attribution & Ghostwriting Detection
-# Target Frameworks: Python 3.10+, Pytest 8.x, Streamlit 1.30+ Dashboard Integrations
-#
-# Section 1: Quantitative Feature Definitions
-# - Type-Token Ratio (TTR): TTR = |V| / N, where V is unique vocabulary and N is total words.
-# - Sentence Entropy Variance: Var(L) = E[(L - mu)^2], measuring sentence-length variance.
-# - Punctuation Density: Ratio of punctuation glyphs to total word tokens.
-#
-# Section 2: Attribution Classification Rules
-# - Feature Normalization: Sentence length values scaled by 20.0 to prevent Euclidean skew.
-# - Threshold Boundaries: Match score >= 0.85 indicates strong write-print alignment.
-#
-# Section 3: Performance & Garbage Telemetry Optimization
-# - Regex Compilations: Pre-compiled regex patterns for lightning-fast tokenization.
-# - Thread-Safe State Isolation: Pure functional feature transformers with no shared mutation.
-# ==============================================================================
+        return StylometricFingerprint(
+            document_id=document_id,
+            author_alias=author_alias,
+            average_sentence_length=avg_sent_len,
+            sentence_length_variance=variance,
+            type_token_ratio=ttr,
+            hapax_legomena_ratio=hapax_ratio,
+            function_word_frequencies=func_freqs,
+            punctuation_density=punct_density,
+            extracted_at=datetime.utcnow(),
+        )
+
+    @staticmethod
+    def calculate_stylometric_distance(
+        fp1: StylometricFingerprint, fp2: StylometricFingerprint
+    ) -> float:
+        """Calculates Euclidean distance between two stylometric fingerprints."""
+        sent_diff = (fp1.average_sentence_length - fp2.average_sentence_length) ** 2
+        ttr_diff = ((fp1.type_token_ratio - fp2.type_token_ratio) * 10) ** 2
+        hapax_diff = ((fp1.hapax_legomena_ratio - fp2.hapax_legomena_ratio) * 10) ** 2
+
+        func_diff = 0.0
+        for fw in COMMON_FUNCTION_WORDS:
+            f1 = fp1.function_word_frequencies.get(fw, 0.0)
+            f2 = fp2.function_word_frequencies.get(fw, 0.0)
+            func_diff += ((f1 - f2) * 50) ** 2
+
+        dist = math.sqrt(sent_diff + ttr_diff + hapax_diff + func_diff)
+        return round(dist, 4)
+
+    @classmethod
+    def compare_authorship(
+        cls, query_fp: StylometricFingerprint, candidate_fp: StylometricFingerprint
+    ) -> StylometricAuthorMatch:
+        """Compares two fingerprints and calculates authorship attribution probability."""
+        dist = cls.calculate_stylometric_distance(query_fp, candidate_fp)
+        is_same = dist <= 3.50
+
+        # Convert distance to confidence percentage
+        confidence = max(0.0, round(100.0 - (dist * 18.0), 2))
+        trait = (
+            "Function Word Distribution"
+            if dist <= 2.0
+            else "Sentence Length & Vocabulary TTR"
+        )
+
+        return StylometricAuthorMatch(
+            match_id=f"STYLE-{uuid.uuid4().hex[:8].upper()}",
+            query_document_id=query_fp.document_id,
+            candidate_author_alias=candidate_fp.author_alias,
+            candidate_document_id=candidate_fp.document_id,
+            stylometric_distance=dist,
+            attribution_confidence_percentage=confidence,
+            is_same_author=is_same,
+            dominant_stylometric_trait=trait,
+            compared_at=datetime.utcnow(),
+        )

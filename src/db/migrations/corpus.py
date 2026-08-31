@@ -6,7 +6,7 @@ import sqlite3
 
 from .common import column_exists, run_migrations, table_exists
 
-CORPUS_SCHEMA_VERSION = 18
+CORPUS_SCHEMA_VERSION = 20
 
 
 def migration_001_create_base_schema(
@@ -415,6 +415,119 @@ def migration_018_add_false_positives_audit_columns(
         )
 
 
+def migration_019_add_times_flagged(
+    connection: sqlite3.Connection,
+) -> None:
+    """Track how many times a recurring document pair has been re-flagged.
+
+    Issue #3421: when a document pair is flagged again in a later scan, the
+    existing incident row is updated in place (see the ON CONFLICT clause in
+    sync_flagged_incidents) rather than creating a duplicate row. This adds
+    the counter that tracks how many times that has happened.
+    """
+    if not column_exists(connection, "plagiarism_incidents", "times_flagged"):
+        connection.execute(
+            "ALTER TABLE plagiarism_incidents "
+            "ADD COLUMN times_flagged INTEGER NOT NULL DEFAULT 1"
+        )
+def migration_020_add_embedding_metadata(
+    connection: sqlite3.Connection,
+) -> None:
+    """Add explicit model/schema metadata to persisted embeddings."""
+    columns = (
+        ("model_identifier", "TEXT"),
+        ("model_version", "TEXT"),
+        ("embedding_dimension", "INTEGER"),
+        ("normalization_strategy", "TEXT"),
+        ("embedding_generated_at", "TEXT"),
+        ("vector_schema_version", "INTEGER"),
+    )
+
+    for column_name, column_type in columns:
+        if not column_exists(connection, "chunks", column_name):
+            connection.execute(
+                f'ALTER TABLE chunks ADD COLUMN "{column_name}" {column_type}'
+            )
+
+    deleted_columns = (
+        ("model_identifier", "TEXT"),
+        ("model_version", "TEXT"),
+        ("embedding_dimension", "INTEGER"),
+        ("normalization_strategy", "TEXT"),
+        ("embedding_generated_at", "TEXT"),
+        ("vector_schema_version", "INTEGER"),
+    )
+
+    for column_name, column_type in deleted_columns:
+        if not column_exists(connection, "deleted_chunks", column_name):
+            connection.execute(
+                f'ALTER TABLE deleted_chunks ADD COLUMN "{column_name}" {column_type}'
+            )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_chunks_embedding_model
+        ON chunks(model_identifier, model_version)
+        """
+    )
+def migration_021_add_corpus_duplicate_detection(
+    connection: sqlite3.Connection,
+) -> None:
+    """Create persistent corpus-level duplicate/fingerprint metadata."""
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS document_fingerprints (
+            filename TEXT PRIMARY KEY,
+            exact_hash TEXT NOT NULL,
+            minhash_signature TEXT NOT NULL,
+            token_count INTEGER NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS corpus_duplicate_relationships (
+            relationship_id TEXT PRIMARY KEY,
+            document_a TEXT NOT NULL,
+            document_b TEXT NOT NULL,
+            relationship_type TEXT NOT NULL
+                CHECK (
+                    relationship_type IN (
+                        'exact_duplicate',
+                        'near_duplicate'
+                    )
+                ),
+            similarity REAL NOT NULL,
+            family_id TEXT NOT NULL,
+            detected_at TEXT NOT NULL,
+            UNIQUE(document_a, document_b)
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_duplicate_relationships_a
+        ON corpus_duplicate_relationships(document_a)
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_duplicate_relationships_b
+        ON corpus_duplicate_relationships(document_b)
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_duplicate_relationships_family
+        ON corpus_duplicate_relationships(family_id)
+        """
+    )
+
 CORPUS_MIGRATIONS = {
     1: migration_001_create_base_schema,
     2: migration_002_add_document_metadata,
@@ -434,6 +547,9 @@ CORPUS_MIGRATIONS = {
     16: migration_016_add_scheduler_runs,
     17: migration_017_add_incident_date_flagged_index,
     18: migration_018_add_false_positives_audit_columns,
+    19: migration_019_add_times_flagged,
+    20: migration_020_add_embedding_metadata,
+    21: migration_021_add_corpus_duplicate_detection,
 }
 
 
@@ -549,6 +665,46 @@ def down_018_add_false_positives_audit_columns(
     _drop_column_if_exists(connection, "false_positives", "dismissal_reason")
 
 
+def down_019_add_times_flagged(connection: sqlite3.Connection) -> None:
+    _drop_column_if_exists(connection, "plagiarism_incidents", "times_flagged")
+
+def down_020_add_embedding_metadata(
+    connection: sqlite3.Connection,
+) -> None:
+    """Remove embedding metadata columns added by migration 020."""
+    columns = (
+        "model_identifier",
+        "model_version",
+        "embedding_dimension",
+        "normalization_strategy",
+        "embedding_generated_at",
+        "vector_schema_version",
+    )
+
+    for table in ("chunks", "deleted_chunks"):
+        for column_name in columns:
+            _drop_column_if_exists(connection, table, column_name)
+
+    connection.execute("DROP INDEX IF EXISTS idx_chunks_embedding_model")
+def down_020_add_corpus_duplicate_detection(
+    connection: sqlite3.Connection,
+) -> None:
+    """Remove corpus duplicate-detection metadata."""
+    connection.execute(
+        "DROP INDEX IF EXISTS idx_duplicate_relationships_a"
+    )
+    connection.execute(
+        "DROP INDEX IF EXISTS idx_duplicate_relationships_b"
+    )
+    connection.execute(
+        "DROP INDEX IF EXISTS idx_duplicate_relationships_family"
+    )
+    connection.execute(
+        "DROP TABLE IF EXISTS corpus_duplicate_relationships"
+    )
+    connection.execute(
+        "DROP TABLE IF EXISTS document_fingerprints"
+    )
 CORPUS_DOWN_MIGRATIONS = {
     1: down_001_create_base_schema,
     2: down_002_add_document_metadata,
@@ -568,7 +724,21 @@ CORPUS_DOWN_MIGRATIONS = {
     16: down_016_add_scheduler_runs,
     17: down_017_add_incident_date_flagged_index,
     18: down_018_add_false_positives_audit_columns,
+    19: down_019_add_times_flagged,
+    20: down_020_add_corpus_duplicate_detection,
 }
+
+
+def _corpus_db_file_path(connection: sqlite3.Connection) -> Path | None:
+    """Return the on-disk path of the connection's "main" database.
+
+    Returns ``None`` for in-memory or temporary databases (no file to
+    back up).
+    """
+    for _, name, filename in connection.execute("PRAGMA database_list"):
+        if name == "main" and filename:
+            return Path(filename)
+    return None
 
 
 def migrate_corpus_database(
@@ -576,8 +746,25 @@ def migrate_corpus_database(
 ) -> int:
     """Upgrade corpus.db to the latest supported schema version."""
     connection.execute("PRAGMA foreign_keys = ON")
-    return run_migrations(
-        connection,
-        migrations=CORPUS_MIGRATIONS,
-        target_version=CORPUS_SCHEMA_VERSION,
-    )
+
+    db_path = _corpus_db_file_path(connection)
+    backup_path = db_path.with_name("corpus_pre_migrate.db.bak") if db_path else None
+
+    if backup_path is not None:
+        shutil.copy2(db_path, backup_path)
+
+    try:
+        return run_migrations(
+            connection,
+            migrations=CORPUS_MIGRATIONS,
+            target_version=CORPUS_SCHEMA_VERSION,
+        )
+    except Exception:
+        if backup_path is not None and backup_path.exists():
+            logger.error(
+                "Migration failed; restoring corpus.db from backup %s.",
+                backup_path,
+            )
+            connection.close()
+            shutil.copy2(backup_path, db_path)
+        raise

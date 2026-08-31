@@ -151,9 +151,16 @@ def initialize_cache_db(db_path: Optional[Path] = None) -> None:
 # ── Hashing Helpers ──────────────────────────────────────────────────────────
 
 
-def _hash_text_simple(text: str) -> str:
-    """Generate a SHA-256 hash of the text for Issue #1956 cache key lookup."""
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+def _hash_text_simple(
+    text: str, source_lang: str = "auto", target_lang: str = "en"
+) -> str:
+    """Generate a SHA-256 hash of the text and language pair for Issue #1956 cache key lookup.
+
+    Includes source_lang and target_lang in the hash payload (f"{source_lang}:{target_lang}:{text}")
+    to prevent primary key collisions when the same source text is translated to different target languages (Issue #2983).
+    """
+    payload = f"{source_lang}:{target_lang}:{text}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _generate_hash(text: str, source_lang: str, target_lang: str) -> str:
@@ -396,7 +403,9 @@ def get_cached_translation(
                             (datetime.utcnow().isoformat(), source_hash),
                         )
                         logger.debug(
-                            "Cache hit for translation: %s -> %s", source_lang, target_lang
+                            "Cache hit for translation: %s -> %s",
+                            source_lang,
+                            target_lang,
                         )
                         return row["translated_text"]
 

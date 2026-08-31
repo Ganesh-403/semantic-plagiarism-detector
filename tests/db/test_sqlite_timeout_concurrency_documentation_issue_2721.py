@@ -36,6 +36,7 @@ from src.db.connection import (
 # Section 1: Constant & Configuration Assertions
 # ---------------------------------------------------------------------------
 
+
 def test_sqlite_timeout_constants_value():
     """Assert that both module constants equal 15.0 seconds as documented."""
     assert AUTH_SQLITE_TIMEOUT == 15.0
@@ -70,6 +71,7 @@ def test_resolve_busy_timeout_ms_validation():
 # ---------------------------------------------------------------------------
 # Section 2: Connection PRAGMA Configuration Assertions
 # ---------------------------------------------------------------------------
+
 
 def test_connection_pragma_busy_timeout_applied():
     """Verify that create_connection applies PRAGMA busy_timeout = 15000."""
@@ -116,6 +118,7 @@ def test_get_connection_context_manager():
 # ---------------------------------------------------------------------------
 # Section 3: Concurrent Multi-Threaded Database Lock Simulations
 # ---------------------------------------------------------------------------
+
 
 def _worker_write_task(db_path: str, worker_id: int, lock_hold_duration: float):
     """Simulate a worker writing to SQLite database under lock contention."""
@@ -168,6 +171,7 @@ def test_concurrent_multi_threaded_writes_with_15s_timeout():
 # Section 4: Bulk FAISS Vector Index & WAL Checkpoint Lock Simulations
 # ---------------------------------------------------------------------------
 
+
 def test_simulated_bulk_faiss_sync_write_lock_contention():
     """Simulate heavy background write transaction (e.g. FAISS vector sync) while
     a concurrent read/write query executes with 15.0s timeout.
@@ -177,8 +181,13 @@ def test_simulated_bulk_faiss_sync_write_lock_contention():
 
     try:
         with get_connection(db_path, timeout=15.0) as conn:
-            conn.execute("CREATE TABLE embeddings (id INT PRIMARY KEY, vector_data TEXT);")
+            conn.execute(
+                "CREATE TABLE embeddings (id INT PRIMARY KEY, vector_data TEXT);"
+            )
             conn.commit()
+
+        import threading
+        sync_started = threading.Event()
 
         def _bulk_faiss_sync():
             with get_connection(db_path, timeout=15.0) as conn:
@@ -188,11 +197,12 @@ def test_simulated_bulk_faiss_sync_write_lock_contention():
                         "INSERT INTO embeddings (id, vector_data) VALUES (?, ?);",
                         (i, f"vector_embedding_{i}"),
                     )
+                sync_started.set()
                 time.sleep(0.3)  # Hold exclusive transaction for 300ms
                 conn.commit()
 
         def _concurrent_read():
-            time.sleep(0.05)  # Let FAISS sync start first
+            sync_started.wait()
             with get_connection(db_path, timeout=15.0) as conn:
                 cursor = conn.execute("SELECT COUNT(*) FROM embeddings;")
                 return cursor.fetchone()[0]
@@ -216,13 +226,17 @@ def test_wal_checkpoint_lock_contention_simulation():
 
     try:
         with get_connection(db_path, timeout=15.0) as conn:
-            conn.execute("CREATE TABLE document_nodes (id INT PRIMARY KEY, content TEXT);")
+            conn.execute(
+                "CREATE TABLE document_nodes (id INT PRIMARY KEY, content TEXT);"
+            )
             conn.commit()
 
         def _wal_writer():
             with get_connection(db_path, timeout=15.0) as conn:
                 for i in range(100):
-                    conn.execute("INSERT INTO document_nodes VALUES (?, ?);", (i, f"node_{i}"))
+                    conn.execute(
+                        "INSERT INTO document_nodes VALUES (?, ?);", (i, f"node_{i}")
+                    )
                 conn.commit()
                 # Run explicit passive checkpoint sweep
                 conn.execute("PRAGMA wal_checkpoint(PASSIVE);")
@@ -230,7 +244,10 @@ def test_wal_checkpoint_lock_contention_simulation():
         def _concurrent_worker():
             time.sleep(0.02)
             with get_connection(db_path, timeout=15.0) as conn:
-                conn.execute("INSERT INTO document_nodes VALUES (?, ?);", (999, "concurrent_node"))
+                conn.execute(
+                    "INSERT INTO document_nodes VALUES (?, ?);",
+                    (999, "concurrent_node"),
+                )
                 conn.commit()
 
         with ThreadPoolExecutor(max_workers=2) as executor:

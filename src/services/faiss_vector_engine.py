@@ -15,8 +15,10 @@ class FAISSVectorIndexEngine:
     and Inner Product dot-similarity for high-throughput semantic manuscript retrieval.
     """
 
-    def __init__(self, vector_dimension: int = 512, metric_type: str = "L2"):
-        self.vector_dimension = vector_dimension
+    def __init__(
+        self, dimensions: int = 384, metric_type: str = "METRIC_INNER_PRODUCT"
+    ):
+        self.dimensions = dimensions
         self.metric_type = metric_type
         self.indexed_vectors: list[list[float]] = []
         self.indexed_doc_ids: list[str] = []
@@ -67,9 +69,15 @@ class FAISSVectorIndexEngine:
         sorted_results = sorted(search_results, key=lambda x: x["semanticSimilarityScore"], reverse=True)
         return sorted_results[:top_k]
 
-    def _compute_l2_distance(self, vec_a: list[float], vec_b: list[float]) -> float:
-        """Computes Euclidean L2 distance between two dense vector representations."""
-        return math.sqrt(sum((a - b) ** 2 for a, b in zip(vec_a, vec_b)))
+        for chunk_id, chunk in self.indexed_chunks.items():
+            # Calculate Inner Product (Cosine Similarity)
+            dot_product = sum(
+                a * b for a, b in zip(normalized_query, chunk.embedding_vector)
+            )
+            l2_dist = self.calculate_l2_distance(
+                normalized_query, chunk.embedding_vector
+            )
+            candidates.append((dot_product, l2_dist, chunk))
 
     def _generate_dense_vector(self, text: str) -> list[float]:
         """Generates normalized pseudo dense embedding vector from raw document text."""

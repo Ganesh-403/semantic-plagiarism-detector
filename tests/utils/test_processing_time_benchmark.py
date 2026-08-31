@@ -139,5 +139,5 @@ class TestProcessingTimerBenchmark:
         # (generous tolerance to account for GC/scheduling jitter).
         assert elapsed2 < elapsed1 * 3, (
             f"Performance degraded: first 1,000 took {elapsed1:.4f}s, "
-            f"last 1,000 took {elapsed2:.4f}s (ratio {elapsed2/elapsed1:.2f}x)."
+            f"last 1,000 took {elapsed2:.4f}s (ratio {elapsed2 / elapsed1:.2f}x)."
         )

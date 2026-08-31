@@ -396,9 +396,10 @@ def test_translation_cache_uses_provided_connection():
     mock_cursor.fetchone.return_value = {"translated_text": "cached_val"}
     mock_conn.execute.return_value = mock_cursor
 
-    with patch("src.db.translation_cache._connect") as mock_connect, \
-         patch("src.db.translation_cache._get_connection") as mock_get_conn:
-
+    with (
+        patch("src.db.translation_cache._connect") as mock_connect,
+        patch("src.db.translation_cache._get_connection") as mock_get_conn,
+    ):
         # Call get_cached_translation with provided connection
         result = get_cached_translation("source", "fr", "en", conn=mock_conn)
         assert result == "cached_val"
@@ -413,89 +414,3 @@ def test_translation_cache_uses_provided_connection():
 
         # Assert that the provided connection was used
         assert mock_conn.execute.call_count >= 2
-
-
-
-
-def test_migrate_legacy_cache_rehashes_and_inserts(tmp_path):
-    """Legacy rows are copied using the modern language-aware cache hash."""
-    legacy_db = tmp_path / "legacy.db"
-    modern_db = tmp_path / "translation_cache.db"
-
-    with sqlite3.connect(legacy_db) as conn:
-        conn.execute(
-            """
-            CREATE TABLE legacy_translation_cache (
-                text_hash TEXT PRIMARY KEY,
-                foreign_text TEXT NOT NULL,
-                translated_text TEXT NOT NULL,
-                source_lang TEXT,
-                target_lang TEXT DEFAULT 'en',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """
-        )
-        conn.execute(
-            """
-            INSERT INTO legacy_translation_cache
-            (text_hash, foreign_text, translated_text, source_lang, target_lang)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            ("legacy-hash", " Bonjour ", "Hello", "FR", "EN"),
-        )
-
-    stats = translation_cache.migrate_legacy_cache(legacy_db, modern_db)
-
-    assert stats == {"scanned": 1, "migrated": 1, "skipped": 0, "errors": 0}
-
-    with sqlite3.connect(modern_db) as conn:
-        row = conn.execute(
-            """
-            SELECT source_hash, source_text, source_lang, target_lang,
-                   translated_text
-            FROM translation_cache
-            """
-        ).fetchone()
-
-    assert row is not None
-    assert row[0] == translation_cache._generate_hash(" Bonjour ", "fr", "en")
-    assert row[0] != "legacy-hash"
-    assert row[1:] == (" Bonjour ", "fr", "en", "Hello")
-
-
-def test_migrate_legacy_cache_is_idempotent(tmp_path):
-    """Running the migration twice does not overwrite existing modern rows."""
-    legacy_db = tmp_path / "legacy.db"
-    modern_db = tmp_path / "translation_cache.db"
-
-    with sqlite3.connect(legacy_db) as conn:
-        conn.execute(
-            """
-            CREATE TABLE legacy_translation_cache (
-                text_hash TEXT PRIMARY KEY,
-                foreign_text TEXT NOT NULL,
-                translated_text TEXT NOT NULL,
-                source_lang TEXT,
-                target_lang TEXT DEFAULT 'en',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """
-        )
-        conn.execute(
-            """
-            INSERT INTO legacy_translation_cache
-            (text_hash, foreign_text, translated_text, source_lang, target_lang)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            ("legacy-hash", "hola", "hello", "es", "en"),
-        )
-
-    first = translation_cache.migrate_legacy_cache(legacy_db, modern_db)
-    second = translation_cache.migrate_legacy_cache(legacy_db, modern_db)
-
-    assert first["migrated"] == 1
-    assert second["migrated"] == 0
-    assert second["skipped"] == 1
-
-    with sqlite3.connect(modern_db) as conn:
-        assert conn.execute("SELECT COUNT(*) FROM translation_cache").fetchone()[0] == 1

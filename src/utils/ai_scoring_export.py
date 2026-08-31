@@ -37,13 +37,15 @@ class AIScoringExporter:
         path = os.path.join(self.output_dir, filename)
         rows = []
         for s in scores:
-            rows.append({
-                "doc_a": s.get("doc_a", ""),
-                "doc_b": s.get("doc_b", ""),
-                "overall_score": s.get("overall_score", 0),
-                "severity": s.get("severity", ""),
-                "fingerprint_match": s.get("fingerprint_match", False),
-            })
+            rows.append(
+                {
+                    "doc_a": s.get("doc_a", ""),
+                    "doc_b": s.get("doc_b", ""),
+                    "overall_score": s.get("overall_score", 0),
+                    "severity": s.get("severity", ""),
+                    "fingerprint_match": s.get("fingerprint_match", False),
+                }
+            )
         with open(path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=rows[0].keys())
             writer.writeheader()
@@ -51,11 +53,15 @@ class AIScoringExporter:
         logger.info(f"Exported CSV: {path}")
         return path
 
-    def export_summary_report(self, scores: list[dict], filename: str = "scoring_summary.txt") -> str:
+    def export_summary_report(
+        self, scores: List[Dict], filename: str = "scoring_summary.txt"
+    ) -> str:
         """Export human-readable summary report."""
         path = os.path.join(self.output_dir, filename)
         total = len(scores)
-        avg_score = sum(s.get("overall_score", 0) for s in scores) / total if total else 0
+        avg_score = (
+            sum(s.get("overall_score", 0) for s in scores) / total if total else 0
+        )
         critical = sum(1 for s in scores if s.get("severity") == "critical")
         high = sum(1 for s in scores if s.get("severity") == "high")
 
@@ -72,7 +78,9 @@ class AIScoringExporter:
             "TOP MATCHES:",
         ]
         for i, s in enumerate(scores[:10], 1):
-            lines.append(f"  #{i} {s.get('doc_a')} ↔ {s.get('doc_b')} — {s.get('overall_score', 0):.1%} ({s.get('severity')})")
+            lines.append(
+                f"  #{i} {s.get('doc_a')} ↔ {s.get('doc_b')} — {s.get('overall_score', 0):.1%} ({s.get('severity')})"
+            )
         lines.extend(["", "=" * 60])
 
         with open(path, "w", encoding="utf-8") as f:

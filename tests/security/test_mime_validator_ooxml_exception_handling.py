@@ -38,8 +38,7 @@ CONTENT_TYPES_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
 """
 
 DOCX_MAIN_CONTENT_TYPE = (
-    "application/vnd.openxmlformats-officedocument."
-    "wordprocessingml.document.main+xml"
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
 )
 
 
@@ -92,9 +91,9 @@ def test_validate_ooxml_archive_try_block_has_a_handler():
 
     try_nodes = [node for node in ast.walk(tree) if isinstance(node, ast.Try)]
     assert try_nodes, "_validate_ooxml_archive should guard archive parsing"
-    assert any(
-        node.handlers for node in try_nodes
-    ), "the try block must have at least one except handler attached"
+    assert any(node.handlers for node in try_nodes), (
+        "the try block must have at least one except handler attached"
+    )
 
 
 # ── The handler must actually catch ──────────────────────────────────────────
