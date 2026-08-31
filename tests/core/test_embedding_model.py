@@ -42,6 +42,7 @@ def mock_model():
     """Fixture to provide a mocked SentenceTransformer model."""
     model = MagicMock()
     model.encode.side_effect = _mock_encode
+    model.get_sentence_embedding_dimension.return_value = 384
     with patch("src.core.embedding_model._get_model", return_value=model):
         yield model
 
@@ -56,7 +57,7 @@ def test_embed_chunks_shape(mock_model):
     assert result.shape == (2, 384)
 
 
-def test_embed_chunks_empty():
+def test_embed_chunks_empty(mock_model):
     """Empty input list must return an empty array of shape (0, 384)."""
     result = embed_chunks([])
     assert result.size == 0
@@ -854,5 +855,56 @@ class TestConfigurableEmbeddingBatchSize:
         assert mock_model.encode.call_count == 2
         for call_args in mock_model.encode.call_args_list:
             assert call_args.kwargs.get("batch_size") == 64
+
+
+class TestThreadSafeEmbeddingManager:
+    """Test suite for thread-safe model singleton access in EmbeddingModelManager (Issue #4011)."""
+
+    def test_concurrent_get_instance_returns_same_singleton(self):
+        """Verify concurrent threads calling get_instance receive the exact same singleton instance."""
+        import concurrent.futures
+
+        instances = []
+
+        def _fetch_instance():
+            return EmbeddingModelManager.get_instance()
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(_fetch_instance) for _ in range(20)]
+            instances = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+        first_instance = instances[0]
+        assert all(inst is first_instance for inst in instances)
+
+    @patch("src.core.embedding_model.SentenceTransformer")
+    def test_concurrent_get_model_loads_model_only_once(self, mock_st):
+        """Verify concurrent requests calling get_model load the underlying model exactly once into memory."""
+        import concurrent.futures
+        import time
+
+        embedding_model._model = None
+        embedding_model._quantized_model = None
+        EmbeddingModelManager._instance = None
+
+        mock_instance = MagicMock()
+        mock_instance.get_sentence_embedding_dimension.return_value = 384
+
+        def _slow_load(*args, **kwargs):
+            time.sleep(0.05)
+            return mock_instance
+
+        mock_st.side_effect = _slow_load
+
+        def _load_model():
+            mgr = EmbeddingModelManager.get_instance()
+            return mgr.get_model()
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [executor.submit(_load_model) for _ in range(16)]
+            models = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+        assert mock_st.call_count == 1
+        assert all(m is mock_instance for m in models)
+
 
 
