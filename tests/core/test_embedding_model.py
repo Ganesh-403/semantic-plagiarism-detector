@@ -42,6 +42,7 @@ def mock_model():
     """Fixture to provide a mocked SentenceTransformer model."""
     model = MagicMock()
     model.encode.side_effect = _mock_encode
+    model.get_sentence_embedding_dimension.return_value = 384
     with patch("src.core.embedding_model._get_model", return_value=model):
         yield model
 
@@ -56,7 +57,7 @@ def test_embed_chunks_shape(mock_model):
     assert result.shape == (2, 384)
 
 
-def test_embed_chunks_empty():
+def test_embed_chunks_empty(mock_model):
     """Empty input list must return an empty array of shape (0, 384)."""
     result = embed_chunks([])
     assert result.size == 0
@@ -854,5 +855,68 @@ class TestConfigurableEmbeddingBatchSize:
         assert mock_model.encode.call_count == 2
         for call_args in mock_model.encode.call_args_list:
             assert call_args.kwargs.get("batch_size") == 64
+
+
+class TestAppleSiliconMPSAcceleration:
+    """Test suite for Apple Silicon Metal (MPS) acceleration support (Issue #4008)."""
+
+    def test_get_device_mps_available_when_cuda_not_present(self, monkeypatch):
+        """When CUDA is not available and MPS is available, get_device returns 'mps'."""
+        from src.core.embedding_model import get_device
+
+        # Mock CUDA not available
+        monkeypatch.setattr(torch.xpu, "is_available", lambda: False, raising=False)
+        if hasattr(torch, "cuda"):
+            monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+
+        # Mock MPS available
+        mock_mps = MagicMock()
+        mock_mps.is_available.return_value = True
+        monkeypatch.setattr(torch.backends, "mps", mock_mps)
+
+        assert get_device(None) == "mps"
+
+    def test_get_device_cuda_takes_precedence_over_mps(self, monkeypatch):
+        """When CUDA is available, get_device returns 'cuda' even if MPS is available."""
+        from src.core.embedding_model import get_device
+
+        monkeypatch.setattr(torch.xpu, "is_available", lambda: False, raising=False)
+        monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+        monkeypatch.setattr(torch.backends.cuda, "is_built", lambda: True)
+
+        mock_mps = MagicMock()
+        mock_mps.is_available.return_value = True
+        monkeypatch.setattr(torch.backends, "mps", mock_mps)
+
+        assert get_device(None) == "cuda"
+
+    def test_get_device_cpu_fallback_when_no_accelerator_available(self, monkeypatch):
+        """When no GPU accelerator (CUDA/MPS/XPU) is available, get_device returns 'cpu'."""
+        from src.core.embedding_model import get_device
+
+        monkeypatch.setattr(torch.xpu, "is_available", lambda: False, raising=False)
+        if hasattr(torch, "cuda"):
+            monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+
+        mock_mps = MagicMock()
+        mock_mps.is_available.return_value = False
+        monkeypatch.setattr(torch.backends, "mps", mock_mps)
+
+        assert get_device(None) == "cpu"
+
+    def test_get_device_reads_model_attribute(self):
+        """When a SentenceTransformer model instance with device attribute is provided, get_device inspects it."""
+        from src.core.embedding_model import get_device
+
+        mock_model = MagicMock()
+        mock_model.device = "mps"
+        assert get_device(mock_model) == "mps"
+
+        mock_model_obj = MagicMock()
+        dev_obj = MagicMock()
+        dev_obj.type = "mps"
+        mock_model_obj.device = dev_obj
+        assert get_device(mock_model_obj) == "mps"
+
 
 
