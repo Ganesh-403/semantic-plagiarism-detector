@@ -5,7 +5,7 @@ import os
 import sqlite3
 from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI, Query, Request, Security, status
+from fastapi import Depends, FastAPI, Query, Request, Security, status, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -483,3 +483,39 @@ def get_audit_events_api(
         }
     }
 app.include_router(admin_router)
+ 
+ 
+from fastapi import WebSocket, WebSocketDisconnect
+
+@app.websocket("/api/v1/scan/progress/{job_id}")
+async def scan_progress_ws(websocket: WebSocket, job_id: str):
+    await websocket.accept()
+    try:
+        from src.celery_app.celery_config import celery_app
+        import asyncio
+        while True:
+            task = celery_app.AsyncResult(job_id)
+            if task.state == 'PENDING':
+                response = {"state": task.state, "status": "Pending..."}
+            elif task.state != 'FAILURE':
+                info = task.info if isinstance(task.info, dict) else {}
+                response = {
+                    "state": task.state, 
+                    "status": info.get('step', ''), 
+                    "progress": info.get('progress', 0),
+                    "total": info.get('total', 0)
+                }
+                if task.state == 'SUCCESS':
+                    response['result'] = info
+            else:
+                response = {"state": task.state, "status": str(task.info)}
+            
+            await websocket.send_json(response)
+            if task.state in ['SUCCESS', 'FAILURE']:
+                break
+            await asyncio.sleep(1)
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        await websocket.close()
