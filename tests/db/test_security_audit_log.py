@@ -182,6 +182,7 @@ def test_update_password_logs_multiple_changes():
 def test_log_security_event_lowercases_username():
     """log_security_event should convert mixed-case usernames to lowercase."""
     from src.db.security_audit import log_security_event as sec_log_security_event
+
     raw_username = "AdminUser_Test"
     expected_username = "adminuser_test"
     sec_log_security_event(event_type="case_test_event", username=raw_username)
@@ -199,11 +200,12 @@ def test_log_security_event_failure_emits_alert():
 
     from src.db.security_audit import log_security_event as sec_log_security_event
 
-    with patch("sqlite3.connect") as mock_connect, patch(
-        "src.db.security_audit._emit_audit_log_failure_alert"
-    ) as mock_alert:
-        mock_connect.side_effect = sqlite3.OperationalError("disk I/O error or full partition")
+    with (
+        patch("sqlite3.connect") as mock_connect,
+        patch("src.db.security_audit._emit_audit_log_failure_alert") as mock_alert,
+    ):
+        mock_connect.side_effect = sqlite3.OperationalError(
+            "disk I/O error or full partition"
+        )
         sec_log_security_event(event_type="test_failure_event", username="test_user")
         mock_alert.assert_called_once()
-
-

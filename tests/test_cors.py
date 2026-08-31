@@ -58,7 +58,9 @@ def test_cors_wildcard_subdomain_success(monkeypatch):
         },
     )
 
-    assert response.headers["access-control-allow-origin"] == "https://cs.university.edu"
+    assert (
+        response.headers["access-control-allow-origin"] == "https://cs.university.edu"
+    )
     assert response.headers.get("access-control-allow-credentials") == "true"
 
 

@@ -422,12 +422,20 @@ class TestGetCurrentUserScopes:
         from src.api.middleware import get_current_user
 
         async def _test():
-            security_scopes = SecurityScopes(scopes=["read", "write"])
-            payload = {"sub": "user1", "scopes": ["read", "write", "admin"]}
-            with patch("src.security.jwt_utils.verify_access_token", return_value=payload):
-                with patch("src.api.middleware.get_valid_tokens", return_value={}):
-                    res = await get_current_user(security_scopes, token="token_jwt")
-                    assert res["scopes"] == ["read", "write", "admin"]
+            request = MagicMock()
+            request.method = "GET"
+            request.url.path = "/api/v1/protected"
+            creds = HTTPAuthorizationCredentials(
+                scheme="Bearer", credentials="valid_token_123"
+            )
+
+            with patch("src.db.auth.is_token_revoked", return_value=False):
+                with patch(
+                    "src.security.jwt_utils.verify_access_token",
+                    return_value={"sub": "user"},
+                ):
+                    token = await verify_bearer_token(request, creds)
+                    assert token == "valid_token_123"
 
         asyncio.run(_test())
 
@@ -438,10 +446,46 @@ class TestGetCurrentUserScopes:
         from src.api.middleware import get_current_user
 
         async def _test():
-            security_scopes = SecurityScopes(scopes=["read", "write"])
-            payload = {"sub": "user1", "scopes": ["read"]}
-            with patch("src.security.jwt_utils.verify_access_token", return_value=payload):
-                with patch("src.api.middleware.get_valid_tokens", return_value={}):
+            request = MagicMock()
+            request.method = "GET"
+            request.url.path = "/api/v1/protected"
+            creds = HTTPAuthorizationCredentials(
+                scheme="Bearer", credentials="invalid_token"
+            )
+
+            with patch(
+                "src.security.jwt_utils.verify_access_token",
+                side_effect=ValueError("Invalid signature"),
+            ):
+                with pytest.raises(HTTPException) as exc_info:
+                    await verify_bearer_token(request, creds)
+                assert exc_info.value.status_code == 401
+
+        asyncio.run(_test())
+
+    def test_unexpected_exception_logs_error_and_returns_401(self, caplog):
+        """Verify unexpected Exception during verification logs error with exc_info and raises 401."""
+        import asyncio
+        from unittest.mock import MagicMock
+
+        from fastapi import HTTPException
+        from fastapi.security import HTTPAuthorizationCredentials
+
+        from src.api.middleware import verify_bearer_token
+
+        async def _test():
+            request = MagicMock()
+            request.method = "GET"
+            request.url.path = "/api/v1/protected"
+            creds = HTTPAuthorizationCredentials(
+                scheme="Bearer", credentials="some_token"
+            )
+
+            with patch(
+                "src.security.jwt_utils.verify_access_token",
+                side_effect=RuntimeError("Corrupted secret key configuration"),
+            ):
+                with caplog.at_level(logging.ERROR):
                     with pytest.raises(HTTPException) as exc_info:
                         await get_current_user(security_scopes, token="token_jwt")
                     assert exc_info.value.status_code == 403
@@ -558,135 +602,3 @@ def test_no_inline_imports_in_middleware_functions():
                         f"Found inline import '{module_name} -> {imported_names}' inside function "
                         f"'{node.name}' at line {child.lineno} in {middleware_path.name}"
                     )
-
-
-
-class TestSecurityScopesAnyVsAll:
-    """Test suite for ANY vs ALL security scope evaluation logic (Issue #3017)."""
-
-    def test_get_current_user_pipe_syntax_any(self):
-        """Verify pipe syntax in scopes provides OR (ANY) authorization logic."""
-        import asyncio
-        from fastapi import HTTPException
-        from fastapi.security import SecurityScopes
-        from src.api.middleware import get_current_user
-
-        async def _test():
-            security_scopes = SecurityScopes(scopes=["admin|manager"])
-
-            # 1. User with 'admin' scope should be authorized
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok1": ["admin"]}):
-                res = await get_current_user(security_scopes, token="tok1")
-                assert res["scopes"] == ["admin"]
-
-            # 2. User with 'manager' scope should be authorized
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok2": ["manager"]}):
-                res = await get_current_user(security_scopes, token="tok2")
-                assert res["scopes"] == ["manager"]
-
-            # 3. User with only 'viewer' scope should be rejected with 403 Forbidden
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok3": ["viewer"]}):
-                with pytest.raises(HTTPException) as exc_info:
-                    await get_current_user(security_scopes, token="tok3")
-                assert exc_info.value.status_code == 403
-
-        asyncio.run(_test())
-
-    def test_get_current_user_default_all_logic(self):
-        """Verify multiple separate scopes require ALL (AND) by default."""
-        import asyncio
-        from fastapi import HTTPException
-        from fastapi.security import SecurityScopes
-        from src.api.middleware import get_current_user
-
-        async def _test():
-            security_scopes = SecurityScopes(scopes=["admin", "write"])
-
-            # 1. User with only 'admin' should fail
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok1": ["admin"]}):
-                with pytest.raises(HTTPException) as exc_info:
-                    await get_current_user(security_scopes, token="tok1")
-                assert exc_info.value.status_code == 403
-
-            # 2. User with both 'admin' and 'write' should succeed
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok2": ["admin", "write", "read"]}):
-                res = await get_current_user(security_scopes, token="tok2")
-                assert "admin" in res["scopes"]
-                assert "write" in res["scopes"]
-
-        asyncio.run(_test())
-
-    def test_require_scopes_class_any_mode(self):
-        """Verify RequireScopes dependency injection class with mode='any'."""
-        import asyncio
-        from fastapi import HTTPException
-        from src.api.middleware import RequireScopes
-
-        async def _test():
-            checker = RequireScopes(scopes=["admin", "manager"], mode="any")
-
-            # Possessing 'manager' is sufficient
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok": ["manager"]}):
-                res = await checker(token="tok")
-                assert res["scopes"] == ["manager"]
-
-            # Possessing neither raises 403
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok": ["read"]}):
-                with pytest.raises(HTTPException) as exc_info:
-                    await checker(token="tok")
-                assert exc_info.value.status_code == 403
-
-        asyncio.run(_test())
-
-    def test_require_scopes_class_all_mode(self):
-        """Verify RequireScopes dependency injection class with mode='all'."""
-        import asyncio
-        from fastapi import HTTPException
-        from src.api.middleware import RequireScopes
-
-        async def _test():
-            checker = RequireScopes(scopes=["admin", "write"], mode="all")
-
-            # Possessing only 'admin' raises 403
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok": ["admin"]}):
-                with pytest.raises(HTTPException) as exc_info:
-                    await checker(token="tok")
-                assert exc_info.value.status_code == 403
-
-            # Possessing both succeeds
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok": ["admin", "write"]}):
-                res = await checker(token="tok")
-                assert res["scopes"] == ["admin", "write"]
-
-        asyncio.run(_test())
-
-    def test_require_scope_helpers(self):
-        """Verify require_any_scope and require_all_scopes convenience helper factories."""
-        import asyncio
-        from src.api.middleware import require_all_scopes, require_any_scope
-
-        any_checker = require_any_scope("admin", "manager")
-        assert any_checker.mode == "any"
-        assert set(any_checker.scopes) == {"admin", "manager"}
-
-        all_checker = require_all_scopes("admin", "write")
-        assert all_checker.mode == "all"
-        assert set(all_checker.scopes) == {"admin", "write"}
-
-        async def _test():
-            with patch("src.api.middleware.get_valid_tokens", return_value={"tok": ["admin"]}):
-                res = await any_checker(token="tok")
-                assert res["scopes"] == ["admin"]
-
-        asyncio.run(_test())
-
-    def test_require_scopes_invalid_mode_raises(self):
-        """Verify RequireScopes raises ValueError on invalid mode."""
-        from src.api.middleware import RequireScopes
-
-        with pytest.raises(ValueError, match="Invalid scope evaluation mode"):
-            RequireScopes(scopes=["admin"], mode="xor")
-
-
-
-

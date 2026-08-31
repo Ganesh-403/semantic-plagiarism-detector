@@ -16,6 +16,8 @@ from .document_parser import (
 )
 from .embedding_model import embed_chunks, embed_documents, get_document_embedding
 from .faiss_index import (
+    FAISSIndex,
+    FaissIndexManager,
     ChunkRecord,
     FaissChunkRecord,
     build_index,
@@ -24,6 +26,8 @@ from .faiss_index import (
     format_faiss_memory_badge,
     get_faiss_index_memory_bytes,
     load_index,
+    rebuild_index_from_database,
+    rebuild_index_from_db,
     save_index,
     search_similar_chunks,
 )
@@ -49,7 +53,7 @@ from .similarity_engines import (
     SimilarityEngineFactory,
 )
 from .tag_manager import TagManager, sanitize_tag_name
-from .text_chunking import chunk_by_sentences, chunk_document, chunk_documents
+from .text_chunking import Chunk, ChunkString, chunk_by_sentences, chunk_document, chunk_documents
 from .translator import translate_text
 from .webhook import (
     EventDispatcher,
@@ -67,9 +71,13 @@ if TYPE_CHECKING:
 __all__ = [
     "BaseSimilarityEngine",
     "BrandingConfig",
+    "Chunk",
     "ChunkRecord",
+    "ChunkString",
     "EventDispatcher",
+    "FAISSIndex",
     "FaissChunkRecord",
+    "FaissIndexManager",
     "HybridSimilarityEngine",
     "LexicalSimilarityEngine",
     "PLAGIARISM_THRESHOLD",
@@ -102,6 +110,8 @@ __all__ = [
     "load_branding_config",
     "load_index",
     "manhattan_similarity",
+    "rebuild_index_from_database",
+    "rebuild_index_from_db",
     "reload_branding_config",
     "run_extraction_pipeline",
     "run_pipeline",

@@ -19,7 +19,7 @@ def test_sqlite_transaction_rollback_on_exception():
             cursor = conn.cursor()
             cursor.execute(
                 "INSERT INTO users (username, email) VALUES (?, ?)",
-                ("rollback_test_user", "rollback@example.com")
+                ("rollback_test_user", "rollback@example.com"),
             )
             # Raise an exception before transaction commits
             raise RuntimeError("Forced exception for rollback test")
@@ -29,5 +29,7 @@ def test_sqlite_transaction_rollback_on_exception():
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE username = 'rollback_test_user'")
         user = cursor.fetchone()
-        
-    assert user is None, "Transaction failed to roll back; user record exists in the database!"
+
+    assert user is None, (
+        "Transaction failed to roll back; user record exists in the database!"
+    )

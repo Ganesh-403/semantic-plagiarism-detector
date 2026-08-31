@@ -16,6 +16,18 @@ class CorpusRepository:
         if db_path is not None:
             corpus_db.configure_db_path(db_path)
 
+    def soft_delete_document(self, filename: str) -> bool:
+        """Soft delete a document by filename."""
+        return corpus_db.soft_delete_document(filename)
+
+    def restore_document(self, filename: str) -> bool:
+        """Restore a soft-deleted document by filename."""
+        return corpus_db.restore_document(filename)
+
+    def get_all_documents(self, include_deleted: bool = False) -> list:
+        """Return all indexed documents, optionally including soft-deleted ones."""
+        return corpus_db.get_all_documents(include_deleted=include_deleted)
+
     def get_documents_by_metadata(
         self,
         class_section: str | None = None,
@@ -62,7 +74,9 @@ class CorpusRepository:
         query += " ORDER BY upload_date DESC"
 
         with corpus_db._connect() as conn:
-            rows = conn.execute(query, params).fetchall()
-            columns = [column[0] for column in conn.description]
+            cursor = conn.execute(query, params)
+            rows = cursor.fetchall()
+            columns = [column[0] for column in cursor.description]
 
         return [dict(zip(columns, row)) for row in rows]
+

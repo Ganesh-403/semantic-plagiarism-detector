@@ -12,10 +12,10 @@ def test_telemetry_cache_hit():
     Test that TelemetryService.get_active_user_count correctly returns a cached value
     without querying the DB.
     """
-    with patch("src.core.telemetry.get_cache") as mock_get_cache, patch(
-        "src.core.telemetry.get_user_count"
-    ) as mock_get_user_count:
-
+    with (
+        patch("src.core.telemetry.get_cache") as mock_get_cache,
+        patch("src.core.telemetry.get_user_count") as mock_get_user_count,
+    ):
         mock_get_cache.return_value = "42"
 
         count = TelemetryService.get_active_user_count()
@@ -29,10 +29,11 @@ def test_telemetry_cache_miss():
     """
     Test that on cache miss, the service queries the DB and populates the cache.
     """
-    with patch("src.core.telemetry.get_cache") as mock_get_cache, patch(
-        "src.core.telemetry.get_user_count"
-    ) as mock_get_user_count, patch("src.core.telemetry.set_cache") as mock_set_cache:
-
+    with (
+        patch("src.core.telemetry.get_cache") as mock_get_cache,
+        patch("src.core.telemetry.get_user_count") as mock_get_user_count,
+        patch("src.core.telemetry.set_cache") as mock_set_cache,
+    ):
         mock_get_cache.return_value = None
         mock_get_user_count.return_value = 17
 
@@ -52,10 +53,10 @@ def test_telemetry_db_failure():
     """
     Test that if the database lookup fails entirely, the service handles it gracefully.
     """
-    with patch("src.core.telemetry.get_cache") as mock_get_cache, patch(
-        "src.core.telemetry.get_user_count"
-    ) as mock_get_user_count:
-
+    with (
+        patch("src.core.telemetry.get_cache") as mock_get_cache,
+        patch("src.core.telemetry.get_user_count") as mock_get_user_count,
+    ):
         mock_get_cache.return_value = None
         mock_get_user_count.side_effect = Exception("DB Connection Lost")
 
@@ -73,10 +74,10 @@ def test_telemetry_doc_count_cache_hit():
     """
     Test that TelemetryService.get_document_count hits the cache.
     """
-    with patch("src.core.telemetry.get_cache") as mock_get_cache, patch(
-        "src.core.telemetry.get_document_count_fast"
-    ) as mock_get_doc_count_fast:
-
+    with (
+        patch("src.core.telemetry.get_cache") as mock_get_cache,
+        patch("src.core.telemetry.get_document_count_fast") as mock_get_doc_count_fast,
+    ):
         mock_get_cache.return_value = "99"
 
         count = TelemetryService.get_document_count()
@@ -90,12 +91,11 @@ def test_telemetry_doc_count_cache_miss():
     """
     Test that on cache miss, get_document_count queries DB and populates cache.
     """
-    with patch("src.core.telemetry.get_cache") as mock_get_cache, patch(
-        "src.core.telemetry.get_document_count_fast"
-    ) as mock_get_doc_count_fast, patch(
-        "src.core.telemetry.set_cache"
-    ) as mock_set_cache:
-
+    with (
+        patch("src.core.telemetry.get_cache") as mock_get_cache,
+        patch("src.core.telemetry.get_document_count_fast") as mock_get_doc_count_fast,
+        patch("src.core.telemetry.set_cache") as mock_set_cache,
+    ):
         mock_get_cache.return_value = None
         mock_get_doc_count_fast.return_value = 3
 
@@ -115,10 +115,10 @@ def test_telemetry_doc_db_failure():
     """
     Test that if document DB query fails, service falls back safely.
     """
-    with patch("src.core.telemetry.get_cache") as mock_get_cache, patch(
-        "src.core.telemetry.get_document_count_fast"
-    ) as mock_get_doc_count_fast:
-
+    with (
+        patch("src.core.telemetry.get_cache") as mock_get_cache,
+        patch("src.core.telemetry.get_document_count_fast") as mock_get_doc_count_fast,
+    ):
         mock_get_cache.return_value = None
         mock_get_doc_count_fast.side_effect = Exception("DB Fault")
 
@@ -136,12 +136,11 @@ def test_telemetry_force_refresh():
     """
     Test that force_refresh bypasses the get_cache check and immediately updates cache.
     """
-    with patch("src.core.telemetry.get_user_count") as mock_get_user_count, patch(
-        "src.core.telemetry.get_document_count_fast"
-    ) as mock_get_doc_count_fast, patch(
-        "src.core.telemetry.set_cache"
-    ) as mock_set_cache:
-
+    with (
+        patch("src.core.telemetry.get_user_count") as mock_get_user_count,
+        patch("src.core.telemetry.get_document_count_fast") as mock_get_doc_count_fast,
+        patch("src.core.telemetry.set_cache") as mock_set_cache,
+    ):
         mock_get_user_count.return_value = 100
         mock_get_doc_count_fast.return_value = 550
 
@@ -173,7 +172,9 @@ def test_telemetry_clear_telemetry_data_exception_handling(caplog):
     """
     Test that clear_telemetry_data handles exceptions from delete_cache gracefully.
     """
-    with patch("src.utils.redis_cache.delete_cache", side_effect=Exception("Redis offline")):
+    with patch(
+        "src.utils.redis_cache.delete_cache", side_effect=Exception("Redis offline")
+    ):
         TelemetryService.clear_telemetry_data()
 
     assert "Failed to clear telemetry cache key" in caplog.text

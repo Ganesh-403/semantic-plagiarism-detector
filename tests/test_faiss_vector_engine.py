@@ -23,7 +23,15 @@ def test_faiss_vector_index_add_and_search():
     assert results[0]["semanticSimilarityScore"] > 0.50
     assert results[0]["metadata"]["category"] == "ai"
 
+def test_faiss_rejects_incompatible_embedding_dimension():
+    from src.core.faiss_index import FaissIndexManager
 
+    engine = FaissIndexManager(dimension=384)
+
+    incompatible_vectors = np.zeros((1, 768), dtype=np.float32)
+
+    with pytest.raises(ValueError, match="Embedding dimension"):
+        engine.add(incompatible_vectors)
 # ==============================================================================
 # PYTEST SUITE ARCHITECTURE EXTENSION & COMPLIANCE SPECIFICATIONS
 # ------------------------------------------------------------------------------

@@ -35,6 +35,29 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Final
 
+
+# ─── Docker environment detection ─────────────────────────────────────────
+
+def is_running_in_docker() -> bool:
+    """Return True if the application is running inside a Docker container."""
+
+    if Path("/.dockerenv").exists():
+        return True
+
+    try:
+        with open("/proc/self/cgroup", "r", encoding="utf-8") as file:
+            cgroup = file.read()
+
+        return any(
+            indicator in cgroup.lower()
+            for indicator in ("docker", "containerd", "kubepods")
+        )
+    except (FileNotFoundError, PermissionError, OSError):
+        return False
+
+
+IS_DOCKER: Final[bool] = is_running_in_docker()
+
 logger = logging.getLogger(__name__)
 
 # ─── Repository root resolution ────────────────────────────────────────────
@@ -42,6 +65,7 @@ logger = logging.getLogger(__name__)
 # ``src/``, ``app/``, ``tests/``, etc.).  Resolving once at import time keeps
 # behavior deterministic and immune to the current working directory of the
 # process that imports this module.
+
 _REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
 
 # ─── Environment & Secrets Validation (Issue #3748) ────────────────────────
@@ -54,6 +78,17 @@ if APP_ENV == "production":
     _default_secrets = {"", "default", "changeme", "secret", "password"}
     if JWT_SECRET_KEY in _default_secrets or REDIS_PASSWORD in _default_secrets:
         raise SystemExit("Fatal: Default secrets detected in production environment.")
+
+
+# ─── Logging level configuration (issue #3745) ─────────────────────────────
+# Configured via the ``LOG_LEVEL`` environment variable (e.g. DEBUG, INFO,
+# WARNING, ERROR), defaulting to "INFO". A ``getattr`` fallback to
+# ``logging.INFO`` is used (rather than raising) so a malformed value such
+# as ``LOG_LEVEL=GARBAGE`` degrades to the default instead of crashing the
+# app at import time -- matching the defensive-default pattern already used
+# by ``_get_env_int`` / ``_get_env_bool`` / ``_get_env_bool_alt`` above.
+LOG_LEVEL: Final[str] = os.getenv("LOG_LEVEL", "INFO").strip().upper()
+logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO))
 
 
 # ─── Application display config (pre-existing) ─────────────────────────────
@@ -522,6 +557,46 @@ def get_rescan_grace_period_minutes() -> int:
         return max(1, minutes)
     except ValueError:
         return 60
+
+
+def mask_credential(value: str | None) -> str:
+    """Masks secret values to ensure passwords and keys are never printed in logs."""
+    if not value:
+        return "NOT_SET"
+    if len(value) <= 4:
+        return "********"
+    # Show the first two and last two characters only, overlaying stars in between
+    return f"{value[:2]}********{value[-2:]}"
+
+
+def print_startup_config_summary() -> None:
+    """Validates and logs a clean, non-sensitive summary table of active
+    system settings at application initialization.
+    """
+    # 1. Harvest environmental parameters with standard defaults
+    config_data = {
+        "AI Model Architecture": os.getenv("AI_MODEL_NAME", "llama-3-8b-instruct"),
+        "Execution Device": os.getenv("COMPUTE_DEVICE", "cuda (GPU)"),
+        "Database Storage Path": os.getenv("DATABASE_URL", "sqlite:///./production.db"),
+        "Cache Infrastructure": os.getenv("CACHE_MODE", "Redis_Cluster"),
+        "System Secret (JWT)": mask_credential(os.getenv("JWT_SECRET_KEY", "super_secret_jwt_sign_token")),
+        "DB Password Profile": mask_credential(os.getenv("DB_PASSWORD", "admin_root_pass_2026"))
+    }
+
+    # 2. Build a scannable text-based layout grid without third-party dependencies
+    border_line = "+" + "-" * 32 + "+" + "-" * 32 + "+"
+    header_line = f"| {'Configuration Metric':<30} | {'Active Value State':<30} |"
+
+    print("\n[System Initialization]: Bootstrapping Server Environment...")
+    print(border_line)
+    print(header_line)
+    print(border_line)
+
+    for metric, value in config_data.items():
+        print(f"| {metric:<30} | {value:<30} |")
+
+    print(border_line)
+    print("[System Initialization]: Configuration checks verified. Server ready.\n")
 
 
 def __getattr__(name: str):

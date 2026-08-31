@@ -208,9 +208,9 @@ def render_faiss_results_ui(
         doc_hash = str(raw_hash) if raw_hash else None
 
         st.markdown(
-            f"<div style='border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; margin-bottom: 8px;'>"
+            f"<div style='border: 1px solid var(--spd-border, #e2e8f0); padding: 12px; border-radius: 8px; margin-bottom: 8px;'>"
             f"<strong>📄 {doc_name}</strong> (Chunk #{chunk_index + 1}) · "
-            f"<span style='color: #3b82f6; font-weight: bold;'>Similarity: {formatted_score} ({score:.1%})</span>"
+            f"<span style='color: var(--spd-primary, #3b82f6); font-weight: bold;'>Similarity: {formatted_score} ({score:.1%})</span>"
             f"</div>",
             unsafe_allow_html=True,
         )

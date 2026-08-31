@@ -7,7 +7,7 @@ from typing import Any, Optional
 
 class CliExitCodes(IntEnum):
     SUCCESS = 0
-    
+
     INVALID_ARGS = 1
     MISSING_ARGUMENT = 2
     INVALID_OPTION = 3
@@ -27,7 +27,7 @@ class CliExitCodes(IntEnum):
     INVALID_REGEX = 17
     INVALID_JSON = 18
     INVALID_YAML = 19
-    
+
     INVALID_FOLDER = 20
     FILE_NOT_FOUND = 21
     FOLDER_NOT_FOUND = 22
@@ -48,7 +48,7 @@ class CliExitCodes(IntEnum):
     FILE_IN_USE = 37
     FILE_ENCODING_ERROR = 38
     UNSUPPORTED_FILE_TYPE = 39
-    
+
     FATAL_ERROR = 40
     RUNTIME_ERROR = 41
     PROCESS_ERROR = 42
@@ -69,7 +69,7 @@ class CliExitCodes(IntEnum):
     DAEMON_ERROR = 57
     SERVICE_ERROR = 58
     INTERRUPTED = 59
-    
+
     NETWORK_ERROR = 60
     CONNECTION_ERROR = 61
     CONNECTION_TIMEOUT = 62
@@ -90,7 +90,7 @@ class CliExitCodes(IntEnum):
     FIREWALL_ERROR = 77
     LOAD_BALANCER_ERROR = 78
     GATEWAY_ERROR = 79
-    
+
     SYSTEM_ERROR = 80
     ENVIRONMENT_ERROR = 81
     PYTHON_VERSION_ERROR = 82
@@ -111,7 +111,7 @@ class CliExitCodes(IntEnum):
     RESOURCE_LIMIT = 97
     ENV_VAR_MISSING = 98
     ENV_VAR_INVALID = 99
-    
+
     CONFIG_ERROR = 100
     CONFIG_FILE_MISSING = 101
     CONFIG_FILE_INVALID = 102
@@ -132,7 +132,7 @@ class CliExitCodes(IntEnum):
     CONFIG_DUPLICATE = 117
     CONFIG_ENCRYPTION_ERROR = 118
     CONFIG_DECRYPTION_ERROR = 119
-    
+
     DATA_ERROR = 120
     DATA_CORRUPTED = 121
     DATA_MISSING = 122
@@ -153,7 +153,7 @@ class CliExitCodes(IntEnum):
     DATA_AGGREGATION_ERROR = 137
     DATA_NORMALIZATION_ERROR = 138
     DATA_PREPROCESSING_ERROR = 139
-    
+
     PERMISSION_ERROR = 140
     PERMISSION_DENIED = 141
     ACCESS_DENIED = 142
@@ -174,7 +174,7 @@ class CliExitCodes(IntEnum):
     CSRF_ERROR = 157
     CORS_ERROR = 158
     SECURITY_POLICY_ERROR = 159
-    
+
     EXTERNAL_SERVICE_ERROR = 160
     DATABASE_ERROR = 161
     DATABASE_CONNECTION_ERROR = 162
@@ -195,11 +195,11 @@ class CliExitCodes(IntEnum):
     IMPORT_ERROR = 177
     EXPORT_ERROR = 178
     MIGRATION_ERROR = 179
-    
+
     INVALID_FOLDER_ALIAS = 1
     FILE_NOT_FOUND_ALIAS = 40
     INVALID_COMMAND_ALIAS = 1
-    
+
     @classmethod
     def get_description(cls, code: int) -> str:
         descriptions = {
@@ -385,58 +385,58 @@ class CliExitCodes(IntEnum):
             cls.MIGRATION_ERROR: "Migration error",
         }
         return descriptions.get(cls(code), "Unknown error")
-    
+
     @classmethod
-    def get_exit_code(cls, code: int) -> Optional['CliExitCodes']:
+    def get_exit_code(cls, code: int) -> Optional["CliExitCodes"]:
         try:
             return cls(code)
         except ValueError:
             return None
-    
+
     @classmethod
     def is_success(cls, code: int) -> bool:
         return code == cls.SUCCESS
-    
+
     @classmethod
     def is_error(cls, code: int) -> bool:
         return code != cls.SUCCESS
-    
+
     @classmethod
     def is_invalid_args(cls, code: int) -> bool:
         return code in range(1, 20)
-    
+
     @classmethod
     def is_file_error(cls, code: int) -> bool:
         return code in range(20, 40)
-    
+
     @classmethod
     def is_runtime_error(cls, code: int) -> bool:
         return code in range(40, 60)
-    
+
     @classmethod
     def is_network_error(cls, code: int) -> bool:
         return code in range(60, 80)
-    
+
     @classmethod
     def is_system_error(cls, code: int) -> bool:
         return code in range(80, 100)
-    
+
     @classmethod
     def is_config_error(cls, code: int) -> bool:
         return code in range(100, 120)
-    
+
     @classmethod
     def is_data_error(cls, code: int) -> bool:
         return code in range(120, 140)
-    
+
     @classmethod
     def is_permission_error(cls, code: int) -> bool:
         return code in range(140, 160)
-    
+
     @classmethod
     def is_external_error(cls, code: int) -> bool:
         return code in range(160, 180)
-    
+
     @classmethod
     def get_category(cls, code: int) -> str:
         categories = {
@@ -452,23 +452,24 @@ class CliExitCodes(IntEnum):
             **{i: "External Service Error" for i in range(160, 180)},
         }
         return categories.get(code, "Unknown Category")
-    
+
     @classmethod
     def get_exit_code_name(cls, code: int) -> str:
         try:
             return cls(code).name
         except ValueError:
             return "UNKNOWN"
-    
+
     @classmethod
     def to_dict(cls) -> dict[int, str]:
         return {code.value: code.name for code in cls}
-    
+
     @classmethod
     def to_json(cls) -> str:
         import json
+
         return json.dumps(cls.to_dict(), indent=2)
-    
+
     @classmethod
     def print_all(cls) -> None:
         print(f"{'Code':<10} {'Name':<40} {'Description':<60}")
@@ -484,22 +485,22 @@ class ExitInfo:
     message: str
     category: str
     timestamp: str
-    
+
     @classmethod
-    def from_code(cls, code: int, message: str = "") -> 'ExitInfo':
+    def from_code(cls, code: int, message: str = "") -> "ExitInfo":
         return cls(
             code=code,
             message=message or CliExitCodes.get_description(code),
             category=CliExitCodes.get_category(code),
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now().isoformat(),
         )
-    
-    def to_dict(self) -> dict[str, Any]:
+
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "code": self.code,
             "message": self.message,
             "category": self.category,
-            "timestamp": self.timestamp
+            "timestamp": self.timestamp,
         }
 
 
@@ -527,58 +528,58 @@ def list_all_exit_codes() -> None:
 class ExitCodeManager:
     def __init__(self):
         self._exit_codes = CliExitCodes
-    
+
     def get_code(self, name: str) -> Optional[int]:
         return get_exit_code(name)
-    
+
     def get_name(self, code: int) -> str:
         return CliExitCodes.get_exit_code_name(code)
-    
+
     def get_description(self, code: int) -> str:
         return CliExitCodes.get_description(code)
-    
+
     def get_category(self, code: int) -> str:
         return CliExitCodes.get_category(code)
-    
+
     def is_success(self, code: int) -> bool:
         return CliExitCodes.is_success(code)
-    
+
     def is_error(self, code: int) -> bool:
         return CliExitCodes.is_error(code)
-    
+
     def is_invalid_args(self, code: int) -> bool:
         return CliExitCodes.is_invalid_args(code)
-    
+
     def is_file_error(self, code: int) -> bool:
         return CliExitCodes.is_file_error(code)
-    
+
     def is_runtime_error(self, code: int) -> bool:
         return CliExitCodes.is_runtime_error(code)
-    
+
     def is_network_error(self, code: int) -> bool:
         return CliExitCodes.is_network_error(code)
-    
+
     def is_system_error(self, code: int) -> bool:
         return CliExitCodes.is_system_error(code)
-    
+
     def is_config_error(self, code: int) -> bool:
         return CliExitCodes.is_config_error(code)
-    
+
     def is_data_error(self, code: int) -> bool:
         return CliExitCodes.is_data_error(code)
-    
+
     def is_permission_error(self, code: int) -> bool:
         return CliExitCodes.is_permission_error(code)
-    
+
     def is_external_error(self, code: int) -> bool:
         return CliExitCodes.is_external_error(code)
-    
+
     def print_all(self) -> None:
         CliExitCodes.print_all()
-    
-    def to_dict(self) -> dict[int, str]:
+
+    def to_dict(self) -> Dict[int, str]:
         return CliExitCodes.to_dict()
-    
+
     def to_json(self) -> str:
         return CliExitCodes.to_json()
 
@@ -587,18 +588,18 @@ class ExitHandler:
     @staticmethod
     def handle(code: int, message: Optional[str] = None) -> None:
         exit_with_code(code, message)
-    
+
     @staticmethod
     def handle_with_info(code: int, message: Optional[str] = None) -> None:
         info = ExitInfo.from_code(code, message or "")
         print(f"Exit: {info.to_dict()}", file=sys.stderr)
         sys.exit(code)
-    
+
     @staticmethod
     def success(message: str = "Success") -> None:
         print(message)
         sys.exit(CliExitCodes.SUCCESS)
-    
+
     @staticmethod
     def error(code: int, message: str) -> None:
         print(f"Error [{code}]: {message}", file=sys.stderr)
@@ -612,5 +613,5 @@ __all__ = [
     "get_exit_code",
     "list_all_exit_codes",
     "ExitCodeManager",
-    "ExitHandler"
+    "ExitHandler",
 ]

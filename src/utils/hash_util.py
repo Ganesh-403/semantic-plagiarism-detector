@@ -14,7 +14,7 @@ def calculate_file_sha256(file_path: str, chunk_size: int = 1024 * 1024) -> str 
 
     Returns:
         The hexadecimal SHA256 hash string.
-    
+
     Raises:
         ValueError: If the file is not found or permission is denied.
     """

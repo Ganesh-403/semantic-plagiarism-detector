@@ -22,7 +22,6 @@ from openpyxl.cell import WriteOnlyCell
 from openpyxl.comments import Comment
 from openpyxl.formatting.rule import ColorScaleRule
 from openpyxl.styles import Alignment, Font, PatternFill
-
 from openpyxl.utils import get_column_letter
 
 from src.utils.export_sanitizer import (
@@ -30,19 +29,46 @@ from src.utils.export_sanitizer import (
     sanitize_spreadsheet_value,
 )
 
+# Excel rejects these characters outright in a worksheet title, and caps the
+# title at 31 characters. Titles can originate from a course or assignment
+# name, so they are not trustworthy input. The set is the one established in
+# #3673 plus the backslash, which Excel rejects as well but which that pass
+# missed.
+_INVALID_SHEET_TITLE_CHARS = re.compile(r"[\[\]\*\?:/\\.]")
 
-def sanitize_sheet_title(title: str) -> str:
+#: Excel's hard limit on worksheet title length.
+MAX_SHEET_TITLE_LENGTH = 31
+
+#: Used when sanitization consumes the whole title.
+DEFAULT_SHEET_TITLE = "Sheet"
+
+#: Default worksheet title for an exported similarity matrix.
+DEFAULT_WORKSHEET_TITLE = "Similarity Matrix"
+
+
+def sanitize_sheet_title(title) -> str:
+    """Coerce a worksheet title into something Excel will accept.
+
+    Excel worksheet titles cannot exceed 31 characters and cannot contain
+    ``[``, ``]``, ``*``, ``?``, ``:``, ``/``, ``\\`` or ``.``. openpyxl raises
+    when handed a title that breaks either rule, which would abort the export.
+
+    Args:
+        title: The desired title. Coerced to ``str``, so a non-string label
+            (e.g. an integer assignment ID) does not raise.
+
+    Returns:
+        A title that satisfies both rules. Falls back to
+        :data:`DEFAULT_SHEET_TITLE` when sanitization leaves nothing usable,
+        because openpyxl also rejects an empty title.
     """
-    Sanitize a worksheet title to comply with Excel's naming rules.
+    sanitized = _INVALID_SHEET_TITLE_CHARS.sub("", str(title))
+    # Excel additionally rejects a title that is only whitespace, and trims
+    # surrounding whitespace itself; do it here so the length cap is applied
+    # to what actually lands in the file.
+    sanitized = sanitized.strip()[:MAX_SHEET_TITLE_LENGTH].strip()
 
-    Excel worksheet titles:
-    - Cannot exceed 31 characters
-    - Cannot contain [, ], *, ?, :, /, or .
-    """
-    sanitized_title = re.sub(r"[\[\]\*\?:/\.]", "", str(title))
-    sanitized_title = sanitized_title[:31]
-
-    return sanitized_title or "Sheet"
+    return sanitized or DEFAULT_SHEET_TITLE
 
 
 def _create_managed_temp_file(suffix: str = ".xlsx", prefix: str = "temp_") -> str:
@@ -83,6 +109,7 @@ def build_similarity_workbook(
     df: pd.DataFrame,
     threshold: float = 0.59,
     write_only: bool = False,
+    sheet_title: str = DEFAULT_WORKSHEET_TITLE,
     low_threshold: float = 0.0,
     mid_threshold: float = 0.59,
     high_threshold: float = 1.0,
@@ -94,6 +121,9 @@ def build_similarity_workbook(
         threshold: Score threshold for conditional formatting color scale.
         write_only: If True, uses openpyxl write_only mode with ws.append() for
             memory-efficient streaming of large matrices. Defaults to False.
+        sheet_title: Worksheet title. Passed through
+            :func:`sanitize_sheet_title`, so a caller may hand in an untrusted
+            label (a course or assignment name) without the export aborting.
         low_threshold: Low breakpoint for the 3-color scale.
         mid_threshold: Mid breakpoint for the 3-color scale.
         high_threshold: High breakpoint for the 3-color scale.
@@ -101,6 +131,8 @@ def build_similarity_workbook(
     Returns:
         Workbook: Configured openpyxl Workbook instance.
     """
+    safe_sheet_title = sanitize_sheet_title(sheet_title)
+
     # Older callers pass ``threshold`` as the yellow midpoint.
     if threshold != 0.59 and mid_threshold == 0.59:
         mid_threshold = threshold
@@ -111,7 +143,7 @@ def build_similarity_workbook(
         wb.properties.creator = "Semantic Plagiarism Detector"
         wb.properties.created = datetime.now(timezone.utc)
 
-        ws = wb.create_sheet(title="Similarity Matrix")
+        ws = wb.create_sheet(title=safe_sheet_title)
 
         header_fill = PatternFill(
             start_color="1F2937", end_color="1F2937", fill_type="solid"
@@ -200,6 +232,53 @@ def build_similarity_workbook(
                 col_len + 3, 12
             )
 
+        # Create Flagged Pairs worksheet (write-only mode)
+        flagged_ws = wb.create_sheet(title="Flagged Pairs")
+
+        # Write header row for flagged sheet
+        flagged_header_row = []
+        for col_name in ["Document A", "Document B", "Similarity Score", "Severity"]:
+            cell = WriteOnlyCell(flagged_ws, value=col_name)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_align
+            flagged_header_row.append(cell)
+        flagged_ws.append(flagged_header_row)
+
+        # Populate flagged pairs (upper triangle only)
+        docs = list(df.index)
+        for i in range(len(docs)):
+            for j in range(i + 1, len(docs)):
+                val = df.iloc[i, j]
+                if pd.notna(val) and float(val) >= mid_threshold:
+                    score = float(val)
+                    severity = "Moderate"
+                    if score >= 0.85:
+                        severity = "High"
+                    if score >= 0.95:
+                        severity = "Critical"
+
+                    row_data = [
+                        sanitize_spreadsheet_value(str(docs[i])),
+                        sanitize_spreadsheet_value(str(docs[j])),
+                        score,
+                        severity,
+                    ]
+                    row_cells = []
+                    for c_idx, item in enumerate(row_data):
+                        cell = WriteOnlyCell(flagged_ws, value=item)
+                        if c_idx == 2:
+                            cell.number_format = "0.0%"
+                            cell.alignment = Alignment(horizontal="right")
+                        row_cells.append(cell)
+                    flagged_ws.append(row_cells)
+
+        # Set column widths for flagged sheet
+        flagged_ws.column_dimensions["A"].width = 25
+        flagged_ws.column_dimensions["B"].width = 25
+        flagged_ws.column_dimensions["C"].width = 18
+        flagged_ws.column_dimensions["D"].width = 15
+
         return wb
 
     # Default write_only=False (in-memory DOM)
@@ -209,7 +288,7 @@ def build_similarity_workbook(
     wb.properties.created = datetime.now(timezone.utc)
 
     ws = wb.active
-    ws.title = sanitize_sheet_title("Similarity Matrix")
+    ws.title = safe_sheet_title
 
     # Write headers and index labels with truncated titles, preserving full names in comments.
     # Labels originate from uploaded filenames, so they are sanitized before
@@ -291,17 +370,73 @@ def build_similarity_workbook(
         col_letter = col[0].column_letter
         ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
 
+    # Create Flagged Pairs worksheet
+    flagged_ws = wb.create_sheet(title=sanitize_sheet_title("Flagged Pairs"))
+
+    # Write headers and style them
+    flagged_ws.cell(row=1, column=1, value="Document A")
+    flagged_ws.cell(row=1, column=2, value="Document B")
+    flagged_ws.cell(row=1, column=3, value="Similarity Score")
+    flagged_ws.cell(row=1, column=4, value="Severity")
+
+    for cell in flagged_ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Populate flagged pairs (upper triangle only)
+    docs = list(df.index)
+    current_row = 2
+    for i in range(len(docs)):
+        for j in range(i + 1, len(docs)):
+            val = df.iloc[i, j]
+            if pd.notna(val) and float(val) >= mid_threshold:
+                score = float(val)
+                severity = "Moderate"
+                if score >= 0.85:
+                    severity = "High"
+                if score >= 0.95:
+                    severity = "Critical"
+
+                flagged_ws.cell(
+                    row=current_row,
+                    column=1,
+                    value=sanitize_spreadsheet_value(str(docs[i])),
+                )
+                flagged_ws.cell(
+                    row=current_row,
+                    column=2,
+                    value=sanitize_spreadsheet_value(str(docs[j])),
+                )
+
+                score_cell = flagged_ws.cell(row=current_row, column=3, value=score)
+                score_cell.number_format = "0.0%"
+                score_cell.alignment = Alignment(horizontal="right")
+
+                flagged_ws.cell(row=current_row, column=4, value=severity)
+                current_row += 1
+
+    # Set column widths for flagged sheet
+    flagged_ws.column_dimensions["A"].width = 25
+    flagged_ws.column_dimensions["B"].width = 25
+    flagged_ws.column_dimensions["C"].width = 18
+    flagged_ws.column_dimensions["D"].width = 15
+
     return wb
 
 
 def export_similarity_matrix_to_excel(
-    df: pd.DataFrame, threshold: float = 0.59, write_only: bool = False
+    df: pd.DataFrame,
+    threshold: float = 0.59,
+    write_only: bool = False,
+    sheet_title: str = DEFAULT_WORKSHEET_TITLE,
 ) -> bytes:
     """Exports a similarity matrix DataFrame into an in-memory Excel file (.xlsx) with formatting."""
     wb = build_similarity_workbook(
         df,
         threshold=threshold,
         write_only=write_only,
+        sheet_title=sheet_title,
         mid_threshold=threshold,
     )
     output = io.BytesIO()
@@ -310,7 +445,10 @@ def export_similarity_matrix_to_excel(
 
 
 def export_similarity_matrix_to_temp_file(
-    df: pd.DataFrame, threshold: float = 0.59, write_only: bool = False
+    df: pd.DataFrame,
+    threshold: float = 0.59,
+    write_only: bool = False,
+    sheet_title: str = DEFAULT_WORKSHEET_TITLE,
 ) -> str:
     """
     Exports the similarity matrix to a temporary .xlsx file on disk.
@@ -323,6 +461,7 @@ def export_similarity_matrix_to_temp_file(
         df,
         threshold=threshold,
         write_only=write_only,
+        sheet_title=sheet_title,
         mid_threshold=threshold,
     )
     temp_path = _create_managed_temp_file(suffix=".xlsx", prefix="similarity_matrix_")

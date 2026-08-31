@@ -75,3 +75,49 @@ def test_values_are_parameterized(tmp_path):
     rows = repo.get_documents_by_metadata(student_name=malicious)
 
     assert rows == []
+
+
+def test_soft_delete_and_restore_document(tmp_path):
+    db = tmp_path / "corpus_sd.db"
+    corpus_db.configure_db_path(db)
+    corpus_db.init_corpus_db()
+    repo = CorpusRepository()
+
+    corpus_db.add_document("doc1.pdf", "hash1")
+    corpus_db.add_document("doc2.pdf", "hash2")
+
+    # Initial state: 2 documents
+    docs = repo.get_all_documents()
+    assert len(docs) == 2
+
+    # Soft delete doc1
+    assert repo.soft_delete_document("doc1.pdf") is True
+    # Attempting to soft-delete again returns False
+    assert repo.soft_delete_document("doc1.pdf") is False
+    # Attempting to soft-delete non-existent doc returns False
+    assert repo.soft_delete_document("nonexistent.pdf") is False
+
+    # Default get_all_documents excludes soft-deleted docs
+    active_docs = repo.get_all_documents()
+    active_filenames = [d.filename for d in active_docs]
+    assert "doc1.pdf" not in active_filenames
+    assert "doc2.pdf" in active_filenames
+
+    # With include_deleted=True, soft-deleted doc is returned
+    all_docs = repo.get_all_documents(include_deleted=True)
+    all_filenames = [d.filename for d in all_docs]
+    assert "doc1.pdf" in all_filenames
+    assert "doc2.pdf" in all_filenames
+
+    # Restore doc1
+    assert repo.restore_document("doc1.pdf") is True
+    # Attempting to restore already restored doc returns False
+    assert repo.restore_document("doc1.pdf") is False
+    # Attempting to restore non-existent doc returns False
+    assert repo.restore_document("nonexistent.pdf") is False
+
+    # Verify doc1 is back in default get_all_documents
+    restored_docs = repo.get_all_documents()
+    restored_filenames = [d.filename for d in restored_docs]
+    assert "doc1.pdf" in restored_filenames
+

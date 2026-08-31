@@ -398,13 +398,13 @@ def dispatch_plagiarism_alert(
     webhook_url: str | None = None,
 ) -> bool:
     """Dispatch a plagiarism alert payload to the configured webhook endpoint.
-    
+
     Args:
         doc_a: Name of the first student document.
         doc_b: Name of the second student document.
         similarity: Cosine similarity score between 0.0 and 1.0.
         webhook_url: Optional explicit webhook URL to override the environment variable.
-        
+
     Returns:
         True if the alert was successfully delivered, False otherwise.
     """
@@ -600,4 +600,3 @@ class EventDispatcher:
             webhook_url=webhook_url,
             lms_id=lms_id,
         )
-

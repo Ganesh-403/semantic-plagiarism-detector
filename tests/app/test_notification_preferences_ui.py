@@ -14,7 +14,7 @@ def test_settings_render_notification_toggles():
 def test_settings_load_persisted_preferences():
     source = APP_PATH.read_text(encoding="utf-8")
 
-    assert ("persisted_notifications = " "get_notification_preferences(") in source
+    assert ("persisted_notifications = get_notification_preferences(") in source
     assert 'st.session_state["email_notifications_toggle"]' in source
     assert 'st.session_state["webhook_notifications_toggle"]' in source
 

@@ -11,15 +11,11 @@ def test_extract_text_from_epub_clean_chapters():
     """Verify extract_text_from_epub parses XML/HTML structures and extracts clean text."""
     mock_item1 = MagicMock()
     mock_item1.get_type.return_value = 9
-    mock_item1.get_content.return_value = (
-        b"<html><body><h1>Chapter 1</h1><p>This is the first chapter text.</p></body></html>"
-    )
+    mock_item1.get_content.return_value = b"<html><body><h1>Chapter 1</h1><p>This is the first chapter text.</p></body></html>"
 
     mock_item2 = MagicMock()
     mock_item2.get_type.return_value = 9
-    mock_item2.get_content.return_value = (
-        b"<html><body><h2>Chapter 2</h2><p>Second chapter with <em>formatted</em> text.</p></body></html>"
-    )
+    mock_item2.get_content.return_value = b"<html><body><h2>Chapter 2</h2><p>Second chapter with <em>formatted</em> text.</p></body></html>"
 
     # Item that is not a document (e.g. image or stylesheet)
     mock_item_other = MagicMock()
@@ -39,7 +35,9 @@ def test_extract_text_from_epub_clean_chapters():
 
 def test_extract_text_from_epub_handles_invalid_or_corrupt_files():
     """Verify extract_text_from_epub gracefully handles corrupted input without raising unhandled exceptions."""
-    with patch("ebooklib.epub.read_epub", side_effect=ValueError("Corrupted EPUB archive")):
+    with patch(
+        "ebooklib.epub.read_epub", side_effect=ValueError("Corrupted EPUB archive")
+    ):
         extracted = extract_text_from_epub(b"corrupted_bytes")
         assert extracted == ""
 

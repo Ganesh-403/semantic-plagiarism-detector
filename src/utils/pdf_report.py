@@ -97,6 +97,7 @@ def load_branding_logo() -> bytes | None:
     except Exception:
         return None
 
+
 def truncate_filename(filename: str, max_len: int = 30) -> str:
     """
     Truncates a filename to max_len characters with an ellipsis if needed,
@@ -113,7 +114,7 @@ def truncate_filename(filename: str, max_len: int = 30) -> str:
         return filename[: max_len - 3] + "..."
 
     half = needed_len // 2
-    truncated_name = f"{name[:half]}...{name[-(needed_len - half):]}"
+    truncated_name = f"{name[:half]}...{name[-(needed_len - half) :]}"
     return f"{truncated_name}{ext}"
 
 
@@ -771,25 +772,24 @@ def highlight_pdf_matches(
             return f.read()
 
     if isinstance(pdf_source, bytes):
-        doc = fitz.open(stream=pdf_source, filetype="pdf")
+        doc_ctx = fitz.open(stream=pdf_source, filetype="pdf")
     else:
-        doc = fitz.open(pdf_source)
+        doc_ctx = fitz.open(pdf_source)
 
-    for page in doc:
-        for chunk in matching_chunks:
-            chunk_clean = str(chunk).strip()
-            if len(chunk_clean) < 3:
-                continue
+    with doc_ctx as doc:
+        for page in doc:
+            for chunk in matching_chunks:
+                chunk_clean = str(chunk).strip()
+                if len(chunk_clean) < 3:
+                    continue
 
-            quad_matches = page.search_for(chunk_clean)
-            for rect in quad_matches:
-                annot = page.add_highlight_annot(rect)
-                annot.set_colors(stroke=highlight_color)
-                annot.update()
+                quad_matches = page.search_for(chunk_clean)
+                for rect in quad_matches:
+                    annot = page.add_highlight_annot(rect)
+                    annot.set_colors(stroke=highlight_color)
+                    annot.update()
 
-    output_bytes = doc.tobytes()
-    doc.close()
-    return output_bytes
+        return doc.tobytes()
 
 
 def generate_audit_summary_html(

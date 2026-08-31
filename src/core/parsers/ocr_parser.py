@@ -57,7 +57,6 @@ def check_ocr_dependencies() -> None:
         raise OCRDependencyError(OCR_TESSERACT_NOT_FOUND) from exc
 
 
-
 def _is_blank_scanned_page(
     pdf_bytes: bytes,
     page_index: int,
@@ -164,7 +163,9 @@ def preprocess_image_for_ocr(image):
         from PIL import ImageEnhance, ImageFilter
 
         # Convert palette/RGBA modes to RGB for uniform channel processing
-        if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
+        if image.mode in ("RGBA", "LA") or (
+            image.mode == "P" and "transparency" in image.info
+        ):
             bg = Image.new("RGB", image.size, (255, 255, 255))
             if image.mode == "P":
                 image = image.convert("RGBA")
@@ -254,7 +255,9 @@ def extract_text_from_image(
                         f"[document_parser] OCR image extraction failed due to memory exhaustion: {exc}"
                     )
                 else:
-                    logger.warning(f"[document_parser] OCR image extraction failed: {exc}")
+                    logger.warning(
+                        f"[document_parser] OCR image extraction failed: {exc}"
+                    )
                 return "[OCR extraction failed for the file]"
     except pytesseract.TesseractNotFoundError as exc:
         ocr_invocations_total.labels(status="failure").inc()

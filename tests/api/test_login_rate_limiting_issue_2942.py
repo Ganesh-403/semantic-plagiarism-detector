@@ -28,11 +28,13 @@ def test_login_endpoint_exists_and_rate_limited(client):
     # First 5 requests should succeed (200 OK)
     for i in range(5):
         response = client.post("/auth/login", headers=headers)
-        assert response.status_code == 200, f"Request {i+1} should succeed"
+        assert response.status_code == 200, f"Request {i + 1} should succeed"
 
     # 6th request should fail with 429 Too Many Requests
     response = client.post("/auth/login", headers=headers)
-    assert response.status_code == 429, "6th request within minute should be rate-limited"
+    assert response.status_code == 429, (
+        "6th request within minute should be rate-limited"
+    )
     data = response.json()
     assert data.get("status") == 429 or "Rate limit exceeded" in str(data)
 

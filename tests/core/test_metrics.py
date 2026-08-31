@@ -85,8 +85,9 @@ def test_corpus_and_index_size_gauges_are_populated(fake_telemetry, tmp_path):
     index_file = tmp_path / "corpus.index"
     index_file.write_bytes(b"y" * 4096)
 
-    with patch("src.db.incidents.DEFAULT_DB_PATH", str(corpus_db)), patch(
-        "src.core.app_config.FAISS_INDEX_PATH", index_file
+    with (
+        patch("src.db.incidents.DEFAULT_DB_PATH", str(corpus_db)),
+        patch("src.core.app_config.FAISS_INDEX_PATH", index_file),
     ):
         metrics.sync_telemetry_gauges()
 
@@ -99,8 +100,9 @@ def test_missing_files_do_not_raise(fake_telemetry, tmp_path):
     missing_db = tmp_path / "nope.db"
     missing_index = tmp_path / "nope.index"
 
-    with patch("src.db.incidents.DEFAULT_DB_PATH", str(missing_db)), patch(
-        "src.core.app_config.FAISS_INDEX_PATH", missing_index
+    with (
+        patch("src.db.incidents.DEFAULT_DB_PATH", str(missing_db)),
+        patch("src.core.app_config.FAISS_INDEX_PATH", missing_index),
     ):
         metrics.sync_telemetry_gauges()  # must not raise
 
@@ -245,5 +247,143 @@ def test_generate_latest_sets_active_threads_gauge():
         metrics.generate_latest()
     assert _sample_value(metrics.active_threads_gauge) == 42
     assert metrics.active_threads_gauge._name == "spd_active_threads"
+
+
+# ── Document Parsing Duration Histogram ────────────────────────────────────────
+
+
+def test_spd_doc_parse_seconds_definition():
+    """Verify that spd_doc_parse_seconds is defined with the correct name, docstring, and labels."""
+    assert hasattr(metrics, "spd_doc_parse_seconds")
+    hist = metrics.spd_doc_parse_seconds
+    assert hist._name == "spd_doc_parse_seconds"
+    assert hist._documentation == "Document parsing time in seconds"
+    assert hist._labelnames == ("extension",)
+
+
+def test_spd_doc_parse_seconds_observe_extensions():
+    """Verify that spd_doc_parse_seconds can record time segmented by file extension."""
+    extensions = ["pdf", "docx", "txt"]
+    for ext in extensions:
+        label_child = metrics.spd_doc_parse_seconds.labels(extension=ext)
+        before_count = sum(b.get() for b in label_child._buckets)
+        with label_child.time():
+            pass
+        after_count = sum(b.get() for b in label_child._buckets)
+        assert after_count == before_count + 1
+        assert label_child._sum.get() >= 0
+
+
+def test_extract_text_observes_spd_doc_parse_seconds():
+    """Verify that extract_text in document_parser records duration in spd_doc_parse_seconds."""
+    from src.core.document_parser import extract_text
+
+    label_child = metrics.spd_doc_parse_seconds.labels(extension="txt")
+    before_count = sum(b.get() for b in label_child._buckets)
+
+    content = b"This is a valid sample document text with enough content."
+    result = extract_text(content, "sample_document.txt")
+
+    assert "sample document" in result
+    after_count = sum(b.get() for b in label_child._buckets)
+    assert after_count == before_count + 1
+
+
+# ── Prometheus text exposition format (Issue #3759) ─────────────────────────────
+
+
+def test_generate_latest_returns_bytes():
+    """generate_latest() must return the raw exposition payload as bytes,
+    matching the prometheus_client convention (not str, not a dict)."""
+    output = metrics.generate_latest()
+    assert isinstance(output, bytes)
+
+
+def test_generate_latest_output_contains_help_and_type_headers():
+    """Every metric family in valid Prometheus text format is preceded by
+    a '# HELP <name> <docstring>' line and a '# TYPE <name> <type>' line."""
+    output = metrics.generate_latest()
+    text = output.decode("utf-8")
+
+    assert "# HELP" in text
+    assert "# TYPE" in text
+
+
+def test_generate_latest_includes_help_and_type_for_a_known_spd_metric():
+    """Check HELP/TYPE aren't just present somewhere in the payload (e.g.
+    from Python's own default process metrics), but specifically cover one
+    of this application's own metrics."""
+    metrics.record_documents(1)
+    output = metrics.generate_latest()
+    text = output.decode("utf-8")
+
+    assert "# HELP spd_documents_total" in text
+    assert "# TYPE spd_documents_total counter" in text
+
+
+def test_generate_latest_metric_values_are_numeric():
+    """Every sample's value must parse as a number -- this is what makes the
+    payload valid Prometheus exposition format rather than arbitrary text.
+    Uses prometheus_client's own parser (the same one generate_metrics_json()
+    uses) rather than naive string splitting, so this stays correct even if
+    label formatting or line wrapping changes upstream.
+    """
+    from prometheus_client.parser import text_string_to_metric_families
+
+    metrics.record_documents(3)
+    metrics.record_upload("success")
+
+    output = metrics.generate_latest()
+    text = output.decode("utf-8")
+
+    families = list(text_string_to_metric_families(text))
+    assert len(families) > 0, "generate_latest() produced no metric families at all"
+
+    sample_count = 0
+    for family in families:
+        for sample in family.samples:
+            sample_count += 1
+            assert isinstance(sample.value, (int, float)), (
+                f"Non-numeric value for {sample.name}: {sample.value!r}"
+            )
+            assert sample.value == sample.value  # NaN check: NaN != NaN
+
+    assert sample_count > 0, "no individual metric samples were found"
+
+
+def test_generate_latest_specific_spd_counter_value_is_numeric_and_correct():
+    """A concrete example tying the parsed numeric value back to a known,
+    freshly-incremented counter, not just 'some number was present somewhere'."""
+    from prometheus_client.parser import text_string_to_metric_families
+
+    def _sample_value(metric):
+        return metric.samples[0].value if metric.samples else 0
+
+    before = _sample_value(metrics.documents_total)
+    metrics.record_documents(7)
+
+    output = metrics.generate_latest()
+    families = {f.name: f for f in text_string_to_metric_families(output.decode("utf-8"))}
+
+    # The parser strips the "_total" suffix from the *family* name for
+    # counters (matching the convention generate_metrics_json() already
+    # relies on), while the individual *sample* keeps the full name.
+    assert "spd_documents" in families
+    documents_samples = [
+        s for s in families["spd_documents"].samples
+        if s.name == "spd_documents_total"
+    ]
+    assert len(documents_samples) == 1
+    assert documents_samples[0].value == before + 7
+
+
+def test_generate_latest_output_is_non_empty_and_multiline():
+    """A sanity check that the payload isn't degenerate (empty string, or a
+    single line with no actual metric data)."""
+    output = metrics.generate_latest()
+    text = output.decode("utf-8")
+
+    assert len(text) > 0
+    assert text.count("\n") > 1
 
 

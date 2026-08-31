@@ -120,9 +120,9 @@ def test_unhandled_runtime_error_injects_request_id(monkeypatch):
     """Verify that global_exception_handler injects the X-Request-ID header value into the error response payload."""
     monkeypatch.setenv("APP_ENVIRONMENT", "production")
 
-    response = client.get(TEST_RUNTIME_ERROR_PATH, headers={"X-Request-ID": "test-req-id-123"})
+    response = client.get(
+        TEST_RUNTIME_ERROR_PATH, headers={"X-Request-ID": "test-req-id-123"}
+    )
     assert response.status_code == 500
     body = response.json()
     assert body["request_id"] == "test-req-id-123"
-
-

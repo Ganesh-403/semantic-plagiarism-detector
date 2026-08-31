@@ -457,7 +457,7 @@ def test_stream_incidents_csv_chunks_default_batch():
             return []
 
         size = min(limit, 2500 - offset)
-        return [{"incident_id": f"INC-{offset+i}"} for i in range(size)]
+        return [{"incident_id": f"INC-{offset + i}"} for i in range(size)]
 
     chunks = list(stream_incidents_csv_chunks(mock_query))
 
@@ -479,7 +479,7 @@ def test_stream_incidents_csv_chunks_custom_batch():
         if offset >= 10:
             return []
         size = min(limit, 10 - offset)
-        return [{"incident_id": f"INC-{offset+i}"} for i in range(size)]
+        return [{"incident_id": f"INC-{offset + i}"} for i in range(size)]
 
     chunks = list(stream_incidents_csv_chunks(mock_query, batch_size=3))
 
@@ -503,7 +503,7 @@ def test_stream_incidents_csv_chunks_memory_efficient():
         if offset >= 50:
             return []
         return [
-            {"incident_id": f"INC-{offset+i}"} for i in range(min(limit, 50 - offset))
+            {"incident_id": f"INC-{offset + i}"} for i in range(min(limit, 50 - offset))
         ]
 
     stream = stream_incidents_csv_chunks(mock_query, batch_size=10)

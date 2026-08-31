@@ -1,0 +1,1009 @@
+"""
+Cross-Language Plagiarism Detection System
+Detects plagiarism across multiple languages using semantic similarity and translation
+"""
+
+import hashlib
+import json
+import re
+import string
+from collections import defaultdict, Counter
+from typing import Dict, List, Tuple, Optional, Set
+import datetime
+import math
+from dataclasses import dataclass, asdict
+import random
+
+# Try to import optional dependencies
+try:
+    from googletrans import Translator
+    HAS_GOOGLETRANS = True
+except ImportError:
+    HAS_GOOGLETRANS = False
+    print("⚠️ googletrans not installed. Install with: pip install googletrans==4.0.0-rc1")
+
+try:
+    import numpy as np
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+    HAS_SKLEARN = True
+except ImportError:
+    HAS_SKLEARN = False
+    print("⚠️ scikit-learn not installed. Install with: pip install scikit-learn")
+
+try:
+    from sentence_transformers import SentenceTransformer
+    HAS_SENTENCE_TRANSFORMERS = True
+except ImportError:
+    HAS_SENTENCE_TRANSFORMERS = False
+    print("⚠️ sentence-transformers not installed. Install with: pip install sentence-transformers")
+
+# ==================== Core Data Structures ====================
+
+@dataclass
+class Document:
+    """Represents a document for plagiarism checking"""
+    id: str
+    content: str
+    language: str
+    title: str = ""
+    author: str = ""
+    source: str = ""
+    timestamp: datetime.datetime = None
+    
+    def __post_init__(self):
+        if self.timestamp is None:
+            self.timestamp = datetime.datetime.now()
+
+@dataclass
+class PlagiarismMatch:
+    """Represents a detected plagiarism match"""
+    source_doc_id: str
+    target_doc_id: str
+    similarity_score: float
+    matched_text_source: str
+    matched_text_target: str
+    source_language: str
+    target_language: str
+    method: str  # translation, semantic, ngram, fingerprint
+    confidence: float
+    position_source: Tuple[int, int] = (0, 0)
+    position_target: Tuple[int, int] = (0, 0)
+    
+    def to_dict(self):
+        return asdict(self)
+
+@dataclass
+class PlagiarismReport:
+    """Comprehensive plagiarism report"""
+    document_id: str
+    total_matches: int
+    similarity_percentage: float
+    matches: List[PlagiarismMatch]
+    risk_level: str  # Low, Medium, High, Critical
+    summary: str
+    recommendations: List[str]
+    generated_at: datetime.datetime = None
+    
+    def __post_init__(self):
+        if self.generated_at is None:
+            self.generated_at = datetime.datetime.now()
+
+# ==================== Language Support ====================
+
+class LanguageSupport:
+    """Language detection and translation support"""
+    
+    SUPPORTED_LANGUAGES = {
+        'en': 'English',
+        'es': 'Spanish',
+        'fr': 'French',
+        'de': 'German',
+        'it': 'Italian',
+        'pt': 'Portuguese',
+        'ru': 'Russian',
+        'zh-cn': 'Chinese (Simplified)',
+        'ja': 'Japanese',
+        'ko': 'Korean',
+        'ar': 'Arabic',
+        'hi': 'Hindi',
+        'nl': 'Dutch',
+        'pl': 'Polish',
+        'tr': 'Turkish',
+        'vi': 'Vietnamese',
+        'th': 'Thai',
+        'id': 'Indonesian',
+        'ms': 'Malay',
+        'fa': 'Persian'
+    }
+    
+    @staticmethod
+    def detect_language(text: str) -> str:
+        """Detect language of text using common patterns"""
+        # Common language indicators
+        indicators = {
+            'en': ['the', 'and', 'for', 'with', 'this'],
+            'es': ['el', 'la', 'de', 'que', 'y'],
+            'fr': ['le', 'la', 'et', 'de', 'pour'],
+            'de': ['der', 'die', 'und', 'für', 'mit'],
+            'it': ['il', 'la', 'di', 'che', 'per'],
+            'pt': ['o', 'a', 'de', 'que', 'para'],
+            'ru': ['и', 'в', 'не', 'на', 'с'],
+            'zh-cn': ['的', '了', '是', '我', '你'],
+            'ja': ['の', 'です', 'ます', 'は', 'が'],
+            'ko': ['은', '는', '이', '가', '을']
+        }
+        
+        # Simple detection based on common words
+        words = text.lower().split()
+        if not words:
+            return 'en'
+        
+        scores = defaultdict(int)
+        for lang, indicators_list in indicators.items():
+            for indicator in indicators_list:
+                if indicator in text.lower():
+                    scores[lang] += 1
+        
+        if scores:
+            return max(scores, key=scores.get)
+        return 'en'
+    
+    @staticmethod
+    def get_language_name(code: str) -> str:
+        """Get full language name from code"""
+        return LanguageSupport.SUPPORTED_LANGUAGES.get(code, 'Unknown')
+    
+    @staticmethod
+    def translate_text(text: str, target_lang: str = 'en', 
+                       source_lang: str = None) -> str:
+        """Translate text using Google Translate API"""
+        if not HAS_GOOGLETRANS:
+            return text
+        
+        try:
+            translator = Translator()
+            if source_lang:
+                result = translator.translate(text, dest=target_lang, src=source_lang)
+            else:
+                result = translator.translate(text, dest=target_lang)
+            return result.text
+        except Exception as e:
+            print(f"Translation error: {e}")
+            return text
+
+# ==================== Text Processing ====================
+
+class TextProcessor:
+    """Advanced text processing for plagiarism detection"""
+    
+    @staticmethod
+    def preprocess_text(text: str) -> str:
+        """Clean and normalize text"""
+        # Remove extra whitespace
+        text = ' '.join(text.split())
+        
+        # Remove special characters but keep punctuation
+        text = re.sub(r'[^\w\s.,!?;:()"-]', ' ', text)
+        
+        # Normalize whitespace
+        text = re.sub(r'\s+', ' ', text)
+        
+        return text.strip()
+    
+    @staticmethod
+    def tokenize(text: str) -> List[str]:
+        """Tokenize text into words"""
+        text = text.lower()
+        # Remove punctuation
+        text = text.translate(str.maketrans('', '', string.punctuation))
+        return text.split()
+    
+    @staticmethod
+    def get_ngrams(text: str, n: int = 3) -> List[str]:
+        """Extract n-grams from text"""
+        tokens = TextProcessor.tokenize(text)
+        ngrams = []
+        for i in range(len(tokens) - n + 1):
+            ngram = ' '.join(tokens[i:i+n])
+            ngrams.append(ngram)
+        return ngrams
+    
+    @staticmethod
+    def get_char_ngrams(text: str, n: int = 4) -> List[str]:
+        """Extract character n-grams from text"""
+        text = text.lower()
+        text = re.sub(r'[^a-z0-9]', ' ', text)
+        char_ngrams = []
+        for i in range(len(text) - n + 1):
+            char_ngrams.append(text[i:i+n])
+        return char_ngrams
+    
+    @staticmethod
+    def get_fingerprint(text: str) -> str:
+        """Generate a unique fingerprint for text"""
+        # Clean and normalize
+        text = TextProcessor.preprocess_text(text)
+        text = text.lower()
+        
+        # Remove common words (stopwords)
+        stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 
+                     'to', 'for', 'of', 'with', 'without'}
+        words = text.split()
+        filtered = [w for w in words if w not in stopwords]
+        
+        # Sort words for fingerprint
+        sorted_words = sorted(filtered)
+        
+        # Create hash
+        fingerprint = hashlib.md5(' '.join(sorted_words).encode()).hexdigest()
+        return fingerprint
+
+# ==================== Core Detection Engine ====================
+
+class CrossLanguageDetector:
+    """Main plagiarism detection engine"""
+    
+    def __init__(self):
+        self.text_processor = TextProcessor()
+        self.language_support = LanguageSupport()
+        self.documents: Dict[str, Document] = {}
+        self.cache = {}
+        
+        # Initialize semantic model if available
+        self.semantic_model = None
+        if HAS_SENTENCE_TRANSFORMERS:
+            try:
+                self.semantic_model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+            except Exception as e:
+                print(f"Failed to load semantic model: {e}")
+        
+        # Initialize TF-IDF if available
+        self.tfidf_vectorizer = None
+        self.tfidf_matrix = None
+        self.tfidf_doc_ids = []
+        
+    def add_document(self, content: str, language: str = None,
+                     title: str = "", author: str = "", 
+                     source: str = "", doc_id: str = None) -> str:
+        """Add a document to the detection system"""
+        if doc_id is None:
+            doc_id = f"doc_{hashlib.md5(content[:100].encode()).hexdigest()[:8]}"
+        
+        # Detect language if not provided
+        if language is None:
+            language = self.language_support.detect_language(content)
+        
+        document = Document(
+            id=doc_id,
+            content=content,
+            language=language,
+            title=title,
+            author=author,
+            source=source
+        )
+        
+        self.documents[doc_id] = document
+        self.cache[doc_id] = {
+            'fingerprint': self.text_processor.get_fingerprint(content),
+            'tokens': self.text_processor.tokenize(content),
+            'ngrams': self.text_processor.get_ngrams(content),
+            'char_ngrams': self.text_processor.get_char_ngrams(content)
+        }
+        
+        return doc_id
+    
+    def detect_plagiarism(self, doc_id: str, 
+                          methods: List[str] = None) -> List[PlagiarismMatch]:
+        """Detect plagiarism for a document"""
+        if methods is None:
+            methods = ['fingerprint', 'ngram', 'semantic', 'translation']
+        
+        if doc_id not in self.documents:
+            raise ValueError(f"Document {doc_id} not found")
+        
+        target_doc = self.documents[doc_id]
+        matches = []
+        
+        for source_id, source_doc in self.documents.items():
+            if source_id == doc_id:
+                continue
+            
+            # Skip if different languages and no translation method
+            if source_doc.language != target_doc.language and 'translation' not in methods:
+                continue
+            
+            match = self._compare_documents(source_doc, target_doc, methods)
+            if match and match.similarity_score > 0.3:
+                matches.append(match)
+        
+        return sorted(matches, key=lambda x: x.similarity_score, reverse=True)
+    
+    def _compare_documents(self, source: Document, target: Document,
+                          methods: List[str]) -> Optional[PlagiarismMatch]:
+        """Compare two documents using specified methods"""
+        best_match = None
+        best_score = 0
+        
+        for method in methods:
+            score = 0
+            matched_source = ""
+            matched_target = ""
+            confidence = 0
+            
+            if method == 'fingerprint':
+                score, confidence = self._fingerprint_comparison(source, target)
+                if score > best_score:
+                    matched_source = source.content[:200]
+                    matched_target = target.content[:200]
+                    
+            elif method == 'ngram':
+                score, confidence, src_ngrams, tgt_ngrams = self._ngram_comparison(source, target)
+                if score > best_score:
+                    matched_source = ' '.join(src_ngrams[:5]) if src_ngrams else ""
+                    matched_target = ' '.join(tgt_ngrams[:5]) if tgt_ngrams else ""
+                    
+            elif method == 'semantic' and self.semantic_model:
+                score, confidence = self._semantic_comparison(source, target)
+                if score > best_score:
+                    matched_source = source.content[:200]
+                    matched_target = target.content[:200]
+                    
+            elif method == 'translation':
+                score, confidence = self._translation_comparison(source, target)
+                if score > best_score:
+                    matched_source = source.content[:200]
+                    matched_target = target.content[:200]
+            
+            if score > best_score:
+                best_score = score
+                best_match = PlagiarismMatch(
+                    source_doc_id=source.id,
+                    target_doc_id=target.id,
+                    similarity_score=score,
+                    matched_text_source=matched_source,
+                    matched_text_target=matched_target,
+                    source_language=source.language,
+                    target_language=target.language,
+                    method=method,
+                    confidence=confidence
+                )
+        
+        return best_match
+    
+    def _fingerprint_comparison(self, source: Document, target: Document) -> Tuple[float, float]:
+        """Compare documents using fingerprint hashing"""
+        source_fp = self.cache[source.id]['fingerprint']
+        target_fp = self.cache[target.id]['fingerprint']
+        
+        if source_fp == target_fp:
+            return 1.0, 1.0
+        
+        # Compare sub-fingerprints (50-char chunks)
+        chunks_source = self._get_chunks(source.content, 50)
+        chunks_target = self._get_chunks(target.content, 50)
+        
+        common = set(chunks_source) & set(chunks_target)
+        if chunks_source:
+            similarity = len(common) / len(chunks_source)
+        else:
+            similarity = 0
+        
+        confidence = min(1.0, (len(common) / 10))
+        return similarity, confidence
+    
+    def _get_chunks(self, text: str, size: int) -> List[str]:
+        """Split text into chunks for fingerprinting"""
+        text = self.text_processor.preprocess_text(text)
+        words = text.split()
+        chunks = []
+        for i in range(0, len(words), size):
+            chunk = ' '.join(words[i:i+size])
+            chunks.append(hashlib.md5(chunk.encode()).hexdigest())
+        return chunks
+    
+    def _ngram_comparison(self, source: Document, target: Document) -> Tuple[float, float, List[str], List[str]]:
+        """Compare documents using n-gram analysis"""
+        src_ngrams = self.cache[source.id]['ngrams']
+        tgt_ngrams = self.cache[target.id]['ngrams']
+        
+        common = set(src_ngrams) & set(tgt_ngrams)
+        if src_ngrams:
+            similarity = len(common) / len(src_ngrams)
+        else:
+            similarity = 0
+        
+        # Find common n-grams
+        common_ngrams = [ng for ng in src_ngrams if ng in common]
+        
+        confidence = min(1.0, len(common) / 20)
+        return similarity, confidence, common_ngrams[:10], common_ngrams[:10]
+    
+    def _semantic_comparison(self, source: Document, target: Document) -> Tuple[float, float]:
+        """Compare documents using semantic similarity"""
+        if not self.semantic_model:
+            return 0.0, 0.0
+        
+        try:
+            # Encode texts
+            source_emb = self.semantic_model.encode(source.content[:512])
+            target_emb = self.semantic_model.encode(target.content[:512])
+            
+            # Calculate cosine similarity
+            similarity = np.dot(source_emb, target_emb) / (np.linalg.norm(source_emb) * np.linalg.norm(target_emb))
+            
+            confidence = min(1.0, similarity * 1.2)
+            return float(similarity), float(confidence)
+            
+        except Exception as e:
+            print(f"Semantic comparison error: {e}")
+            return 0.0, 0.0
+    
+    def _translation_comparison(self, source: Document, target: Document) -> Tuple[float, float]:
+        """Compare documents after translation"""
+        if not HAS_GOOGLETRANS:
+            return 0.0, 0.0
+        
+        try:
+            # Translate both to English
+            source_translated = self.language_support.translate_text(source.content[:500], 'en')
+            target_translated = self.language_support.translate_text(target.content[:500], 'en')
+            
+            # Simple similarity using n-grams
+            source_ngrams = self.text_processor.get_ngrams(source_translated, 2)
+            target_ngrams = self.text_processor.get_ngrams(target_translated, 2)
+            
+            common = set(source_ngrams) & set(target_ngrams)
+            if source_ngrams:
+                similarity = len(common) / len(source_ngrams)
+            else:
+                similarity = 0
+            
+            confidence = min(1.0, similarity * 0.8 + 0.2)
+            return similarity, confidence
+            
+        except Exception as e:
+            print(f"Translation comparison error: {e}")
+            return 0.0, 0.0
+    
+    def generate_report(self, doc_id: str, threshold: float = 0.3) -> PlagiarismReport:
+        """Generate a comprehensive plagiarism report"""
+        matches = self.detect_plagiarism(doc_id)
+        filtered_matches = [m for m in matches if m.similarity_score >= threshold]
+        
+        if not filtered_matches:
+            return PlagiarismReport(
+                document_id=doc_id,
+                total_matches=0,
+                similarity_percentage=0,
+                matches=[],
+                risk_level="Low",
+                summary="No significant plagiarism detected.",
+                recommendations=["Continue practicing original writing"]
+            )
+        
+        avg_similarity = sum(m.similarity_score for m in filtered_matches) / len(filtered_matches)
+        similarity_percentage = avg_similarity * 100
+        
+        # Determine risk level
+        if similarity_percentage >= 70:
+            risk_level = "Critical"
+        elif similarity_percentage >= 50:
+            risk_level = "High"
+        elif similarity_percentage >= 30:
+            risk_level = "Medium"
+        else:
+            risk_level = "Low"
+        
+        # Generate summary
+        doc = self.documents[doc_id]
+        summary = f"Found {len(filtered_matches)} matches across {len(set(m.source_doc_id for m in filtered_matches))} source documents. "
+        summary += f"Average similarity: {similarity_percentage:.1f}%. "
+        
+        # Recommendations
+        recommendations = []
+        if risk_level in ["High", "Critical"]:
+            recommendations.append("⚠️ Immediate action required: Review and rewrite plagiarized sections")
+            recommendations.append("📝 Properly cite all external sources")
+            recommendations.append("🔄 Use paraphrasing techniques to express ideas in your own words")
+            recommendations.append("📚 Consult original sources to ensure proper understanding")
+        elif risk_level == "Medium":
+            recommendations.append("📖 Review similarities and ensure proper attribution")
+            recommendations.append("🔍 Check for unintentional similarities")
+            recommendations.append("💡 Consider reorganizing your content")
+        else:
+            recommendations.append("✅ Continue current practices")
+            recommendations.append("📝 Maintain proper citation habits")
+        
+        if len(set(m.source_doc_id for m in filtered_matches)) > 1:
+            recommendations.append("📊 Consider using more diverse sources")
+        
+        return PlagiarismReport(
+            document_id=doc_id,
+            total_matches=len(filtered_matches),
+            similarity_percentage=similarity_percentage,
+            matches=filtered_matches,
+            risk_level=risk_level,
+            summary=summary,
+            recommendations=recommendations
+        )
+
+# ==================== Cross-Language Theft Detection ====================
+
+class CrossLanguageTheftDetector(CrossLanguageDetector):
+    """Specialized detector for cross-language content theft"""
+    
+    def __init__(self):
+        super().__init__()
+        self.language_pairs: Dict[Tuple[str, str], int] = defaultdict(int)
+        self.theft_patterns = []
+    
+    def detect_content_theft(self, doc_id: str) -> Dict:
+        """Detect potential content theft across languages"""
+        matches = self.detect_plagiarism(doc_id)
+        
+        # Analyze language pairs
+        for match in matches:
+            pair = (match.source_language, match.target_language)
+            self.language_pairs[pair] += 1
+        
+        # Identify theft patterns
+        theft_indicators = {
+            'translation_theft': 0,
+            'paraphrase_theft': 0,
+            'direct_copy': 0,
+            'structure_theft': 0
+        }
+        
+        for match in matches:
+            if match.method == 'translation':
+                theft_indicators['translation_theft'] += 1
+            elif match.similarity_score > 0.8:
+                theft_indicators['direct_copy'] += 1
+            elif 0.5 <= match.similarity_score <= 0.8:
+                theft_indicators['paraphrase_theft'] += 1
+            
+            # Check structural similarity
+            if self._structural_similarity(match):
+                theft_indicators['structure_theft'] += 1
+        
+        # Generate theft analysis
+        doc = self.documents.get(doc_id)
+        analysis = {
+            'document_id': doc_id,
+            'document_title': doc.title if doc else '',
+            'language': doc.language if doc else '',
+            'total_matches': len(matches),
+            'theft_indicators': theft_indicators,
+            'high_risk_matches': [m for m in matches if m.similarity_score > 0.7],
+            'language_pairs': dict(self.language_pairs),
+            'risk_assessment': self._assess_theft_risk(theft_indicators, matches)
+        }
+        
+        return analysis
+    
+    def _structural_similarity(self, match: PlagiarismMatch) -> bool:
+        """Check structural similarity between documents"""
+        source = self.documents.get(match.source_doc_id)
+        target = self.documents.get(match.target_doc_id)
+        
+        if not source or not target:
+            return False
+        
+        # Compare paragraph count and sentence structure
+        source_paragraphs = source.content.split('\n\n')
+        target_paragraphs = target.content.split('\n\n')
+        
+        if len(source_paragraphs) == 0 or len(target_paragraphs) == 0:
+            return False
+        
+        # Compare paragraph counts
+        if abs(len(source_paragraphs) - len(target_paragraphs)) <= 1:
+            # Check sentence structure in first few paragraphs
+            for i in range(min(3, len(source_paragraphs), len(target_paragraphs))):
+                source_sentences = source_paragraphs[i].split('.')
+                target_sentences = target_paragraphs[i].split('.')
+                if abs(len(source_sentences) - len(target_sentences)) <= 1:
+                    return True
+        
+        return False
+    
+    def _assess_theft_risk(self, indicators: Dict, matches: List) -> str:
+        """Assess the overall theft risk level"""
+        high_risk_count = len([m for m in matches if m.similarity_score > 0.7])
+        
+        score = 0
+        score += indicators['translation_theft'] * 3
+        score += indicators['direct_copy'] * 5
+        score += indicators['paraphrase_theft'] * 2
+        score += high_risk_count * 2
+        
+        if score >= 20:
+            return "Critical Theft Risk"
+        elif score >= 12:
+            return "High Theft Risk"
+        elif score >= 6:
+            return "Moderate Theft Risk"
+        else:
+            return "Low Theft Risk"
+
+# ==================== Training Data Generator ====================
+
+class TrainingDataGenerator:
+    """Generate training data for plagiarism detection"""
+    
+    @staticmethod
+    def generate_plagiarism_examples(num_examples: int = 100) -> List[Dict]:
+        """Generate synthetic plagiarism examples"""
+        examples = []
+        
+        templates = [
+            "The rapid advancement of technology has transformed the way we live and work.",
+            "Climate change poses one of the most significant challenges of our time.",
+            "Education is the foundation of a prosperous and equitable society.",
+            "Innovation drives economic growth and social progress.",
+            "Healthcare systems around the world face unprecedented challenges."
+        ]
+        
+        languages = ['en', 'es', 'fr', 'de', 'it', 'pt']
+        
+        for i in range(num_examples):
+            # Choose base template
+            template = random.choice(templates)
+            
+            # Generate original and plagiarized versions
+            original = template
+            plagiarized = template
+            
+            # Apply plagiarism techniques
+            technique = random.choice(['translation', 'paraphrase', 'synonym', 'structure'])
+            
+            if technique == 'translation':
+                # Translate to another language and back
+                target_lang = random.choice([l for l in languages if l != 'en'])
+                translated = LanguageSupport.translate_text(original, target_lang)
+                plagiarized = LanguageSupport.translate_text(translated, 'en')
+                
+            elif technique == 'paraphrase':
+                # Simple paraphrasing: reorder words
+                words = original.split()
+                if len(words) > 5:
+                    middle = len(words) // 2
+                    plagiarized = ' '.join(words[:middle] + words[middle+1:] + words[middle:middle+1])
+                else:
+                    plagiarized = original
+                    
+            elif technique == 'synonym':
+                # Replace words with synonyms (simplified)
+                synonyms = {
+                    'rapid': ['swift', 'quick', 'fast'],
+                    'transformed': ['changed', 'altered', 'modified'],
+                    'significant': ['important', 'major', 'crucial'],
+                    'foundation': ['basis', 'base', 'core'],
+                    'prosperous': ['affluent', 'wealthy', 'thriving']
+                }
+                for word, syns in synonyms.items():
+                    if word in plagiarized and random.random() > 0.5:
+                        plagiarized = plagiarized.replace(word, random.choice(syns))
+                        
+            elif technique == 'structure':
+                # Modify structure but keep meaning
+                sentences = original.split('.')
+                if len(sentences) > 1:
+                    random.shuffle(sentences)
+                    plagiarized = '. '.join(sentences)
+                else:
+                    plagiarized = original
+            
+            examples.append({
+                'original': original,
+                'plagiarized': plagiarized,
+                'technique': technique,
+                'language': 'en'
+            })
+        
+        return examples
+
+# ==================== CLI Application ====================
+
+class CrossLanguagePlagiarismCLI:
+    """Command-line interface for cross-language plagiarism detection"""
+    
+    def __init__(self):
+        self.detector = CrossLanguageTheftDetector()
+        self.documents: Dict[str, Document] = {}
+    
+    def run(self):
+        """Main application loop"""
+        print("\n" + "=" * 60)
+        print("🌐 CROSS-LANGUAGE PLAGIARISM DETECTION".center(60))
+        print("=" * 60)
+        
+        while True:
+            print("\n📋 MENU")
+            print("-" * 40)
+            print("1. 📝 Add Document")
+            print("2. 🔍 Detect Plagiarism")
+            print("3. 📊 Generate Report")
+            print("4. 🔎 Detect Cross-Language Theft")
+            print("5. 📖 View Documents")
+            print("6. 🎯 Compare Two Documents")
+            print("7. 📚 Generate Test Data")
+            print("8. 🚪 Exit")
+            
+            choice = input("\nSelect option: ").strip()
+            
+            if choice == "1":
+                self._add_document()
+            elif choice == "2":
+                self._detect_plagiarism()
+            elif choice == "3":
+                self._generate_report()
+            elif choice == "4":
+                self._detect_theft()
+            elif choice == "5":
+                self._view_documents()
+            elif choice == "6":
+                self._compare_documents()
+            elif choice == "7":
+                self._generate_test_data()
+            elif choice == "8":
+                print("\n👋 Goodbye! Keep content original!")
+                break
+            else:
+                print("❌ Invalid option")
+    
+    def _add_document(self):
+        """Add a new document"""
+        print("\n📝 ADD DOCUMENT")
+        content = input("Enter document content: ").strip()
+        if not content:
+            print("❌ Content cannot be empty")
+            return
+        
+        title = input("Title (optional): ").strip()
+        author = input("Author (optional): ").strip()
+        source = input("Source (optional): ").strip()
+        
+        # Detect language
+        language = LanguageSupport.detect_language(content)
+        print(f"📋 Detected language: {LanguageSupport.get_language_name(language)} ({language})")
+        
+        doc_id = self.detector.add_document(content, language, title, author, source)
+        print(f"✅ Document added successfully!")
+        print(f"📋 Document ID: {doc_id}")
+    
+    def _detect_plagiarism(self):
+        """Detect plagiarism for a document"""
+        print("\n🔍 DETECT PLAGIARISM")
+        doc_id = input("Enter Document ID: ").strip()
+        
+        if doc_id not in self.detector.documents:
+            print("❌ Document not found")
+            return
+        
+        doc = self.detector.documents[doc_id]
+        print(f"\n📄 Checking: {doc.title or 'Untitled'} ({doc.language})")
+        
+        matches = self.detector.detect_plagiarism(doc_id)
+        matches = [m for m in matches if m.similarity_score > 0.2]
+        
+        if not matches:
+            print("✅ No significant plagiarism detected!")
+            return
+        
+        print(f"\n📊 Found {len(matches)} potential matches:")
+        for i, match in enumerate(matches[:5], 1):
+            print(f"\n{i}. Source: {match.source_doc_id}")
+            print(f"   Similarity: {match.similarity_score:.2%}")
+            print(f"   Method: {match.method}")
+            print(f"   Confidence: {match.confidence:.2%}")
+            print(f"   Languages: {match.source_language} → {match.target_language}")
+            
+            if match.similarity_score > 0.5:
+                print(f"   ⚠️  Matched text: {match.matched_text_source[:100]}...")
+    
+    def _generate_report(self):
+        """Generate a plagiarism report"""
+        print("\n📊 GENERATE REPORT")
+        doc_id = input("Enter Document ID: ").strip()
+        
+        if doc_id not in self.detector.documents:
+            print("❌ Document not found")
+            return
+        
+        report = self.detector.generate_report(doc_id)
+        
+        print("\n" + "=" * 60)
+        print("PLAGIARISM REPORT".center(60))
+        print("=" * 60)
+        print(f"\n📄 Document ID: {report.document_id}")
+        print(f"📊 Total Matches: {report.total_matches}")
+        print(f"📈 Similarity Percentage: {report.similarity_percentage:.1f}%")
+        print(f"⚠️  Risk Level: {report.risk_level}")
+        print(f"\n📝 Summary: {report.summary}")
+        
+        print("\n💡 Recommendations:")
+        for rec in report.recommendations:
+            print(f"  • {rec}")
+        
+        if report.matches:
+            print("\n🔍 Top Matches:")
+            for i, match in enumerate(report.matches[:3], 1):
+                print(f"\n  {i}. Similarity: {match.similarity_score:.2%}")
+                print(f"     Method: {match.method}")
+                print(f"     Source ID: {match.source_doc_id}")
+        
+        # Save report
+        save = input("\n💾 Save report to file? (y/n): ").strip().lower() == 'y'
+        if save:
+            filename = f"report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            with open(filename, 'w') as f:
+                json.dump({
+                    'document_id': report.document_id,
+                    'total_matches': report.total_matches,
+                    'similarity_percentage': report.similarity_percentage,
+                    'risk_level': report.risk_level,
+                    'summary': report.summary,
+                    'recommendations': report.recommendations,
+                    'matches': [m.to_dict() for m in report.matches]
+                }, f, indent=2, default=str)
+            print(f"✅ Report saved to {filename}")
+    
+    def _detect_theft(self):
+        """Detect cross-language content theft"""
+        print("\n🔎 CROSS-LANGUAGE THEFT DETECTION")
+        doc_id = input("Enter Document ID: ").strip()
+        
+        if doc_id not in self.detector.documents:
+            print("❌ Document not found")
+            return
+        
+        analysis = self.detector.detect_content_theft(doc_id)
+        
+        print("\n" + "=" * 60)
+        print("CONTENT THEFT ANALYSIS".center(60))
+        print("=" * 60)
+        
+        print(f"\n📄 Document: {analysis['document_title']}")
+        print(f"🌐 Language: {analysis['language']}")
+        print(f"📊 Total Matches: {analysis['total_matches']}")
+        print(f"⚠️  Risk Assessment: {analysis['risk_assessment']}")
+        
+        print("\n🔍 Theft Indicators:")
+        for indicator, count in analysis['theft_indicators'].items():
+            if count > 0:
+                print(f"  • {indicator.replace('_', ' ').title()}: {count}")
+        
+        if analysis['high_risk_matches']:
+            print(f"\n🚨 High-Risk Matches ({len(analysis['high_risk_matches'])}):")
+            for match in analysis['high_risk_matches'][:3]:
+                print(f"  • Source: {match.source_doc_id}")
+                print(f"    Similarity: {match.similarity_score:.2%}")
+                print(f"    Languages: {match.source_language} → {match.target_language}")
+    
+    def _view_documents(self):
+        """View all documents"""
+        print("\n📖 DOCUMENTS")
+        print("-" * 40)
+        
+        if not self.detector.documents:
+            print("No documents")
+            return
+        
+        for doc_id, doc in self.detector.documents.items():
+            print(f"\n🔹 ID: {doc_id}")
+            print(f"   Title: {doc.title or 'Untitled'}")
+            print(f"   Language: {LanguageSupport.get_language_name(doc.language)}")
+            print(f"   Author: {doc.author or 'Unknown'}")
+            print(f"   Content length: {len(doc.content)} chars")
+            print(f"   Added: {doc.timestamp.strftime('%Y-%m-%d %H:%M')}")
+    
+    def _compare_documents(self):
+        """Compare two documents directly"""
+        print("\n🎯 COMPARE DOCUMENTS")
+        doc1_id = input("Enter first Document ID: ").strip()
+        doc2_id = input("Enter second Document ID: ").strip()
+        
+        if doc1_id not in self.detector.documents or doc2_id not in self.detector.documents:
+            print("❌ One or both documents not found")
+            return
+        
+        doc1 = self.detector.documents[doc1_id]
+        doc2 = self.detector.documents[doc2_id]
+        
+        # Compare using multiple methods
+        methods = ['fingerprint', 'ngram', 'semantic', 'translation']
+        results = []
+        
+        for method in methods:
+            if method == 'semantic' and not self.detector.semantic_model:
+                continue
+            if method == 'translation' and not HAS_GOOGLETRANS:
+                continue
+            
+            match = self.detector._compare_documents(doc1, doc2, [method])
+            if match:
+                results.append((method, match.similarity_score, match.confidence))
+        
+        print("\n📊 COMPARISON RESULTS")
+        print("-" * 40)
+        print(f"Document 1: {doc1.title or 'Untitled'} ({doc1.language})")
+        print(f"Document 2: {doc2.title or 'Untitled'} ({doc2.language})")
+        
+        for method, score, confidence in results:
+            print(f"\n🔹 Method: {method.title()}")
+            print(f"   Similarity: {score:.2%}")
+            print(f"   Confidence: {confidence:.2%}")
+        
+        if results:
+            avg_score = sum(s for _, s, _ in results) / len(results)
+            print(f"\n📈 Average Similarity: {avg_score:.2%}")
+            
+            if avg_score > 0.5:
+                print("⚠️  High similarity detected! Possible plagiarism.")
+            elif avg_score > 0.3:
+                print("📝 Moderate similarity detected. Further review recommended.")
+            else:
+                print("✅ Low similarity detected. Content appears original.")
+    
+    def _generate_test_data(self):
+        """Generate test data for demonstration"""
+        print("\n📚 GENERATE TEST DATA")
+        
+        num_examples = int(input("Number of examples (default 10): ").strip() or 10)
+        examples = TrainingDataGenerator.generate_plagiarism_examples(num_examples)
+        
+        print(f"\n✅ Generated {len(examples)} examples")
+        print("\nSample:")
+        example = random.choice(examples)
+        print(f"\n🔹 Original: {example['original']}")
+        print(f"🔹 Plagiarized: {example['plagiarized']}")
+        print(f"🔹 Technique: {example['technique']}")
+        
+        # Add some examples to the system
+        add_to_system = input("\nAdd these examples to the system? (y/n): ").strip().lower() == 'y'
+        if add_to_system:
+            for i, ex in enumerate(examples[:5]):  # Add first 5
+                self.detector.add_document(
+                    ex['original'],
+                    'en',
+                    title=f"Original {i+1}",
+                    author="Test Author",
+                    doc_id=f"test_orig_{i+1}"
+                )
+                self.detector.add_document(
+                    ex['plagiarized'],
+                    'en',
+                    title=f"Plagiarized {i+1}",
+                    author="Test Author",
+                    doc_id=f"test_plag_{i+1}"
+                )
+            print("✅ Added test documents to system")
+
+# ==================== Main Execution ====================
+
+def main():
+    """Main function to run the cross-language plagiarism detection system"""
+    cli = CrossLanguagePlagiarismCLI()
+    
+    # Display system status
+    print("\n🔧 System Status:")
+    print(f"  • Google Translate: {'✅ Available' if HAS_GOOGLETRANS else '❌ Not installed'}")
+    print(f"  • scikit-learn: {'✅ Available' if HAS_SKLEARN else '❌ Not installed'}")
+    print(f"  • Sentence Transformers: {'✅ Available' if HAS_SENTENCE_TRANSFORMERS else '❌ Not installed'}")
+    
+    if not HAS_GOOGLETRANS:
+        print("\n💡 For full functionality, install dependencies:")
+        print("  pip install googletrans==4.0.0-rc1 scikit-learn sentence-transformers")
+    
+    try:
+        cli.run()
+    except KeyboardInterrupt:
+        print("\n\n👋 Goodbye! Keep content authentic!")
+    except Exception as e:
+        print(f"\n❌ An error occurred: {e}")
+        raise
+
+if __name__ == "__main__":
+    main()

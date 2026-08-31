@@ -9,7 +9,7 @@ audit trail, including login attempts, configuration changes, and data exports.
 Issue #2810: Decompose monolithic streamlit_app.py.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pandas as pd
 import streamlit as st

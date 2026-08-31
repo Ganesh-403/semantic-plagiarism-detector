@@ -1,4 +1,3 @@
-
 with open("src/utils/bulk_export.py", "r") as f:
     content = f.read()
 

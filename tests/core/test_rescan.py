@@ -76,9 +76,7 @@ def _patch_common(monkeypatch, tmp_path):
 
 def test_rescan_with_no_recent_documents_is_a_noop(mock_db, monkeypatch, _patch_common):
     """No documents in the grace period => no incidents, run still recorded."""
-    monkeypatch.setattr(
-        "src.db.corpus_db.get_documents_since", lambda since_iso: []
-    )
+    monkeypatch.setattr("src.db.corpus_db.get_documents_since", lambda since_iso: [])
 
     result = rescan_recent_documents(
         grace_period=60, threshold=0.75, now=FIXED_NOW, db_path=mock_db
@@ -178,7 +176,9 @@ def test_rescan_rerun_creates_zero_new_rows_and_does_not_renotify(
     assert _patch_common["dispatch_mock"].call_count == 1
 
 
-def test_rescan_below_threshold_creates_no_incident(mock_db, monkeypatch, _patch_common):
+def test_rescan_below_threshold_creates_no_incident(
+    mock_db, monkeypatch, _patch_common
+):
     monkeypatch.setattr(
         "src.db.corpus_db.get_documents_since", lambda since_iso: ["studentB.pdf"]
     )

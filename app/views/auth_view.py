@@ -21,7 +21,11 @@ from src.db.auth import (
     is_user_active,
 )
 from src.utils.redis_cache import cache_session_state
-from src.utils.sso import exchange_github_code, exchange_google_code
+from src.utils.sso import (
+    SSOConfigurationError,
+    exchange_github_code,
+    exchange_google_code,
+)
 
 
 def handle_oauth_callbacks(session_id: str):
@@ -32,10 +36,13 @@ def handle_oauth_callbacks(session_id: str):
             _state = st.query_params["state"]
 
             _user_info, _error_msg = None, None
-            if _state.startswith("google_"):
-                _user_info, _error_msg = exchange_google_code(_code)
-            elif _state.startswith("github_"):
-                _user_info, _error_msg = exchange_github_code(_code)
+            try:
+                if _state.startswith("google_"):
+                    _user_info, _error_msg = exchange_google_code(_code)
+                elif _state.startswith("github_"):
+                    _user_info, _error_msg = exchange_github_code(_code)
+            except (SSOConfigurationError, ValueError) as _exc:
+                _user_info, _error_msg = None, f"Configuration Error: {_exc}"
 
             if _user_info and _user_info.get("email"):
                 _email = _user_info["email"]

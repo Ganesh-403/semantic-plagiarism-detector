@@ -225,3 +225,56 @@ MOBILE_LAYOUT_CSS = """
 }
 """
 """Responsive rules for narrow viewports: tighter padding and shorter charts."""
+
+# ── Namespaced CSS custom properties (Issue #3762) ──────────────────────────────
+#
+# app.theme.THEMES already defines the Light/Dark color palettes and
+# app.theme.inject_css() already writes a :root {} block with generic
+# variable names (--primary-bg, --accent-color, etc.). This adds a second,
+# explicitly "spd-" namespaced set of the same values, so UI components can
+# opt in to a stable, collision-resistant variable naming convention
+# (--spd-primary, --spd-bg, --spd-bg-card, ...) instead of hardcoding hex
+# colors directly in inline styles.
+#
+# Deliberately NOT hardcoded here: the values are supplied by the caller
+# (app.theme.inject_css) at injection time, so switching between Light and
+# Dark themes still updates every --spd-* variable along with the existing
+# generic ones, with no second source of truth for the actual color values.
+
+
+def spd_root_css_variables(colors: dict, accent_hex: str) -> str:
+    """Return a ``:root { --spd-...: ...; }`` block using the "spd-" prefix.
+
+    Args:
+        colors: A theme color dict shaped like one of app.theme.THEMES's
+            values (keys: background, surface, card, ink, muted, border,
+            input, danger, danger_soft, warning, warning_soft, success,
+            success_soft, neutral_soft). Values should already be sanitized
+            hex colors (see app.theme.sanitize_theme_colors).
+        accent_hex: The active theme's accent/brand color, already sanitized.
+
+    Returns:
+        A CSS string containing one ``:root { ... }`` rule. Meant to be
+        concatenated into the larger stylesheet built by
+        app.theme.inject_css(), not injected on its own.
+    """
+    return f"""
+        :root {{
+            --spd-primary: {accent_hex};
+            --spd-primary-color: {accent_hex};
+            --spd-bg: {colors["background"]};
+            --spd-bg-card: {colors["card"]};
+            --spd-bg-surface: {colors["surface"]};
+            --spd-text: {colors["ink"]};
+            --spd-text-muted: {colors["muted"]};
+            --spd-border: {colors["border"]};
+            --spd-input-bg: {colors["input"]};
+            --spd-danger: {colors["danger"]};
+            --spd-danger-soft: {colors["danger_soft"]};
+            --spd-warning: {colors["warning"]};
+            --spd-warning-soft: {colors["warning_soft"]};
+            --spd-success: {colors["success"]};
+            --spd-success-soft: {colors["success_soft"]};
+            --spd-neutral-soft: {colors["neutral_soft"]};
+        }}
+    """

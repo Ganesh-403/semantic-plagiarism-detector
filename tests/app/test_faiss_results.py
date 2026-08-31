@@ -145,9 +145,10 @@ def test_render_faiss_results_ui():
     results = [
         (MockRecord("doc_a.pdf", 2, "Matched text here"), 0.88),
     ]
-    with patch("app.components.faiss_results.st") as mock_st, patch(
-        "app.components.faiss_results.inspect_diff_dialog"
-    ) as mock_dialog:
+    with (
+        patch("app.components.faiss_results.st") as mock_st,
+        patch("app.components.faiss_results.inspect_diff_dialog") as mock_dialog,
+    ):
         mock_st.button.return_value = True
 
         render_faiss_results_ui(results, "query text")
@@ -169,9 +170,10 @@ def test_render_faiss_results_ui_passes_matching_pdf_bytes():
     ]
     source_bytes = b"%PDF-1.4 raw bytes"
 
-    with patch("app.components.faiss_results.st") as mock_st, patch(
-        "app.components.faiss_results.inspect_diff_dialog"
-    ) as mock_dialog:
+    with (
+        patch("app.components.faiss_results.st") as mock_st,
+        patch("app.components.faiss_results.inspect_diff_dialog") as mock_dialog,
+    ):
         mock_st.button.return_value = True
 
         render_faiss_results_ui(
@@ -193,9 +195,10 @@ def test_render_faiss_results_ui_no_matching_pdf_bytes():
         (MockRecord("doc_a.pdf", 2, "Matched text here"), 0.88),
     ]
 
-    with patch("app.components.faiss_results.st") as mock_st, patch(
-        "app.components.faiss_results.inspect_diff_dialog"
-    ) as mock_dialog:
+    with (
+        patch("app.components.faiss_results.st") as mock_st,
+        patch("app.components.faiss_results.inspect_diff_dialog") as mock_dialog,
+    ):
         mock_st.button.return_value = True
 
         render_faiss_results_ui(
@@ -218,13 +221,16 @@ def test_inspect_diff_dialog_offers_pdf_download_when_highlighting_succeeds():
 
     fake_highlighter = MagicMock(return_value=fake_annotated_bytes)
 
-    with patch("app.components.faiss_results.st") as mock_st, patch.dict(
-        "sys.modules",
-        {
-            "src.utils.pdf_highlighter": MagicMock(
-                highlight_pdf_matches=fake_highlighter
-            )
-        },
+    with (
+        patch("app.components.faiss_results.st") as mock_st,
+        patch.dict(
+            "sys.modules",
+            {
+                "src.utils.pdf_highlighter": MagicMock(
+                    highlight_pdf_matches=fake_highlighter
+                )
+            },
+        ),
     ):
         col1, col2 = MagicMock(), MagicMock()
         mock_st.columns.return_value = (col1, col2)

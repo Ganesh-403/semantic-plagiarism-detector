@@ -287,15 +287,12 @@ class PaginationPage(Generic[T]):
         return self.page - 1 if self.has_previous() else None
 
     def has_previous(self) -> bool:
-        """Check if there is a previous page available."""
-        return self.page > 1
-
-        """Get the next page number if available.
+        """Check if there is a previous page available.
 
         Returns:
-            Next page number or None if on last page
+            True if current page > 1, False otherwise
         """
-        return self.page + 1 if self.has_next() else None
+        return self.page > 1
 
     def previous_page(self) -> Optional[int]:
         """Get the previous page number if available.
@@ -303,7 +300,15 @@ class PaginationPage(Generic[T]):
         Returns:
             Previous page number or None if on first page
         """
-        return self.page - 1 if self.has_previous() else None
+        return self.prev_page
+
+    def next_page_number(self) -> Optional[int]:
+        """Get the next page number if available.
+
+        Returns:
+            Next page number or None if on last page
+        """
+        return self.next_page
 
     def to_dict(self) -> dict:
         """Convert to dictionary representation for JSON serialization.
@@ -322,8 +327,8 @@ class PaginationPage(Generic[T]):
             "was_clamped": self.was_clamped,
             "has_next": self.has_next(),
             "has_previous": self.has_previous(),
-            "next_page": self.next_page(),
-            "previous_page": self.previous_page(),
+            "next_page": self.next_page,
+            "previous_page": self.prev_page,
         }
 
 

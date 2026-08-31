@@ -68,12 +68,14 @@ def render_pattern_recognition():
 
     st.subheader("Intelligent Pattern Recognition & Prediction")
 
-    tab_dash, tab_details, tab_risk, tab_recs = st.tabs([
-        "Pattern Dashboard",
-        "Pattern Details",
-        "Risk Matrix",
-        "Recommendations",
-    ])
+    tab_dash, tab_details, tab_risk, tab_recs = st.tabs(
+        [
+            "Pattern Dashboard",
+            "Pattern Details",
+            "Risk Matrix",
+            "Recommendations",
+        ]
+    )
 
     with tab_dash:
         _render_pattern_dashboard()
@@ -122,8 +124,16 @@ def _render_pattern_dashboard():
 
     # Pattern list
     st.markdown("#### Detected Patterns")
-    status_filter = st.selectbox("Filter by status", ["All", "active", "resolved", "escalated"], key="pat_status_filter")
-    type_filter = st.selectbox("Filter by type", ["All"] + list(_PATTERN_TYPE_LABELS.values()), key="pat_type_filter")
+    status_filter = st.selectbox(
+        "Filter by status",
+        ["All", "active", "resolved", "escalated"],
+        key="pat_status_filter",
+    )
+    type_filter = st.selectbox(
+        "Filter by type",
+        ["All"] + list(_PATTERN_TYPE_LABELS.values()),
+        key="pat_type_filter",
+    )
 
     patterns = repo.get_patterns(
         status=status_filter if status_filter != "All" else None,
@@ -218,7 +228,11 @@ def _render_pattern_details():
         return
 
     pattern_ids = [p["pattern_id"] for p in patterns]
-    selected_id = st.selectbox("Select a pattern", pattern_ids, format_func=lambda x: _short_pattern_label(x, patterns))
+    selected_id = st.selectbox(
+        "Select a pattern",
+        pattern_ids,
+        format_func=lambda x: _short_pattern_label(x, patterns),
+    )
 
     if not selected_id:
         return
@@ -288,7 +302,9 @@ def _render_pattern_details():
         fig.update_yaxes(title_text="Score", secondary_y=True)
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("No evolution snapshots yet. Click 'Record Evolution Snapshot' to start tracking.")
+        st.info(
+            "No evolution snapshots yet. Click 'Record Evolution Snapshot' to start tracking."
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -425,7 +441,8 @@ def _render_recommendations():
         priority = rec.get("priority", 3)
         priority_label = _PRIORITY_LABELS.get(priority, f"P{priority}")
         rec_type_label = _REC_TYPE_LABELS.get(
-            rec.get("recommendation_type", ""), rec.get("recommendation_type", "unknown")
+            rec.get("recommendation_type", ""),
+            rec.get("recommendation_type", "unknown"),
         )
 
         with st.expander(
@@ -446,7 +463,9 @@ def _render_recommendations():
                     for item in action_items:
                         st.markdown(f"  1. {item}")
 
-            st.caption(f"Created: {rec.get('created_at', '')} | Status: {rec.get('status', 'pending')}")
+            st.caption(
+                f"Created: {rec.get('created_at', '')} | Status: {rec.get('status', 'pending')}"
+            )
 
             col_a, col_b, col_c = st.columns(3)
             with col_a:

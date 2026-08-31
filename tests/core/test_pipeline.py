@@ -173,7 +173,9 @@ def test_run_full_pipeline_psutil_missing(sample_documents, monkeypatch, caplog)
     assert "psutil is not installed" in caplog.text
 
 
-def test_run_full_pipeline_psutil_high_memory_warning(sample_documents, monkeypatch, caplog):
+def test_run_full_pipeline_psutil_high_memory_warning(
+    sample_documents, monkeypatch, caplog
+):
     """Assert pipeline logs warning when psutil reports high memory usage."""
     import sys
     from unittest.mock import MagicMock
@@ -200,4 +202,3 @@ def test_run_full_pipeline_psutil_high_memory_warning(sample_documents, monkeypa
 
     assert result is not None
     assert "High memory usage detected (90%)" in caplog.text
-

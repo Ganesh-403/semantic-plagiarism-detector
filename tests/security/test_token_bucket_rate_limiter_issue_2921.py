@@ -70,10 +70,13 @@ async def test_verify_bearer_token_rate_limiting_exceeded():
 
     limiter = TokenBucketRateLimiter(capacity=1.0, refill_rate=0.0)
 
-    with patch("src.api.middleware.get_valid_tokens", return_value={test_token: ["read"]}), \
-         patch("src.api.middleware.db_auth.is_token_revoked", return_value=False), \
-         patch("src.api.middleware.get_token_bucket_limiter", return_value=limiter):
-
+    with (
+        patch(
+            "src.api.middleware.get_valid_tokens", return_value={test_token: ["read"]}
+        ),
+        patch("src.api.middleware.db_auth.is_token_revoked", return_value=False),
+        patch("src.api.middleware.get_token_bucket_limiter", return_value=limiter),
+    ):
         # First request consumes the single available token
         result = await verify_bearer_token(mock_request, credentials)
         assert result == test_token

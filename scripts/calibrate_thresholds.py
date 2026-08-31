@@ -308,12 +308,16 @@ def print_f1_table(
         f"  Recommended threshold       : {best_t:.4f} "
         f"({best_t * 100:.0f}%)  F1 = {float(best['f1']):.4f}"
     )
-    cm = best["confusion_matrix"] if "confusion_matrix" in best else {
-        "tp": best["tp"],
-        "fp": best["fp"],
-        "fn": best["fn"],
-        "tn": best["tn"],
-    }
+    cm = (
+        best["confusion_matrix"]
+        if "confusion_matrix" in best
+        else {
+            "tp": best["tp"],
+            "fp": best["fp"],
+            "fn": best["fn"],
+            "tn": best["tn"],
+        }
+    )
     print(f"  Confusion matrix @ {best_t:.4f}: {cm}")
     print("=" * 78)
     return best
@@ -374,8 +378,10 @@ def main() -> None:
     print("  THRESHOLD CALIBRATION & BACKTEST HARNESS (Issue #2267)")
     print("=" * 78)
     print(f"  Dataset : {args.csv}")
-    print(f"  Grid    : {args.grid_start:.2f} -> {args.grid_stop:.2f} "
-          f"step {args.grid_step:.2f} ({len(grid)} points)")
+    print(
+        f"  Grid    : {args.grid_start:.2f} -> {args.grid_stop:.2f} "
+        f"step {args.grid_step:.2f} ({len(grid)} points)"
+    )
     print(f"  Columns : {', '.join(score_columns)}")
 
     best_overall: Optional[dict] = None

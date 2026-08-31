@@ -86,8 +86,20 @@ def get_admin_emails() -> list[str]:
         return admin_emails
 
     env_email = os.getenv("ADMIN_EMAIL")
-    if env_email and is_valid_email(env_email):
-        return [env_email.strip()]
+    if env_email:
+        raw_emails = re.split(r"[,;]", env_email)
+        valid_emails = []
+        for e in raw_emails:
+            cleaned = e.strip()
+            if cleaned:
+                if is_valid_email(cleaned):
+                    valid_emails.append(cleaned)
+                else:
+                    logger.warning(
+                        f"Skipping invalid admin email token configuration: \"{cleaned}\""
+                    )
+        if valid_emails:
+            return valid_emails
 
     return []
 
@@ -337,7 +349,7 @@ def build_email_html_body(
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
         <h2 style="color: #333333; text-align: center; border-bottom: 2px solid #007bff; padding-bottom: 10px;">Daily Plagiarism Summary</h2>
         <p style="color: #666666; font-size: 14px; text-align: right;">
-            Report generated on: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}
+            Report generated on: {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}
         </p>
 
         <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
@@ -359,7 +371,7 @@ def build_email_html_body(
         {footer_note_html}
 
         <p style="color: #888888; text-align: center; font-size: 14px; margin-top: 30px;">
-            <a href="{os.getenv('APP_BASE_URL', 'http://localhost:8501')}" style="color: #007bff; text-decoration: none;">Review all incidents in the dashboard</a>
+            <a href="{os.getenv("APP_BASE_URL", "http://localhost:8501")}" style="color: #007bff; text-decoration: none;">Review all incidents in the dashboard</a>
         </p>
     </div>
     </body>
@@ -572,9 +584,6 @@ def send_email(
     attachment_filename: str = "daily_plagiarism_summary.csv",
     timeout: float = 10.0,
     reply_to: Optional[str] = None,
-    attach_csv: bool = True,
-    csv_data: Optional[bytes | str] = None,
-    text_body: Optional[str] = None,
 ) -> bool:
     """
     Send an email using SMTP with multipart/alternative container supporting plain-text and HTML versions.

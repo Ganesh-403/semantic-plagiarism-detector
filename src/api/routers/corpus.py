@@ -6,16 +6,43 @@ import os
 from fastapi import APIRouter, HTTPException, Query, Request, Security, status
 
 from src.api.dependencies import get_current_user
-from src.api.schemas import ClearDataResponse, ErrorResponse
+from src.api.schemas import ClearDataResponse, CorpusStatsResponse, ErrorResponse
 from src.core.app_config import FAISS_INDEX_PATH
 from src.db.auth import get_user_role, log_security_event
-from src.db.corpus_db import clear_all_data
+from src.db.corpus_db import clear_all_data, get_corpus_stats
 from src.utils.redis_cache import CacheNamespace, get_cache
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["System Administration"])
 INDEX_PATH = str(FAISS_INDEX_PATH)
+
+
+@router.get(
+    "/api/v1/corpus/stats",
+    response_model=CorpusStatsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get corpus statistics",
+    description="Retrieve high-level statistics about the stored corpus without fetching all documents.",
+    responses={
+        500: {"model": ErrorResponse, "description": "Internal Server Error"},
+    },
+)
+async def get_corpus_stats_endpoint(
+    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+):
+    """
+    Retrieve high-level statistics about the stored corpus including total documents,
+    total chunks, total embeddings, and last update timestamp.
+    """
+    try:
+        return get_corpus_stats()
+    except Exception as e:
+        logger.error(f"Error fetching corpus stats: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while fetching corpus statistics: {str(e)}",
+        )
 
 
 @router.post(
