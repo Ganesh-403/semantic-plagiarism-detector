@@ -728,6 +728,19 @@ CORPUS_DOWN_MIGRATIONS = {
     20: down_020_add_corpus_duplicate_detection,
 }
 
+
+def _corpus_db_file_path(connection: sqlite3.Connection) -> Path | None:
+    """Return the on-disk path of the connection's "main" database.
+
+    Returns ``None`` for in-memory or temporary databases (no file to
+    back up).
+    """
+    for _, name, filename in connection.execute("PRAGMA database_list"):
+        if name == "main" and filename:
+            return Path(filename)
+    return None
+
+
 def migrate_corpus_database(
     connection: sqlite3.Connection,
 ) -> int:

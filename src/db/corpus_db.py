@@ -153,13 +153,13 @@ def _connect():
     if conn is None:
         try:
             conn = sqlite3.connect(
-                path, check_same_thread=False, factory=WeakConnection
+                path, check_same_thread=False, factory=WeakConnection, timeout=15.0
             )
         except sqlite3.OperationalError:
             path = str(FALLBACK_CORPUS_DB_PATH)
             os.makedirs(os.path.dirname(path), exist_ok=True)
             conn = sqlite3.connect(
-                path, check_same_thread=False, factory=WeakConnection
+                path, check_same_thread=False, factory=WeakConnection, timeout=15.0
             )
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA journal_mode=WAL")
@@ -1416,7 +1416,7 @@ def vacuum_corpus_database() -> None:
     close_connections(all_threads=True)
 
     path = get_corpus_db_path()
-    conn = sqlite3.connect(os.path.abspath(path))
+    conn = sqlite3.connect(os.path.abspath(path), timeout=15.0)
     conn.isolation_level = None
     try:
         conn.execute("VACUUM")
@@ -1431,7 +1431,7 @@ def optimize_database() -> dict[str, any]:
     try:
         size_before = path.stat().st_size if path.exists() else 0
 
-        conn = sqlite3.connect(os.path.abspath(path))
+        conn = sqlite3.connect(os.path.abspath(path), timeout=15.0)
         conn.isolation_level = None
         try:
             conn.execute("VACUUM")
