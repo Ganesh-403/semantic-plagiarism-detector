@@ -397,6 +397,51 @@ def _find_sentence_boundary(
     return index
 
 
+# ── Paragraph boundary search helper (Issue #3999) ───────────────────────────
+
+
+def _find_paragraph_boundary(
+    text: str,
+    index: int,
+    direction: str = "forward",
+    max_search: int = 150,
+) -> int | None:
+    """Find the nearest paragraph boundary (double newline) relative to *index*.
+
+    Splitting at a paragraph boundary preserves semantic completeness better
+    than splitting at an arbitrary sentence boundary, since paragraphs are
+    already-authored units of meaning.
+
+    Args:
+        text: The full document text.
+        index: The starting index to search from.
+        direction: 'forward' to search right, 'backward' to search left.
+        max_search: Maximum number of characters to search before giving up.
+
+    Returns:
+        The index immediately after the paragraph break (forward) or
+        immediately before it (backward), or None if no paragraph boundary
+        is found within max_search.
+    """
+    if not text or index < 0 or index > len(text):
+        return None
+
+    if direction == "forward":
+        end_idx = min(len(text), index + max_search)
+        search_space = text[index:end_idx]
+        pos = search_space.find("\n\n")
+        if pos == -1:
+            return None
+        return index + pos + 2
+
+    start_idx = max(0, index - max_search)
+    search_space = text[start_idx:index]
+    pos = search_space.rfind("\n\n")
+    if pos == -1:
+        return None
+    return start_idx + pos
+
+
 # ── Fixed-size chunking with sentence-aware padding (Issue #1480 & #2912) ───
 
 
@@ -511,15 +556,27 @@ def chunk_text(
         # The chunk meets the minimum word count. Now apply sentence boundary
         # alignment if enabled.
         if sentence_padding:
-            # Adjust end to the nearest forward sentence boundary
+            # Adjust end to the nearest forward boundary. Prefer a paragraph
+            # break (Issue #3999) over a plain sentence boundary when one is
+            # available within the chunk size target range, since it
+            # preserves semantic completeness better than an arbitrary
+            # sentence split.
             if end < text_len:
-                end = _find_sentence_boundary(
-                    text, end, direction="forward", max_search=100
-                )
-                # Hard cap to prevent chunks from growing too large for embedding models
                 max_allowed_end = _find_length_capped_end(
                     text, start, chunk_size * 2, count_bytes
                 )
+
+                paragraph_end = _find_paragraph_boundary(
+                    text, end, direction="forward", max_search=100
+                )
+                if paragraph_end is not None and paragraph_end <= max_allowed_end:
+                    end = paragraph_end
+                else:
+                    end = _find_sentence_boundary(
+                        text, end, direction="forward", max_search=100
+                    )
+
+                # Hard cap to prevent chunks from growing too large for embedding models
                 if end > max_allowed_end:
                     end = max_allowed_end
 
@@ -575,11 +632,18 @@ def chunk_text(
         # Calculate next start position with overlap
         next_start = end - chunk_overlap
 
-        # Apply sentence padding to the start of the next chunk
+        # Apply padding to the start of the next chunk, preferring a
+        # paragraph boundary (Issue #3999) over a sentence boundary.
         if sentence_padding and next_start > 0:
-            next_start = _find_sentence_boundary(
+            paragraph_start = _find_paragraph_boundary(
                 text, next_start, direction="backward", max_search=50
             )
+            if paragraph_start is not None:
+                next_start = paragraph_start
+            else:
+                next_start = _find_sentence_boundary(
+                    text, next_start, direction="backward", max_search=50
+                )
 
         # Prevent infinite loops if sentence padding doesn't advance the pointer
         if next_start <= start:

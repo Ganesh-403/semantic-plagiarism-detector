@@ -11,3 +11,13 @@ try:
 except ImportError:
     app = None
     __all__ = []
+
+
+"""
+API module for the Semantic Plagiarism Detector
+"""
+
+from .upload import router as upload_router
+from .routes import router as documents_router
+
+__all__ = ['upload_router', 'documents_router']

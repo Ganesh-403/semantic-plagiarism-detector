@@ -356,6 +356,9 @@ def test_generate_latest_specific_spd_counter_value_is_numeric_and_correct():
     freshly-incremented counter, not just 'some number was present somewhere'."""
     from prometheus_client.parser import text_string_to_metric_families
 
+    def _sample_value(metric):
+        return metric.samples[0].value if metric.samples else 0
+
     before = _sample_value(metrics.documents_total)
     metrics.record_documents(7)
 

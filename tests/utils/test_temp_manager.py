@@ -695,3 +695,25 @@ def test_managed_ocr_temp_dir_restores_environment_and_tempdir():
 
     assert tempfile.tempdir == orig_tempdir
     assert os.environ.get("TMPDIR") == orig_tmpdir_env
+
+
+def test_create_managed_temp_file_atomic_cleanup_on_failure():
+    """Verify that if temp file registration fails, the temp file is deleted and exception is re-raised."""
+    from unittest.mock import patch
+
+    with patch("src.utils.temp_manager.register_temp_path", side_effect=RuntimeError("Registration failed")):
+        original_mkstemp = tempfile.mkstemp
+        created_paths = []
+
+        def spy_mkstemp(*args, **kwargs):
+            fd, path = original_mkstemp(*args, **kwargs)
+            created_paths.append(path)
+            return fd, path
+
+        with patch("src.utils.temp_manager.tempfile.mkstemp", side_effect=spy_mkstemp):
+            with pytest.raises(RuntimeError, match="Registration failed"):
+                create_managed_temp_file()
+
+        assert len(created_paths) == 1
+        assert not os.path.exists(created_paths[0])
+

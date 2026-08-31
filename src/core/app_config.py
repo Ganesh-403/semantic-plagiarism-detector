@@ -35,6 +35,29 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Final
 
+
+# ─── Docker environment detection ─────────────────────────────────────────
+
+def is_running_in_docker() -> bool:
+    """Return True if the application is running inside a Docker container."""
+
+    if Path("/.dockerenv").exists():
+        return True
+
+    try:
+        with open("/proc/self/cgroup", "r", encoding="utf-8") as file:
+            cgroup = file.read()
+
+        return any(
+            indicator in cgroup.lower()
+            for indicator in ("docker", "containerd", "kubepods")
+        )
+    except (FileNotFoundError, PermissionError, OSError):
+        return False
+
+
+IS_DOCKER: Final[bool] = is_running_in_docker()
+
 logger = logging.getLogger(__name__)
 
 # ─── Repository root resolution ────────────────────────────────────────────
@@ -42,6 +65,7 @@ logger = logging.getLogger(__name__)
 # ``src/``, ``app/``, ``tests/``, etc.).  Resolving once at import time keeps
 # behavior deterministic and immune to the current working directory of the
 # process that imports this module.
+
 _REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
 
 # ─── Environment & Secrets Validation (Issue #3748) ────────────────────────
