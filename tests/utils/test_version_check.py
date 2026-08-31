@@ -184,6 +184,27 @@ class TestFetchLatestGithubVersion:
         call_args = mock_client.get.call_args
         assert call_args[0][0] == custom_url
 
+    def test_uses_custom_user_agent_header(self) -> None:
+        """AsyncClient should be initialized with User-Agent and Accept headers."""
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock(return_value=None)
+        mock_response.json.return_value = {"tag_name": "v1.0.0"}
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        with patch.object(_vc_mod.httpx, "AsyncClient", return_value=mock_client) as mock_async_client:
+            self._run(fetch_latest_github_version())
+
+        mock_async_client.assert_called_once()
+        _, kwargs = mock_async_client.call_args
+        headers = kwargs.get("headers", {})
+        assert "User-Agent" in headers
+        assert f"SemanticPlagiarismDetector/{_vc_mod.APP_VERSION}" in headers["User-Agent"]
+        assert headers.get("Accept") == "application/vnd.github+json"
+
 
 # ── check_for_update_sync ──────────────────────────────────────────────────────
 

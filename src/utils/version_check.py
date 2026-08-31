@@ -88,10 +88,13 @@ async def fetch_latest_github_version(
         failed or the response did not contain a ``tag_name`` field.
     """
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        custom_headers = {
+            "User-Agent": f"SemanticPlagiarismDetector/{APP_VERSION}",
+            "Accept": "application/vnd.github+json",
+        }
+        async with httpx.AsyncClient(headers=custom_headers, timeout=timeout) as client:
             response = await client.get(
                 url,
-                headers={"Accept": "application/vnd.github+json"},
                 follow_redirects=True,
             )
             response.raise_for_status()
