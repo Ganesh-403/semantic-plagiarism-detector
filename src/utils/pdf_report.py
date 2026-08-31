@@ -750,6 +750,8 @@ def highlight_pdf_matches(
     pdf_source: str | bytes,
     matching_chunks: list[str],
     highlight_color: tuple[float, float, float] = (1.0, 0.85, 0.0),
+    source_doc: str | None = None,
+    similarity: float | None = None,
 ) -> bytes:
     """Opens an original PDF, searches for matching plagiarized text chunks,
     applies yellow highlight annotations on exact coordinate boxes,
@@ -784,6 +786,12 @@ def highlight_pdf_matches(
             quad_matches = page.search_for(chunk_clean)
             for rect in quad_matches:
                 annot = page.add_highlight_annot(rect)
+                s_doc = source_doc if source_doc else "Source Document"
+                s_sim = similarity if similarity is not None else 1.0
+                annot.set_info(
+                    content=f"Matched with {s_doc} ({s_sim:.1%})",
+                    title="Plagiarism Match",
+                )
                 annot.set_colors(stroke=highlight_color)
                 annot.update()
 
