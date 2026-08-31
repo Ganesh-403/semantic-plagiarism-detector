@@ -470,7 +470,7 @@ def migration_020_add_embedding_metadata(
         ON chunks(model_identifier, model_version)
         """
     )
-    def migration_021_add_corpus_duplicate_detection(
+def migration_021_add_corpus_duplicate_detection(
     connection: sqlite3.Connection,
 ) -> None:
     """Create persistent corpus-level duplicate/fingerprint metadata."""
@@ -686,7 +686,7 @@ def down_020_add_embedding_metadata(
             _drop_column_if_exists(connection, table, column_name)
 
     connection.execute("DROP INDEX IF EXISTS idx_chunks_embedding_model")
-    def down_020_add_corpus_duplicate_detection(
+def down_020_add_corpus_duplicate_detection(
     connection: sqlite3.Connection,
 ) -> None:
     """Remove corpus duplicate-detection metadata."""
