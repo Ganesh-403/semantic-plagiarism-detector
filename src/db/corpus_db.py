@@ -786,19 +786,6 @@ def update_document_embeddings(
 
             if vector.shape[0] != embeddings.shape[1]:
                 raise ValueError("Inconsistent embedding dimensions.")
-def get_documents_with_embeddings() -> list[str]:
-    """Return documents that have persisted chunk embeddings."""
-    with _connect() as conn:
-        rows = conn.execute(
-            """
-            SELECT DISTINCT filename
-            FROM chunks
-            WHERE embedding IS NOT NULL
-            ORDER BY filename ASC
-            """
-        ).fetchall()
-
-    return [row["filename"] for row in rows]
             conn.execute(
                 """
                 UPDATE chunks
@@ -825,7 +812,7 @@ def get_documents_with_embeddings() -> list[str]:
             )
 
         return len(rows)
-        def get_document_embeddings_for_migration(
+def get_document_embeddings_for_migration(
     filename: str,
 ) -> tuple[list[str], np.ndarray]:
     """Load one document's chunk text for controlled re-embedding."""
@@ -1700,3 +1687,17 @@ def get_embedding_storage_footprint() -> dict[str, int | float]:
         "embedding_percentage": float(percentage),
         "chunk_count": chunk_count,
     }
+
+def get_documents_with_embeddings() -> list[str]:
+    """Return documents that have persisted chunk embeddings."""
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT filename
+            FROM chunks
+            WHERE embedding IS NOT NULL
+            ORDER BY filename ASC
+            """
+        ).fetchall()
+
+    return [row["filename"] for row in rows]
