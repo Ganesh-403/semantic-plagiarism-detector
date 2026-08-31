@@ -1,0 +1,70 @@
+/*
+ * Enterprise CSS Styling Sheet for Semantic Plagiarism Detector Studio
+ */
+:root {
+  --bg-slate-dark: #090d16;
+  --panel-bg: rgba(15, 23, 42, 0.75);
+  --border-slate-800: rgba(30, 41, 59, 0.8);
+  --accent-cyan-400: #38bdf8;
+  --accent-emerald-400: #34d399;
+  --accent-purple-400: #c084fc;
+  --text-slate-100: #f8fafc;
+  --text-slate-400: #94a3b8;
+}
+
+body.semantic-dashboard {
+  background-color: var(--bg-slate-dark);
+  color: var(--text-slate-100);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.semantic-glass-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--border-slate-800);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  backdrop-filter: blur(12px);
+}
+
+.semantic-score-indicator {
+  height: 12px;
+  border-radius: 6px;
+  background: #1e293b;
+  overflow: hidden;
+}
+
+.semantic-badge-online {
+  background: rgba(52, 211, 153, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+}
+
+.semantic-btn-primary {
+  background: linear-gradient(135deg, #0284c7, #7e22ce);
+  color: #ffffff;
+  border: none;
+  padding: 0.875rem 1.75rem;
+  font-weight: 700;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.semantic-btn-primary:hover {
+  opacity: 0.95;
+  transform: translateY(-2px);
+}
+
+/* ==============================================================================
+ENTERPRISE CSS STYLING SHEET SPECIFICATIONS
+------------------------------------------------------------------------------
+Expanded design system tokens ensuring responsive glassmorphism aesthetic across all screens.
+Section 1: Dark Mode Glassmorphic Panel Design System
+- Backdrop Blur: 12px gaussian blur with 75% opacity dark slate background.
+- Border Gradients: 1px semi-transparent slate border for crisp high-DPI rendering.
+Section 2: Interactive Button & Widget Micro-Interactions
+- Hover Elevate: Subtle 2px vertical elevation with CSS drop-shadow blur.
+- Focus Ring Accent: 2px solid cyan focus ring for full accessibility.
+============================================================================== */

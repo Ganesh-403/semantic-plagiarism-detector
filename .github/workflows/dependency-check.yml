@@ -12,12 +12,17 @@ on:
     - cron: '0 6 * * 1'
   # Allow the workflow to be triggered manually from the Actions tab
   workflow_dispatch:
-
+  pull_request:
+    branches:
+      - main
 # Cancel in-progress runs for the same ref (branch or tag) when a new run is triggered.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pull-requests: write
 jobs:
   dependency-check:
     name: Check for Outdated Dependencies
@@ -40,6 +45,9 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
+      - name: Install pip-audit
+        run: |
+          pip install pip-audit
       - name: Check for outdated packages
         run: |
           mkdir -p reports
@@ -55,3 +63,50 @@ jobs:
           name: outdated-packages-report
           path: reports/outdated-packages.txt
           if-no-files-found: error
+
+      - name: Run pip-audit (JSON)
+        if: github.event_name == 'pull_request'
+        run: |
+          mkdir -p reports
+          if [ -f requirements.txt ]; then
+            pip-audit -r requirements.txt --format json -o reports/pip-audit.json || true
+          else
+            pip-audit --format json -o reports/pip-audit.json || true
+          fi
+
+      - name: Post vulnerability summary comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'reports/pip-audit.json';
+            if (!fs.existsSync(path)) return;
+
+            const data = JSON.parse(fs.readFileSync(path, 'utf8'));
+            const vulns = data.dependencies
+              ? data.dependencies.filter(dep => dep.vulns && dep.vulns.length > 0)
+              : [];
+
+            if (vulns.length === 0) return;
+
+            let body = '### ⚠️ Known vulnerabilities found in dependencies\n\n';
+            body += '| Package | Version | CVE / ID | Description |\n';
+            body += '|---|---|---|---|\n';
+            for (const dep of vulns) {
+              for (const v of dep.vulns) {
+                const desc = (v.description || '').replace(/\|/g, '\\|').slice(0, 150);
+                body += `| ${dep.name} | ${dep.version} | ${v.id} | ${desc} |\n`;
+              }
+            }
+
+            try {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            } catch (e) {
+              console.log("Could not post comment on PR (likely due to read-only permissions on fork PRs):", e);
+            }

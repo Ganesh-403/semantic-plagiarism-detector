@@ -213,7 +213,7 @@ def plot_similarity_heatmap(
     figsize: Optional[tuple] = None,
     show_annotations: bool = True,
     dpi: int = 150,
-    theme_colors: Optional[Dict[str, str]] = None,
+    theme_colors: Optional[dict[str, str]] = None,
     colormap_name: str = DEFAULT_UI_COLORMAP,
     mask_threshold: Optional[float] = None,
     log_scale: bool = False,
@@ -407,7 +407,7 @@ def plot_similarity_heatmap_plotly(
     similarity_df: pd.DataFrame,
     title: str = "Semantic Similarity Matrix",
     threshold: float = PLAGIARISM_THRESHOLD,
-    theme_colors: Optional[Dict[str, str]] = None,
+    theme_colors: Optional[dict[str, str]] = None,
     colorscale: str = "Viridis",
     show_annotations: bool = True,
     mask_threshold: Optional[float] = None,
@@ -641,7 +641,7 @@ def plot_document_similarity_heatmap(
     similarity_df: pd.DataFrame,
     title: str = "Semantic Similarity Matrix",
     threshold: float = PLAGIARISM_THRESHOLD,
-    theme_colors: Optional[Dict[str, str]] = None,
+    theme_colors: Optional[dict[str, str]] = None,
     colormap_name: str = DEFAULT_UI_COLORMAP,
     colorscale: str = "Viridis",
     show_annotations: bool = True,
@@ -708,7 +708,7 @@ def plot_differential_heatmap(
     title: str = "Similarity Matrix Delta (Algorithm A - Algorithm B)",
     label_a: str = "Algorithm A",
     label_b: str = "Algorithm B",
-    theme_colors: Optional[Dict[str, str]] = None,
+    theme_colors: Optional[dict[str, str]] = None,
     colorscale: str = "RdBu",
     show_annotations: bool = True,
     class_tag: Optional[str] = None,
@@ -910,7 +910,7 @@ def plot_differential_heatmap_matplotlib(
     label_b: str = "Algorithm B",
     figsize: Optional[tuple] = None,
     dpi: int = 150,
-    theme_colors: Optional[Dict[str, str]] = None,
+    theme_colors: Optional[dict[str, str]] = None,
     colormap_name: str = "coolwarm",
 ) -> Figure:
     """Render a static Matplotlib differential heatmap comparing score variance between two algorithms."""
@@ -1060,7 +1060,7 @@ def plot_chunk_similarity_comparison(
 def render_heatmap_ui(
     similarity_df: pd.DataFrame,
     threshold: float = PLAGIARISM_THRESHOLD,
-    theme_colors: Optional[Dict[str, str]] = None,
+    theme_colors: Optional[dict[str, str]] = None,
 ):
     """Streamlit UI wrapper for similarity heatmap controls."""
     if similarity_df.empty:
@@ -1191,12 +1191,12 @@ def render_heatmap_ui(
 
 
 def plot_multi_heatmap_grid(
-    matrices: Dict[str, pd.DataFrame],
+    matrices: dict[str, pd.DataFrame],
     colorscale: str = "Viridis",
     threshold: float = PLAGIARISM_THRESHOLD,
     show_annotations: bool = True,
     shared_colorbar: bool = True,
-    theme_colors: Optional[Dict[str, str]] = None,
+    theme_colors: Optional[dict[str, str]] = None,
     font_scale: float = 1.0,
 ):
     """Render a Plotly subplot grid displaying similarity heatmaps side-by-side.
@@ -1305,7 +1305,7 @@ def plot_multi_heatmap_grid(
     )
 
     # ── Pre-validate each matrix ─────────────────────────────────────────────
-    cleaned: Dict[str, Optional[pd.DataFrame]] = {}
+    cleaned: dict[str, Optional[pd.DataFrame]] = {}
     for lbl, df in matrices.items():
         if df is None or not isinstance(df, pd.DataFrame) or df.empty or len(df) < 2:
             cleaned[lbl] = None

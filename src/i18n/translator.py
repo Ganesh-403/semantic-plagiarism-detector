@@ -34,13 +34,13 @@ DISPLAY_TO_CODE = {
     display_name: code for code, display_name in _SUPPORTED_LANGUAGES.items()
 }
 
-_translations: Dict[str, Dict[str, str]] = {}
+_translations: dict[str, dict[str, str]] = {}
 
 
 @st.cache_data(show_spinner=False)
 def _load_translation_dictionary(
     file_path: str,
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Read and cache one translation JSON dictionary.
 
     The resolved file path is part of Streamlit's cache key, so each
@@ -52,7 +52,7 @@ def _load_translation_dictionary(
         loaded = json.load(translation_file)
 
     if not isinstance(loaded, dict):
-        raise ValueError("Translation file must contain a JSON object: " f"{file_path}")
+        raise ValueError(f"Translation file must contain a JSON object: {file_path}")
 
     return {str(key): str(value) for key, value in loaded.items()}
 
@@ -66,7 +66,7 @@ def load_translations() -> None:
     """
     global _translations
 
-    loaded_translations: Dict[str, Dict[str, str]] = {}
+    loaded_translations: dict[str, dict[str, str]] = {}
 
     for lang_code in _SUPPORTED_LANGUAGES:
         file_path = os.path.join(
@@ -118,7 +118,7 @@ _FORMAT_FIELD_RE = re.compile(r"(?<!\{)\{([a-zA-Z_][a-zA-Z0-9_]*)")
 REFERENCE_LANGUAGE = "en"
 
 
-def supported_language_codes() -> List[str]:
+def supported_language_codes() -> list[str]:
     """Return the language codes offered in the picker.
 
     Returns:
@@ -127,7 +127,7 @@ def supported_language_codes() -> List[str]:
     return list(_SUPPORTED_LANGUAGES)
 
 
-def _format_fields(template: str) -> List[str]:
+def _format_fields(template: str) -> list[str]:
     """Return the sorted, de-duplicated field names used by *template*.
 
     Args:
@@ -139,7 +139,7 @@ def _format_fields(template: str) -> List[str]:
     return sorted(set(_FORMAT_FIELD_RE.findall(template)))
 
 
-def missing_translation_keys(lang_code: str) -> List[str]:
+def missing_translation_keys(lang_code: str) -> list[str]:
     """Return the English keys that *lang_code* does not translate.
 
     A locale file that is missing a key is not broken — ``get_text`` falls
@@ -163,7 +163,7 @@ def missing_translation_keys(lang_code: str) -> List[str]:
     return sorted(set(reference) - set(translated))
 
 
-def placeholder_mismatches(lang_code: str) -> Dict[str, tuple]:
+def placeholder_mismatches(lang_code: str) -> dict[str, tuple]:
     """Return keys whose placeholders differ from the English original.
 
     A translation that renames ``{doc_a}`` or drops ``{ai_a:.1%}`` does not
@@ -184,7 +184,7 @@ def placeholder_mismatches(lang_code: str) -> Dict[str, tuple]:
     reference = _translations.get(REFERENCE_LANGUAGE, {})
     translated = _translations.get(lang_code, {})
 
-    mismatches: Dict[str, tuple] = {}
+    mismatches: dict[str, tuple] = {}
     for key, english_template in reference.items():
         if key not in translated:
             continue
@@ -274,7 +274,7 @@ def format_text(
     if not kwargs:
         return template
 
-    values: Dict[str, Any]
+    values: dict[str, Any]
     if escape_html:
         values = {name: _EscapedValue(value) for name, value in kwargs.items()}
     else:

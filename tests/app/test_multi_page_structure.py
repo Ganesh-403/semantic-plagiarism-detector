@@ -74,6 +74,6 @@ class TestMultiPageAppStructure:
 
         for py_file in py_files:
             content = py_file.read_text(encoding="utf-8")
-            assert (
-                '"""' in content or "'''" in content
-            ), f"{py_file.name} must have a module docstring"
+            assert '"""' in content or "'''" in content, (
+                f"{py_file.name} must have a module docstring"
+            )

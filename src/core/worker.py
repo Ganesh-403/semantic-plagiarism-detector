@@ -62,7 +62,7 @@ def _get_queue() -> Queue:
 # ── Job status helpers ─────────────────────────────────────────────────────────
 
 
-def get_job_status(job_id: str) -> Optional[Dict[str, Any]]:
+def get_job_status(job_id: str) -> Optional[dict[str, Any]]:
     """Return the current status and (if finished) the result summary for a job.
 
     Returns ``None`` if the job ID is unknown or expired.
@@ -72,7 +72,7 @@ def get_job_status(job_id: str) -> Optional[Dict[str, Any]]:
     except Exception:
         return None
 
-    status: Dict[str, Any] = {
+    status: dict[str, Any] = {
         "job_id": job.id,
         "status": job.get_status(),
         "created_at": job.created_at.isoformat() if job.created_at else None,
@@ -84,7 +84,7 @@ def get_job_status(job_id: str) -> Optional[Dict[str, Any]]:
     if job.is_failed:
         status["error"] = str(job.exc_info)
     elif job.is_finished:
-        result: Dict[str, Any] = job.return_value or {}
+        result: dict[str, Any] = job.return_value or {}
         status["result"] = {
             "document_count": result.get("document_count", 0),
             "flags_count": result.get("flags_count", 0),
@@ -97,14 +97,14 @@ def get_job_status(job_id: str) -> Optional[Dict[str, Any]]:
 
 
 def _run_upload_job(
-    file_bytes_dict: Dict[str, bytes],
+    file_bytes_dict: dict[str, bytes],
     threshold: float = PLAGIARISM_THRESHOLD,
     ignore_phrases: Optional[str] = None,
     ocr_language: str = "eng",
     ocr_dpi: int = 300,
     chunk_size: int = 500,
     chunk_overlap: int = 50,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Background task executed by the RQ worker.
 
     Runs the full pipeline then syncs incidents to the database.  Returns a
@@ -155,7 +155,7 @@ def _run_upload_job(
 
 
 def enqueue_upload_job(
-    file_bytes_dict: Dict[str, bytes],
+    file_bytes_dict: dict[str, bytes],
     *,
     threshold: float = PLAGIARISM_THRESHOLD,
     ignore_phrases: Optional[str] = None,

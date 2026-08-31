@@ -49,17 +49,23 @@ def render_multimodal_ocr_dashboard():
 
     with col1:
         st.subheader("Source Document Image OCR Text")
-        img_name = st.text_input("Image Document Name", value="Scanned_Assignment_Page_1.jpg")
+        img_name = st.text_input(
+            "Image Document Name", value="Scanned_Assignment_Page_1.jpg"
+        )
         raw_ocr = st.text_area(
             "Extracted OCR Text Content",
             value="Artificial intelligence algorithms enable modern automated plagiarism detection tools to parse complex text corpora and identify paraphrased content across multiple languages.",
             height=160,
         )
-        engine_type = st.selectbox("OCR Engine Pipeline", ["Tesseract-5.0", "EasyOCR", "PaddleOCR-v3"])
+        engine_type = st.selectbox(
+            "OCR Engine Pipeline", ["Tesseract-5.0", "EasyOCR", "PaddleOCR-v3"]
+        )
 
     with col2:
         st.subheader("Reference Text Corpus")
-        ref_title = st.text_input("Reference Corpus Title", value="Academic AI Research Paper v2")
+        ref_title = st.text_input(
+            "Reference Corpus Title", value="Academic AI Research Paper v2"
+        )
         ref_text = st.text_area(
             "Reference Text Content",
             value="Modern artificial intelligence tools use advanced algorithms to parse large document corpora and detect paraphrased text across diverse linguistic sources.",
@@ -67,7 +73,9 @@ def render_multimodal_ocr_dashboard():
         )
 
     if st.button("Run Multimodal OCR Plagiarism Scan", use_container_width=True):
-        chunks = MultimodalOcrEngine.process_document_image("IMG-101", img_name, raw_ocr)
+        chunks = MultimodalOcrEngine.process_document_image(
+            "IMG-101", img_name, raw_ocr
+        )
 
         match = MultimodalOcrEngine.scan_image_against_reference(
             image_id="IMG-101",

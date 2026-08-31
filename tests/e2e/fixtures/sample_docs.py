@@ -6,6 +6,7 @@ Playwright E2E test (Issue #3030).
 
 Two near-duplicate documents + one unrelated document.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

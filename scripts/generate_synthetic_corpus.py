@@ -193,14 +193,14 @@ _SYNONYM_DICT = {
 # ── Text Mutation Functions ────────────────────────────────────────────────────
 
 
-def _tokenize_sentences(text: str) -> List[str]:
+def _tokenize_sentences(text: str) -> list[str]:
     """Split text into sentences using basic regex punctuation matching."""
     # Split on period, exclamation, or question mark followed by space or end
     sentences = re.split(r"(?<=[.!?])\s+", text.strip())
     return [s.strip() for s in sentences if s.strip()]
 
 
-def _tokenize_words(sentence: str) -> List[str]:
+def _tokenize_words(sentence: str) -> list[str]:
     """Split a sentence into words while preserving punctuation."""
     # Find all words and punctuation marks
     tokens = re.findall(r"\b\w+\b|[^\w\s]", sentence)
@@ -416,7 +416,7 @@ def generate_corpus(
     num_docs: int,
     plagiarism_ratio: float,
     output_dir: Path,
-) -> List[Dict[str, any]]:
+) -> list[dict[str, any]]:
     """
     Generate a synthetic corpus of original and plagiarized documents.
 

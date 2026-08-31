@@ -599,9 +599,7 @@ import requests
 API_BASE_URL = "http://localhost:8000"
 BEARER_TOKEN = "dev-bearer-token"
 
-headers = {
-    "Authorization": f"Bearer {BEARER_TOKEN}"
-}
+headers = {"Authorization": f"Bearer {BEARER_TOKEN}"}
 
 # 1. Scan Document for Plagiarism
 file_path = "sample_essay.pdf"

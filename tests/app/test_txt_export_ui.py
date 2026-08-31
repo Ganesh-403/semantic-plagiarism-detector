@@ -6,9 +6,7 @@ APP_PATH = Path("app/streamlit_app.py")
 def test_warnings_tab_generates_txt_export():
     source = APP_PATH.read_text(encoding="utf-8")
 
-    assert (
-        "txt_data = LMSExportEngine.generate_incident_txt(" "raw_incidents)"
-    ) in source
+    assert ("txt_data = LMSExportEngine.generate_incident_txt(raw_incidents)") in source
 
 
 def test_txt_download_button_has_expected_metadata():

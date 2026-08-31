@@ -17,9 +17,9 @@ All three representations are built in the same order — documents in insertion
 ```python
 @dataclass
 class ChunkRecord:
-    doc_name: str       # document filename, e.g. "essay1.pdf"
-    chunk_index: int    # 0-based position of this chunk within the document
-    chunk_text: str     # the raw text of this chunk
+    doc_name: str  # document filename, e.g. "essay1.pdf"
+    chunk_index: int  # 0-based position of this chunk within the document
+    chunk_text: str  # the raw text of this chunk
 ```
 
 A `List[ChunkRecord]` (the **registry**) serves as the lookup table: `registry[faiss_id]` returns the `ChunkRecord` for that vector.
@@ -68,10 +68,7 @@ Documents (PDF/DOCX/TXT)
 
 ```python
 # Each chunk stored with its vector_id
-add_chunks([
-    (vector_id, filename, chunk_index, chunk_text, embedding_np_array),
-    ...
-])
+add_chunks([(vector_id, filename, chunk_index, chunk_text, embedding_np_array), ...])
 ```
 
 ### 3. Query Flow
@@ -81,7 +78,7 @@ scores, indices = index.search(query_vector, top_k)
 # indices[0] = [FAISS_ID_1, FAISS_ID_2, ...]
 
 for score, faiss_id in zip(scores[0], indices[0]):
-    record = registry[faiss_id]              # direct list-index lookup
+    record = registry[faiss_id]  # direct list-index lookup
     print(record.doc_name, record.chunk_text)
 ```
 
@@ -89,9 +86,9 @@ for score, faiss_id in zip(scores[0], indices[0]):
 
 ```python
 def load_or_rebuild_index(filepath):
-    matrix = get_all_embeddings()      # SELECT ... ORDER BY vector_id ASC
-    registry = get_chunk_registry()    # SELECT ... ORDER BY vector_id ASC
-    assert matrix.shape[0] == len(registry)   # safety check
+    matrix = get_all_embeddings()  # SELECT ... ORDER BY vector_id ASC
+    registry = get_chunk_registry()  # SELECT ... ORDER BY vector_id ASC
+    assert matrix.shape[0] == len(registry)  # safety check
     # Use or rebuild the on-disk FAISS index
 ```
 

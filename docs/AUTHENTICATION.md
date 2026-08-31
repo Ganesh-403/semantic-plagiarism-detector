@@ -51,10 +51,7 @@ import requests
 
 url = "http://localhost:8000/api/v1/auth/login"
 
-payload = {
-    "email": "user@example.com",
-    "password": "password"
-}
+payload = {"email": "user@example.com", "password": "password"}
 
 response = requests.post(url, json=payload)
 
@@ -87,25 +84,13 @@ import requests
 
 url = "http://localhost:8000/api/v1/scan"
 
-headers = {
-    "Authorization": "Bearer <access_token>"
-}
+headers = {"Authorization": "Bearer <access_token>"}
 
-files = {
-    "file": open("sample.pdf", "rb")
-}
+files = {"file": open("sample.pdf", "rb")}
 
-data = {
-    "threshold": 0.59,
-    "top_k": 3
-}
+data = {"threshold": 0.59, "top_k": 3}
 
-response = requests.post(
-    url,
-    headers=headers,
-    files=files,
-    data=data
-)
+response = requests.post(url, headers=headers, files=files, data=data)
 
 print(response.status_code)
 print(response.json())

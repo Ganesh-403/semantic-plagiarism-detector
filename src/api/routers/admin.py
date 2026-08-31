@@ -6,13 +6,16 @@ import time
 from datetime import datetime, timezone
 
 import psutil
-from fastapi import APIRouter, Request, Security, status
+from fastapi import APIRouter, HTTPException, Request, Security, status
 from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi import APIRouter, HTTPException, Query, Request, Security, status
+from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 
 from src.api.middleware import get_current_user
 from src.api.schemas import (
     HealthCheckResponse,
     HealthzResponse,
+    MetricFamily,
     StatusResponse,
 )
 from src.core.app_config import HEALTHZ_DB_PATHS
@@ -68,25 +71,44 @@ def get_service_status(request: Request):
 def get_api_usage(request: Request):
     """Public usage endpoint returning total scan count and system uptime."""
     from src.api.routers.analysis import total_scans
+    from src.utils.processing_time import format_uptime_seconds
 
     uptime = time.time() - START_TIME
     return {
         "total_scans": total_scans,
         "uptime_seconds": float(uptime),
+        "uptime_formatted": format_uptime_seconds(uptime),
     }
 
 
 @router.get("/metrics", tags=["Monitoring"], response_class=PlainTextResponse)
 def metrics_prometheus():
     """Prometheus-format metrics export for production monitoring."""
-    from src.core.metrics import generate_latest as _gen
+    from src.core.metrics import PROMETHEUS_METRICS_ENABLED, generate_latest as _gen
+
+    if not PROMETHEUS_METRICS_ENABLED:
+        raise HTTPException(status_code=404, detail="Metrics disabled")
 
     return PlainTextResponse(_gen().decode("utf-8"))
 
 
-@router.get("/metrics/json", tags=["Monitoring"])
+@router.get(
+    "/metrics/json",
+    tags=["Monitoring"],
+    response_model=dict[str, MetricFamily],
+    summary="JSON format metrics export",
+)
 def metrics_json():
-    """JSON-format metrics export for non-Prometheus monitoring setups."""
+    """JSON-format metrics export for non-Prometheus monitoring setups.
+    
+    Converts all Prometheus metric types (Gauges, Counters, Histograms) into a clean
+    JSON format suitable for web dashboards. Includes metric name, metric type,
+    metric value, and label dictionaries for each sample.
+    """
+    from src.core.metrics import PROMETHEUS_METRICS_ENABLED, generate_metrics_json
+
+    if not PROMETHEUS_METRICS_ENABLED:
+        raise HTTPException(status_code=404, detail="Metrics disabled")
     from src.core.metrics import generate_metrics_json
 
     return JSONResponse(generate_metrics_json())
@@ -172,3 +194,46 @@ def get_version(request: Request):
         "version": getattr(request.app, "version", APP_VERSION),
         "status": "active",
     }
+
+
+@router.get(
+    "/api/v1/admin/backup/download",
+    tags=["System Administration"],
+    summary="Download streamed database backup snapshot",
+)
+@router.get(
+    "/api/v1/backup/download",
+    tags=["System Administration"],
+    summary="Download streamed database backup snapshot",
+)
+def download_database_backup(
+    db_name: str = Query(
+        default="corpus.db", description="Database file to download (corpus.db or users.db)"
+    ),
+    _user: dict = Security(get_current_user, scopes=["admin"]),
+):
+    """Stream a transactionally consistent SQLite database snapshot directly from disk in chunks."""
+    from pathlib import Path
+    from src.core.app_config import AUTH_DB_PATH, CORPUS_DB_PATH
+    from src.db.database_backup import iter_sqlite_snapshot_chunks
+
+    if db_name in ("users.db", "auth.db"):
+        target_path = Path(AUTH_DB_PATH)
+    else:
+        target_path = Path(CORPUS_DB_PATH)
+
+    if not target_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Database file '{db_name}' not found.",
+        )
+
+    headers = {
+        "Content-Disposition": f'attachment; filename="{target_path.name}"',
+    }
+
+    return StreamingResponse(
+        iter_sqlite_snapshot_chunks(target_path),
+        media_type="application/x-sqlite3",
+        headers=headers,
+    )

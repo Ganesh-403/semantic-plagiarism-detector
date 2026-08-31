@@ -55,9 +55,7 @@ EXCLUDED_PARTS = {
 ALLOWED_CONTROL_BYTES = {0x09, 0x0A, 0x0D}
 
 # C0 controls plus DEL.
-DISALLOWED_BYTES = frozenset(
-    set(range(0x00, 0x20)) - ALLOWED_CONTROL_BYTES | {0x7F}
-)
+DISALLOWED_BYTES = frozenset(set(range(0x00, 0x20)) - ALLOWED_CONTROL_BYTES | {0x7F})
 
 
 def _is_excluded(path: pathlib.Path) -> bool:
@@ -92,9 +90,7 @@ def _describe_offset(data: bytes, offset: int) -> str:
 def find_control_bytes(data: bytes) -> list[tuple[int, int]]:
     """Return ``(offset, byte_value)`` for every disallowed byte in ``data``."""
     return [
-        (offset, byte)
-        for offset, byte in enumerate(data)
-        if byte in DISALLOWED_BYTES
+        (offset, byte) for offset, byte in enumerate(data) if byte in DISALLOWED_BYTES
     ]
 
 
@@ -129,9 +125,7 @@ def test_no_source_file_contains_control_bytes():
                 f"write it as the escape \\x{byte:02x} instead"
             )
         if len(found) > 5:
-            failures.append(
-                f"  - {relative}: ...and {len(found) - 5} more"
-            )
+            failures.append(f"  - {relative}: ...and {len(found) - 5} more")
 
     assert not failures, (
         "Python files containing disallowed control bytes:\n" + "\n".join(failures)

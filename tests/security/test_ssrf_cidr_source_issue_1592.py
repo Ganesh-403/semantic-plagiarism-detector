@@ -29,7 +29,7 @@ def test_all_required_cidr_blocks_are_configured():
 def test_url_validation_uses_cidr_helper():
     source = SOURCE.read_text(encoding="utf-8")
 
-    assert "for cidr_block in " "cls.RESTRICTED_IPV4_CIDR_BLOCKS" in source
+    assert "for cidr_block in cls.RESTRICTED_IPV4_CIDR_BLOCKS" in source
     assert "is_ip_in_cidr_block(ip_str, cidr_block)" in source
     tests = TESTS.read_text(encoding="utf-8")
     assert "test_validate_url_safety_integrates_required_cidr_filter" in tests

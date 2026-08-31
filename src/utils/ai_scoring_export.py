@@ -21,7 +21,7 @@ class AIScoringExporter:
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
 
-    def export_json(self, scores: List[Dict], filename: str = "ai_scores.json") -> str:
+    def export_json(self, scores: list[dict], filename: str = "ai_scores.json") -> str:
         """Export scores to JSON."""
         path = os.path.join(self.output_dir, filename)
         export_data = {"exported_at": datetime.now().isoformat(), "scores": scores}
@@ -30,20 +30,22 @@ class AIScoringExporter:
         logger.info(f"Exported JSON: {path}")
         return path
 
-    def export_csv(self, scores: List[Dict], filename: str = "ai_scores.csv") -> str:
+    def export_csv(self, scores: list[dict], filename: str = "ai_scores.csv") -> str:
         """Export scores to CSV."""
         if not scores:
             return ""
         path = os.path.join(self.output_dir, filename)
         rows = []
         for s in scores:
-            rows.append({
-                "doc_a": s.get("doc_a", ""),
-                "doc_b": s.get("doc_b", ""),
-                "overall_score": s.get("overall_score", 0),
-                "severity": s.get("severity", ""),
-                "fingerprint_match": s.get("fingerprint_match", False),
-            })
+            rows.append(
+                {
+                    "doc_a": s.get("doc_a", ""),
+                    "doc_b": s.get("doc_b", ""),
+                    "overall_score": s.get("overall_score", 0),
+                    "severity": s.get("severity", ""),
+                    "fingerprint_match": s.get("fingerprint_match", False),
+                }
+            )
         with open(path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=rows[0].keys())
             writer.writeheader()
@@ -51,11 +53,15 @@ class AIScoringExporter:
         logger.info(f"Exported CSV: {path}")
         return path
 
-    def export_summary_report(self, scores: List[Dict], filename: str = "scoring_summary.txt") -> str:
+    def export_summary_report(
+        self, scores: List[Dict], filename: str = "scoring_summary.txt"
+    ) -> str:
         """Export human-readable summary report."""
         path = os.path.join(self.output_dir, filename)
         total = len(scores)
-        avg_score = sum(s.get("overall_score", 0) for s in scores) / total if total else 0
+        avg_score = (
+            sum(s.get("overall_score", 0) for s in scores) / total if total else 0
+        )
         critical = sum(1 for s in scores if s.get("severity") == "critical")
         high = sum(1 for s in scores if s.get("severity") == "high")
 
@@ -72,7 +78,9 @@ class AIScoringExporter:
             "TOP MATCHES:",
         ]
         for i, s in enumerate(scores[:10], 1):
-            lines.append(f"  #{i} {s.get('doc_a')} ↔ {s.get('doc_b')} — {s.get('overall_score', 0):.1%} ({s.get('severity')})")
+            lines.append(
+                f"  #{i} {s.get('doc_a')} ↔ {s.get('doc_b')} — {s.get('overall_score', 0):.1%} ({s.get('severity')})"
+            )
         lines.extend(["", "=" * 60])
 
         with open(path, "w", encoding="utf-8") as f:
@@ -80,7 +88,7 @@ class AIScoringExporter:
         logger.info(f"Exported summary: {path}")
         return path
 
-    def export_all(self, scores: List[Dict]) -> Dict[str, str]:
+    def export_all(self, scores: list[dict]) -> dict[str, str]:
         """Export all formats."""
         exports = {}
         exports["json"] = self.export_json(scores)

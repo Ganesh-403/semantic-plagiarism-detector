@@ -9,6 +9,7 @@ def test_calculate_file_sha256_file_not_found():
     with pytest.raises(ValueError, match="The specified file was not found"):
         calculate_file_sha256("nonexistent_file_12345.txt")
 
+
 @patch("builtins.open", side_effect=PermissionError("Permission denied"))
 def test_calculate_file_sha256_permission_error(mock_open):
     with pytest.raises(ValueError, match="Permission denied when accessing file"):

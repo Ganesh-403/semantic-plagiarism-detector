@@ -27,5 +27,5 @@ def test_embedding_generation_performance():
 
     assert len(embeddings) == len(texts)
     assert elapsed < 5.0, (
-        f"Embedding generation took {elapsed:.2f}s " "which exceeds the 5.0s threshold."
+        f"Embedding generation took {elapsed:.2f}s which exceeds the 5.0s threshold."
     )

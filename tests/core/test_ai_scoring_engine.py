@@ -24,7 +24,9 @@ class TestContentFingerprinter:
 
     def test_create_fingerprint(self):
         """Test fingerprint creation."""
-        fp = self.fingerprinter.create_fingerprint("This is a test document with some content.", "test.txt")
+        fp = self.fingerprinter.create_fingerprint(
+            "This is a test document with some content.", "test.txt"
+        )
         assert isinstance(fp, ContentFingerprint)
         assert fp.doc_name == "test.txt"
         assert len(fp.shingles) > 0
@@ -40,8 +42,12 @@ class TestContentFingerprinter:
 
     def test_different_texts(self):
         """Test different texts produce lower similarity."""
-        fp1 = self.fingerprinter.create_fingerprint("Machine learning algorithms analyze large datasets.", "a.txt")
-        fp2 = self.fingerprinter.create_fingerprint("Cooking recipes for delicious pasta dishes.", "b.txt")
+        fp1 = self.fingerprinter.create_fingerprint(
+            "Machine learning algorithms analyze large datasets.", "a.txt"
+        )
+        fp2 = self.fingerprinter.create_fingerprint(
+            "Cooking recipes for delicious pasta dishes.", "b.txt"
+        )
         sim = self.fingerprinter.compare_fingerprints(fp1, fp2)
         assert sim < 0.5
 
@@ -52,7 +58,10 @@ class TestContentFingerprinter:
 
     def test_near_duplicates(self):
         """Test near-duplicate detection."""
-        base = "This is a long document about artificial intelligence and machine learning. " * 5
+        base = (
+            "This is a long document about artificial intelligence and machine learning. "
+            * 5
+        )
         modified = base + " Some additional content added at the end."
         fp1 = self.fingerprinter.create_fingerprint(base, "a.txt")
         fp2 = self.fingerprinter.create_fingerprint(modified, "b.txt")
@@ -70,7 +79,7 @@ class TestScoringComponents:
         """Test semantic scoring."""
         score = self.engine.compute_semantic_score(
             "Machine learning algorithms process large datasets efficiently.",
-            "Machine learning systems analyze big data effectively."
+            "Machine learning systems analyze big data effectively.",
         )
         assert 0 <= score.score <= 1
         assert score.method == "semantic"
@@ -80,7 +89,7 @@ class TestScoringComponents:
         """Test lexical scoring."""
         score = self.engine.compute_lexical_score(
             "The quick brown fox jumps over the lazy dog.",
-            "The quick brown fox leaps over the lazy dog."
+            "The quick brown fox leaps over the lazy dog.",
         )
         assert 0 <= score.score <= 1
         assert score.method == "lexical"

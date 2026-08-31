@@ -53,8 +53,8 @@ def test_legacy_bcrypt_2b_hash_transparent_migration_to_argon2():
     with _connect() as conn:
         conn.execute(
             """
-            INSERT INTO users (username, password, role, is_active, status)
-            VALUES (?, ?, ?, 1, 'active')
+            INSERT INTO users (username, password, role, status)
+            VALUES (?, ?, ?, 'active')
             """,
             (username, bcrypt_hash, "teacher"),
         )
@@ -100,8 +100,8 @@ def test_legacy_bcrypt_2a_hash_transparent_migration_to_argon2():
     with _connect() as conn:
         conn.execute(
             """
-            INSERT INTO users (username, password, role, is_active, status)
-            VALUES (?, ?, ?, 1, 'active')
+            INSERT INTO users (username, password, role, status)
+            VALUES (?, ?, ?, 'active')
             """,
             (username, bcrypt_hash, "teacher"),
         )
@@ -136,8 +136,8 @@ def test_legacy_bcrypt_2y_hash_transparent_migration_to_argon2():
     with _connect() as conn:
         conn.execute(
             """
-            INSERT INTO users (username, password, role, is_active, status)
-            VALUES (?, ?, ?, 1, 'active')
+            INSERT INTO users (username, password, role, status)
+            VALUES (?, ?, ?, 'active')
             """,
             (username, bcrypt_2y_hash, "teacher"),
         )
@@ -169,8 +169,8 @@ def test_legacy_bcrypt_invalid_password_does_not_migrate():
     with _connect() as conn:
         conn.execute(
             """
-            INSERT INTO users (username, password, role, is_active, status)
-            VALUES (?, ?, ?, 1, 'active')
+            INSERT INTO users (username, password, role, status)
+            VALUES (?, ?, ?, 'active')
             """,
             (username, bcrypt_hash, "teacher"),
         )
@@ -199,8 +199,8 @@ def test_legacy_bcrypt_suspended_user_does_not_migrate():
     with _connect() as conn:
         conn.execute(
             """
-            INSERT INTO users (username, password, role, is_active, status)
-            VALUES (?, ?, ?, 1, 'suspended')
+            INSERT INTO users (username, password, role, status)
+            VALUES (?, ?, ?, 'suspended')
             """,
             (username, bcrypt_hash, "teacher"),
         )
@@ -216,7 +216,7 @@ def test_legacy_bcrypt_suspended_user_does_not_migrate():
 
 
 def test_legacy_bcrypt_inactive_user_does_not_migrate():
-    """Verify that an inactive user (is_active=0) with a legacy bcrypt hash is rejected and not migrated."""
+    """Verify that an inactive/suspended user with a legacy bcrypt hash is rejected and not migrated."""
     username = "bcrypt_inactive_user"
     plain_password = "InactivePass123!"
 
@@ -226,8 +226,8 @@ def test_legacy_bcrypt_inactive_user_does_not_migrate():
     with _connect() as conn:
         conn.execute(
             """
-            INSERT INTO users (username, password, role, is_active, status)
-            VALUES (?, ?, ?, 0, 'active')
+            INSERT INTO users (username, password, role, status)
+            VALUES (?, ?, ?, 'suspended')
             """,
             (username, bcrypt_hash, "teacher"),
         )
@@ -265,8 +265,8 @@ def test_legacy_bcrypt_migration_with_must_change_password_flag():
     with _connect() as conn:
         conn.execute(
             """
-            INSERT INTO users (username, password, role, is_active, status, must_change_password)
-            VALUES (?, ?, ?, 1, 'active', 1)
+            INSERT INTO users (username, password, role, status, must_change_password)
+            VALUES (?, ?, ?, 'active', 1)
             """,
             (username, bcrypt_hash, "teacher"),
         )
@@ -296,8 +296,8 @@ def test_multiple_legacy_bcrypt_logins_idempotency():
     with _connect() as conn:
         conn.execute(
             """
-            INSERT INTO users (username, password, role, is_active, status)
-            VALUES (?, ?, ?, 1, 'active')
+            INSERT INTO users (username, password, role, status)
+            VALUES (?, ?, ?, 'active')
             """,
             (username, bcrypt_hash, "teacher"),
         )
@@ -335,7 +335,7 @@ def test_batch_legacy_bcrypt_users_migration_simulation():
         b_hash = bcrypt.hashpw(pword.encode("utf-8"), salt).decode("utf-8")
         with _connect() as conn:
             conn.execute(
-                "INSERT INTO users (username, password, role, is_active, status) VALUES (?, ?, 'teacher', 1, 'active')",
+                "INSERT INTO users (username, password, role, status) VALUES (?, ?, 'teacher', 'active')",
                 (uname, b_hash),
             )
             conn.commit()
@@ -346,6 +346,8 @@ def test_batch_legacy_bcrypt_users_migration_simulation():
 
     # Assert all migrated to Argon2
     with _connect() as conn:
-        rows = conn.execute("SELECT username, password FROM users WHERE username IN ('user1', 'user2', 'user3')").fetchall()
+        rows = conn.execute(
+            "SELECT username, password FROM users WHERE username IN ('user1', 'user2', 'user3')"
+        ).fetchall()
         for u, h in rows:
             assert h.startswith("$argon2")

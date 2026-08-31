@@ -120,4 +120,3 @@ class TestGetAuditEventsCount:
         """Verify count respects username filter."""
         count = get_audit_events_count(username="user_0", db_path=audit_db)
         assert count == 10  # 50 events / 5 users
-

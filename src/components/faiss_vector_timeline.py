@@ -3,7 +3,7 @@
 from typing import Any, List
 
 
-def render_vector_search_timeline(reports: List[Any]) -> str:
+def render_vector_search_timeline(reports: list[Any]) -> str:
     """Renders HTML telemetry timeline list for FAISS vector search queries."""
     if not reports:
         return """
@@ -30,10 +30,10 @@ def render_vector_search_timeline(reports: List[Any]) -> str:
         ">
             <div>
                 <span style="color: #10B981; font-weight: 800; font-size: 14px;">
-                    {rep_dict.get('query_id', 'QRY-NODE')}
+                    {rep_dict.get("query_id", "QRY-NODE")}
                 </span>
                 <div style="color: #94A3B8; font-size: 12px; margin-top: 4px;">
-                    Query: "{rep_dict.get('query_text')[:60]}..." | Exec: {rep_dict.get('execution_time_ms')} ms
+                    Query: "{rep_dict.get("query_text")[:60]}..." | Exec: {rep_dict.get("execution_time_ms")} ms
                 </div>
             </div>
             <div style="text-align: right;">

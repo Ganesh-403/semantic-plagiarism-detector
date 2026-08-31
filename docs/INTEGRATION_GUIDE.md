@@ -196,6 +196,7 @@ import requests
 API_URL = "http://localhost:8000"
 API_TOKEN = "your-api-token"
 
+
 def scan_document(file_path: str, threshold: float = 0.59):
     url = f"{API_URL}/api/v1/scan"
     params = {"threshold": threshold}
@@ -206,6 +207,7 @@ def scan_document(file_path: str, threshold: float = 0.59):
         response = requests.post(url, headers=headers, params=params, files=files)
 
     return response.json()
+
 
 result = scan_document("assignment1.pdf")
 print(f"Plagiarism flagged: {result['plagiarism_flagged']}")
@@ -349,23 +351,22 @@ def scan_multiple_documents(file_paths: list, threshold: float = 0.59):
 ```python
 def process_scan_result(result: dict):
     """Process a scan result and return severity information."""
-    if not result.get('plagiarism_flagged'):
-        return {
-            'status': 'clean',
-            'score': result['max_chunk_similarity']
-        }
+    if not result.get("plagiarism_flagged"):
+        return {"status": "clean", "score": result["max_chunk_similarity"]}
 
-    flagged_matches = result['matched_documents']
-    highest_match = max(flagged_matches, key=lambda x: x['max_chunk_similarity_score'])
+    flagged_matches = result["matched_documents"]
+    highest_match = max(flagged_matches, key=lambda x: x["max_chunk_similarity_score"])
 
-    severity = 'high' if highest_match['max_chunk_similarity_score'] >= 0.90 else 'medium'
+    severity = (
+        "high" if highest_match["max_chunk_similarity_score"] >= 0.90 else "medium"
+    )
 
     return {
-        'status': 'flagged',
-        'score': highest_match['max_chunk_similarity_score'],
-        'severity': severity,
-        'matched_document': highest_match['filename'],
-        'flagged_chunks': highest_match['flagged_chunks']
+        "status": "flagged",
+        "score": highest_match["max_chunk_similarity_score"],
+        "severity": severity,
+        "matched_document": highest_match["filename"],
+        "flagged_chunks": highest_match["flagged_chunks"],
     }
 ```
 
@@ -429,14 +430,14 @@ function processScanResult($result) {
 ```python
 # Example: Store results in Canvas LMS gradebook
 def store_in_gradebook(student_id, assignment_id, result, canvas_api):
-    score = result['max_chunk_similarity']
-    status = 'flagged' if result['plagiarism_flagged'] else 'clean'
+    score = result["max_chunk_similarity"]
+    status = "flagged" if result["plagiarism_flagged"] else "clean"
 
     # Update LMS grade or status
     canvas_api.update_submission_status(
         assignment_id,
         student_id,
-        {'graded': True, 'score': score, 'plagiarism_status': status}
+        {"graded": True, "score": score, "plagiarism_status": status},
     )
 ```
 
@@ -488,7 +489,7 @@ payload = {
     "custom_field": "value",
     "similarity": similarity,
     "doc_a": doc_a,
-    "doc_b": doc_b
+    "doc_b": doc_b,
 }
 ```
 
@@ -548,6 +549,7 @@ import time
 import requests
 from requests.exceptions import RequestException
 
+
 def scan_with_retry(file_path: str, max_retries: int = 3, timeout: int = 30):
     """Scan with exponential backoff retry."""
     for attempt in range(max_retries):
@@ -558,14 +560,14 @@ def scan_with_retry(file_path: str, max_retries: int = 3, timeout: int = 30):
                     f"{API_URL}/api/v1/scan",
                     headers={"Authorization": f"Bearer {API_TOKEN}"},
                     files=files,
-                    timeout=timeout
+                    timeout=timeout,
                 )
                 response.raise_for_status()
                 return response.json()
         except RequestException as e:
             if attempt == max_retries - 1:
                 raise
-            wait_time = 2 ** attempt  # Exponential backoff
+            wait_time = 2**attempt  # Exponential backoff
             time.sleep(wait_time)
     return None
 ```
@@ -575,8 +577,9 @@ def scan_with_retry(file_path: str, max_retries: int = 3, timeout: int = 30):
 ```python
 def validate_scan_result(result: dict) -> bool:
     """Validate that scan result contains expected fields."""
-    required_fields = ['filename', 'word_count', 'chunk_count', 'plagiarism_flagged']
+    required_fields = ["filename", "word_count", "chunk_count", "plagiarism_flagged"]
     return all(field in result for field in required_fields)
+
 
 # Usage
 result = scan_document("assignment.pdf")
@@ -621,18 +624,18 @@ external_tool_config = {
             <lti_message_type>ContentItemSelectionRequest</lti_message_type>
             <resource_link_id>{resource_link_id}</resource_link_id>
         </basic-lti-launch-request>
-    """
+    """,
 }
 
 headers = {
     "Authorization": f"Bearer {CANVAS_TOKEN}",
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
 }
 
 response = requests.post(
     f"{CANVAS_API_URL}/api/v1/accounts/1/external_tools",
     json={"external_tool": external_tool_config},
-    headers=headers
+    headers=headers,
 )
 ```
 
@@ -642,14 +645,19 @@ response = requests.post(
 def submit_to_plagiarism_detector(canvas_submission, api_token):
     """Download assignment from Canvas and scan for plagiarism."""
     # Download file from Canvas
-    file_url = canvas_submission['attachments'][0]['url']
+    file_url = canvas_submission["attachments"][0]["url"]
     file_response = requests.get(file_url)
 
     # Scan with plagiarism detector
     scan_response = requests.post(
         "http://localhost:8000/api/v1/scan",
         headers={"Authorization": f"Bearer {api_token}"},
-        files={"file": (canvas_submission['attachments'][0]['filename'], file_response.content)}
+        files={
+            "file": (
+                canvas_submission["attachments"][0]["filename"],
+                file_response.content,
+            )
+        },
     )
 
     return scan_response.json()
@@ -893,14 +901,17 @@ curl -X POST "http://localhost:8000/api/v1/scan" \
 import pytest
 import requests
 
+
 @pytest.fixture
 def api_token():
     return "test-token"
+
 
 def test_health_check():
     response = requests.get("http://localhost:8000/health")
     assert response.status_code == 200
     assert response.json()["status"] == "healthy"
+
 
 def test_scan_document(api_token):
     # Create test file
@@ -909,7 +920,7 @@ def test_scan_document(api_token):
     response = requests.post(
         "http://localhost:8000/api/v1/scan",
         headers={"Authorization": f"Bearer {api_token}"},
-        files={"file": ("test.txt", test_content)}
+        files={"file": ("test.txt", test_content)},
     )
 
     assert response.status_code == 200

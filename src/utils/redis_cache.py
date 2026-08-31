@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 redis_cache.py
 --------------
@@ -16,7 +38,8 @@ import time
 import urllib.parse
 import zlib
 from enum import Enum
-from typing import Any, Optional
+from pathlib import Path
+from typing import Any, List, Optional, Union
 
 # CacheKeyPrefix has been consolidated into CacheNamespace below
 
@@ -30,6 +53,15 @@ try:
     from src.core.app_config import REDIS_CACHE_TTL
 except ImportError:
     REDIS_CACHE_TTL = int(os.getenv("REDIS_CACHE_TTL", "3600"))
+
+try:
+    from src.core.app_config import REDIS_PORT
+except ImportError:
+    REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+try:
+    from src.version import APP_VERSION
+except ImportError:
+    APP_VERSION = "1.0.0"
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +102,6 @@ RedisTimeoutError = (
 
 # Redis connection configuration
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 try:
     REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 except ValueError:
@@ -95,13 +126,27 @@ REDIS_TIMEOUT_SECONDS = float(os.getenv("REDIS_TIMEOUT_SECONDS", "2.0"))
 
 # TTL settings (in seconds) - Configurable via environment variables (Issue #2323)
 # Defaults are preserved for backward compatibility when env vars are not set
-SESSION_TTL = int(os.getenv("SESSION_TTL", str(15 * 60)))  # 15 minutes for session state
-FAISS_INDEX_TTL = int(os.getenv("FAISS_INDEX_TTL", str(24 * 60 * 60)))  # 24 hours for FAISS index cache
-ANALYSIS_RESULTS_TTL = int(os.getenv("ANALYSIS_RESULTS_TTL", str(2 * 60 * 60)))  # 2 hours for analysis results
-LOGIN_LOCKOUT_TTL = int(os.getenv("LOGIN_LOCKOUT_TTL", str(15 * 60)))  # 15 minutes for login lockout
-UPLOAD_RATE_TTL = int(os.getenv("UPLOAD_RATE_TTL", str(60 * 60)))  # 1 hour for upload rate limiting
-BADGE_TTL = int(os.getenv("BADGE_TTL", str(24 * 60 * 60)))  # 24 hours for badge buffer cache
-DEFAULT_TTL = int(os.getenv("DEFAULT_TTL", str(24 * 60 * 60)))  # 24 hours fallback for keys without explicit TTL
+SESSION_TTL = int(
+    os.getenv("SESSION_TTL", str(15 * 60))
+)  # 15 minutes for session state
+FAISS_INDEX_TTL = int(
+    os.getenv("FAISS_INDEX_TTL", str(24 * 60 * 60))
+)  # 24 hours for FAISS index cache
+ANALYSIS_RESULTS_TTL = int(
+    os.getenv("ANALYSIS_RESULTS_TTL", str(2 * 60 * 60))
+)  # 2 hours for analysis results
+LOGIN_LOCKOUT_TTL = int(
+    os.getenv("LOGIN_LOCKOUT_TTL", str(15 * 60))
+)  # 15 minutes for login lockout
+UPLOAD_RATE_TTL = int(
+    os.getenv("UPLOAD_RATE_TTL", str(60 * 60))
+)  # 1 hour for upload rate limiting
+BADGE_TTL = int(
+    os.getenv("BADGE_TTL", str(24 * 60 * 60))
+)  # 24 hours for badge buffer cache
+DEFAULT_TTL = int(
+    os.getenv("DEFAULT_TTL", str(24 * 60 * 60))
+)  # 24 hours fallback for keys without explicit TTL
 
 
 # ============================================================================
@@ -155,7 +200,7 @@ class PayloadCompressor:
 
             logger.debug(
                 f"[CacheCompression] Compressed payload from {len(data)}B to {len(compressed_data)}B. "
-                f"Ratio: {compression_ratio:.2f}x. Time: {(time.perf_counter()-start_time)*1000:.2f}ms"
+                f"Ratio: {compression_ratio:.2f}x. Time: {(time.perf_counter() - start_time) * 1000:.2f}ms"
             )
 
             return cls.MAGIC_HEADER + compressed_data
@@ -178,24 +223,24 @@ class PayloadCompressor:
 
                 logger.debug(
                     f"[CacheCompression] Decompressed payload. "
-                    f"Time: {(time.perf_counter()-start_time)*1000:.2f}ms"
+                    f"Time: {(time.perf_counter() - start_time) * 1000:.2f}ms"
                 )
                 return decompressed_data
-                
+
             except zlib.error as e:
                 logger.critical(
                     "[CacheCompression] CRITICAL: zlib decompression failed due to "
                     "corrupted payload. Treating as cache miss. Error: %s",
                     e,
-                    exc_info=True
+                    exc_info=True,
                 )
                 return None
-                
+
             except Exception as e:
                 logger.critical(
                     "[CacheCompression] CRITICAL: Unexpected error during decompression: %s",
                     e,
-                    exc_info=True
+                    exc_info=True,
                 )
                 return None
 
@@ -207,6 +252,23 @@ class PayloadCompressor:
 # ============================================================================
 
 
+def normalize_cache_key_path(p: Any) -> str:
+    r"""Normalize path strings for cross-platform Redis cache keys (Issue #2939, #3028).
+
+    Uses pathlib.Path(p).as_posix() explicitly whenever creating cache keys based on file paths
+    to convert backslashes (\) on Windows to POSIX forward slashes (/) for cross-platform
+    cache key compatibility.
+    """
+    if p is None:
+        return ""
+    if isinstance(p, Path):
+        return p.as_posix()
+    p_str = str(p)
+    if not p_str:
+        return ""
+    return Path(p_str).as_posix()
+
+
 class CacheNamespace(str, Enum):
     SESSION = "spd:v1:session"
     FAISS = "spd:v1:faiss"
@@ -214,9 +276,14 @@ class CacheNamespace(str, Enum):
     LOGIN_ATTEMPTS = "spd:v1:login_attempts"
     UPLOADS = "spd:v1:uploads"
     BADGES = "spd:v1:badges"
+    SCAN_JOBS = "spd:v1:scan_jobs"
+    CLUSTERING_JOBS = "spd:v1:clustering_jobs"
 
-    def build_key(self, *parts: str) -> str:
-        return ":".join([self.value] + list(parts))
+    def build_key(self, *parts: Any) -> str:
+        """Build a normalized Redis cache key appending APP_VERSION and using pathlib.Path(p).as_posix() for path components."""
+        normalized_parts = [normalize_cache_key_path(p) for p in parts]
+        key_parts = [self.value, APP_VERSION] + [p for p in normalized_parts if p]
+        return ":".join(key_parts)
 
 
 CacheKeyPrefix = CacheNamespace
@@ -369,6 +436,16 @@ class RedisCache:
         except Exception:
             return False
 
+    def scan_keys(self, match: str) -> list[str]:
+        if not self.is_available():
+            return []
+        try:
+            raw_keys = list(self._client.scan_iter(match=match))
+            return [k.decode("utf-8") if isinstance(k, bytes) else k for k in raw_keys]
+        except Exception as e:
+            logger.error(f"[RedisCache] Error scanning keys for pattern {match}: {e}")
+            return []
+
     def ping(self) -> tuple[bool, Optional[float]]:
         if self._client is None:
             return False, None
@@ -409,6 +486,26 @@ class RedisCache:
             return 0.0
         return (hits / total) * 100
 
+    def _inc_hits(self) -> None:
+        with self._lock:
+            self._hits += 1
+        try:
+            from src.core.metrics import cache_hits_total
+
+            cache_hits_total.labels(cache_type="redis").inc()
+        except Exception:
+            pass
+
+    def _inc_misses(self) -> None:
+        with self._lock:
+            self._misses += 1
+        try:
+            from src.core.metrics import cache_misses_total
+
+            cache_misses_total.labels(cache_type="redis").inc()
+        except Exception:
+            pass
+
     def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
         if self.is_available():
             try:
@@ -433,11 +530,11 @@ class RedisCache:
                 data = self._client.get(key)
                 if data is not None:
                     decompressed = PayloadCompressor.decompress(data)
-                    
+
                     if decompressed is None:
                         logger.warning(
                             "[RedisCache] Corrupted payload detected for key '%s'. Deleting.",
-                            key
+                            key,
                         )
                         try:
                             self._client.delete(key)
@@ -447,18 +544,18 @@ class RedisCache:
                         with self._lock:
                             self._hits += 1
                         return pickle.loads(decompressed)
-                        
+
             except Exception as e:
-                logger.error(f"[RedisCache] Error getting key {key}: {e}. Falling back.")
+                logger.error(
+                    f"[RedisCache] Error getting key {key}: {e}. Falling back."
+                )
 
         val = self._fallback_get(key)
         if val is not None:
-            with self._lock:
-                self._hits += 1
+            self._inc_hits()
             return val
 
-        with self._lock:
-            self._misses += 1
+        self._inc_misses()
         return None
 
     def delete(self, key: str) -> bool:
@@ -494,11 +591,11 @@ class RedisCache:
                 data = self._client.get(key)
                 if data is not None:
                     decompressed = PayloadCompressor.decompress(data)
-                    
+
                     if decompressed is None:
                         logger.warning(
                             "[RedisCache] Corrupted JSON payload for key '%s'. Deleting.",
-                            key
+                            key,
                         )
                         try:
                             self._client.delete(key)
@@ -507,19 +604,17 @@ class RedisCache:
                     else:
                         with self._lock:
                             self._hits += 1
-                        return json.loads(decompressed.decode('utf-8'))
-                        
+                        return json.loads(decompressed.decode("utf-8"))
+
             except Exception as e:
                 logger.error(f"[RedisCache] Error getting JSON key {key}: {e}.")
 
         val = self._fallback_get_json(key)
         if val is not None:
-            with self._lock:
-                self._hits += 1
+            self._inc_hits()
             return val
 
-        with self._lock:
-            self._misses += 1
+        self._inc_misses()
         return None
 
     def exists(self, key: str) -> bool:
@@ -548,9 +643,7 @@ class RedisCache:
                         chunk = keys[i : i + chunk_size]
                         pipeline.delete(*chunk)
                     results = pipeline.execute()
-                    redis_count = sum(
-                        r for r in results if isinstance(r, (int, float))
-                    )
+                    redis_count = sum(r for r in results if isinstance(r, (int, float)))
             except Exception as e:
                 logger.error(
                     f"[RedisCache] Error clearing pattern {pattern}: {e}. Falling back to in-memory."
@@ -696,6 +789,28 @@ def get_cached_badge(
     return _cache.get(cache_key)
 
 
+def cache_scan_job(
+    job_id: str,
+    data: dict,
+    ttl: Optional[int] = None,
+) -> bool:
+    """Store scan job status and results in Redis under spd:v1:scan_jobs:{job_id} with 24-hour TTL (Issue #3222)."""
+    cache_key = CacheNamespace.SCAN_JOBS.build_key(job_id)
+    return _cache.set_json(cache_key, data, ttl or SCAN_JOBS_TTL)
+
+
+def get_scan_job(job_id: str) -> Optional[dict]:
+    """Retrieve scan job status and results from Redis (Issue #3222)."""
+    cache_key = CacheNamespace.SCAN_JOBS.build_key(job_id)
+    return _cache.get_json(cache_key)
+
+
+def delete_scan_job(job_id: str) -> bool:
+    """Delete scan job from Redis (Issue #3222)."""
+    cache_key = CacheNamespace.SCAN_JOBS.build_key(job_id)
+    return _cache.delete(cache_key)
+
+
 def _cleanup_redis() -> None:
     if _cache:
         _cache.close()
@@ -704,71 +819,82 @@ def _cleanup_redis() -> None:
 atexit.register(_cleanup_redis)
 
 
-def store_large_data(key: str, data: Any, ttl: int = 1800) -> None:
-    """Store large data in Redis with compression."""
+def store_large_data(key: str | Path, data: Any, ttl: int = 1800) -> None:
+    """Store large data in Redis with compression and normalized POSIX key paths."""
+    key_str = normalize_cache_key_path(key)
     try:
         cache = get_cache()
         compressed = zlib.compress(pickle.dumps(data))
-        
+
         if cache.is_available():
-            cache._client.setex(f"spd:v1:large:{key}", ttl, compressed)
+            cache._client.setex(f"spd:v1:large:{key_str}", ttl, compressed)
         else:
-            cache.fallback_cache[f"spd:v1:large:{key}"] = {
+            cache.fallback_cache[f"spd:v1:large:{key_str}"] = {
                 "data": compressed,
-                "expiry": time.time() + ttl
+                "expiry": time.time() + ttl,
             }
-        logger.debug(f"Stored large data for key: {key} ({len(compressed)} bytes compressed)")
+        logger.debug(
+            f"Stored large data for key: {key_str} ({len(compressed)} bytes compressed)"
+        )
     except Exception as e:
-        logger.error(f"Failed to store large data for key {key}: {e}")
+        logger.error(f"Failed to store large data for key {key_str}: {e}")
 
 
-def get_large_data(key: str) -> Optional[Any]:
-    """Retrieve large data from Redis with decompression."""
+def get_large_data(key: str | Path) -> Optional[Any]:
+    """Retrieve large data from Redis with decompression and normalized POSIX key paths."""
+    key_str = normalize_cache_key_path(key)
     try:
         cache = get_cache()
         data = None
-        
+
         if cache.is_available():
-            data = cache._client.get(f"spd:v1:large:{key}")
+            data = cache._client.get(f"spd:v1:large:{key_str}")
         else:
-            entry = cache.fallback_cache.get(f"spd:v1:large:{key}")
+            entry = cache.fallback_cache.get(f"spd:v1:large:{key_str}")
             if entry and entry.get("expiry", 0) > time.time():
                 data = entry["data"]
             elif entry:
-                del cache.fallback_cache[f"spd:v1:large:{key}"]
-        
+                del cache.fallback_cache[f"spd:v1:large:{key_str}"]
+
         if data:
-            return pickle.loads(zlib.decompress(data))
+            return pickle.loads(zlib.decompress(data))  # nosec
         return None
     except Exception as e:
         logger.error(f"Failed to retrieve large data for key {key}: {e}")
         return None
 
 
-def clear_large_data(key: str) -> None:
-    """Clear large data from cache."""
+def clear_large_data(key: str | Path) -> None:
+    """Clear large data from cache using normalized POSIX key paths (Issue #3028)."""
+    key_str = normalize_cache_key_path(key)
     try:
         cache = get_cache()
         if cache.is_available():
-            cache._client.delete(f"spd:v1:large:{key}")
+            cache._client.delete(f"spd:v1:large:{key_str}")
         else:
-            cache.fallback_cache.pop(f"spd:v1:large:{key}", None)
-        logger.debug(f"Cleared large data for key: {key}")
+            cache.fallback_cache.pop(f"spd:v1:large:{key_str}", None)
+        logger.debug(f"Cleared large data for key: {key_str}")
     except Exception as e:
-        logger.error(f"Failed to clear large data for key {key}: {e}")
+        logger.error(f"Failed to clear large data for key {key_str}: {e}")
 
 
-def clear_all_large_data(session_id: str) -> None:
-    """Clear all large data for a session using pipelined deletion."""
+def clear_all_large_data(session_id: str | Path) -> None:
+    """Clear all large data for a session using pipelined deletion and normalized POSIX path (Issue #3028)."""
+    sid_str = normalize_cache_key_path(session_id)
     try:
         cache = get_cache()
-        pattern = f"spd:v1:large:{session_id}:*"
+        patterns = [f"spd:v1:large:{sid_str}:*", f"spd:v1:large:{sid_str}/*"]
 
         if cache.is_available():
-            if hasattr(cache._client, "scan_iter"):
-                keys = list(cache._client.scan_iter(match=pattern, count=1000))
-            else:
-                keys = cache._client.keys(pattern)
+            keys = []
+            for pattern in patterns:
+                if hasattr(cache._client, "scan_iter"):
+                    keys.extend(
+                        list(cache._client.scan_iter(match=pattern, count=1000))
+                    )
+                else:
+                    keys.extend(cache._client.keys(pattern))
+            keys = list(set(keys))
             if keys:
                 pipeline = cache._client.pipeline()
                 chunk_size = 1000
@@ -777,9 +903,13 @@ def clear_all_large_data(session_id: str) -> None:
                     pipeline.delete(*chunk)
                 pipeline.execute()
         else:
-            keys_to_remove = [k for k in cache.fallback_cache.keys() if k.startswith(f"spd:v1:large:{session_id}:")]
+            keys_to_remove = [
+                k
+                for k in cache.fallback_cache.keys()
+                if k.startswith(f"spd:v1:large:{session_id}:")
+            ]
             for key in keys_to_remove:
                 del cache.fallback_cache[key]
-        logger.debug(f"Cleared all large data for session: {session_id}")
+        logger.debug(f"Cleared all large data for session: {sid_str}")
     except Exception as e:
-        logger.error(f"Failed to clear all large data for session {session_id}: {e}")
+        logger.error(f"Failed to clear all large data for session {sid_str}: {e}")

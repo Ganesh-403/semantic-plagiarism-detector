@@ -57,7 +57,7 @@ def _is_page_number(line: str) -> bool:
     )
 
 
-def _clean_page_text(page_text: str) -> List[str]:
+def _clean_page_text(page_text: str) -> list[str]:
     """Split page text into clean lines while removing standalone page numbers."""
     if not page_text:
         return []
@@ -66,14 +66,14 @@ def _clean_page_text(page_text: str) -> List[str]:
 
 
 def _remove_repeated_boundary_lines(
-    page_lines: List[List[str]],
-) -> List[List[str]]:
+    page_lines: list[list[str]],
+) -> list[list[str]]:
     """Identify and remove repeated header/footer lines occurring across pages."""
     if len(page_lines) < 2:
         return page_lines
 
-    header_candidates: Dict[str, int] = {}
-    footer_candidates: Dict[str, int] = {}
+    header_candidates: dict[str, int] = {}
+    footer_candidates: dict[str, int] = {}
 
     for lines in page_lines:
         if not lines:
@@ -93,7 +93,7 @@ def _remove_repeated_boundary_lines(
         line for line, count in footer_candidates.items() if count >= min_occurrence
     }
 
-    cleaned_pages: List[List[str]] = []
+    cleaned_pages: list[list[str]] = []
     for lines in page_lines:
         if not lines:
             cleaned_pages.append([])
@@ -108,7 +108,7 @@ def _remove_repeated_boundary_lines(
     return cleaned_pages
 
 
-def _normalize_whitespace(page_lines: List[List[str]]) -> str:
+def _normalize_whitespace(page_lines: list[list[str]]) -> str:
     """Rejoin cleaned page lines into a standardized document string.
 
     Performs normalization on page boundary newlines, tab characters, multiple spaces,
@@ -127,7 +127,9 @@ def _normalize_whitespace(page_lines: List[List[str]]) -> str:
     return raw_document.strip()
 
 
-def _calculate_image_area_coverage(images: list, page_width: float, page_height: float) -> tuple[float, bool]:
+def _calculate_image_area_coverage(
+    images: list, page_width: float, page_height: float
+) -> tuple[float, bool]:
     """Calculate total bounding box image area ratio relative to page geometry.
 
     Args:
@@ -217,15 +219,14 @@ def _has_meaningful_text(text: str, page=None) -> bool:
     return len(words) >= MIN_NATIVE_WORDS_PER_PAGE and alphanumeric_chars >= 30
 
 
-
 def _should_use_parallel() -> bool:
     """Check if multiprocessing should be enabled."""
     return os.cpu_count() is not None and os.cpu_count() > 1
 
 
-def _format_table_as_text(table: List[List[Optional[str]]]) -> str:
+def _format_table_as_text(table: list[list[Optional[str]]]) -> str:
     """Format a pdfplumber-extracted table into clean, readable text."""
-    lines: List[str] = []
+    lines: list[str] = []
     for row in table:
         cells = [str(cell).strip() if cell is not None else "" for cell in row]
         if any(cells):
@@ -238,7 +239,7 @@ def _parse_pdf_page(
     page_index: int,
     ocr_dpi: int,
     ocr_language: str,
-) -> List[str]:
+) -> list[str]:
     """Extract text from a single PDF page."""
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
@@ -322,13 +323,13 @@ def _resolve_process_pool_workers(
 
 
 def extract_texts_parallel(
-    files_dict: Dict[str, bytes],
+    files_dict: dict[str, bytes],
     *,
     ocr_language: str = DEFAULT_OCR_LANGUAGE,
     ocr_dpi: int = DEFAULT_OCR_DPI,
     session_id: Optional[str] = None,
     max_workers: int | None = None,
-) -> tuple[Dict[str, str], Dict[str, Exception]]:
+) -> tuple[dict[str, str], dict[str, Exception]]:
     """Extract text from multiple files using a bounded process pool."""
     check_batch_rate_limit(len(files_dict) if files_dict else 0, session_id=session_id)
 
@@ -337,8 +338,8 @@ def extract_texts_parallel(
         ocr_dpi=ocr_dpi,
     )
 
-    results: Dict[str, str] = {}
-    errors: Dict[str, Exception] = {}
+    results: dict[str, str] = {}
+    errors: dict[str, Exception] = {}
 
     if not files_dict:
         return results, errors
@@ -434,7 +435,7 @@ def count_pdf_images(pdf_bytes: bytes) -> int:
         return 0
 
 
-def extract_pdf_metadata(file: PDFInput) -> Dict[str, str]:
+def extract_pdf_metadata(file: PDFInput) -> dict[str, str]:
     """Extract PDF metadata (Author, Creation Date, Title) using PyMuPDF."""
     pdf_bytes = _read_pdf_bytes(file)
     metadata = {"author": None, "creation_date": None, "title": None}
@@ -562,10 +563,10 @@ def extract_text_from_pdf(
 def extract_texts_from_pdfs(
     files: list,
     session_id: Optional[str] = None,
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Extract text from multiple PDF files."""
     check_batch_rate_limit(len(files) if files else 0, session_id=session_id)
-    results: Dict[str, str] = {}
+    results: dict[str, str] = {}
     for item in files:
         if isinstance(item, tuple):
             name, content = item

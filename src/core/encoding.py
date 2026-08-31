@@ -83,14 +83,14 @@ _MOJIBAKE_SOURCE_CODEPOINTS = (
 )
 
 
-def _build_mojibake_table() -> Dict[str, str]:
+def _build_mojibake_table() -> dict[str, str]:
     """Derive the mojibake lookup table from the UTF-8/Windows-1252 mismatch.
 
     Returns:
         A mapping of garbled sequence to the character it should be restored
         to. Keys are always two or more characters long.
     """
-    table: Dict[str, str] = {}
+    table: dict[str, str] = {}
 
     for codepoint in _MOJIBAKE_SOURCE_CODEPOINTS:
         character = chr(codepoint)
@@ -120,11 +120,11 @@ def _build_mojibake_table() -> Dict[str, str]:
 # Only sequences that stay two characters or longer after the drop are listed.
 # The two-byte accented capitals (Á, Í, Ï, Ð, Ý) collapse to a lone "Ã" and are
 # therefore indistinguishable from ordinary text, so they are left alone.
-_TRUNCATED_MOJIBAKE_REPLACEMENTS: Dict[str, str] = {
+_TRUNCATED_MOJIBAKE_REPLACEMENTS: dict[str, str] = {
     "â€": "”",  # U+201D with its undefined 0x9D byte dropped
 }
 
-MOJIBAKE_REPLACEMENTS: Dict[str, str] = {
+MOJIBAKE_REPLACEMENTS: dict[str, str] = {
     **_build_mojibake_table(),
     **_TRUNCATED_MOJIBAKE_REPLACEMENTS,
 }

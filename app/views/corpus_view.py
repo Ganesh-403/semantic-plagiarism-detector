@@ -294,8 +294,14 @@ def render_sidebar(user_role: str, root_dir: str, faiss_index=None):
                     for code, display_name in SUPPORTED_OCR_LANGUAGES.items()
                 }
                 language_names = list(ocr_language_labels)
-                default_language_name = SUPPORTED_OCR_LANGUAGES.get(DEFAULT_OCR_LANGUAGE, "English")
-                default_index = language_names.index(default_language_name) if default_language_name in language_names else 0
+                default_language_name = SUPPORTED_OCR_LANGUAGES.get(
+                    DEFAULT_OCR_LANGUAGE, "English"
+                )
+                default_index = (
+                    language_names.index(default_language_name)
+                    if default_language_name in language_names
+                    else 0
+                )
                 st.selectbox(
                     "OCR Language",
                     options=language_names,

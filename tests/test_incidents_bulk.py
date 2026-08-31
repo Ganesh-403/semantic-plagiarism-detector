@@ -11,13 +11,13 @@ def setup_teardown(monkeypatch, tmp_path):
     """
     # Option A: Using an in-memory SQLite database (or Option B using tmp_path)
     test_db = ":memory:"
-    
+
     # Patch the database path or connection reference used by your app
     monkeypatch.setattr(database, "DEFAULT_DB_PATH", test_db)
-    
+
     # Initialize the database schema for the test session
     database.init_db()
-    
+
     yield
-    
+
     # Teardown logic if required (in-memory DBs destroy themselves automatically)

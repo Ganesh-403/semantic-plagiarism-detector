@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Semantic Plagiarism Analytics Dashboard | Semantic Plagiarism Detector</title>
+    <meta name="description" content="Enterprise Semantic Plagiarism Analytics Suite providing multi-vector semantic similarity metrics, embedding distance distribution, and document pair telemetry.">
+    <link rel="stylesheet" href="styles/semantic_analytics_dashboard.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <!-- Architecture Header Comment: Enterprise Semantic Plagiarism Analytics Dashboard UI -->
+    <!-- Design Pattern: Glassmorphic Modular Dashboard layout with dynamic real-time telemetry panels -->
+    <!-- WCAG 2.1 AA Compliant high-contrast semantic indicators and interactive controls -->
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar-navigation" id="sidebar-nav">
+            <div class="brand-header">
+                <div class="brand-logo">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h2>SemanticShield</h2>
+                    <span>Enterprise Analytics v4.2</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#overview" class="nav-item active" id="nav-overview">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span>Overview Matrix</span>
+                </a>
+                <a href="#semantic-vectors" class="nav-item" id="nav-semantic-vectors">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    <span>Vector Sim Space</span>
+                </a>
+                <a href="#document-telemetry" class="nav-item" id="nav-doc-telemetry">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    <span>Document Corpus</span>
+                </a>
+                <a href="#cluster-analysis" class="nav-item" id="nav-clusters">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                    <span>Paraphrase Clusters</span>
+                </a>
+                <a href="#settings" class="nav-item" id="nav-settings">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>Engine Thresholds</span>
+                </a>
+            </nav>
+
+            <div class="system-status-widget glass-card">
+                <div class="status-indicator online"></div>
+                <div class="status-info">
+                    <span class="status-title">FAISS Index Connected</span>
+                    <span class="status-subtitle">1,248,500 Vectors Staged</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Surface -->
+        <main class="main-content">
+            <!-- Top Controls Bar -->
+            <header class="top-header glass-card">
+                <div class="header-search">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="corpus-search-input" placeholder="Search document checksum, author ID, or semantic hash..." aria-label="Search corpus">
+                </div>
+
+                <div class="header-actions">
+                    <div class="filter-dropdown">
+                        <select id="similarity-metric-select" class="styled-select">
+                            <option value="cosine">Cosine Embedding Distance</option>
+                            <option value="euclidean">Euclidean Vector Norm</option>
+                            <option value="manhattan">Manhattan Semantic Delta</option>
+                            <option value="jaccard">N-Gram Jaccard Index</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-secondary" id="btn-refresh-telemetry">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        <span>Sync Telemetry</span>
+                    </button>
+
+                    <button class="btn btn-primary" id="btn-run-full-scan">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                        <span>Execute Corpus Audit</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Content Scroll Area -->
+            <div class="dashboard-body">
+                <!-- Summary Metric Cards Banner -->
+                <section class="metrics-grid">
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon blue-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Analyzed Documents</span>
+                            <span class="metric-value" id="val-total-docs">48,290</span>
+                            <span class="metric-trend positive">+14.2% this week</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon red-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">High Similarity Flagged</span>
+                            <span class="metric-value" id="val-flagged-count">1,402</span>
+                            <span class="metric-trend negative">3.1% high risk</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon purple-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Avg Semantic Similarity</span>
+                            <span class="metric-value" id="val-avg-similarity">24.8%</span>
+                            <span class="metric-trend neutral">Baseline optimal</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon green-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Embedding Speed</span>
+                            <span class="metric-value" id="val-embedding-speed">4.2 ms/doc</span>
+                            <span class="metric-trend positive">GPU Accelerated</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Main Analytics Section (Charts & Filters) -->
+                <section class="analytics-section-grid">
+                    <!-- Vector Similarity Distribution Panel -->
+                    <div class="analytics-card glass-card span-col-2">
+                        <div class="card-header">
+                            <div class="title-group">
+                                <h3>Semantic Vector Distance Distribution</h3>
+                                <p class="card-subtitle">Cosine similarity spectrum across active corpus embeddings</p>
+                            </div>
+                            <div class="card-actions">
+                                <span class="badge badge-accent" id="badge-threshold">Threshold: 85%</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="vector-graph-container" id="vector-graph-visual">
+                                <!-- Bars rendered dynamically via JS -->
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 15%;"></div>
+                                    <span class="graph-label">0-20%</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 45%;"></div>
+                                    <span class="graph-label">21-40%</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 78%;"></div>
+                                    <span class="graph-label">41-60%</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 32%;"></div>
+                                    <span class="graph-label">61-80%</span>
+                                </div>
+                                <div class="graph-bar-wrapper danger-zone">
+                                    <div class="graph-bar danger" style="height: 18%;"></div>
+                                    <span class="graph-label">81-100%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Paraphrase Detection Control Console -->
+                    <div class="analytics-card glass-card">
+                        <div class="card-header">
+                            <h3>Detection Sensitivity</h3>
+                        </div>
+                        <div class="card-body controls-form">
+                            <div class="form-group">
+                                <label for="range-similarity-cutoff">Similarity Cutoff: <span id="lbl-cutoff">85%</span></label>
+                                <input type="range" id="range-similarity-cutoff" min="50" max="99" value="85" class="styled-range">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="range-min-chunk-size">Min Chunk Token Length: <span id="lbl-chunk-size">64 tokens</span></label>
+                                <input type="range" id="range-min-chunk-size" min="16" max="256" value="64" step="16" class="styled-range">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="select-embedding-model">Vector Transformer Model</label>
+                                <select id="select-embedding-model" class="styled-select">
+                                    <option value="all-mpnet-base-v2">all-mpnet-base-v2 (768d)</option>
+                                    <option value="paraphrase-multilingual-mpnet-base-v2">paraphrase-multilingual (768d)</option>
+                                    <option value="text-embedding-ada-002">text-embedding-ada-002 (1536d)</option>
+                                    <option value="bge-large-en-v1.5">bge-large-en-v1.5 (1024d)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group toggle-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="chk-cross-lingual" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label">Enable Cross-Lingual Paraphrase Mapping</span>
+                            </div>
+
+                            <button class="btn btn-primary btn-full" id="btn-recalculate-corpus">
+                                <span>Apply Engine Re-Indexing</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Document Pair Similarity Telemetry Table -->
+                <section class="table-section glass-card">
+                    <div class="card-header">
+                        <div class="title-group">
+                            <h3>Flagged Document Pair Matches</h3>
+                            <p class="card-subtitle">Real-time vector alignment metrics for suspected plagiarized pairs</p>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-sm btn-secondary" id="btn-export-csv">Export Analytics CSV</button>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="data-table" id="plagiarism-telemetry-table">
+                            <thead>
+                                <tr>
+                                    <th>Pair ID</th>
+                                    <th>Source Document</th>
+                                    <th>Target Candidate Document</th>
+                                    <th>Cosine Similarity</th>
+                                    <th>Jaccard Lexical</th>
+                                    <th>Risk Assessment</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="telemetry-table-body">
+                                <!-- Populated dynamically by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="../src/services/semantic_analytics_engine.js"></script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+
+def test_excel_export_temp_file_cleaned_on_exit():
+    """Temp .xlsx from export_similarity_matrix_to_temp_file is unlinked after exit."""
+    root = Path(__file__).resolve().parents[2]
+    child = f"""
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path({str(root)!r}) / "src" / "utils"))
+
+import pandas as pd
+import excel_export
+
+df = pd.DataFrame(
+    [[1.0, 0.4], [0.4, 1.0]],
+    index=["a.txt", "b.txt"],
+    columns=["a.txt", "b.txt"],
+)
+path = excel_export.export_similarity_matrix_to_temp_file(df)
+assert os.path.isfile(path)
+print(path)
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", child],
+        cwd=str(root),
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    temp_path = result.stdout.strip().splitlines()[-1]
+    assert temp_path.endswith(".xlsx")
+    assert not os.path.exists(temp_path)

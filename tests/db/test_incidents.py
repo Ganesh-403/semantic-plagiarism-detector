@@ -45,6 +45,11 @@ def test_build_incident_id_same_pair_different_order():
     assert id1 == id2
 
 
+def test_build_incident_id_commutativity():
+    """Verify build_incident_id is commutative and yields identical hash IDs regardless of document order (Issue #3429)."""
+    assert build_incident_id("doc_alpha.pdf", "doc_beta.pdf") == build_incident_id("doc_beta.pdf", "doc_alpha.pdf")
+
+
 def test_build_incident_id_no_collision_between_distinct_pairs():
     """Regression test: build_incident_id() previously joined the two
     normalised filenames with a bare "0" digit before hashing
@@ -156,6 +161,39 @@ def test_sync_flagged_incidents_ignores_duplicate_pairs(test_db):
     assert len(incidents) == 1
 
 
+def test_sync_flagged_incidents_bulk_upsert(test_db):
+    flags = [
+        {
+            "doc_a": "doc1.pdf",
+            "doc_b": "doc2.pdf",
+            "similarity": 0.50,
+            "severity": "Medium",
+        }
+    ]
+
+    sync_flagged_incidents(flags, test_db)
+    incidents = get_all_incidents(test_db)
+    assert len(incidents) == 1
+    assert incidents[0]["similarity_score"] == 0.50
+    assert incidents[0]["severity_rank"] == "Medium"
+
+    flags[0]["similarity"] = 0.99
+    flags[0]["severity"] = "Critical"
+    sync_flagged_incidents(flags, test_db)
+    incidents = get_all_incidents(test_db)
+    assert len(incidents) == 1
+    assert incidents[0]["similarity_score"] == 0.99
+    assert incidents[0]["severity_rank"] == "Critical"
+
+    flags[0]["similarity"] = 0.50
+    flags[0]["severity"] = "Low"
+    sync_flagged_incidents(flags, test_db)
+    incidents = get_all_incidents(test_db)
+    assert len(incidents) == 1
+    assert incidents[0]["similarity_score"] == 0.50
+    assert incidents[0]["severity_rank"] == "Low"
+
+
 def test_sync_flagged_incidents_handles_invalid_similarity(test_db):
     flags = [
         {
@@ -229,12 +267,63 @@ def test_update_review_status_success(test_db):
 
 
 def test_update_review_status_invalid_status(test_db):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Invalid review status: Done. Must be one of"):
         update_review_status(
             "INC-123456",
             "Done",
             test_db,
         )
+
+
+def test_update_review_status_dismissed(test_db):
+    flags = [
+        {
+            "doc_a": "doc1.pdf",
+            "doc_b": "doc2.pdf",
+            "similarity": 0.9,
+        }
+    ]
+    incidents = sync_flagged_incidents(flags, test_db)
+    incident_id = incidents[0]["incident_id"]
+
+    result = update_review_status(
+        incident_id,
+        "Dismissed",
+        test_db,
+    )
+    assert result is True
+
+    updated = get_all_incidents(test_db)
+    assert updated[0]["review_status"] == "Dismissed"
+
+
+def test_bulk_update_incident_status_validation(test_db):
+    from src.db.incidents import bulk_update_incident_status
+    flags = [
+        {
+            "doc_a": "doc1.pdf",
+            "doc_b": "doc2.pdf",
+            "similarity": 0.9,
+        }
+    ]
+    incidents = sync_flagged_incidents(flags, test_db)
+    incident_id = incidents[0]["incident_id"]
+
+    # 1. Invalid status check
+    with pytest.raises(ValueError, match="Invalid review status: InvalidState. Must be one of"):
+        bulk_update_incident_status([incident_id], "InvalidState", test_db)
+
+    # 2. Valid status update to Resolved
+    count = bulk_update_incident_status([incident_id], "Resolved", test_db)
+    assert count == 1
+    updated = get_all_incidents(test_db)
+    assert updated[0]["review_status"] == "Resolved"
+
+    # 3. Valid status update to Dismissed
+    count = bulk_update_incident_status([incident_id], "Dismissed", test_db)
+    assert count == 1
+    updated = get_all_incidents(test_db)
+    assert updated[0]["review_status"] == "Dismissed"
 
 
 def test_update_review_status_unknown_incident(test_db):
@@ -279,6 +368,41 @@ def test_incidents_to_csv_empty_input():
     text = csv_bytes.decode("utf-8-sig")
 
     assert "Incident ID" in text
+
+
+def test_incidents_to_csv_escapes_special_characters():
+    """Verify filenames with commas, quotes, and newlines are RFC 4180 compliant."""
+    rows = [
+        {
+            "incident_id": "INC-001",
+            "document_a": "thesis, final (v2).pdf",
+            "document_b": 'report "draft".docx',
+            "similarity_score": 0.88,
+            "severity_rank": "High",
+            "review_status": "Pending",
+            "date_flagged": "2026-01-01T00:00:00Z",
+        },
+        {
+            "incident_id": "INC-002",
+            "document_a": "line\nbreak.pdf",
+            "document_b": "normal.pdf",
+            "similarity_score": 0.75,
+            "severity_rank": "Medium",
+            "review_status": "Reviewed",
+            "date_flagged": "2026-01-02T00:00:00Z",
+        },
+    ]
+
+    csv_bytes = incidents_to_csv(rows)
+    text = csv_bytes.decode("utf-8-sig")
+
+    reader = csv.DictReader(io.StringIO(text))
+    records = list(reader)
+
+    assert len(records) == 2
+    assert records[0]["Document A"] == "thesis, final (v2).pdf"
+    assert records[0]["Document B"] == 'report "draft".docx'
+    assert records[1]["Document A"] == "line\nbreak.pdf"
 
 
 def test_export_current_flags_csv_exports_incidents(test_db):
@@ -1196,3 +1320,125 @@ def test_get_incident_by_id_returns_dict_type(test_db):
     assert result is not None
     assert isinstance(result, dict)
     assert not isinstance(result, sqlite3.Row)
+
+
+def test_self_plagiarism_exclusion(test_db):
+    """Verify that sync_flagged_incidents skips self-plagiarism when allow_self_plagiarism_flags=False."""
+    import sqlite3
+    from src.db.incidents import sync_flagged_incidents, get_all_incidents
+
+    # 1. Insert documents with matching student_name into database
+    with sqlite3.connect(test_db) as conn:
+        conn.execute(
+            """
+            INSERT INTO documents (filename, file_hash, upload_date, class_section, student_name, assignment_title)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            ("student_draft1.pdf", "hash1", "2026-08-01", "CS101", "Alice Smith", "Assignment 1")
+        )
+        conn.execute(
+            """
+            INSERT INTO documents (filename, file_hash, upload_date, class_section, student_name, assignment_title)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            ("student_draft2.pdf", "hash2", "2026-08-02", "CS101", "Alice Smith", "Assignment 1")
+        )
+        conn.commit()
+
+    # 2. Call sync_flagged_incidents with allow_self_plagiarism_flags=False
+    flag = {
+        "doc_a": "student_draft1.pdf",
+        "doc_b": "student_draft2.pdf",
+        "similarity": 0.95,
+        "severity": "High"
+    }
+
+    results = sync_flagged_incidents(
+        [flag],
+        db_path=test_db,
+        allow_self_plagiarism_flags=False
+    )
+
+    # 3. Assert it did not return any match results and is not in the db
+    assert len(results) == 0
+    all_incidents = get_all_incidents(db_path=test_db)
+    assert len(all_incidents) == 0
+
+    # 4. Call sync_flagged_incidents with allow_self_plagiarism_flags=True
+    results_allow = sync_flagged_incidents(
+        [flag],
+        db_path=test_db,
+        allow_self_plagiarism_flags=True
+    )
+    # It should successfully log and return the MatchResult
+    assert len(results_allow) == 1
+    assert results_allow[0].document_a == "student_draft1.pdf"
+
+
+def test_self_plagiarism_no_exclusion_when_names_differ(test_db):
+    """Verify that sync_flagged_incidents does not skip when student names differ or are empty."""
+    import sqlite3
+    from src.db.incidents import sync_flagged_incidents
+
+    # 1. Insert documents with different student names
+    with sqlite3.connect(test_db) as conn:
+        conn.execute(
+            """
+            INSERT INTO documents (filename, file_hash, upload_date, class_section, student_name, assignment_title)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            ("alice_draft.pdf", "hash3", "2026-08-01", "CS101", "Alice Smith", "Assignment 1")
+        )
+        conn.execute(
+            """
+            INSERT INTO documents (filename, file_hash, upload_date, class_section, student_name, assignment_title)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            ("bob_draft.pdf", "hash4", "2026-08-02", "CS101", "Bob Jones", "Assignment 1")
+        )
+        conn.commit()
+
+    # 2. Call sync_flagged_incidents with allow_self_plagiarism_flags=False
+    flag = {
+        "doc_a": "alice_draft.pdf",
+        "doc_b": "bob_draft.pdf",
+        "similarity": 0.85,
+        "severity": "Medium"
+    }
+
+    results = sync_flagged_incidents(
+        [flag],
+        db_path=test_db,
+        allow_self_plagiarism_flags=False
+    )
+
+    # 3. Assert it was NOT skipped (since student names differ)
+    assert len(results) == 1
+    assert results[0].document_a == "alice_draft.pdf"
+
+
+def test_plagiarism_incidents_total_counter(test_db):
+    """Verify spd_plagiarism_incidents_total counter increments by severity."""
+    from src.core.metrics import plagiarism_incidents_total
+    from src.db.incidents import sync_flagged_incidents
+
+    high_before = plagiarism_incidents_total.labels(severity="High")._value.get()
+    med_before = plagiarism_incidents_total.labels(severity="Medium")._value.get()
+    low_before = plagiarism_incidents_total.labels(severity="Low")._value.get()
+
+    flags = [
+        {"doc_a": "doc_h1.pdf", "doc_b": "doc_h2.pdf", "similarity": 0.95, "severity": "High"},
+        {"doc_a": "doc_m1.pdf", "doc_b": "doc_m2.pdf", "similarity": 0.75, "severity": "Medium"},
+        {"doc_a": "doc_l1.pdf", "doc_b": "doc_l2.pdf", "similarity": 0.35, "severity": "Low"},
+    ]
+
+    sync_flagged_incidents(flags, db_path=test_db)
+
+    high_after = plagiarism_incidents_total.labels(severity="High")._value.get()
+    med_after = plagiarism_incidents_total.labels(severity="Medium")._value.get()
+    low_after = plagiarism_incidents_total.labels(severity="Low")._value.get()
+
+    assert high_after == high_before + 1
+    assert med_after == med_before + 1
+    assert low_after == low_before + 1
+

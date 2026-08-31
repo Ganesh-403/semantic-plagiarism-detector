@@ -190,7 +190,7 @@ def parse_arguments() -> argparse.Namespace:
     return args
 
 
-def build_grid(start: float, stop: float, step: float) -> List[float]:
+def build_grid(start: float, stop: float, step: float) -> list[float]:
     """Generate the threshold sweep grid (start inclusive, stop exclusive)."""
     return [round(float(value), 6) for value in np.arange(start, stop, step)]
 
@@ -231,12 +231,12 @@ def load_labeled_dataset(csv_path: str) -> pd.DataFrame:
     return df
 
 
-def detect_score_columns(df: pd.DataFrame) -> List[str]:
+def detect_score_columns(df: pd.DataFrame) -> list[str]:
     """Return recognized precomputed score columns present in the CSV."""
     return [col for col in SCORE_COLUMN_PRIORITY if col in df.columns]
 
 
-def compute_semantic_scores(df: pd.DataFrame) -> List[float]:
+def compute_semantic_scores(df: pd.DataFrame) -> list[float]:
     """Compute row-wise semantic cosine similarities for text_a/text_b pairs."""
     if "text_a" not in df.columns or "text_b" not in df.columns:
         raise SystemExit(
@@ -275,10 +275,10 @@ def compute_semantic_scores(df: pd.DataFrame) -> List[float]:
 
 
 def print_f1_table(
-    evaluations: List[Dict],
+    evaluations: list[dict],
     score_column: str,
     current_threshold: float,
-) -> Dict:
+) -> dict:
     """Print the F1 sweep table and highlight the best threshold row."""
     best = best_evaluation(evaluations)
     best_t = float(best["threshold"])
@@ -308,12 +308,16 @@ def print_f1_table(
         f"  Recommended threshold       : {best_t:.4f} "
         f"({best_t * 100:.0f}%)  F1 = {float(best['f1']):.4f}"
     )
-    cm = best["confusion_matrix"] if "confusion_matrix" in best else {
-        "tp": best["tp"],
-        "fp": best["fp"],
-        "fn": best["fn"],
-        "tn": best["tn"],
-    }
+    cm = (
+        best["confusion_matrix"]
+        if "confusion_matrix" in best
+        else {
+            "tp": best["tp"],
+            "fp": best["fp"],
+            "fn": best["fn"],
+            "tn": best["tn"],
+        }
+    )
     print(f"  Confusion matrix @ {best_t:.4f}: {cm}")
     print("=" * 78)
     return best
@@ -322,8 +326,8 @@ def print_f1_table(
 def run_calibration(
     df: pd.DataFrame,
     score_column: str,
-    grid: List[float],
-) -> List[Dict]:
+    grid: list[float],
+) -> list[dict]:
     """Run the threshold sweep over a single score column."""
     scores = df[score_column].astype(float).tolist()
     labels = df["label_int"].tolist()
@@ -344,7 +348,7 @@ def main() -> None:
     df = load_labeled_dataset(args.csv)
 
     # ── Select score columns ──────────────────────────────────────────────────
-    score_columns: List[str] = []
+    score_columns: list[str] = []
     if args.score_column is not None:
         if args.score_column not in df.columns:
             raise SystemExit(
@@ -374,14 +378,16 @@ def main() -> None:
     print("  THRESHOLD CALIBRATION & BACKTEST HARNESS (Issue #2267)")
     print("=" * 78)
     print(f"  Dataset : {args.csv}")
-    print(f"  Grid    : {args.grid_start:.2f} -> {args.grid_stop:.2f} "
-          f"step {args.grid_step:.2f} ({len(grid)} points)")
+    print(
+        f"  Grid    : {args.grid_start:.2f} -> {args.grid_stop:.2f} "
+        f"step {args.grid_step:.2f} ({len(grid)} points)"
+    )
     print(f"  Columns : {', '.join(score_columns)}")
 
-    best_overall: Optional[Dict] = None
+    best_overall: Optional[dict] = None
     best_column: Optional[str] = None
-    best_sweep: List[Dict] = []
-    best_scores: List[float] = []
+    best_sweep: list[dict] = []
+    best_scores: list[float] = []
 
     for score_column in score_columns:
         evaluations = run_calibration(df, score_column, grid)

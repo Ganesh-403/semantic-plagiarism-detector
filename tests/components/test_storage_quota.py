@@ -18,11 +18,11 @@ def test_get_total_corpus_storage_bytes():
 
 def test_render_storage_quota_progress():
     """Verify st.progress and caption rendered with 10GB limit."""
-    with patch(
-        "app.components.storage_quota.calculate_storage_usage"
-    ) as mock_calc, patch("streamlit.progress") as mock_progress, patch(
-        "streamlit.caption"
-    ) as mock_caption:
+    with (
+        patch("app.components.storage_quota.calculate_storage_usage") as mock_calc,
+        patch("streamlit.progress") as mock_progress,
+        patch("streamlit.caption") as mock_caption,
+    ):
         mock_calc.return_value = {"total_bytes": 1288490188}  # ~1.2 GB
         res = render_storage_quota_progress(limit_gb=10.0)
 

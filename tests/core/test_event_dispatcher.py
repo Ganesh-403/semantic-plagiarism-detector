@@ -45,9 +45,10 @@ def test_register_and_unregister_lms_webhook(dispatcher):
 
 def test_dispatch_analysis_complete_success(dispatcher):
     """Verify dispatch_analysis_complete fires POST request with valid JSON payload to LMS."""
-    with patch("src.security.ssrf_protector.SSRFProtector.validate_webhook_url"), patch(
-        "src.core.webhook.requests.post"
-    ) as mock_post:
+    with (
+        patch("src.security.ssrf_protector.SSRFProtector.validate_webhook_url"),
+        patch("src.core.webhook.requests.post") as mock_post,
+    ):
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
         mock_post.return_value = mock_response
@@ -86,9 +87,10 @@ def test_dispatch_analysis_complete_success(dispatcher):
 
 def test_dispatch_analysis_complete_registered_lms_tenant(dispatcher):
     """Verify dispatching event for a specific registered LMS tenant."""
-    with patch("src.security.ssrf_protector.SSRFProtector.validate_webhook_url"), patch(
-        "src.core.webhook.requests.post"
-    ) as mock_post:
+    with (
+        patch("src.security.ssrf_protector.SSRFProtector.validate_webhook_url"),
+        patch("src.core.webhook.requests.post") as mock_post,
+    ):
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
         mock_post.return_value = mock_response

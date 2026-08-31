@@ -251,4 +251,3 @@ class TestValidationExceptionEdgeCases:
         body = json.loads(response.body)
         # The field should be empty string since loc is missing
         assert body["details"][0]["field"] == ""
-

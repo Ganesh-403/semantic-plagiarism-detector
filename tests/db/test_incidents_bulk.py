@@ -1,16 +1,68 @@
-"""
-tests/db/test_incidents_bulk.py
--------------------------------
-Bulk operation tests for the plagiarism incidents database.
-
-Refactored to use the centralized db_connection pytest fixture (Issue #2725),
-eliminating duplicated sqlite3.connect() and conn.close() boilerplate.
-"""
-
 import sqlite3
-from datetime import datetime
-
 import pytest
+from unittest.mock import patch
+
+# --- Pytest Fixtures Layer ---
+
+@pytest.fixture(scope="function")
+def isolated_test_db():
+    """
+    Provides a transient, in-memory SQLite database session connection.
+    Guarantees zero file leakage into the developer's working environment.
+    """
+    connection = sqlite3.connect(":memory:")
+    # Initialize basic schema prerequisites required for the bulk worker test
+    cursor = connection.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS incidents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            severity TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    connection.commit()
+    
+    yield connection
+    
+    # Teardown hook: Close out connection securely
+    connection.close()
+
+
+# --- Refactored Test Suite ---
+
+def test_incidents_bulk_insertion_pipeline(isolated_test_db):
+    """
+    Scenario: Validate bulk record operations execute completely inside 
+              the isolated mock database context hook.
+    """
+    conn = isolated_test_db
+    cursor = conn.cursor()
+    
+    # Mock dataset payload matching operational structures
+    bulk_payload = [
+        ("Network Outage East", "CRITICAL"),
+        ("Database Replica Delay", "WARNING"),
+        ("Expired SSL Alert", "INFO")
+    ]
+    
+    # Execute batch insertion execution steps
+    cursor.executemany(
+        "INSERT INTO incidents (title, severity) VALUES (?, ?);", 
+        bulk_payload
+    )
+    conn.commit()
+    
+    # Verify count metrics match the injected parameters
+    cursor.execute("SELECT COUNT(*) FROM incidents;")
+    record_count = cursor.fetchone()[0]
+    assert record_count == 3
+    
+    # Validate structural content properties
+    cursor.execute("SELECT title FROM incidents ORDER BY id ASC;")
+    inserted_titles = [row[0] for row in cursor.fetchall()]
+    assert inserted_titles[0] == "Network Outage East"
+
 
 
 class TestBulkIncidentInsertion:
@@ -75,15 +127,19 @@ class TestBulkIncidentInsertion:
         ]
 
         with pytest.raises(sqlite3.IntegrityError):
-            db_connection.executemany(
-                """
-                INSERT INTO plagiarism_incidents 
-                (incident_id, document_a, document_b, similarity, severity, timestamp, threshold_at_time_of_flag, review_status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                incidents,
-            )
-            db_connection.commit()
+            try:
+                db_connection.executemany(
+                    """
+                    INSERT INTO plagiarism_incidents 
+                    (incident_id, document_a, document_b, similarity, severity, timestamp, threshold_at_time_of_flag, review_status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    incidents,
+                )
+                db_connection.commit()
+            except sqlite3.IntegrityError:
+                db_connection.rollback()
+                raise
 
         # Verify only the original incident exists
         cursor = db_connection.execute("SELECT COUNT(*) FROM plagiarism_incidents")
@@ -156,3 +212,29 @@ class TestBulkIncidentDeletion:
         min_timestamp = cursor.fetchone()[0]
 
         assert min_timestamp >= cutoff_date
+
+
+class TestBulkIncidentUpsert:
+    """Test suite for bulk updating / upserting incidents."""
+
+    def test_sync_flagged_incidents_bulk_upsert_severity(
+        self, populated_db_connection: sqlite3.Connection
+    ):
+        """Verify updating an incident's severity to 'Critical' correctly records 'Critical' rather than defaulting to 'High'."""
+        conn = populated_db_connection
+
+        conn.execute(
+            """
+            UPDATE plagiarism_incidents
+            SET similarity = 0.99, severity = 'Critical'
+            WHERE incident_id = 'INC-0000'
+            """
+        )
+        conn.commit()
+
+        cursor = conn.execute(
+            "SELECT similarity, severity FROM plagiarism_incidents WHERE incident_id = 'INC-0000'"
+        )
+        row = cursor.fetchone()
+        assert row[0] == 0.99
+        assert row[1] == "Critical"

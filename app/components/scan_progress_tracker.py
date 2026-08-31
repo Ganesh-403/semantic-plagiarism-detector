@@ -94,9 +94,9 @@ def _inject_css() -> None:
         f"""
         <style>
         .scan-card {{
-            background: {t['card_bg']};
-            border: 1px solid {t['card_border']};
-            border-radius: {t['radius']};
+            background: {t["card_bg"]};
+            border: 1px solid {t["card_border"]};
+            border-radius: {t["radius"]};
             padding: 1rem 1.25rem;
             margin-bottom: 0.75rem;
         }}
@@ -106,30 +106,30 @@ def _inject_css() -> None:
             margin-bottom: 0.35rem;
         }}
         .scan-card-sub {{
-            color: {t['text_muted']};
+            color: {t["text_muted"]};
             font-size: 0.85rem;
         }}
         .scan-success-card {{
-            background: {t['success_bg']};
-            border: 1px solid {t['success_border']};
-            border-radius: {t['radius']};
+            background: {t["success_bg"]};
+            border: 1px solid {t["success_border"]};
+            border-radius: {t["radius"]};
             padding: 1.25rem;
             text-align: center;
         }}
         .scan-success-title {{
-            color: {t['success']};
+            color: {t["success"]};
             font-weight: 700;
             font-size: 1.15rem;
             margin-bottom: 0.5rem;
         }}
         .scan-error-card {{
-            background: {t['error_bg']};
-            border: 1px solid {t['error_border']};
-            border-radius: {t['radius']};
+            background: {t["error_bg"]};
+            border: 1px solid {t["error_border"]};
+            border-radius: {t["radius"]};
             padding: 1.1rem;
         }}
         .scan-error-title {{
-            color: {t['error']};
+            color: {t["error"]};
             font-weight: 700;
             margin-bottom: 0.35rem;
         }}
@@ -143,7 +143,7 @@ def _inject_css() -> None:
             font-weight: 700;
         }}
         .scan-stat-label {{
-            color: {t['text_muted']};
+            color: {t["text_muted"]};
             font-size: 0.8rem;
         }}
         </style>
@@ -410,7 +410,7 @@ class ProgressTracker:
         st.markdown(
             f"""
             <div class="scan-card">
-                <div class="scan-card-title">📄 {s.current_file_name or 'Waiting for file...'}</div>
+                <div class="scan-card-title">📄 {s.current_file_name or "Waiting for file..."}</div>
                 <div class="scan-card-sub">
                     Document {s.current_file_index} of {s.total_files} &nbsp;·&nbsp;
                     Stage: {s.stage.value} &nbsp;·&nbsp;

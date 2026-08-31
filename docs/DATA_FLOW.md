@@ -17,10 +17,7 @@ Dict[str, bytes]
 Example:
 
 ```python
-{
-    "report.pdf": b"...",
-    "assignment.docx": b"..."
-}
+{"report.pdf": b"...", "assignment.docx": b"..."}
 ```
 
 **Output Format**
@@ -50,9 +47,7 @@ str
 **Output Format**
 
 ```python
-{
-    "report.pdf": "Extracted document text..."
-}
+{"report.pdf": "Extracted document text..."}
 ```
 
 ---
@@ -84,11 +79,7 @@ list[str]
 Example:
 
 ```python
-[
-    "Introduction...",
-    "Methodology...",
-    "Experimental Results..."
-]
+["Introduction...", "Methodology...", "Experimental Results..."]
 ```
 
 ---

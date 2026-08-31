@@ -125,7 +125,7 @@ def generate_synthetic_document(
 def generate_synthetic_corpus(
     num_docs: int,
     chunks_per_doc: int,
-) -> Dict[str, List[str]]:
+) -> dict[str, list[str]]:
     """
     Generate a synthetic corpus of documents and their pre-chunked text.
 
@@ -174,9 +174,9 @@ def generate_synthetic_corpus(
 
 
 def benchmark_embedding_throughput(
-    corpus: Dict[str, List[str]],
+    corpus: dict[str, list[str]],
     batch_size: int = 32,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Measure the throughput and latency of the embedding pipeline.
 
@@ -214,9 +214,9 @@ def benchmark_embedding_throughput(
 
 
 def benchmark_document_embedding(
-    corpus: Dict[str, List[str]],
+    corpus: dict[str, list[str]],
     batch_size: int = 32,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Measure the throughput of document-level embedding (embed_documents).
 
@@ -247,9 +247,9 @@ def benchmark_document_embedding(
 
 
 def benchmark_faiss_indexing(
-    corpus: Dict[str, List[str]],
+    corpus: dict[str, list[str]],
     batch_size: int = 32,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Measure the time required to build a FAISS index from the corpus.
 
@@ -298,7 +298,7 @@ def benchmark_faiss_indexing(
 
 def print_metrics_table(
     title: str,
-    metrics: Dict[str, float],
+    metrics: dict[str, float],
     device: str,
 ) -> None:
     """
@@ -336,7 +336,7 @@ def print_metrics_table(
 
 
 def save_results_to_json(
-    results: Dict[str, Dict[str, float]],
+    results: dict[str, dict[str, float]],
     output_path: str,
     args: argparse.Namespace,
 ) -> None:

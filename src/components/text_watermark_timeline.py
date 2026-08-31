@@ -3,7 +3,7 @@
 from typing import Any, List
 
 
-def render_watermark_timeline(matches: List[Any]) -> str:
+def render_watermark_timeline(matches: list[Any]) -> str:
     """Renders HTML telemetry timeline list for watermark detection tests."""
     if not matches:
         return """
@@ -32,10 +32,10 @@ def render_watermark_timeline(matches: List[Any]) -> str:
         ">
             <div>
                 <span style="color: #F59E0B; font-weight: 800; font-size: 14px;">
-                    {m_dict.get('detection_id', 'WM-NODE')}
+                    {m_dict.get("detection_id", "WM-NODE")}
                 </span>
                 <div style="color: #94A3B8; font-size: 12px; margin-top: 4px;">
-                    Document: {m_dict.get('document_title')} | Signature: {m_dict.get('model_generator_signature')}
+                    Document: {m_dict.get("document_title")} | Signature: {m_dict.get("model_generator_signature")}
                 </div>
             </div>
             <div style="text-align: right;">

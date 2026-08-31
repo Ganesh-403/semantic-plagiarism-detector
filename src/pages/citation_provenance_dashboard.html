@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Neural Citation Provenance Verifier Suite | Semantic Plagiarism Detector</title>
+    <meta name="description" content="Enterprise Neural Citation Provenance Verifier Suite providing academic paper citation integrity, hallucinated bibliography detection, and Crossref DOI verification telemetry.">
+    <link rel="stylesheet" href="styles/citation_provenance_dashboard.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <!-- Architecture Comment: Neural Citation Provenance & Academic Reference Verification Dashboard -->
+    <!-- Design Pattern: Glassmorphic Modular Dashboard with Real-time DOI Crossref Lookup & Bibliography Telemetry -->
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar-navigation" id="sidebar-nav">
+            <div class="brand-header">
+                <div class="brand-logo">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h2>CiteShield</h2>
+                    <span>Citation Engine v4.9</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#overview" class="nav-item active" id="nav-overview">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span>Citation Matrix</span>
+                </a>
+                <a href="#doi-provenance" class="nav-item" id="nav-doi-provenance">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <span>Crossref DOI Graph</span>
+                </a>
+                <a href="#bibliography-corpus" class="nav-item" id="nav-bibliography-corpus">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    <span>Reference Database</span>
+                </a>
+                <a href="#hallucination-alerts" class="nav-item" id="nav-hallucination-alerts">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <span>Fake Reference Flags</span>
+                </a>
+                <a href="#settings" class="nav-item" id="nav-settings">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>Crossref API Config</span>
+                </a>
+            </nav>
+
+            <div class="system-status-widget glass-card">
+                <div class="status-indicator online"></div>
+                <div class="status-info">
+                    <span class="status-title">Crossref REST Connected</span>
+                    <span class="status-subtitle">OpenAlex & SemanticScholar Sync</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Surface -->
+        <main class="main-content">
+            <!-- Top Controls Bar -->
+            <header class="top-header glass-card">
+                <div class="header-search">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="citation-search-input" placeholder="Search DOI, paper title, author, or BibTeX key..." aria-label="Search citations">
+                </div>
+
+                <div class="header-actions">
+                    <div class="filter-dropdown">
+                        <select id="citation-provider-select" class="styled-select">
+                            <option value="crossref">Crossref Metadata REST API</option>
+                            <option value="openalex">OpenAlex Academic Graph</option>
+                            <option value="semanticscholar">Semantic Scholar API</option>
+                            <option value="pubmed">PubMed Central MEDLINE</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-secondary" id="btn-sync-citation-telemetry">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        <span>Sync Telemetry</span>
+                    </button>
+
+                    <button class="btn btn-primary" id="btn-run-citation-audit">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                        <span>Execute Provenance Verification</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Body -->
+            <div class="dashboard-body">
+                <!-- Metrics Cards Banner -->
+                <section class="metrics-grid">
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon blue-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Verified Citations</span>
+                            <span class="metric-value" id="val-verified-citations">68,420</span>
+                            <span class="metric-trend positive">+11.5% verified</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon red-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Hallucinated References</span>
+                            <span class="metric-value" id="val-fake-citations">1,890</span>
+                            <span class="metric-trend negative">2.7% fake references</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon purple-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">DOI Resolution Rate</span>
+                            <span class="metric-value" id="val-doi-rate">97.3%</span>
+                            <span class="metric-trend positive">High resolution</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon green-glow">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                        </div>
+                        <div class="metric-data">
+                            <span class="metric-label">Verification Speed</span>
+                            <span class="metric-value" id="val-verify-speed">3.4 ms/ref</span>
+                            <span class="metric-trend positive">Async HTTP Cache</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Analytics Section Grid -->
+                <section class="analytics-section-grid">
+                    <!-- Citation Integrity Spectrum -->
+                    <div class="analytics-card glass-card span-col-2">
+                        <div class="card-header">
+                            <div class="title-group">
+                                <h3>Citation Authenticity Distribution</h3>
+                                <p class="card-subtitle">DOI validity spectrum and academic provenance confidence scores</p>
+                            </div>
+                            <div class="card-actions">
+                                <span class="badge badge-accent" id="badge-citation-cutoff">Authenticity Threshold: 85%</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="vector-graph-container" id="citation-graph-visual">
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 12%;"></div>
+                                    <span class="graph-label">Invalid DOI</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 38%;"></div>
+                                    <span class="graph-label">Author Mismatch</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 75%;"></div>
+                                    <span class="graph-label">Year Drift</span>
+                                </div>
+                                <div class="graph-bar-wrapper">
+                                    <div class="graph-bar" style="height: 88%;"></div>
+                                    <span class="graph-label">Crossref Matched</span>
+                                </div>
+                                <div class="graph-bar-wrapper danger-zone">
+                                    <div class="graph-bar danger" style="height: 15%;"></div>
+                                    <span class="graph-label">LLM Hallucinated</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sensitivity Controls Form -->
+                    <div class="analytics-card glass-card">
+                        <div class="card-header">
+                            <h3>Provenance Controls</h3>
+                        </div>
+                        <div class="card-body controls-form">
+                            <div class="form-group">
+                                <label for="range-citation-cutoff">Minimum Confidence: <span id="lbl-citation-cutoff">85%</span></label>
+                                <input type="range" id="range-citation-cutoff" min="50" max="99" value="85" class="styled-range">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="select-citation-style">Reference Style Parser</label>
+                                <select id="select-citation-style" class="styled-select">
+                                    <option value="apa7">APA 7th Edition</option>
+                                    <option value="ieee">IEEE Citation Standard</option>
+                                    <option value="mla9">MLA 9th Edition</option>
+                                    <option value="chicago">Chicago Manual of Style</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group toggle-group">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="chk-flag-llm-fake" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label">Strictly Flag LLM Bibliography Hallucinations</span>
+                            </div>
+
+                            <button class="btn btn-primary btn-full" id="btn-reindex-citations">
+                                <span>Re-Verify Bibliography Graph</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Citation Telemetry Data Table -->
+                <section class="table-section glass-card">
+                    <div class="card-header">
+                        <div class="title-group">
+                            <h3>Academic Citation Verification Telemetry</h3>
+                            <p class="card-subtitle">Real-time DOI resolution and bibliography integrity auditing</p>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-sm btn-secondary" id="btn-export-citation-csv">Export Citation CSV</button>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="data-table" id="citation-telemetry-table">
+                            <thead>
+                                <tr>
+                                    <th>Ref ID</th>
+                                    <th>Citation Title</th>
+                                    <th>Target DOI</th>
+                                    <th>Crossref Status</th>
+                                    <th>Confidence Score</th>
+                                    <th>Provenance Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="citation-table-body">
+                                <!-- Dynamic JS Population -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script src="../src/services/citation_provenance_engine.js"></script>
+</body>
+</html>

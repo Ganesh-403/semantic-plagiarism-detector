@@ -19,8 +19,12 @@ def temp_audit_db(tmp_path):
 
     # Seed test events
     auth_repo.log_security_event("login", "admin", "Admin login successful")
-    auth_repo.log_security_event("file_upload", "teacher1", "Uploaded document assignment.pdf")
-    auth_repo.log_security_event("password_change", "teacher1", "Password updated successfully")
+    auth_repo.log_security_event(
+        "file_upload", "teacher1", "Uploaded document assignment.pdf"
+    )
+    auth_repo.log_security_event(
+        "password_change", "teacher1", "Password updated successfully"
+    )
     auth_repo.log_security_event("token_revocation", "system", "Revoked bearer token")
 
     yield db_file

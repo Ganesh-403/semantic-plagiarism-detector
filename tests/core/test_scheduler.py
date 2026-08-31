@@ -102,9 +102,7 @@ def test_scheduler_survives_a_failed_pass():
 def test_scheduler_double_start_is_idempotent():
     async def _run():
         scheduler = RescanScheduler(interval_minutes=60)
-        with patch.object(
-            RescanScheduler, "run_once", new_callable=AsyncMock
-        ):
+        with patch.object(RescanScheduler, "run_once", new_callable=AsyncMock):
             await scheduler.start()
             first_task = scheduler._task
             await scheduler.start()  # should not replace the running task
@@ -128,9 +126,7 @@ def test_scheduler_run_once_dispatches_to_thread():
         scheduler = RescanScheduler(
             interval_minutes=60, grace_period_minutes=45, threshold=0.8
         )
-        with patch(
-            "src.core.processing.rescan_recent_documents"
-        ) as mock_rescan:
+        with patch("src.core.processing.rescan_recent_documents") as mock_rescan:
             mock_rescan.return_value = "sentinel-result"
             result = await scheduler.run_once()
 

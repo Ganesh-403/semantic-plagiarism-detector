@@ -107,9 +107,9 @@ class TestCorpusMigrationFlow:
                 "date_flagged",
                 "last_seen",
             ):
-                assert column_exists(
-                    conn, "plagiarism_incidents", col
-                ), f"Missing: {col}"
+                assert column_exists(conn, "plagiarism_incidents", col), (
+                    f"Missing: {col}"
+                )
             assert index_exists(conn, "idx_incidents_status")
         finally:
             conn.close()
@@ -396,6 +396,16 @@ class TestAuthMigrationFlow:
         finally:
             conn.close()
 
+    def test_version_17_drops_is_active(self):
+        conn = _connect()
+        try:
+            _apply_up_to(conn, AUTH_MIGRATIONS, 17)
+            assert get_user_version(conn) == 17
+            assert not column_exists(conn, "users", "is_active")
+            assert column_exists(conn, "users", "status")
+        finally:
+            conn.close()
+
     def test_full_auth_flow_reaches_latest_version(self):
         """Single end-to-end pass: v0 → AUTH_SCHEMA_VERSION via migrate_auth_database."""
         conn = _connect()
@@ -419,11 +429,16 @@ class TestAuthMigrationFlow:
                 "otp_secret",
                 "two_factor_enabled",
                 "preferences",
-                "is_active",
                 "theme",
                 "last_login_at",
+                "password_changed_at",
+                "version",
+                "status",
+                "must_change_password",
             ):
                 assert column_exists(conn, "users", col), f"Missing column: {col}"
+
+            assert not column_exists(conn, "users", "is_active"), "is_active column should be dropped"
 
             assert index_exists(conn, "idx_users_role")
             assert index_exists(conn, "idx_audit_log_username")
@@ -501,7 +516,7 @@ class TestMigrationColumnDefaults:
         finally:
             conn.close()
 
-    def test_auth_is_active_defaults_to_one(self):
+    def test_auth_status_defaults_to_active(self):
         conn = _connect()
         try:
             from src.db.migrations import migrate_auth_database
@@ -513,10 +528,10 @@ class TestMigrationColumnDefaults:
             )
             conn.commit()
             row = conn.execute(
-                "SELECT is_active FROM users WHERE username = ?",
+                "SELECT status FROM users WHERE username = ?",
                 ("carol",),
             ).fetchone()
-            assert row == (1,)
+            assert row == ("active",)
         finally:
             conn.close()
 
@@ -579,3 +594,23 @@ class TestMigrationColumnDefaults:
             assert row == (0.0,)
         finally:
             conn.close()
+
+
+def test_auth_migrations_auto_discovered():
+    """Verify that AUTH_MIGRATIONS is dynamically discovered and sorted by numeric prefix (Issue #2999)."""
+    import inspect
+    from src.db.migrations import auth
+
+    funcs = [
+        f
+        for name, f in inspect.getmembers(auth, inspect.isfunction)
+        if name.startswith("migration_")
+    ]
+    assert len(auth.AUTH_MIGRATIONS) == len(funcs)
+    assert auth.AUTH_SCHEMA_VERSION == len(funcs)
+
+    for i in range(1, len(funcs) + 1):
+        assert i in auth.AUTH_MIGRATIONS
+        assert callable(auth.AUTH_MIGRATIONS[i])
+        assert auth.AUTH_MIGRATIONS[i].__name__.startswith(f"migration_{i:03d}")
+

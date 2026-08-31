@@ -88,7 +88,7 @@ def init_citation_db() -> None:
     logger.info("Citation database tables initialized.")
 
 
-def add_document_citations(doc_name: str, citations: List[Dict[str, str]]) -> int:
+def add_document_citations(doc_name: str, citations: list[dict[str, str]]) -> int:
     """Insert extracted citations into the database and link them to a document.
 
     Args:
@@ -139,7 +139,7 @@ def add_document_citations(doc_name: str, citations: List[Dict[str, str]]) -> in
     return added_count
 
 
-def get_shared_citations(doc_a: str, doc_b: str) -> List[Dict[str, str]]:
+def get_shared_citations(doc_a: str, doc_b: str) -> list[dict[str, str]]:
     """Find citations that appear in both Document A and Document B.
 
     Args:

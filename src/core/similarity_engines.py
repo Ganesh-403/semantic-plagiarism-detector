@@ -27,6 +27,7 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
         batch_size: Optional[int] = None,
         min_threshold: float = 0.0,
         min_percentile: Optional[float] = None,
+        pooling: str = "mean",
     ):
         """
         Initialize the Semantic Similarity Engine.
@@ -38,15 +39,21 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
             batch_size: Batch size for matrix computation.
             min_threshold: Minimum similarity score to keep.
             min_percentile: Optional percentile threshold for filtering.
+            pooling: Pooling strategy for multi-chunk document embeddings ('mean' or 'max').
         """
+        if not isinstance(pooling, str) or pooling.lower() not in ("mean", "max"):
+            raise ValueError(
+                f"Invalid pooling method '{pooling}'. Supported methods: 'mean', 'max'."
+            )
         self.embedding_model = embedding_model
         self.faiss_index = faiss_index
         self.registry = registry
         self.batch_size = batch_size
         self.min_threshold = min_threshold
         self.min_percentile = min_percentile
+        self.pooling = pooling
 
-    def _get_embedding(self, doc: Union[str, np.ndarray]) -> np.ndarray:
+    def _get_embedding(self, doc: str | np.ndarray) -> np.ndarray:
         """Helper to resolve a document to its embedding representation."""
         if isinstance(doc, np.ndarray):
             return doc
@@ -61,28 +68,31 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
 
             # Lazy load fallback model to avoid circular import issues
             from src.core.embedding_model import get_document_embedding
+
             return get_document_embedding(doc)
 
         raise TypeError("Document must be a string or a numpy array of embeddings.")
 
     def compute_pairwise_similarity(
         self,
-        doc1: Union[str, np.ndarray],
-        doc2: Union[str, np.ndarray],
+        doc1: str | np.ndarray,
+        doc2: str | np.ndarray,
     ) -> float:
         emb1 = self._get_embedding(doc1)
         emb2 = self._get_embedding(doc2)
 
-        # Mean pool if chunk embeddings are provided (2D matrix of shape chunks x dim)
+        pooling_fn = np.max if self.pooling.lower() == "max" else np.mean
+
+        # Pool if chunk embeddings are provided (2D matrix of shape chunks x dim)
         if emb1.ndim == 2 and emb1.shape[0] > 0:
-            vec1 = np.mean(emb1, axis=0)
+            vec1 = pooling_fn(emb1, axis=0)
         elif emb1.ndim == 1 and emb1.shape[0] > 0:
             vec1 = emb1
         else:
             vec1 = np.zeros(384)
 
         if emb2.ndim == 2 and emb2.shape[0] > 0:
-            vec2 = np.mean(emb2, axis=0)
+            vec2 = pooling_fn(emb2, axis=0)
         elif emb2.ndim == 1 and emb2.shape[0] > 0:
             vec2 = emb2
         else:
@@ -96,11 +106,7 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
 
     def compute_matrix(
         self,
-        documents: Union[
-            Dict[str, Union[str, np.ndarray]],
-            List[Union[str, np.ndarray]],
-            np.ndarray,
-        ],
+        documents: dict[str, str | np.ndarray] | list[str | np.ndarray] | np.ndarray,
     ) -> np.ndarray:
         if isinstance(documents, dict):
             # Resolve all to embeddings
@@ -110,6 +116,7 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
                 batch_size=self.batch_size,
                 min_threshold=self.min_threshold,
                 min_percentile=self.min_percentile,
+                pooling=self.pooling,
             )
             if isinstance(df_or_arr, pd.DataFrame):
                 return df_or_arr.to_numpy()
@@ -126,6 +133,7 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
                 batch_size=self.batch_size,
                 min_threshold=self.min_threshold,
                 min_percentile=self.min_percentile,
+                pooling=self.pooling,
             )
             if isinstance(df_or_arr, pd.DataFrame):
                 return df_or_arr.to_numpy()
@@ -136,11 +144,11 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
 
     def search_similar_chunks(
         self,
-        query: Union[str, np.ndarray],
+        query: str | np.ndarray,
         top_k: int = 10,
         exclude_doc: Optional[str] = None,
         threshold: float = 0.0,
-    ) -> List[Tuple[Any, float]]:
+    ) -> list[tuple[Any, float]]:
         """Query FAISS index for similar chunks if index is configured."""
         if self.faiss_index is None or self.registry is None:
             raise ValueError("FAISS index and registry are not configured.")
@@ -154,6 +162,7 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
             emb = query
 
         from src.core.faiss_index import search_similar_chunks
+
         return search_similar_chunks(
             emb,
             self.faiss_index,
@@ -175,8 +184,8 @@ class LexicalSimilarityEngine(BaseSimilarityEngine):
         algorithm: str = "tfidf",
         stopwords: Optional[Iterable[str]] = None,
         ngram_size: int = 3,
-        custom_stopwords: Optional[Set[str]] = None,
-        corpus: Optional[List[str]] = None,
+        custom_stopwords: Optional[set[str]] = None,
+        corpus: Optional[list[str]] = None,
     ):
         """
         Initialize the Lexical Similarity Engine.
@@ -196,8 +205,8 @@ class LexicalSimilarityEngine(BaseSimilarityEngine):
 
     def compute_pairwise_similarity(
         self,
-        doc1: Union[str, np.ndarray],
-        doc2: Union[str, np.ndarray],
+        doc1: str | np.ndarray,
+        doc2: str | np.ndarray,
     ) -> float:
         if not isinstance(doc1, str) or not isinstance(doc2, str):
             raise TypeError("Lexical similarity requires string document inputs.")
@@ -214,9 +223,7 @@ class LexicalSimilarityEngine(BaseSimilarityEngine):
                     calculate_lexical_similarity,
                 )
 
-                return calculate_lexical_similarity(
-                    doc1, doc2, self.custom_stopwords
-                )
+                return calculate_lexical_similarity(doc1, doc2, self.custom_stopwords)
 
         elif self.algorithm == "jaccard":
             from src.core.lexical_similarity import jaccard_similarity
@@ -260,11 +267,7 @@ class LexicalSimilarityEngine(BaseSimilarityEngine):
 
     def compute_matrix(
         self,
-        documents: Union[
-            Dict[str, Union[str, np.ndarray]],
-            List[Union[str, np.ndarray]],
-            np.ndarray,
-        ],
+        documents: dict[str, str | np.ndarray] | list[str | np.ndarray] | np.ndarray,
     ) -> np.ndarray:
         if isinstance(documents, dict):
             # Resolve all values to str
@@ -305,9 +308,7 @@ class LexicalSimilarityEngine(BaseSimilarityEngine):
                     if i == j:
                         matrix[i][j] = 1.0
                     else:
-                        sim = self.compute_pairwise_similarity(
-                            doc_list[i], doc_list[j]
-                        )
+                        sim = self.compute_pairwise_similarity(doc_list[i], doc_list[j])
                         matrix[i][j] = sim
                         matrix[j][i] = sim
             return matrix
@@ -347,14 +348,12 @@ class HybridSimilarityEngine(BaseSimilarityEngine):
 
     def compute_pairwise_similarity(
         self,
-        doc1: Union[str, np.ndarray],
-        doc2: Union[str, np.ndarray],
+        doc1: str | np.ndarray,
+        doc2: str | np.ndarray,
     ) -> float:
         # Check if lexical computation is possible (e.g. requires string inputs)
         try:
-            lex_sim = self.lexical_engine.compute_pairwise_similarity(
-                doc1, doc2
-            )
+            lex_sim = self.lexical_engine.compute_pairwise_similarity(doc1, doc2)
             has_lex = True
         except (TypeError, ValueError):
             lex_sim = 0.0
@@ -370,11 +369,7 @@ class HybridSimilarityEngine(BaseSimilarityEngine):
 
     def compute_matrix(
         self,
-        documents: Union[
-            Dict[str, Union[str, np.ndarray]],
-            List[Union[str, np.ndarray]],
-            np.ndarray,
-        ],
+        documents: dict[str, str | np.ndarray] | list[str | np.ndarray] | np.ndarray,
     ) -> np.ndarray:
         sem_matrix = self.semantic_engine.compute_matrix(documents)
 

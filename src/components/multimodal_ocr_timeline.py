@@ -3,7 +3,7 @@
 from typing import Any, List
 
 
-def render_ocr_timeline(matches: List[Any]) -> str:
+def render_ocr_timeline(matches: list[Any]) -> str:
     """Renders HTML telemetry timeline list for OCR document image scans."""
     if not matches:
         return """
@@ -16,7 +16,13 @@ def render_ocr_timeline(matches: List[Any]) -> str:
     for match in matches:
         m_dict = match if isinstance(match, dict) else match.__dict__
         overall_pct = int(m_dict.get("overall_multimodal_score", 0.0) * 100)
-        status_color = "#EF4444" if overall_pct > 75 else "#F59E0B" if overall_pct > 40 else "#10B981"
+        status_color = (
+            "#EF4444"
+            if overall_pct > 75
+            else "#F59E0B"
+            if overall_pct > 40
+            else "#10B981"
+        )
 
         items_html += f"""
         <div style="
@@ -31,10 +37,10 @@ def render_ocr_timeline(matches: List[Any]) -> str:
         ">
             <div>
                 <span style="color: #6EE7B7; font-weight: 800; font-size: 14px;">
-                    {m_dict.get('scan_id', 'OCR-NODE')}
+                    {m_dict.get("scan_id", "OCR-NODE")}
                 </span>
                 <div style="color: #94A3B8; font-size: 12px; margin-top: 4px;">
-                    Image: {m_dict.get('source_image_name')} | Engine: {m_dict.get('ocr_engine_used')}
+                    Image: {m_dict.get("source_image_name")} | Engine: {m_dict.get("ocr_engine_used")}
                 </div>
             </div>
             <div style="text-align: right;">

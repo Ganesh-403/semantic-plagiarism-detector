@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2026 Ganesh Kambli
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 badge_generator.py
 ------------------
@@ -16,27 +38,52 @@ Issue #2898: Fallback behavior for named colors in Badge Generator.
 import hashlib
 import html
 import logging
-import hashlib
-from datetime import datetime, timezonefrom io import BytesIO
-from typing import Optional, Tuple, Dict
 import re
-from datetime import datetime
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from io import BytesIO
-from typing import Dict, Optional
+from pathlib import Path
+from typing import Dict, Optional, Tuple
 
 try:
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
 except ImportError:
     Image = None
     ImageDraw = None
     ImageFont = None
+    PngImagePlugin = None
 
-from reportlab.lib.colors import HexColor
-from reportlab.lib.enums import TA_CENTER
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import inch
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+def has_pillow() -> bool:
+    """Check if PIL/Pillow is installed."""
+    return Image is not None
+
+
+try:
+    from reportlab.lib.colors import HexColor
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import inch
+    from reportlab.platypus import (
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
+    )
+except ImportError:
+    HexColor = None
+    TA_CENTER = None
+    A4 = None
+    ParagraphStyle = None
+    getSampleStyleSheet = None
+    inch = None
+    Paragraph = None
+    SimpleDocTemplate = None
+    Spacer = None
+    Table = None
+    TableStyle = None
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +91,7 @@ logger = logging.getLogger(__name__)
 # This allows theme configurations to use human-readable color names
 # (e.g., "red", "transparent", "darkslategray") instead of forcing
 # strict hex code validation.
-CSS_NAMED_COLORS: Dict[str, str] = {
+CSS_NAMED_COLORS: dict[str, str] = {
     "transparent": "#00000000",
     "black": "#000000",
     "white": "#ffffff",
@@ -117,7 +164,14 @@ _HEX_COLOR_PATTERN = re.compile(
 DEFAULT_BADGE_COLOR = "#4f46e5"
 
 
-def validate_hex_color(color: Optional[str], default_color: str = "#2563eb") -> str:
+def has_reportlab() -> bool:
+    """Return True when reportlab is installed and PDF badge generation is available."""
+    return SimpleDocTemplate is not None
+
+
+def validate_hex_color(
+    color: Optional[str], default_color: str = DEFAULT_BADGE_COLOR
+) -> str:
     """Validate and normalize a color string into a standard hex format.
 
     This function accepts both standard hex color codes (e.g., "#ff0000")
@@ -132,10 +186,10 @@ def validate_hex_color(color: Optional[str], default_color: str = "#2563eb") -> 
         color: The input color string to validate. Can be a hex code or
                a CSS named color.
         default_color: The fallback hex color to return if validation fails.
-                      Defaults to a standard blue ("#2563eb").
+                      Defaults to DEFAULT_BADGE_COLOR.
 
     Returns:
-        A validated, normalized hex color string (e.g., "#ff0000").
+        A validated hex color string (e.g., "#ff0000").
 
     Examples:
         >>> validate_hex_color("#ff0000")
@@ -145,7 +199,7 @@ def validate_hex_color(color: Optional[str], default_color: str = "#2563eb") -> 
         >>> validate_hex_color("transparent")
         '#00000000'
         >>> validate_hex_color("invalid_color_name")
-        '#2563eb'
+        '#4f46e5'
     """
     if not color or not isinstance(color, str):
         logger.warning(
@@ -161,9 +215,11 @@ def validate_hex_color(color: Optional[str], default_color: str = "#2563eb") -> 
     if _HEX_COLOR_PATTERN.match(cleaned_color):
         # Normalize 3-digit hex to 6-digit for consistency (e.g., #f00 -> #ff0000)
         if len(cleaned_color) == 4:  # #RGB
-            return f"#{cleaned_color[1]*2}{cleaned_color[2]*2}{cleaned_color[3]*2}"
+            return (
+                f"#{cleaned_color[1] * 2}{cleaned_color[2] * 2}{cleaned_color[3] * 2}"
+            )
         if len(cleaned_color) == 5:  # #RGBA
-            return f"#{cleaned_color[1]*2}{cleaned_color[2]*2}{cleaned_color[3]*2}{cleaned_color[4]*2}"
+            return f"#{cleaned_color[1] * 2}{cleaned_color[2] * 2}{cleaned_color[3] * 2}{cleaned_color[4] * 2}"
         return cleaned_color
 
     # 2. Check if it's a recognized CSS named color (Issue #2898)
@@ -196,9 +252,8 @@ def generate_badge_svg(
     """
     Generates a simple SVG "Originality Verified" badge.
 
-    The accent_color is validated (and defaulted if invalid) before being
-    inserted into the SVG markup, preventing malformed or unescaped color
-    values from producing invalid SVG.
+    Builds the SVG with ElementTree so text/attributes are XML-escaped
+    automatically instead of relying on manual string interpolation.
 
     Args:
         student_name: Name of the student (optional, defaults to "Student")
@@ -213,16 +268,68 @@ def generate_badge_svg(
     if date is None:
         date = datetime.now(timezone.utc).strftime("%B %d, %Y")
 
-    safe_name = html.escape(student_name)    safe_date = html.escape(date)
+    safe_name = html.escape(student_name)
+    safe_date = html.escape(date)
+    root = ET.Element(
+        "svg",
+        {
+            "xmlns": "http://www.w3.org/2000/svg",
+            "width": "400",
+            "height": "120",
+            "viewBox": "0 0 400 120",
+        },
+    )
+    ET.SubElement(
+        root,
+        "rect",
+        {
+            "width": "400",
+            "height": "120",
+            "rx": "12",
+            "fill": safe_color,
+        },
+    )
 
-    safe_font = html.escape(font_family)
+    title = ET.SubElement(
+        root,
+        "text",
+        {
+            "x": "20",
+            "y": "45",
+            "font-family": font_family,
+            "font-size": str(font_size),
+            "fill": "#ffffff",
+        },
+    )
+    title.text = "Originality Verified"
 
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="400" height="120" viewBox="0 0 400 120">
-  <rect width="400" height="120" rx="12" fill="{safe_color}" />
-  <text x="20" y="45" font-family="{safe_font}" font-size="{font_size}" fill="#ffffff">Originality Verified</text>
-  <text x="20" y="75" font-family="{safe_font}" font-size="{font_size}" fill="#e0e7ff">Awarded to: {safe_name}</text>
-  <text x="20" y="100" font-family="{safe_font}" font-size="{font_size}" fill="#e0e7ff">Date: {safe_date}</text>
-</svg>"""
+    awarded = ET.SubElement(
+        root,
+        "text",
+        {
+            "x": "20",
+            "y": "75",
+            "font-family": font_family,
+            "font-size": str(font_size),
+            "fill": "#e0e7ff",
+        },
+    )
+    awarded.text = f"Awarded to: {student_name}"
+
+    dated = ET.SubElement(
+        root,
+        "text",
+        {
+            "x": "20",
+            "y": "100",
+            "font-family": font_family,
+            "font-size": str(font_size),
+            "fill": "#e0e7ff",
+        },
+    )
+    dated.text = f"Date: {date}"
+
+    return ET.tostring(root, encoding="unicode")
 
 
 def generate_badge_png(
@@ -295,17 +402,31 @@ def generate_badge_png(
         width=2,
     )
 
-    # Try to load fonts, fallback to default if not available
-    try:
-        title_font = ImageFont.truetype("arial.ttf", 48)
-        subtitle_font = ImageFont.truetype("arial.ttf", 32)
-        body_font = ImageFont.truetype("arial.ttf", 24)
-        small_font = ImageFont.truetype("arial.ttf", 18)
-    except (IOError, OSError):
-        title_font = ImageFont.load_default()
-        subtitle_font = ImageFont.load_default()
-        body_font = ImageFont.load_default()
-        small_font = ImageFont.load_default()
+    # Load bundled TTF font (Roboto-Regular or DejaVuSans), with system and default fallbacks
+    fonts_dir = Path(__file__).parent.parent / "assets" / "fonts"
+    bundled_fonts = [
+        fonts_dir / "Roboto-Regular.ttf",
+        fonts_dir / "DejaVuSans.ttf",
+    ]
+
+    def _load_badge_font(size: int):
+        for font_path in bundled_fonts:
+            if font_path.exists():
+                try:
+                    return ImageFont.truetype(str(font_path), size)
+                except OSError:
+                    pass
+        for system_font in ["arial.ttf", "DejaVuSans.ttf"]:
+            try:
+                return ImageFont.truetype(system_font, size)
+            except OSError:
+                pass
+        return ImageFont.load_default()
+
+    title_font = _load_badge_font(48)
+    subtitle_font = _load_badge_font(32)
+    body_font = _load_badge_font(24)
+    small_font = _load_badge_font(18)
 
     # Title
     title_text = "ORIGINALITY VERIFIED"
@@ -354,7 +475,8 @@ def generate_badge_png(
     # Date
     if date is None:
         date = datetime.now(timezone.utc).strftime("%B %d, %Y")
-    date_text = f"Date: {date}"    date_bbox = draw.textbbox((0, 0), date_text, font=body_font)
+    date_text = f"Date: {date}"
+    date_bbox = draw.textbbox((0, 0), date_text, font=body_font)
     date_width = date_bbox[2] - date_bbox[0]
     date_x = (width - date_width) // 2
     draw.text((date_x, 380), date_text, fill="#e0e7ff", font=body_font)
@@ -378,9 +500,15 @@ def generate_badge_png(
     footer_x = (width - footer_width) // 2
     draw.text((footer_x, 540), footer_text, fill="#94a3b8", font=small_font)
 
+    # Create PngInfo for accessibility alt-text metadata
+    pnginfo = PngImagePlugin.PngInfo()
+    pnginfo.add_text(
+        "Description", f"Originality Verified Certificate for {student_name}"
+    )
+
     # Save to buffer
     buffer = BytesIO()
-    img.save(buffer, format="PNG", quality=95)
+    img.save(buffer, format="PNG", pnginfo=pnginfo, quality=95)
     png_bytes = buffer.getvalue()
     try:
         cache.set(cache_key, png_bytes, ttl=BADGE_TTL)
@@ -411,6 +539,9 @@ def generate_badge_pdf(
     Returns:
         BytesIO buffer containing the PDF certificate
     """
+    if not has_reportlab():
+        raise ImportError("reportlab is required for PDF badge generation")
+
     target_date = date if date is not None else datetime.now().strftime("%B %d, %Y")
     ident = str(student_id if student_id is not None else student_name)
 
@@ -593,3 +724,61 @@ def generate_badge_pdf(
         pass
     result_buffer.seek(0)
     return result_buffer
+
+
+def generate_svg_badge(
+    label: str,
+    message: str,
+    label_color: str = "#555",
+    message_color: str = "#007ec6",
+    icon: Optional[str] = None,
+) -> str:
+    """Generate a shields.io-style SVG badge.
+
+    Args:
+        label: The left-side text (e.g., "build", "coverage").
+        message: The right-side text (e.g., "passing", "95%").
+        label_color: Background color for the label side.
+        message_color: Background color for the message side.
+        icon: Optional base64 encoded SVG icon.
+
+    Returns:
+        A complete SVG XML string.
+    """
+    # Validate colors using the robust fallback mechanism
+    valid_label_color = validate_hex_color(label_color, "#555555")
+    valid_message_color = validate_hex_color(message_color, "#007ec6")
+
+    # Calculate approximate widths (simplified for this example)
+    label_width = max(30, len(label) * 7 + 10)
+    message_width = max(30, len(message) * 7 + 10)
+    total_width = label_width + message_width
+
+    svg_template = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{total_width}" height="20">
+      <linearGradient id="b" x2="0" y2="100%">
+        <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+        <stop offset="1" stop-opacity=".1"/>
+      </linearGradient>
+      <mask id="a">
+        <rect width="{total_width}" height="20" rx="3" fill="#fff"/>
+      </mask>
+      <g mask="url(#a)">
+        <path fill="{valid_label_color}" d="M0 0h{label_width}v20H0z"/>
+        <path fill="{valid_message_color}" d="M{label_width} 0h{message_width}v20H{label_width}z"/>
+        <path fill="url(#b)" d="M0 0h{total_width}v20H0z"/>
+      </g>
+      <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="11">
+        <text x="{label_width/2}" y="15" fill="#010101" fill-opacity=".3">{label}</text>
+        <text x="{label_width/2}" y="14">{label}</text>
+        <text x="{label_width + message_width/2}" y="15" fill="#010101" fill-opacity=".3">{message}</text>
+        <text x="{label_width + message_width/2}" y="14">{message}</text>
+      </g>
+    </svg>"""
+
+    return svg_template
+
+
+def get_badge_cache_key(label: str, message: str, color: str) -> str:
+    """Generate a deterministic cache key for a badge configuration."""
+    raw_key = f"{label}|{message}|{color}"
+    return hashlib.md5(raw_key.encode("utf-8")).hexdigest()  # nosec

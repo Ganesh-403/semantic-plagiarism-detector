@@ -27,14 +27,17 @@ import logging
 import os
 import re
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
+from typing import Any, Callable, Generator, Optional
 
 import numpy as np
 import pandas as pd
 
 from src.core.similarity import find_most_similar_chunks
+from src.db.corpus_db import _connect, get_all_documents, get_document_word_counts
+from src.utils.export_sanitizer import sanitize_spreadsheet_value
+from src.utils.filename import sanitize_filename
 from src.utils.pdf_report import generate_plagiarism_report
 
 logger = logging.getLogger(__name__)
@@ -134,8 +137,8 @@ class ExportFormat(str, Enum):
 def sanitize_csv_cell_value(val: Any) -> str:
     """Sanitize a CSV cell value to prevent CSV formula injection (Issue #1744).
 
-    Prepends a single quote `'` if the string representation of val begins with
-    '=', '+', '-', or '@'.
+    Uses the shared spreadsheet sanitizer so CSV and Excel exports apply the
+    same formula-injection rules.
 
     Args:
         val: Any cell value (string, numeric, None, etc.)
@@ -145,10 +148,8 @@ def sanitize_csv_cell_value(val: Any) -> str:
     """
     if val is None:
         return ""
-    str_val = str(val)
-    if str_val and str_val[0] in ("=", "+", "-", "@"):
-        return f"'{str_val}"
-    return str_val
+    sanitized = sanitize_spreadsheet_value(str(val))
+    return sanitized if isinstance(sanitized, str) else str(sanitized)
 
 
 def normalize_csv_headers(headers: list[str]) -> list[str]:
@@ -243,7 +244,7 @@ def normalize_csv_headers(headers: list[str]) -> list[str]:
 
 
 def export_incidents_csv_stream(
-    incidents_list: List[Dict],
+    incidents_list: list[dict],
     delimiter: str = ",",
     quoting_style: int = csv.QUOTE_MINIMAL,
 ) -> bytes:
@@ -252,13 +253,13 @@ def export_incidents_csv_stream(
 
     The function writes the following columns in order:
 
-    * **Incident ID** – ``incident_id`` field (default: empty string)
-    * **Doc A**       – ``document_a`` field
-    * **Doc B**       – ``document_b`` field
-    * **Similarity**  – ``similarity_score`` formatted as a percentage (e.g. ``95.00%``)
-    * **Severity**    – ``severity_rank`` field
-    * **Status**      – ``review_status`` field
-    * **Date**        – ``date_flagged`` field
+    * **Incident ID** â€“ ``incident_id`` field (default: empty string)
+    * **Doc A**       â€“ ``document_a`` field
+    * **Doc B**       â€“ ``document_b`` field
+    * **Similarity**  â€“ ``similarity_score`` formatted as a percentage (e.g. ``95.00%``)
+    * **Severity**    â€“ ``severity_rank`` field
+    * **Status**      â€“ ``review_status`` field
+    * **Date**        â€“ ``date_flagged`` field
 
     Parameters
     ----------
@@ -326,7 +327,7 @@ def export_incidents_csv_stream(
     return csv_text.encode("utf-8-sig")
 
 
-def export_incidents_json_stream(incidents_list: List[Dict]) -> bytes:
+def export_incidents_json_stream(incidents_list: list[dict]) -> bytes:
     """Serialize a list of incident dicts into a JSON-formatted byte stream.
 
     Args:
@@ -340,7 +341,7 @@ def export_incidents_json_stream(incidents_list: List[Dict]) -> bytes:
     return json_str.encode("utf-8")
 
 
-def export_incidents_xlsx_stream(incidents_list: List[Dict]) -> bytes:
+def export_incidents_xlsx_stream(incidents_list: list[dict]) -> bytes:
     """Convert a list of incident dicts into an Excel XLSX byte stream.
 
     Requires pandas and openpyxl. If openpyxl is missing, falls back to CSV.
@@ -369,6 +370,11 @@ def export_incidents_xlsx_stream(incidents_list: List[Dict]) -> bytes:
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             df.to_excel(writer, index=False, sheet_name="Plagiarism Incidents")
+            wb = writer.book
+            if hasattr(wb, "properties") and wb.properties is not None:
+                wb.properties.title = "Semantic Plagiarism Similarity Report"
+                wb.properties.creator = "Semantic Plagiarism Detector"
+                wb.properties.created = datetime.now(timezone.utc)
 
         return output.getvalue()
     except ImportError:
@@ -377,8 +383,8 @@ def export_incidents_xlsx_stream(incidents_list: List[Dict]) -> bytes:
 
 
 def export_incidents_to_format(
-    incidents_list: List[Dict],
-    format: Union[ExportFormat, str] = ExportFormat.CSV,
+    incidents_list: list[dict],
+    format: ExportFormat | str = ExportFormat.CSV,
 ) -> bytes:
     """Dispatcher function that routes incident data to the appropriate serializer.
 
@@ -440,11 +446,11 @@ def sanitize_export_filename(filename: str, default_ext: str = ".csv") -> str:
 
 
 def export_incidents_csv(
-    incidents_list: List[Dict],
+    incidents_list: list[dict],
     delimiter: str = ",",
     quoting_style: int = csv.QUOTE_MINIMAL,
     filename: Optional[str] = None,
-) -> Union[bytes, Tuple[bytes, str]]:
+) -> bytes | tuple[bytes, str]:
     """Export a list of incident dicts to a CSV-formatted byte stream.
 
     Validates that the delimiter is a single character string, falling back to a
@@ -546,21 +552,15 @@ def stream_incidents_csv_chunks(
             break
 
 
-def _sanitise_filename(name: str) -> str:
-    """Strip non-alphanumeric characters (except ``-``, ``_``) for safe filenames."""
-    return (
-        "".join(c for c in name if c.isalnum() or c in ("-", "_")).rstrip() or "unnamed"
-    )
-
-
 def generate_bulk_reports_zip(
-    flags: List[Dict],
+    flags: list[dict],
     *,
-    chunked_docs: Optional[Dict[str, List[str]]] = None,
-    embeddings: Optional[Dict[str, "np.ndarray"]] = None,
+    chunked_docs: Optional[dict[str, list[str]]] = None,
+    embeddings: Optional[dict[str, "np.ndarray"]] = None,
     include_pdf: bool = True,
     include_csv: bool = True,
     include_json: bool = True,
+    progress_callback: Optional[Callable[[int, int], None]] = None,
 ) -> bytes:
     """Generate a ZIP file containing selected artefacts for flagged document pairs.
 
@@ -569,23 +569,26 @@ def generate_bulk_reports_zip(
     flags:
         List of flag dicts returned by :func:`~src.core.similarity.flag_plagiarism`.
     chunked_docs:
-        Optional mapping of document name → list of text chunks.
+        Optional mapping of document name â†’ list of text chunks.
     embeddings:
-        Optional mapping of document name → NumPy embedding array.
+        Optional mapping of document name â†’ NumPy embedding array.
     include_pdf:
-        Whether to generate per‑pair PDF reports.
+        Whether to generate perâ€‘pair PDF reports.
     include_csv:
         Whether to include a summary CSV of all flagged pairs.
     include_json:
         Whether to include a metadata JSON file describing the export.
+    progress_callback:
+        Optional callback invoked with (current_idx, total_count) after processing each pair.
 
     Returns
     -------
     bytes
-        In‑memory ZIP file contents.
+        Inâ€‘memory ZIP file contents.
     """
     memory_file = io.BytesIO()
     csv_rows = []
+    total_count = len(flags)
 
     with zipfile.ZipFile(memory_file, "w", zipfile.ZIP_DEFLATED) as zf:
         for idx, flag in enumerate(flags):
@@ -614,8 +617,8 @@ def generate_bulk_reports_zip(
                     emb_a = embeddings[doc_a]
                     emb_b = embeddings[doc_b]
                     top_pairs = find_most_similar_chunks(
-                        chunked_docs[doc_a],
-                        chunked_docs[doc_b],
+                        [chunk.text for chunk in chunked_docs[doc_a]],
+                        [chunk.text for chunk in chunked_docs[doc_b]],
                         emb_a,
                         emb_b,
                         top_k=3,
@@ -623,7 +626,7 @@ def generate_bulk_reports_zip(
                     )
                 except Exception as exc:
                     logger.debug(
-                        "Could not compute chunk pairs for %s ↔ %s: %s",
+                        "Could not compute chunk pairs for %s â†” %s: %s",
                         doc_a,
                         doc_b,
                         exc,
@@ -639,18 +642,24 @@ def generate_bulk_reports_zip(
                         top_pairs=top_pairs,
                         report_title=f"Plagiarism Report: {doc_a} vs {doc_b}",
                     )
-                    safe_a = _sanitise_filename(doc_a)
-                    safe_b = _sanitise_filename(doc_b)
-                    pdf_filename = f"report_{safe_a}_{safe_b}.pdf"
+                    safe_a = os.path.splitext(
+                        sanitize_filename(doc_a, fallback="doc_a")
+                    )[0]
+                    safe_b = os.path.splitext(
+                        sanitize_filename(doc_b, fallback="doc_b")
+                    )[0]
+                    pdf_filename = sanitize_filename(
+                        f"report_{safe_a}_{safe_b}.pdf", fallback="report.pdf"
+                    )
                     zf.writestr(pdf_filename, pdf_buffer.getvalue())
                 except Exception as exc:
                     logger.error(
-                        "Failed to generate PDF for %s ↔ %s: %s", doc_a, doc_b, exc
+                        "Failed to generate PDF for %s â†” %s: %s", doc_a, doc_b, exc
                     )
 
-            # Fallback JSON per‑pair if PDF generation fails
-            safe_a = _sanitise_filename(doc_a)
-            safe_b = _sanitise_filename(doc_b)
+            # Fallback JSON perâ€‘pair if PDF generation fails
+            safe_a = os.path.splitext(sanitize_filename(doc_a, fallback="doc_a"))[0]
+            safe_b = os.path.splitext(sanitize_filename(doc_b, fallback="doc_b"))[0]
             fallback = {
                 "generated_at": datetime.now().isoformat(),
                 "document_a": doc_a,
@@ -660,8 +669,14 @@ def generate_bulk_reports_zip(
                 "note": "PDF generation failed; JSON fallback provided.",
             }
             zf.writestr(
-                f"report_{safe_a}_{safe_b}.json", json.dumps(fallback, indent=2)
+                sanitize_filename(
+                    f"report_{safe_a}_{safe_b}.json", fallback="report.json"
+                ),
+                json.dumps(fallback, indent=2),
             )
+
+            if progress_callback:
+                progress_callback(idx + 1, total_count)
 
         # Optional CSV summary
         if include_csv:
@@ -690,6 +705,7 @@ def create_batch_incident_zip_archive(
     incidents: list[dict],
     delimiter: str = ",",
     quoting_style: int = csv.QUOTE_MINIMAL,
+    progress_callback: Optional[Callable[[int, int], None]] = None,
 ) -> bytes:
     """Generate in-memory ZIP byte buffer containing incidents_summary.csv, metadata.json, and PDF reports.
 
@@ -697,11 +713,13 @@ def create_batch_incident_zip_archive(
         incidents: A list of incident dictionaries.
         delimiter: Field delimiter used for ``incidents_summary.csv``.
         quoting_style: The quoting mode passed to CSV export.
+        progress_callback: Optional callback invoked with (current_idx, total_count) after processing each incident.
 
     Returns:
         bytes: The in-memory ZIP file content.
     """
     memory_file = io.BytesIO()
+    total_count = len(incidents)
 
     with zipfile.ZipFile(memory_file, "w", zipfile.ZIP_DEFLATED) as zf:
         # 1. Generate and write incidents_summary.csv
@@ -737,6 +755,8 @@ def create_batch_incident_zip_archive(
                     "Skipping PDF generation for incident at index %d: missing doc_a or doc_b",
                     idx,
                 )
+                if progress_callback:
+                    progress_callback(idx + 1, total_count)
                 continue
 
             raw_score = incident.get("similarity_score") or incident.get(
@@ -765,9 +785,12 @@ def create_batch_incident_zip_archive(
                 except Exception:
                     incident_id = f"unknown_{idx}"
 
-            safe_a = _sanitise_filename(doc_a)
-            safe_b = _sanitise_filename(doc_b)
-            pdf_filename = f"report_{incident_id}_{safe_a}_{safe_b}.pdf"
+            safe_id = sanitize_filename(str(incident_id), fallback=f"unknown_{idx}")
+            safe_a = os.path.splitext(sanitize_filename(doc_a, fallback="doc_a"))[0]
+            safe_b = os.path.splitext(sanitize_filename(doc_b, fallback="doc_b"))[0]
+            pdf_filename = sanitize_filename(
+                f"report_{safe_id}_{safe_a}_{safe_b}.pdf", fallback="report.pdf"
+            )
 
             try:
                 pdf_buffer = generate_plagiarism_report(
@@ -781,29 +804,36 @@ def create_batch_incident_zip_archive(
                 zf.writestr(pdf_filename, pdf_buffer.getvalue())
             except Exception as exc:
                 logger.error(
-                    "Failed to generate PDF for incident %s (%s ↔ %s): %s",
+                    "Failed to generate PDF for incident %s (%s â†” %s): %s",
                     incident_id,
                     doc_a,
                     doc_b,
                     exc,
                 )
 
+            if progress_callback:
+                progress_callback(idx + 1, total_count)
+
     return memory_file.getvalue()
 
 
-def create_documents_bulk_zip_archive(filenames: list[str]) -> bytes:
+def create_bulk_export_zip(
+    filenames: list[str],
+    progress_callback: Optional[Callable[[int, int], None]] = None,
+    preserve_hierarchy: bool = True,
+) -> bytes:
     """Create a downloadable .zip archive containing text content and metadata manifest
     for the specified document filenames from the corpus database.
 
     Args:
         filenames: List of document filenames to include in the ZIP archive.
+        progress_callback: Optional callback invoked with (current_idx, total_count) after processing each document.
+        preserve_hierarchy: If True (default), structure archive files into folders as
+            "{class_section}/{assignment_title}/{filename}". If False, flatten files into the root of the ZIP.
 
     Returns:
         ZIP archive file bytes ready for download.
     """
-    from src.db.corpus_db import _connect, get_all_documents, get_document_word_counts
-    from src.utils.filename import sanitize_filename
-
     buffer = io.BytesIO()
     raw_docs = get_all_documents(include_deleted=True)
     all_docs = {}
@@ -816,9 +846,10 @@ def create_documents_bulk_zip_archive(filenames: list[str]) -> bytes:
 
     word_counts = get_document_word_counts()
     manifest_rows = []
+    total_count = len(filenames)
 
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zip_file:
-        for filename in filenames:
+        for idx, filename in enumerate(filenames):
             doc_obj = all_docs.get(filename)
             doc_meta = {}
             if doc_obj:
@@ -847,12 +878,22 @@ def create_documents_bulk_zip_archive(filenames: list[str]) -> bytes:
             if not os.path.splitext(clean_name)[1]:
                 clean_name += ".txt"
 
-            zip_file.writestr(clean_name, text_content.encode("utf-8"))
+            class_section = doc_meta.get("class_section") or "Unassigned"
+            assignment_title = doc_meta.get("assignment_title") or "General"
+
+            if preserve_hierarchy:
+                safe_class = sanitize_filename(str(class_section), fallback="Unassigned")
+                safe_assignment = sanitize_filename(str(assignment_title), fallback="General")
+                archive_member_path = f"{safe_class}/{safe_assignment}/{clean_name}"
+            else:
+                archive_member_path = clean_name
+
+            zip_file.writestr(archive_member_path, text_content.encode("utf-8"))
 
             manifest_rows.append(
                 {
                     "filename": filename,
-                    "exported_as": clean_name,
+                    "exported_as": archive_member_path,
                     "student_name": doc_meta.get("student_name") or "N/A",
                     "assignment_title": doc_meta.get("assignment_title") or "N/A",
                     "class_section": doc_meta.get("class_section") or "N/A",
@@ -862,6 +903,9 @@ def create_documents_bulk_zip_archive(filenames: list[str]) -> bytes:
                 }
             )
 
+            if progress_callback:
+                progress_callback(idx + 1, total_count)
+
         if manifest_rows:
             manifest_df = pd.DataFrame(manifest_rows)
             manifest_csv = manifest_df.to_csv(index=False).encode("utf-8-sig")
@@ -869,3 +913,20 @@ def create_documents_bulk_zip_archive(filenames: list[str]) -> bytes:
 
     buffer.seek(0)
     return buffer.getvalue()
+
+
+def create_documents_bulk_zip_archive(
+    filenames: list[str],
+    progress_callback: Optional[Callable[[int, int], None]] = None,
+    preserve_hierarchy: bool = True,
+) -> bytes:
+    """Create a downloadable .zip archive for document filenames.
+
+    Alias for create_bulk_export_zip for backward compatibility.
+    """
+    return create_bulk_export_zip(
+        filenames,
+        progress_callback=progress_callback,
+        preserve_hierarchy=preserve_hierarchy,
+    )
+

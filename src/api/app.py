@@ -33,6 +33,9 @@ logger = logging.getLogger(__name__)
 
 # ── API Initialization ────────────────────────────────────────────────────────
 
+from src.core.app_config import print_startup_config_summary
+
+
 app = FastAPI(
     title="Semantic Plagiarism Detector API",
     description="REST API for programmatically checking documents for semantic plagiarism.",
@@ -50,6 +53,56 @@ app = FastAPI(
     ],
     dependencies=[Depends(verify_bearer_token)],
 )
+
+
+@app.on_event("startup")
+def startup_event() -> None:
+    """Run the one-off work the API needs before it serves its first request.
+
+    Two things happen here, and they are deliberately independent: warming the
+    embedding model is best-effort, printing the configuration summary is not.
+    A warm-up that cannot run — no cached weights, no network, a machine with
+    no room for the model — must not stop the process from coming up, because
+    most of the API surface (auth, corpus listing, admin) does not need
+    embeddings at all.
+    """
+    _warmup_embedding_model()
+    print_startup_config_summary()
+
+
+def _warmup_embedding_model() -> bool:
+    """Pre-load the embedding weights so the first real request is not slow.
+
+    The import is deliberately deferred to call time rather than module scope:
+    pulling in ``src.core.embedding_model`` drags in the whole ML stack, and
+    ``src/api/app.py`` is imported by tooling that has no business paying for
+    that (test collection, ``--help`` on the CLI, OpenAPI schema dumps).
+
+    Returns:
+        ``True`` if the warm-up pass completed, ``False`` if it was skipped or
+        failed. Never raises — a failed warm-up costs latency on the first
+        request, not availability.
+    """
+    try:
+        from src.core.embedding_model import warmup_embedding_model
+    except Exception:
+        # The ML extras are optional; an API deployment that only serves the
+        # non-embedding routes is a supported configuration.
+        logger.warning(
+            "Embedding model unavailable; skipping startup warmup. "
+            "The first scan request will pay the model load cost.",
+            exc_info=True,
+        )
+        return False
+
+    try:
+        return bool(warmup_embedding_model())
+    except Exception:
+        logger.warning(
+            "Embedding model warmup failed; continuing startup.", exc_info=True
+        )
+        return False
+
 
 # Enable CORS for external LMS frontends
 origins = os.getenv("CORS_ALLOWED_ORIGINS", "*")
@@ -127,7 +180,7 @@ async def otel_tracing_middleware(request: Request, call_next):
 
         try:
             response = await call_next(request)
-            
+
             # Use request.scope.get("route").path to extract generalized FastAPI route template for span name
             route = request.scope.get("route")
             if route and hasattr(route, "path"):
@@ -229,7 +282,9 @@ async def value_error_handler(request: Request, exc: ValueError):
 
 
 @app.exception_handler(sqlite3.OperationalError)
-async def sqlite_operational_error_handler(request: Request, exc: sqlite3.OperationalError):
+async def sqlite_operational_error_handler(
+    request: Request, exc: sqlite3.OperationalError
+):
     """Handle sqlite3.OperationalError, particularly database is locked, returning RFC 7807 response."""
     err_msg = str(exc)
     status_code = (
@@ -286,6 +341,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     trace_id = None
     try:
         from opentelemetry import trace
+
         current_span = trace.get_current_span()
         if current_span and current_span.get_span_context().is_valid:
             trace_id = trace.format_trace_id(current_span.get_span_context().trace_id)
@@ -373,6 +429,7 @@ app.include_router(lti_router)
 
 # ── Audit Events Endpoint (Issue #2732) ───────────────────────────────────────
 
+
 @app.get(
     "/api/v1/audit/events",
     tags=["System Administration"],
@@ -381,68 +438,53 @@ app.include_router(lti_router)
 )
 def get_audit_events_api(
     limit: int = Query(default=20, ge=1, le=100, description="Max events per page"),
-    offset: int = Query(default=0, ge=0, description="Number of events to skip (pagination)"),
+    offset: int = Query(
+        default=0, ge=0, description="Number of events to skip (pagination)"
+    ),
     event_type: str | None = Query(default=None, description="Filter by event type"),
     username: str | None = Query(default=None, description="Filter by username"),
-    _user: dict = Security(get_current_user, scopes=["admin"])
+    _user: dict = Security(get_current_user, scopes=["admin"]),
 ):
     """Retrieve paginated security audit events.
-    
+
     Supports pagination via limit and offset parameters (Issue #2732).
     """
     from src.db.auth import get_security_audit_log_count, get_security_audit_logs
-    
+
     events = get_security_audit_logs(
-        limit=limit,
-        offset=offset,
-        event_type=event_type,
-        username=username
+        limit=limit, offset=offset, event_type=event_type, username=username
     )
-    
-    total_count = get_security_audit_log_count(
-        event_type=event_type,
-        username=username
-    )
-    
+
+    total_count = get_security_audit_log_count(event_type=event_type, username=username)
+
     return {
         "events": events,
         "pagination": {
             "limit": limit,
             "offset": offset,
             "total_count": total_count,
-            "total_pages": (total_count + limit - 1) // limit if limit > 0 else 0
-        }
+            "total_pages": (total_count + limit - 1) // limit if limit > 0 else 0,
+        },
     }
 
-"""src/api/app.py - FastAPI REST API for LMS integration."""
-
-import logging
-import os
-
-from fastapi import Depends, FastAPI, Request, status
-from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
-from starlette.exceptions import HTTPException as StarletteHTTPException
-
-from src.api.dependencies import (
-    custom_rate_limit_exceeded_handler,
-    limiter,
-)
-from src.api.middleware import verify_bearer_token
-from src.api.routers import (
-    admin_router,
-    analysis_router,
-    auth_router,
-    corpus_router,
-)
 
 # Re-exports for backward compatibility with existing tests and scripts
+import sys
+import types
 
-logger = logging.getLogger(__name__)
 
-# ── API Initialization ────────────────────────────────────────────────────────
+class _ApiAppModule(types.ModuleType):
+    @property
+    def total_scans(self) -> int:
+        from src.api.routers import analysis
+
+        return analysis.total_scans
+
+    @total_scans.setter
+    def total_scans(self, value: int) -> None:
+        from src.api.routers import analysis
+
+        analysis.total_scans = value
 
 @app.get(
     "/api/v1/audit/events",
@@ -487,3 +529,21 @@ def get_audit_events_api(
 app.include_router(admin_router)
 from src.api.routers.lti_router import router as lti_router
 app.include_router(lti_router)
+
+sys.modules[__name__].__class__ = _ApiAppModule
+
+
+# Bind property to FastAPI class to support tests referencing the app instance as api_app
+def _get_total_scans(self) -> int:
+    from src.api.routers import analysis
+
+    return analysis.total_scans
+
+
+def _set_total_scans(self, value: int) -> None:
+    from src.api.routers import analysis
+
+    analysis.total_scans = value
+
+
+FastAPI.total_scans = property(_get_total_scans, _set_total_scans)

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import csv
 import io
 import json
@@ -313,8 +314,8 @@ class TestNormalizeCsvHeaders:
 
     def test_unicode_characters_preserved(self):
         """Unicode characters must be preserved in normalized headers."""
-        result = normalize_csv_headers(["café", "naïve", "résumé"])
-        assert result == ["café", "naïve", "résumé"]
+        result = normalize_csv_headers(["caf\u00e9", "na\u00efve", "r\u00e9sum\u00e9"])
+        assert result == ["caf\u00e9", "na\u00efve", "r\u00e9sum\u00e9"]
 
     def test_single_header(self):
         """A single header must be normalized correctly."""
@@ -385,8 +386,8 @@ def test_create_batch_incident_zip_archive():
         # Check for PDF reports
         pdf_names = [n for n in names if n.lower().endswith(".pdf")]
         assert len(pdf_names) == 2
-        assert "report_INC-001_alicepdf_bobpdf.pdf" in pdf_names
-        assert "report_INC-002_charliedocx_davedocx.pdf" in pdf_names
+        assert "report_INC_001_alice_bob.pdf" in pdf_names
+        assert "report_INC_002_charlie_dave.pdf" in pdf_names
 
         # Verify metadata JSON content
         meta_content = zf.read("metadata.json").decode("utf-8")
@@ -400,6 +401,45 @@ def test_create_batch_incident_zip_archive():
         assert "INC-002" in csv_content
         assert "95.00%" in csv_content
         assert "72.00%" in csv_content
+
+
+def test_bulk_zip_rejects_path_traversal_in_entry_names():
+    """Document / incident metadata must not become ../ or absolute ZIP paths."""
+    from src.utils.bulk_export import create_batch_incident_zip_archive
+
+    flags = [
+        {
+            "doc_a": "../../etc/passwd",
+            "doc_b": "/tmp/evil.pdf",
+            "similarity": 0.9,
+            "threshold_at_time_of_flag": 0.5,
+        }
+    ]
+    zip_bytes = generate_bulk_reports_zip(flags, include_pdf=False)
+    with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+        for name in zf.namelist():
+            assert ".." not in name
+            assert not name.startswith("/")
+            assert not name.startswith("\\")
+
+    incidents = [
+        {
+            "incident_id": "../../evil",
+            "document_a": "../secret.txt",
+            "document_b": "/abs/path.docx",
+            "similarity_score": 0.8,
+        }
+    ]
+    with patch(
+        "src.utils.bulk_export.generate_plagiarism_report",
+        return_value=io.BytesIO(b"%PDF-1.4"),
+    ):
+        zip_bytes = create_batch_incident_zip_archive(incidents)
+    with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+        for name in zf.namelist():
+            assert ".." not in name
+            assert not name.startswith("/")
+            assert not name.startswith("\\")
 
 
 # ---------------------------------------------------------------------------
@@ -417,7 +457,7 @@ def test_stream_incidents_csv_chunks_default_batch():
             return []
 
         size = min(limit, 2500 - offset)
-        return [{"incident_id": f"INC-{offset+i}"} for i in range(size)]
+        return [{"incident_id": f"INC-{offset + i}"} for i in range(size)]
 
     chunks = list(stream_incidents_csv_chunks(mock_query))
 
@@ -439,7 +479,7 @@ def test_stream_incidents_csv_chunks_custom_batch():
         if offset >= 10:
             return []
         size = min(limit, 10 - offset)
-        return [{"incident_id": f"INC-{offset+i}"} for i in range(size)]
+        return [{"incident_id": f"INC-{offset + i}"} for i in range(size)]
 
     chunks = list(stream_incidents_csv_chunks(mock_query, batch_size=3))
 
@@ -463,7 +503,7 @@ def test_stream_incidents_csv_chunks_memory_efficient():
         if offset >= 50:
             return []
         return [
-            {"incident_id": f"INC-{offset+i}"} for i in range(min(limit, 50 - offset))
+            {"incident_id": f"INC-{offset + i}"} for i in range(min(limit, 50 - offset))
         ]
 
     stream = stream_incidents_csv_chunks(mock_query, batch_size=10)
@@ -886,3 +926,68 @@ class TestLegacyFunctions:
         incidents = [{"incident_id": "1", "document_a": "A"}]
         result = export_incidents_json_stream(incidents)
         assert json.loads(result.decode("utf-8"))[0]["incident_id"] == "1"
+
+# ---------------------------------------------------------------------------
+# Tests for Progress Callback (Issue #3467)
+# ---------------------------------------------------------------------------
+
+def test_generate_bulk_reports_zip_progress_callback():
+    from src.utils.bulk_export import generate_bulk_reports_zip
+    flags = [
+        {"doc_a": "A.pdf", "doc_b": "B.pdf", "similarity": 0.5},
+        {"doc_a": "C.pdf", "doc_b": "D.pdf", "similarity": 0.6},
+    ]
+    calls = []
+    def progress_cb(current, total):
+        calls.append((current, total))
+
+    generate_bulk_reports_zip(flags, include_pdf=False, progress_callback=progress_cb)
+
+    assert calls == [(1, 2), (2, 2)]
+
+def test_create_batch_incident_zip_archive_progress_callback():
+    from src.utils.bulk_export import create_batch_incident_zip_archive
+    incidents = [
+        {"incident_id": "1", "document_a": "A", "document_b": "B"},
+        {"incident_id": "2", "document_a": "C", "document_b": "D"},
+        {"incident_id": "3", "document_a": "E", "document_b": "F"},
+    ]
+    calls = []
+    def progress_cb(current, total):
+        calls.append((current, total))
+
+    # Mock generate_plagiarism_report to speed up test
+    with patch("src.utils.bulk_export.generate_plagiarism_report") as mock_report:
+        mock_report.return_value = io.BytesIO(b"fake pdf")
+        create_batch_incident_zip_archive(incidents, progress_callback=progress_cb)
+
+    assert calls == [(1, 3), (2, 3), (3, 3)]
+
+def test_create_documents_bulk_zip_archive_progress_callback():
+    from src.utils.bulk_export import create_documents_bulk_zip_archive
+    filenames = ["doc1.pdf", "doc2.pdf"]
+    calls = []
+    def progress_cb(current, total):
+        calls.append((current, total))
+
+    with patch("src.utils.bulk_export.get_all_documents", return_value=[]), \
+         patch("src.utils.bulk_export.get_document_word_counts", return_value={}), \
+         patch("src.utils.bulk_export._connect") as mock_connect:
+
+        # mock conn
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchall.return_value = []
+        mock_connect.return_value.__enter__.return_value = mock_conn
+
+        create_documents_bulk_zip_archive(filenames, progress_callback=progress_cb)
+
+    assert calls == [(1, 2), (2, 2)]
+
+def test_generate_bulk_reports_zip_no_callback():
+    from src.utils.bulk_export import generate_bulk_reports_zip
+    flags = [
+        {"doc_a": "A.pdf", "doc_b": "B.pdf", "similarity": 0.5},
+    ]
+    # Should not raise any error
+    result = generate_bulk_reports_zip(flags, include_pdf=False)
+    assert isinstance(result, bytes)

@@ -56,7 +56,7 @@ def test_healthcheck_curls_a_reachable_port_8501_endpoint():
 
 def test_healthcheck_fails_over_with_exit_1():
     text = _dockerfile_text()
-    healthcheck_block = text[text.index("HEALTHCHECK"):]
+    healthcheck_block = text[text.index("HEALTHCHECK") :]
     healthcheck_block = healthcheck_block[: healthcheck_block.index("\n\n")]
     assert "|| exit 1" in healthcheck_block
 

@@ -9,7 +9,9 @@ from src.services.stylometric_author_engine import StylometricAuthorEngine
 
 def render_stylometric_author_dashboard():
     """Main rendering function for Streamlit Stylometric Author dashboard tab."""
-    st.set_page_config(page_title="Stylometric Author Attribution Engine", layout="wide")
+    st.set_page_config(
+        page_title="Stylometric Author Attribution Engine", layout="wide"
+    )
 
     st.markdown(
         """
@@ -63,7 +65,9 @@ def render_stylometric_author_dashboard():
             value="Furthermore, empirical results indicate that deep learning architectures are highly data-dependent. Therefore, hardware acceleration is necessary to mitigate the computational latency observed during gradient optimization.",
             height=160,
         )
-        candidate_alias = st.text_input("Candidate Author Alias", value="Prof. Alex Mercer")
+        candidate_alias = st.text_input(
+            "Candidate Author Alias", value="Prof. Alex Mercer"
+        )
 
     if st.button("Run Stylometric Authorship Verification", use_container_width=True):
         fp_query = StylometricAuthorEngine.extract_fingerprint(

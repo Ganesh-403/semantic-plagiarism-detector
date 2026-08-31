@@ -10,7 +10,18 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from src.api.middleware import get_current_user, verify_bearer_token  # noqa: F401
+from src.api.middleware import (  # noqa: F401
+    RequireScopes,
+    extract_token_scopes,
+    get_current_user,
+    get_current_user_any,
+    require_all_scopes,
+    require_any_scope,
+    require_any_scopes,
+    require_scopes,
+    validate_scopes,
+    verify_bearer_token,
+)
 from src.db.corpus_db import _connect, init_corpus_db
 
 logger = logging.getLogger(__name__)
@@ -53,10 +64,10 @@ def validate_content_type(request: Request) -> None:
         )
 
 
-def get_corpus_documents_with_embeddings() -> Dict[str, Dict]:
+def get_corpus_documents_with_embeddings() -> dict[str, dict]:
     """Load all stored corpus documents, text chunks, and chunk embeddings from SQLite."""
     init_corpus_db()
-    corpus: Dict[str, Dict] = {}
+    corpus: dict[str, dict] = {}
 
     with _connect() as conn:
         rows = conn.execute(

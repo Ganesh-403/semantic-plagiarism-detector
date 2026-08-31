@@ -64,14 +64,14 @@ def _cosine_similarity_matrix(emb_a: np.ndarray, emb_b: np.ndarray) -> np.ndarra
 
 
 def align_semantic_sequences(
-    chunks_a: List[str],
-    chunks_b: List[str],
+    chunks_a: list[str],
+    chunks_b: list[str],
     embeddings_a: np.ndarray,
     embeddings_b: np.ndarray,
     match_threshold: float = DEFAULT_MATCH_THRESHOLD,
     gap_penalty: float = DEFAULT_GAP_PENALTY,
     band_width: int = DEFAULT_BAND_WIDTH,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Align two sequences of text chunks based on semantic similarity.
 
     Uses a banded Needleman-Wunsch dynamic programming algorithm to find

@@ -35,10 +35,8 @@ def check_file(file_path):
     missing_functions = []
 
     for node in tree.body:
-
         # Top-level functions
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-
             if node.name.startswith("_"):
                 continue
 
@@ -51,11 +49,8 @@ def check_file(file_path):
 
         # Methods inside classes
         elif isinstance(node, ast.ClassDef):
-
             for method in node.body:
-
                 if isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef)):
-
                     if method.name.startswith("_"):
                         continue
 
@@ -87,7 +82,6 @@ def main():
     all_missing = []
 
     for file in files:
-
         total, documented, missing = check_file(file)
 
         total_functions += total
@@ -105,7 +99,6 @@ def main():
         print("Missing docstrings:\n")
 
         for file, functions in all_missing:
-
             print(file.relative_to(SRC_DIR.parent).as_posix())
 
             for function in functions:

@@ -11,9 +11,9 @@ import numpy as np
 
 
 def build_index(
-    doc_embeddings: Union[Dict[str, np.ndarray], np.ndarray, List[np.ndarray]],
-    chunked_docs: Dict[str, List[str]] = None,
-) -> Tuple[faiss.IndexFlatIP, List[Dict]]:
+    doc_embeddings: dict[str, np.ndarray] | np.ndarray | list[np.ndarray],
+    chunked_docs: dict[str, list[str]] = None,
+) -> tuple[faiss.IndexFlatIP, list[dict]]:
     """
     Build a FAISS IndexFlatIP (Inner Product / Cosine Similarity) index.
 

@@ -11,6 +11,7 @@ Issue #2812: Visual indicators for low-confidence tags.
 """
 
 from typing import List, Optional
+import html as html_lib
 
 import streamlit as st
 
@@ -88,12 +89,18 @@ def render_tag(tag: DocumentTag, show_confidence: bool = True) -> str:
     Returns:
         HTML string representing the styled tag badge.
     """
-    # Use the domain model's built-in HTML badge generator
-    return tag.get_html_badge(show_confidence=show_confidence)
+    badge = tag.get_html_badge(show_confidence=show_confidence)
+    label = html_lib.escape(tag.name, quote=True)
+    # Clickable tag chips need an accessible name for screen readers (#3768).
+    return badge.replace(
+        "<span ",
+        f'<span role="button" aria-label="{label}" ',
+        1,
+    )
 
 
 def render_tag_collection(
-    tags: List[DocumentTag], title: Optional[str] = None, show_confidence: bool = True
+    tags: list[DocumentTag], title: Optional[str] = None, show_confidence: bool = True
 ) -> None:
     """Render a collection of DocumentTags in the Streamlit UI.
 

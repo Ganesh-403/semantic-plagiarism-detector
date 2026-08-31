@@ -12,8 +12,8 @@ The original source text is never replaced. Only ``embedding_text`` is
 translated to English so FAISS vectors for different languages share the same
 semantic space.
 
-Recent Additions (Issue #1956):
-- Implemented detect_chunk_language() using lightweight heuristics.
+Recent Additions (Issue #1956, #3696):
+- Implemented detect_chunk_language() using lightweight heuristics and thread-safe LRU cache.
 - Implemented back_translate_chunk() with SQLite cache integration.
 - Implemented verify_semantic_fidelity() for translation quality checks.
 """
@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import re
 from collections import OrderedDict
 from dataclasses import asdict, dataclass
@@ -31,7 +32,11 @@ from typing import Callable, Iterable, Optional
 import numpy as np
 from langdetect import DetectorFactory, LangDetectException, detect_langs
 
-from src.core.translator import translate_text
+from src.core.translator import (
+    translate_text,
+    translate_text_batch,
+    translate_text_secondary,
+)
 from src.db.translation_cache import get_cached_translation, save_translation
 
 logger = logging.getLogger(__name__)
@@ -46,7 +51,7 @@ MIN_DETECTION_CHARACTERS = 20
 # Target language for back-translation (primary corpus language)
 TARGET_LANGUAGE = "en"
 
-# ── Lightweight Language Detection Heuristics (Issue #1956, #2222) ────────────
+# ── Lightweight Language Detection Heuristics (Issue #1956, #2222, #3696) ────────────
 
 # Regex patterns for common stop words and character ranges.
 # Avoids heavy dependencies like langdetect for fast chunk-level detection.
@@ -73,7 +78,14 @@ _LANGUAGE_HEURISTICS = {
     ),
     "zh": re.compile(r"[\u4e00-\u9fff]"),  # CJK Unified Ideographs
     "ja": re.compile(r"[\u3040-\u309f\u30a0-\u30ff]"),  # Hiragana/Katakana
+    "ar": re.compile(r"[\u0600-\u06ff]"),  # Arabic script
+    "hi": re.compile(r"[\u0900-\u097f]"),  # Devanagari script (Hindi)
 }
+
+# Thread-safe LRU Cache for Language Detection
+_DETECT_LANG_CACHE_LOCK = RLock()
+_DETECT_LANG_CACHE: OrderedDict[str, str] = OrderedDict()
+_DETECT_LANG_CACHE_MAXSIZE = 1024
 
 
 def detect_chunk_language(text: str) -> str:
@@ -81,7 +93,8 @@ def detect_chunk_language(text: str) -> str:
 
     This function uses regex matching against common stop words and Unicode
     character ranges to identify the language without requiring heavy NLP
-    models or external API calls.
+    models or external API calls. Results are cached using a thread-safe
+    LRU cache to speed up multi-lingual processing.
 
     Args:
         text: The input text chunk to analyze.
@@ -92,34 +105,56 @@ def detect_chunk_language(text: str) -> str:
     if not text or not isinstance(text, str):
         return TARGET_LANGUAGE
 
-    # Check for CJK characters first as they are highly distinctive
+    # Generate SHA-256 hash for cache key
+    text_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+    # Check cache first
+    with _DETECT_LANG_CACHE_LOCK:
+        if text_hash in _DETECT_LANG_CACHE:
+            _DETECT_LANG_CACHE.move_to_end(text_hash)
+            return _DETECT_LANG_CACHE[text_hash]
+
+    detected_lang = TARGET_LANGUAGE
+    cjk_found = False
+
+    # Check for script-based languages first as they are highly distinctive
     for lang, pattern in _LANGUAGE_HEURISTICS.items():
-        if lang in ("zh", "ja"):
+        if lang in ("zh", "ja", "ar", "hi"):
             if pattern.search(text):
-                return lang
+                detected_lang = lang
+                cjk_found = True
+                break
 
-    # Count stop word matches for European languages
-    matches: dict[str, int] = {}
-    words = text.lower().split()
-    total_words = len(words)
+    if not cjk_found:
+        # Count stop word matches for European languages
+        matches: dict[str, int] = {}
+        words = text.lower().split()
+        total_words = len(words)
 
-    if total_words < 3:
-        return TARGET_LANGUAGE
+        if total_words >= 3:
+            for lang, pattern in _LANGUAGE_HEURISTICS.items():
+                if lang in ("zh", "ja", "ar", "hi"):
+                    continue
+                count = len(pattern.findall(text))
+                matches[lang] = count
 
-    for lang, pattern in _LANGUAGE_HEURISTICS.items():
-        if lang in ("zh", "ja"):
-            continue
-        count = len(pattern.findall(text))
-        matches[lang] = count
+            # Find the language with the highest stop word density
+            if matches:
+                best_lang = max(matches, key=matches.get)
+                # Require at least 15% of words to be stop words to avoid false positives
+                if matches[best_lang] / total_words > 0.15:
+                    detected_lang = best_lang
 
-    # Find the language with the highest stop word density
-    if matches:
-        best_lang = max(matches, key=matches.get)
-        # Require at least 15% of words to be stop words to avoid false positives
-        if matches[best_lang] / total_words > 0.15:
-            return best_lang
+    # Update cache securely
+    with _DETECT_LANG_CACHE_LOCK:
+        if text_hash in _DETECT_LANG_CACHE:
+            _DETECT_LANG_CACHE.move_to_end(text_hash)
+        else:
+            if len(_DETECT_LANG_CACHE) >= _DETECT_LANG_CACHE_MAXSIZE:
+                _DETECT_LANG_CACHE.popitem(last=False)
+        _DETECT_LANG_CACHE[text_hash] = detected_lang
 
-    return TARGET_LANGUAGE
+    return detected_lang
 
 
 # ── Back-Translation with SQLite Cache (Issue #1956) ─────────────────────────
@@ -177,7 +212,7 @@ def back_translate_chunk(
             target_lang=TARGET_LANGUAGE,
             source_lang=source_lang,
         )
-        
+
         # Validate translation result
         if not translated_text or not isinstance(translated_text, str):
             logger.warning(
@@ -187,9 +222,9 @@ def back_translate_chunk(
                 TARGET_LANGUAGE,
             )
             return text
-            
+
         translated_text = translated_text.strip()
-        
+
         # Check if translation is suspiciously identical to source
         # (could indicate translation service failure)
         if translated_text == text.strip() and source_lang != TARGET_LANGUAGE:
@@ -199,16 +234,29 @@ def back_translate_chunk(
                 source_lang,
                 TARGET_LANGUAGE,
             )
-        
+
     except Exception as exc:
-        # Graceful fallback: return original text if translation fails
         logger.error(
-            "Translation failed for %s -> %s: %s. Falling back to original text.",
+            "Translation failed for %s -> %s: %s. Attempting fallback.",
             source_lang,
             TARGET_LANGUAGE,
             exc,
-            exc_info=True,
         )
+        # Route to secondary translator if enabled (resilience layer)
+        if os.getenv("SECONDARY_TRANSLATOR_ENABLED", "false").lower() == "true":
+            try:
+                logger.info("Routing translation request to secondary offline model...")
+                translated_text = translate_text_secondary(
+                    text,
+                    target_lang=TARGET_LANGUAGE,
+                    source_lang=source_lang,
+                )
+                if translated_text:
+                    if use_cache:
+                        save_translation(text, source_lang, TARGET_LANGUAGE, translated_text)
+                    return translated_text
+            except Exception as sec_exc:
+                logger.error("Secondary offline model translation also failed: %s", sec_exc)
         return text
 
     # Save to cache
@@ -216,6 +264,106 @@ def back_translate_chunk(
         save_translation(text, source_lang, TARGET_LANGUAGE, translated_text)
 
     return translated_text
+
+
+def back_translate_chunks(
+    chunks: list[str],
+    source_lang: Optional[str] = None,
+) -> list[str]:
+    """Translate a list of document text chunks back to English.
+
+    Uncached chunks are batched into groups of 10 to minimize translation
+    API round-trips.
+
+    Args:
+        chunks: List of source text chunks to translate.
+        source_lang: Optional source language code. If None, auto-detected per chunk.
+
+    Returns:
+        List of translated text strings matching original index sequence.
+    """
+    if not chunks:
+        return []
+
+    # Initialize results list with placeholders
+    results: list[Optional[str]] = [None] * len(chunks)
+
+    # Store indices and text of uncached chunks grouped by source language
+    # structure: {lang: [(original_index, chunk_text), ...]}
+    uncached_by_lang: dict[str, list[tuple[int, str]]] = {}
+
+    for idx, chunk in enumerate(chunks):
+        if not chunk or not isinstance(chunk, str):
+            results[idx] = ""
+            continue
+
+        # Determine source language
+        lang = source_lang if source_lang is not None else detect_chunk_language(chunk)
+
+        # If it's already English, no translation needed
+        if lang == TARGET_LANGUAGE:
+            results[idx] = chunk
+            continue
+
+        # Check SQLite cache
+        cached = get_cached_translation(chunk, lang, TARGET_LANGUAGE)
+        if cached:
+            results[idx] = cached
+        else:
+            if lang not in uncached_by_lang:
+                uncached_by_lang[lang] = []
+            uncached_by_lang[lang].append((idx, chunk))
+
+    # Process uncached chunks by language in batches of 10
+    BATCH_SIZE = 10
+
+    for lang, items in uncached_by_lang.items():
+        for i in range(0, len(items), BATCH_SIZE):
+            batch = items[i : i + BATCH_SIZE]
+            batch_texts = [item[1] for item in batch]
+
+            try:
+                translated_batch = translate_text_batch(
+                    batch_texts,
+                    target_lang=TARGET_LANGUAGE,
+                    source_lang=lang,
+                )
+            except Exception as exc:
+                logger.error(
+                    "Batch translation failed for %s -> %s: %s. Falling back to individual translations.",
+                    lang,
+                    TARGET_LANGUAGE,
+                    exc,
+                )
+                translated_batch = []
+                for text in batch_texts:
+                    try:
+                        translated_batch.append(
+                            translate_text(text, target_lang=TARGET_LANGUAGE, source_lang=lang)
+                        )
+                    except Exception:
+                        translated_batch.append(text)
+
+            # Assign results and save to cache
+            for (idx, original_text), translated_text in zip(batch, translated_batch):
+                if (
+                    not translated_text
+                    or not isinstance(translated_text, str)
+                    or translated_text.lower().startswith("(translation error")
+                ):
+                    translated_text = original_text
+                else:
+                    translated_text = translated_text.strip()
+                    save_translation(original_text, lang, TARGET_LANGUAGE, translated_text)
+
+                results[idx] = translated_text
+
+    # Any remaining None gets original chunk
+    for idx, res in enumerate(results):
+        if res is None:
+            results[idx] = chunks[idx]
+
+    return results
 
 
 # ── Semantic Fidelity Verification (Issue #1956) ─────────────────────────────
@@ -535,7 +683,7 @@ def prepare_chunks_for_embedding(
     metadata: list[dict[str, object]] = []
 
     for chunk in chunks:
-        prepared = prepare_text_for_embedding(chunk)
+        prepared = prepare_text_for_embedding(chunk.text if hasattr(chunk, "text") else chunk)
         embedding_chunks.append(str(prepared["embedding_text"]))
         metadata.append(prepared)
 

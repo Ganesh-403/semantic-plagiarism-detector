@@ -71,7 +71,7 @@ def _build_essay(fake, topic: str, student_name: str) -> str:
     return essay
 
 
-def generate_mock_essays(num_essays: int = 5) -> List[Tuple[str, str, str]]:
+def generate_mock_essays(num_essays: int = 5) -> list[tuple[str, str, str]]:
     """Return a list of (filename, student_name, essay_text) tuples.
 
     Args:
@@ -94,7 +94,7 @@ def generate_mock_essays(num_essays: int = 5) -> List[Tuple[str, str, str]]:
     fake = Faker()
     Faker.seed(42)  # Reproducible names/sentences across runs
 
-    essays: List[Tuple[str, str, str]] = []
+    essays: list[tuple[str, str, str]] = []
     for i in range(num_essays):
         topic = _ESSAY_TOPICS[i % len(_ESSAY_TOPICS)]
         student_name = fake.name()
@@ -112,7 +112,7 @@ def generate_mock_data(
     assignment_title: str = "Demo Assignment",
     chunk_size: int = 500,
     chunk_overlap: int = 50,
-) -> Dict:
+) -> dict:
     """Generate fake essays, persist them to corpus.db, and build a FAISS index.
 
     This is the main entry-point called by the Admin sidebar button.
@@ -153,10 +153,10 @@ def generate_mock_data(
 
     essays = generate_mock_essays(num_essays)
 
-    added: List[Tuple[str, str]] = []
-    skipped: List[str] = []
+    added: list[tuple[str, str]] = []
+    skipped: list[str] = []
 
-    raw_texts: Dict[str, str] = {}
+    raw_texts: dict[str, str] = {}
 
     for filename, student_name, text in essays:
         file_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -201,7 +201,7 @@ def generate_mock_data(
             chunk_rows = []
             for chunk_idx, (chunk_text, vec) in enumerate(zip(chunks, emb_array)):
                 vector_id = current_count + len(chunk_rows)
-                chunk_rows.append((vector_id, doc_name, chunk_idx, chunk_text, vec))
+                chunk_rows.append((vector_id, doc_name, chunk_idx, chunk_text.text, vec))
 
             if chunk_rows:
                 add_chunks(chunk_rows)
@@ -215,8 +215,8 @@ def generate_mock_data(
         registry = get_chunk_registry()
 
         # Group embeddings back into per-doc dicts for build_index
-        chunked_for_index: Dict[str, List[str]] = {}
-        embeddings_for_index: Dict[str, np.ndarray] = {}
+        chunked_for_index: dict[str, list[str]] = {}
+        embeddings_for_index: dict[str, np.ndarray] = {}
 
         for record in registry:
             chunked_for_index.setdefault(record.doc_name, []).append(record.chunk_text)

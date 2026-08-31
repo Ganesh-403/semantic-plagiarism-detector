@@ -107,10 +107,10 @@ def test_redis_configurable_timeout():
 
     import src.utils.redis_cache
 
-    with patch.dict(os.environ, {"REDIS_TIMEOUT_SECONDS": "4.5"}), patch(
-        "redis.from_url"
-    ) as mock_from_url:
-
+    with (
+        patch.dict(os.environ, {"REDIS_TIMEOUT_SECONDS": "4.5"}),
+        patch("redis.from_url") as mock_from_url,
+    ):
         # Reload the module to pick up the new environment variable value
         importlib.reload(src.utils.redis_cache)
 

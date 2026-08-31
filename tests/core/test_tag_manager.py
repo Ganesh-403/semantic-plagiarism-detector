@@ -139,5 +139,3 @@ def test_sanitize_tag_name_html_entity_encoded_payload():
     entity_script_only = "&lt;script&gt;&lt;/script&gt;"
     with pytest.raises(ValueError, match="cannot be empty"):
         sanitize_tag_name(entity_script_only)
-
-

@@ -11,6 +11,7 @@ import logging
 
 from src.utils.badge_generator import (
     CSS_NAMED_COLORS,
+    DEFAULT_BADGE_COLOR,
     generate_svg_badge,
     validate_hex_color,
 )
@@ -25,19 +26,19 @@ class TestValidateHexColorStandard:
         assert validate_hex_color("#00FF00") == "#00ff00"
         assert validate_hex_color("#123abc") == "#123abc"
 
-    def test_valid_3_digit_hex_normalized(self):
-        """Verify 3-digit hex codes are normalized to 6 digits."""
-        assert validate_hex_color("#f00") == "#ff0000"
-        assert validate_hex_color("#0F0") == "#00ff00"
-        assert validate_hex_color("#123") == "#112233"
+    def test_valid_3_digit_hex(self):
+        """Verify 3-digit hex codes are accepted as-is."""
+        assert validate_hex_color("#f00") == "#f00"
+        assert validate_hex_color("#0F0") == "#0f0"
+        assert validate_hex_color("#123") == "#123"
 
     def test_valid_8_digit_hex_with_alpha(self):
         """Verify 8-digit hex codes (with alpha channel) are accepted."""
         assert validate_hex_color("#ff000080") == "#ff000080"
 
-    def test_valid_4_digit_hex_with_alpha_normalized(self):
-        """Verify 4-digit hex codes are normalized to 8 digits."""
-        assert validate_hex_color("#f008") == "#ff000088"
+    def test_valid_4_digit_hex_with_alpha(self):
+        """Verify 4-digit hex codes are accepted as-is."""
+        assert validate_hex_color("#f008") == "#f008"
 
     def test_whitespace_stripped(self):
         """Verify leading/trailing whitespace is stripped before validation."""
@@ -84,28 +85,28 @@ class TestValidateHexColorFallback:
 
     def test_invalid_named_color_falls_back(self):
         """Verify unrecognized named colors fall back to default."""
-        assert validate_hex_color("notacolor") == "#2563eb"
-        assert validate_hex_color("superred") == "#2563eb"
+        assert validate_hex_color("notacolor") == DEFAULT_BADGE_COLOR
+        assert validate_hex_color("superred") == DEFAULT_BADGE_COLOR
 
     def test_invalid_hex_format_falls_back(self):
         """Verify malformed hex codes fall back to default."""
-        assert validate_hex_color("#gg0000") == "#2563eb"  # Invalid hex chars
-        assert validate_hex_color("#12345") == "#2563eb"  # 5 digits (invalid)
-        assert validate_hex_color("ff0000") == "#2563eb"  # Missing #
+        assert validate_hex_color("#gg0000") == DEFAULT_BADGE_COLOR  # Invalid hex chars
+        assert validate_hex_color("#12345") == DEFAULT_BADGE_COLOR  # 5 digits (invalid)
+        assert validate_hex_color("ff0000") == DEFAULT_BADGE_COLOR  # Missing #
 
     def test_empty_string_falls_back(self):
         """Verify empty strings fall back to default."""
-        assert validate_hex_color("") == "#2563eb"
-        assert validate_hex_color("   ") == "#2563eb"
+        assert validate_hex_color("") == DEFAULT_BADGE_COLOR
+        assert validate_hex_color("   ") == DEFAULT_BADGE_COLOR
 
     def test_none_input_falls_back(self):
         """Verify None input falls back to default."""
-        assert validate_hex_color(None) == "#2563eb"
+        assert validate_hex_color(None) == DEFAULT_BADGE_COLOR
 
     def test_non_string_input_falls_back(self):
         """Verify non-string inputs fall back to default."""
-        assert validate_hex_color(12345) == "#2563eb"
-        assert validate_hex_color(["#ff0000"]) == "#2563eb"
+        assert validate_hex_color(12345) == DEFAULT_BADGE_COLOR
+        assert validate_hex_color(["#ff0000"]) == DEFAULT_BADGE_COLOR
 
     def test_custom_default_color(self):
         """Verify custom default color is used when validation fails."""
