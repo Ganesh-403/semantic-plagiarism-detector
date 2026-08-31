@@ -1,0 +1,268 @@
+"""
+CSV Exporter for the Report Generation Module
+Exports report data to CSV format for external analysis.
+"""
+
+import csv
+import io
+from typing import Dict, Any, List, Optional
+from datetime import datetime
+
+from src.models.report import Report, ReportConfig
+
+
+class CSVExporter:
+    """
+    Exports report data to CSV format with multiple sheets/sections.
+    """
+    
+    def __init__(self):
+        self.delimiter = ','
+        self.encoding = 'utf-8'
+    
+    def export(self, report: Report, content: Dict[str, Any]) -> str:
+        """
+        Export report data to CSV format.
+        
+        Args:
+            report: Report object
+            content: Report content data
+        
+        Returns:
+            CSV string
+        """
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header section
+        writer.writerow(['=' * 60])
+        writer.writerow([f'Report: {report.title}'])
+        writer.writerow([f'Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'])
+        writer.writerow([f'Report ID: {report.id}'])
+        writer.writerow([f'Type: {report.report_type.value}'])
+        writer.writerow(['=' * 60])
+        writer.writerow([])
+        
+        # Write summary statistics
+        if report.statistics:
+            writer.writerow(['SUMMARY STATISTICS'])
+            writer.writerow(['-' * 40])
+            stats = report.statistics
+            stat_items = [
+                ('Total Documents', stats.get('total_documents', 0)),
+                ('Total Comparisons', stats.get('total_comparisons', 0)),
+                ('Total Matches', stats.get('total_matches', 0)),
+                ('Average Similarity', f"{stats.get('avg_similarity', 0):.4f}"),
+                ('Median Similarity', f"{stats.get('median_similarity', 0):.4f}"),
+                ('Max Similarity', f"{stats.get('max_similarity', 0):.4f}"),
+                ('Min Similarity', f"{stats.get('min_similarity', 0):.4f}"),
+                ('Std Deviation', f"{stats.get('std_similarity', 0):.4f}"),
+                ('High Severity (≥80%)', stats.get('high_severity_count', 0)),
+                ('Medium Severity (50-80%)', stats.get('medium_severity_count', 0)),
+                ('Low Severity (30-50%)', stats.get('low_severity_count', 0)),
+                ('Very Low (<30%)', stats.get('none_severity_count', 0))
+            ]
+            for label, value in stat_items:
+                writer.writerow([label, value])
+            writer.writerow([])
+        
+        # Write similarity matrix
+        if report.similarity_matrix and report.document_names:
+            writer.writerow(['SIMILARITY MATRIX'])
+            writer.writerow(['-' * 40])
+            
+            # Header row with document names
+            header = [''] + report.document_names
+            writer.writerow(header)
+            
+            # Data rows
+            for i, row in enumerate(report.similarity_matrix):
+                row_data = [report.document_names[i]] + [f"{val:.4f}" for val in row]
+                writer.writerow(row_data)
+            writer.writerow([])
+        
+        # Write matches
+        if report.matches:
+            writer.writerow(['DETECTED MATCHES'])
+            writer.writerow(['-' * 40])
+            writer.writerow([
+                'Match ID',
+                'Source Document',
+                'Target Document',
+                'Lexical Score',
+                'Semantic Score',
+                'Hybrid Score',
+                'Severity'
+            ])
+            
+            for i, match in enumerate(report.matches, 1):
+                score = match.get('hybrid_score', match.get('score', 0))
+                
+                if score >= 0.8:
+                    severity = 'High'
+                elif score >= 0.6:
+                    severity = 'Medium'
+                elif score >= 0.4:
+                    severity = 'Low'
+                else:
+                    severity = 'None'
+                
+                writer.writerow([
+                    i,
+                    match.get('source_document', 'Unknown'),
+                    match.get('target_document', 'Unknown'),
+                    f"{match.get('lexical_score', 0):.4f}",
+                    f"{match.get('semantic_score', 0):.4f}",
+                    f"{match.get('hybrid_score', match.get('score', 0)):.4f}",
+                    severity
+                ])
+            writer.writerow([])
+        
+        # Write document list
+        if report.document_names:
+            writer.writerow(['DOCUMENTS ANALYZED'])
+            writer.writerow(['-' * 40])
+            writer.writerow(['Document ID', 'Document Name'])
+            for i, name in enumerate(report.document_names, 1):
+                writer.writerow([i, name])
+            writer.writerow([])
+        
+        # Write footer
+        writer.writerow(['=' * 60])
+        writer.writerow(['Report generated by Semantic Plagiarism Detector'])
+        writer.writerow([f'Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'])
+        writer.writerow(['=' * 60])
+        
+        return output.getvalue()
+    
+    def export_matches_only(self, report: Report) -> str:
+        """
+        Export only matches to CSV.
+        
+        Args:
+            report: Report object
+        
+        Returns:
+            CSV string with matches only
+        """
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        writer.writerow([
+            'Source Document',
+            'Target Document',
+            'Lexical Score',
+            'Semantic Score',
+            'Hybrid Score',
+            'Severity'
+        ])
+        
+        for match in report.matches:
+            score = match.get('hybrid_score', match.get('score', 0))
+            
+            if score >= 0.8:
+                severity = 'High'
+            elif score >= 0.6:
+                severity = 'Medium'
+            elif score >= 0.4:
+                severity = 'Low'
+            else:
+                severity = 'None'
+            
+            writer.writerow([
+                match.get('source_document', 'Unknown'),
+                match.get('target_document', 'Unknown'),
+                f"{match.get('lexical_score', 0):.4f}",
+                f"{match.get('semantic_score', 0):.4f}",
+                f"{match.get('hybrid_score', match.get('score', 0)):.4f}",
+                severity
+            ])
+        
+        return output.getvalue()
+    
+    def export_summary_only(self, report: Report) -> str:
+        """
+        Export only summary statistics to CSV.
+        
+        Args:
+            report: Report object
+        
+        Returns:
+            CSV string with summary only
+        """
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        writer.writerow(['Metric', 'Value'])
+        
+        stats = report.statistics
+        stat_items = [
+            ('Total Documents', stats.get('total_documents', 0)),
+            ('Total Comparisons', stats.get('total_comparisons', 0)),
+            ('Total Matches', stats.get('total_matches', 0)),
+            ('Average Similarity', f"{stats.get('avg_similarity', 0):.4f}"),
+            ('Median Similarity', f"{stats.get('median_similarity', 0):.4f}"),
+            ('Max Similarity', f"{stats.get('max_similarity', 0):.4f}"),
+            ('Min Similarity', f"{stats.get('min_similarity', 0):.4f}"),
+            ('Std Deviation', f"{stats.get('std_similarity', 0):.4f}"),
+            ('High Severity (≥80%)', stats.get('high_severity_count', 0)),
+            ('Medium Severity (50-80%)', stats.get('medium_severity_count', 0)),
+            ('Low Severity (30-50%)', stats.get('low_severity_count', 0)),
+            ('Very Low (<30%)', stats.get('none_severity_count', 0))
+        ]
+        
+        for label, value in stat_items:
+            writer.writerow([label, value])
+        
+        return output.getvalue()
+    
+    def export_matrix_only(self, report: Report) -> str:
+        """
+        Export only similarity matrix to CSV.
+        
+        Args:
+            report: Report object
+        
+        Returns:
+            CSV string with matrix only
+        """
+        if not report.similarity_matrix or not report.document_names:
+            return "No similarity matrix available"
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Header
+        header = [''] + report.document_names
+        writer.writerow(header)
+        
+        # Data rows
+        for i, row in enumerate(report.similarity_matrix):
+            row_data = [report.document_names[i]] + [f"{val:.4f}" for val in row]
+            writer.writerow(row_data)
+        
+        return output.getvalue()
+    
+    def export_to_dict(self, report: Report) -> Dict[str, Any]:
+        """
+        Export report data as dictionary (for JSON conversion).
+        
+        Args:
+            report: Report object
+        
+        Returns:
+            Dictionary representation of report data
+        """
+        result = {
+            'report_id': report.id,
+            'title': report.title,
+            'description': report.description,
+            'generated_at': report.generated_at.isoformat(),
+            'report_type': report.report_type.value,
+            'statistics': report.statistics,
+            'document_names': report.document_names,
+            'matches': report.matches,
+            'similarity_matrix': report.similarity_matrix
+        }
+        
+        return result
