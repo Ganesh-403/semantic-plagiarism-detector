@@ -117,7 +117,7 @@ requests==2.34.2
 responses==0.26.2
 rich==15.0.0
 rpds-py==2026.6.3
-ruff==0.16.0
+ruff==0.16.5
 safetensors==0.8.0
 scikit-learn==1.9.0
 scipy==1.18.0
