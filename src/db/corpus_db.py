@@ -153,13 +153,13 @@ def _connect():
     if conn is None:
         try:
             conn = sqlite3.connect(
-                path, check_same_thread=False, factory=WeakConnection, timeout=15.0
+                path, check_same_thread=False, factory=WeakConnection
             )
         except sqlite3.OperationalError:
             path = str(FALLBACK_CORPUS_DB_PATH)
             os.makedirs(os.path.dirname(path), exist_ok=True)
             conn = sqlite3.connect(
-                path, check_same_thread=False, factory=WeakConnection, timeout=15.0
+                path, check_same_thread=False, factory=WeakConnection
             )
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA journal_mode=WAL")
@@ -1403,7 +1403,7 @@ def vacuum_corpus_database() -> None:
     close_connections(all_threads=True)
 
     path = get_corpus_db_path()
-    conn = sqlite3.connect(os.path.abspath(path), timeout=15.0)
+    conn = sqlite3.connect(os.path.abspath(path))
     conn.isolation_level = None
     try:
         conn.execute("VACUUM")
@@ -1418,7 +1418,7 @@ def optimize_database() -> dict[str, any]:
     try:
         size_before = path.stat().st_size if path.exists() else 0
 
-        conn = sqlite3.connect(os.path.abspath(path), timeout=15.0)
+        conn = sqlite3.connect(os.path.abspath(path))
         conn.isolation_level = None
         try:
             conn.execute("VACUUM")
@@ -1688,8 +1688,8 @@ def get_embedding_storage_footprint() -> dict[str, int | float]:
         "chunk_count": chunk_count,
     }
 
+
 def get_documents_with_embeddings() -> list[str]:
-    """Return documents that have persisted chunk embeddings."""
     with _connect() as conn:
         rows = conn.execute(
             """
@@ -1699,5 +1699,4 @@ def get_documents_with_embeddings() -> list[str]:
             ORDER BY filename ASC
             """
         ).fetchall()
-
     return [row["filename"] for row in rows]
