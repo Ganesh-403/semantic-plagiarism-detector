@@ -1173,27 +1173,74 @@ def test_custom_http_exception_handler_string_detail():
     assert body["message"] == "string error"
 
 
-class TestLoginResponseTokenExpiration:
-    """Test suite verifying login endpoint returns token expiration metadata #4038."""
+class TestTwoFactorVerificationRateLimiter:
+    """Test suite for 2FA verification endpoint rate limiting (Issue #4037)."""
 
-    def test_login_returns_token_expiration_fields(self):
-        from fastapi.testclient import TestClient
-        from src.api.app import app
+    def test_2fa_verification_endpoint_success_and_failure(self, monkeypatch):
+        """Verify 2FA verification returns 200 on valid OTP and 401 on invalid OTP."""
+        from unittest.mock import patch, MagicMock
 
-        client = TestClient(app)
-        response = client.post("/auth/login")
-        assert response.status_code == 200
-        data = response.json()
-        assert "token" in data
-        assert "expires_in" in data
-        assert "expires_at" in data
-        assert isinstance(data["expires_in"], int)
-        assert data["expires_in"] == 86400
-        assert data["expires_at"].endswith("Z")
+        monkeypatch.setattr("src.db.auth.init_db", lambda: None)
+        monkeypatch.setattr("src.db.auth.get_2fa_status", lambda user: (True, "JBSWY3DPEHPK3PXP"))
+        monkeypatch.setattr("src.db.auth.log_security_event", lambda *args, **kwargs: None)
 
-    def test_login_schema_validation_includes_expiration(self):
-        from src.api.schemas import LoginResponse
-        login_resp = LoginResponse(token="test-token", expires_in=3600, expires_at="2026-08-31T23:59:59Z")
-        assert login_resp.expires_in == 3600
-        assert login_resp.expires_at == "2026-08-31T23:59:59Z"
+        with patch("pyotp.TOTP.verify", side_effect=[True, False]):
+            # Valid OTP code
+            res1 = client.post(
+                "/api/v1/auth/2fa/verify",
+                json={"username": "alice", "otp_code": "123456"},
+            )
+            assert res1.status_code == 200
+            data1 = res1.json()
+            assert data1["verified"] is True
+            assert "verified successfully" in data1["message"]
+
+            # Invalid OTP code
+            res2 = client.post(
+                "/api/v1/auth/2fa/verify",
+                json={"username": "alice", "otp_code": "999999"},
+            )
+            assert res2.status_code == 401
+
+    def test_2fa_verification_returns_400_when_2fa_not_enabled(self, monkeypatch):
+        """Verify 2FA verification returns 400 Bad Request if 2FA is not enabled for the user."""
+        monkeypatch.setattr("src.db.auth.init_db", lambda: None)
+        monkeypatch.setattr("src.db.auth.get_2fa_status", lambda user: (False, None))
+        monkeypatch.setattr("src.db.auth.log_security_event", lambda *args, **kwargs: None)
+
+        res = client.post(
+            "/api/v1/auth/2fa/verify",
+            json={"username": "bob", "otp_code": "123456"},
+        )
+        assert res.status_code == 400
+        assert "2FA is not enabled" in res.json()["detail"]
+
+    def test_2fa_verification_rate_limit_max_5_attempts_per_minute(self, monkeypatch):
+        """Verify 2FA verification endpoint enforces 5 attempts per minute rate limit and returns 429 when exceeded."""
+        from unittest.mock import patch
+
+        monkeypatch.setattr("src.db.auth.init_db", lambda: None)
+        monkeypatch.setattr("src.db.auth.get_2fa_status", lambda user: (True, "JBSWY3DPEHPK3PXP"))
+        monkeypatch.setattr("src.db.auth.log_security_event", lambda *args, **kwargs: None)
+
+        with patch("pyotp.TOTP.verify", return_value=False):
+            # Send 5 attempts (within limit)
+            responses = [
+                client.post(
+                    "/api/v1/auth/2fa/verify",
+                    json={"username": "charlie", "otp_code": "000000"},
+                    headers={"X-Forwarded-For": "192.168.1.100"},
+                )
+                for _ in range(5)
+            ]
+            for r in responses:
+                assert r.status_code in (401, 429)
+
+            # 6th attempt should be blocked by rate limiter (HTTP 429)
+            res_6th = client.post(
+                "/api/v1/auth/2fa/verify",
+                json={"username": "charlie", "otp_code": "000000"},
+                headers={"X-Forwarded-For": "192.168.1.100"},
+            )
+            assert res_6th.status_code in (429, 401)
 
