@@ -15,6 +15,16 @@ Recent Additions (Issue #1956):
 import logging
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
+from src.core.match_consolidation import (
+    ChunkMatch,
+    chunk_offsets,
+    consolidate_chunk_matches,
+    consolidated_target_coverage,
+)
+from src.core.language_similarity_config import (
+    build_language_metadata,
+    get_language_pair_policy,
+)
 from src.core.plagiarism_evidence import build_plagiarism_evidence
 from src.core.threshold_calibration import (compute_calibration_metrics,
                                             find_optimal_threshold)
@@ -724,6 +734,7 @@ def flag_plagiarism(
     use_cross_encoder: bool = CROSS_ENCODER_RERANKING_ENABLED,
     cross_encoder_model: str = DEFAULT_CROSS_ENCODER_MODEL,
     cross_encoder_top_k: int = DEFAULT_CROSS_ENCODER_TOP_K,
+    language_metadata: Optional[dict[str, dict[str, Any]]] = None,
 ) -> list[dict]:
     """Identify document pairs whose similarity reaches the threshold.
 
@@ -746,6 +757,18 @@ def flag_plagiarism(
     doc_names = similarity_df.columns.tolist()
     name_to_idx = {name: i for i, name in enumerate(doc_names)}
 
+    if language_metadata is None and chunked_docs is not None:
+        language_metadata = build_language_metadata(
+            {
+                name: " ".join(
+                    chunk.text if hasattr(chunk, "text") else str(chunk)
+                    for chunk in chunks
+                )
+                for name, chunks in chunked_docs.items()
+            }
+        )
+
+    language_metadata = language_metadata or {}
     if candidate_pairs is not None:
         pairs_to_check = [
             (name_to_idx[a], name_to_idx[b])
@@ -760,33 +783,155 @@ def flag_plagiarism(
     for i, j in pairs_to_check:
         score = float(similarity_df.iloc[i, j])
 
-        if is_plagiarism(score, threshold):
+        effective_threshold = threshold
+
+        if is_plagiarism(score, effective_threshold):
             doc_a = doc_names[i]
             doc_b = doc_names[j]
             matched_length = 0
             chunk_pair_texts = None
 
+            source_language_info = language_metadata.get(
+                doc_a,
+                {"language": "unknown", "language_confident": False},
+            )
+            target_language_info = language_metadata.get(
+                doc_b,
+                {"language": "unknown", "language_confident": False},
+            )
+
+            source_language = source_language_info.get("language", "unknown")
+            target_language = target_language_info.get("language", "unknown")
+            detection_confident = bool(
+                source_language_info.get("language_confident", False)
+                and target_language_info.get("language_confident", False)
+            )
+
+            language_policy = get_language_pair_policy(
+                source_language,
+                target_language,
+                detection_confident=detection_confident,
+                base_threshold=threshold,
+            )
+
+            effective_threshold = language_policy.threshold
             if chunked_docs is not None and embeddings is not None:
-                sim_matrix = cosine_similarity(embeddings[doc_a], embeddings[doc_b])
-                idx_a, idx_b = np.unravel_index(np.argmax(sim_matrix), sim_matrix.shape)
+                sim_matrix = cosine_similarity(
+                    embeddings[doc_a],
+                    embeddings[doc_b],
+                )
+
+                idx_a, idx_b = np.unravel_index(
+                    np.argmax(sim_matrix),
+                    sim_matrix.shape,
+                )
+
                 chunk_a = chunked_docs[doc_a][idx_a]
                 chunk_b = chunked_docs[doc_b][idx_b]
-                chunk_text = chunk_a.text if hasattr(chunk_a, "text") else chunk_a
-                chunk_text_b = chunk_b.text if hasattr(chunk_b, "text") else chunk_b
+
+                chunk_text = (
+                    chunk_a.text if hasattr(chunk_a, "text") else chunk_a
+                )
+                chunk_text_b = (
+                    chunk_b.text if hasattr(chunk_b, "text") else chunk_b
+                )
+
                 matched_length = len(chunk_text.split())
                 chunk_pair_texts = (chunk_text, chunk_text_b)
-            flag_dict = {
-                "doc_a": doc_a,
-                "doc_b": doc_b,
-                "similarity": round(score, 4),
-                "threshold_at_time_of_flag": float(threshold),
-                "matched_length": matched_length,
-                "severity": severity_from_score(
-                    score,
-                    DEFAULT_THRESHOLDS,
-                ),
-            }
 
+                source_offsets, source_length = chunk_offsets(
+                    chunked_docs[doc_a]
+                )
+                target_offsets, target_length = chunk_offsets(
+                    chunked_docs[doc_b]
+                )
+
+                chunk_matches = [
+                    ChunkMatch(
+                        source_index=int(match_i),
+                        target_index=int(match_j),
+                        source_start=source_offsets[match_i][0],
+                        source_end=source_offsets[match_i][1],
+                        target_start=target_offsets[match_j][0],
+                        target_end=target_offsets[match_j][1],
+                        similarity=float(sim_matrix[match_i, match_j]),
+                        source_text=(
+                            chunked_docs[doc_a][match_i].text
+                            if hasattr(
+                                chunked_docs[doc_a][match_i],
+                                "text",
+                            )
+                            else chunked_docs[doc_a][match_i]
+                        ),
+                        target_text=(
+                            chunked_docs[doc_b][match_j].text
+                            if hasattr(
+                                chunked_docs[doc_b][match_j],
+                                "text",
+                            )
+                            else chunked_docs[doc_b][match_j]
+                        ),
+                    )
+                    for match_i, match_j in np.argwhere(
+                        sim_matrix >= threshold
+                    )
+                ]
+
+                segments = consolidate_chunk_matches(
+                    chunk_matches,
+                    source_length=source_length,
+                    target_length=target_length,
+                )
+
+                flag_dict = {
+                    "doc_a": doc_a,
+                    "doc_b": doc_b,
+                    "similarity": round(score, 4),
+                    "threshold_at_time_of_flag": float(effective_threshold),
+                    "matched_length": matched_length,
+                    "severity": severity_from_score(
+                        score,
+                        DEFAULT_THRESHOLDS,
+                    ),
+                    "language_pair": {
+                        "source": language_policy.source_language,
+                        "target": language_policy.target_language,
+                        "same_language": language_policy.same_language,
+                        "cross_lingual": language_policy.cross_lingual,
+                        "detection_confident": language_policy.detection_confident,
+                        "lexical_processing_available": (
+                            language_policy.lexical_processing_available
+                        ),
+                        "embedding_compatible": (
+                            language_policy.embedding_compatible
+                        ),
+                    },
+                    "chunk_matches": [
+                            match.to_dict() for match in chunk_matches
+                        ],
+                        "plagiarism_segments": [
+                            segment.to_dict() for segment in segments
+                        ],
+                        "plagiarism_coverage": round(
+                            consolidated_target_coverage(
+                                segments,
+                                target_length,
+                            ),
+                            4,
+                        ),
+                    }
+            else:
+                flag_dict = {
+                    "doc_a": doc_a,
+                    "doc_b": doc_b,
+                    "similarity": round(score, 4),
+                    "threshold_at_time_of_flag": float(threshold),
+                    "matched_length": matched_length,
+                    "severity": severity_from_score(
+                        score,
+                        DEFAULT_THRESHOLDS,
+                    ),
+                }
             # Attach evidence if chunk data available
             if chunk_pair_texts is not None:
                 evidence = build_plagiarism_evidence(

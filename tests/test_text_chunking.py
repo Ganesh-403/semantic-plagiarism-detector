@@ -110,6 +110,27 @@ class TestChunkingEdgeCases:
         chunks = chunk_text(text, max_chunk_size=5)
         assert "".join(chunks) == text
 
+    def test_repetitive_single_character_adversarial_10k_a(self):
+        """Issue #4006: Test chunking an adversarial document containing 10,000 'a'
+        characters without spaces or periods to verify it splits into fixed chunks
+        without infinite loops.
+        """
+        import time
+
+        adversarial_text = "a" * 10000
+        chunk_size = 50
+
+        start_time = time.time()
+        chunks = chunk_text(adversarial_text, max_chunk_size=chunk_size)
+        elapsed_time = time.time() - start_time
+
+        # Assert chunker splits text without hanging (< 1.0s)
+        assert elapsed_time < 1.0
+        assert len(chunks) == 200
+        assert all(len(c) == chunk_size for c in chunks)
+        assert "".join(chunks) == adversarial_text
+
+
 
 # ==============================================================================
 # SECTION 4: Random Fuzz Testing (The "Property" Part)

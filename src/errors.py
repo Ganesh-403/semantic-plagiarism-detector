@@ -92,6 +92,11 @@ __all__ = [
     "CLI_THRESHOLD_INVALID",
     "CLI_INVALID_COMMAND",
     "EXPORT_GENERATION_IO_FAILED",
+    "EVENT_MALFORMED_PAYLOAD",
+    "EVENT_MISSING_FIELD",
+    "EVENT_UNKNOWN_TYPE",
+    "EventSchemaError",
+    "SSOConfigurationError",
     "PDFEncryptedError",
 ]
 
@@ -309,4 +314,3 @@ class PDFEncryptedError(ValueError):
 
     def __str__(self) -> str:
         return self.message
-

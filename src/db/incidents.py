@@ -495,6 +495,33 @@ def get_total_incidents_count(
     return int(row[0]) if row is not None else 0
 
 
+def get_incident_statistics(
+    db_path: str | Path = DEFAULT_DB_PATH,
+) -> dict[str, Any]:
+    """Return a summary of plagiarism incident statistics.
+    Returns:
+        A dictionary containing:
+        - 'total': Total number of visible incidents.
+        - 'severity_distribution': A mapping of severity levels to counts.
+        - 'daily_counts': A list of daily incident counts.
+    """
+    total = get_total_incidents_count(db_path)
+    
+    # Get distribution by severity
+    severity_distribution = {}
+    for level in ["High", "Medium", "Low"]:
+        severity_distribution[level] = len(get_incidents_by_severity(level, db_path))
+        
+    # Get daily counts
+    daily_counts = get_incidents_count_by_date(db_path)
+    
+    return {
+        "total": total,
+        "severity_distribution": severity_distribution,
+        "daily_counts": daily_counts,
+    }
+
+
 def get_incident_by_id(
     incident_id: int,
     db_path: str | Path | None = None,

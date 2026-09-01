@@ -171,6 +171,24 @@ def _detect_device(model: SentenceTransformer | None = None) -> str:
     return "cpu"
 
 
+def get_device(model: SentenceTransformer | None = None) -> str:
+    """Public helper function to inspect and get the target hardware compute device.
+
+    Checks available hardware backends in priority order:
+    1. Intel XPU acceleration
+    2. NVIDIA CUDA / AMD ROCm HIP GPU acceleration
+    3. Apple Silicon Metal Performance Shaders (MPS) acceleration via torch.backends.mps.is_available()
+    4. CPU fallback
+
+    Args:
+        model: Optional SentenceTransformer model instance to inspect active device attribute.
+
+    Returns:
+        Device string identifier ("cuda", "mps", "xpu", or "cpu").
+    """
+    return _detect_device(model)
+
+
 def _get_model_name() -> str:
     """Return the configured sentence-transformers model name."""
     return os.getenv("SEMANTIC_PLAGIARISM_MODEL", _DEFAULT_MODEL_NAME)
@@ -206,7 +224,10 @@ class EmbeddingModelManager:
         self._quantized_model = None
 
     @classmethod
-    def get_instance(cls, quantize_model: bool = False) -> "EmbeddingModelManager":
+    def get_instance(cls, quantize_model: bool | None = None) -> "EmbeddingModelManager":
+        if quantize_model is None:
+            quantize_model = is_quantization_enabled()
+            
         if cls._instance is None:
             cls._instance = cls(quantize_model=quantize_model)
         elif quantize_model and not cls._instance.quantize_model:
@@ -293,9 +314,20 @@ class EmbeddingModelManager:
         return _model
 
 
+def is_quantization_enabled() -> bool:
+    """Check if dynamic INT8 quantization is enabled via ENABLE_EMBEDDING_QUANTIZATION environment variable.
+
+    Returns:
+        True if ENABLE_EMBEDDING_QUANTIZATION is set to 'true', '1', or 'yes' (case-insensitive).
+    """
+    env_val = os.getenv("ENABLE_EMBEDDING_QUANTIZATION", "false").lower().strip()
+    return env_val in ("true", "1", "yes")
+
+
 def _get_model() -> SentenceTransformer:
     """Lazy-load the Sentence Transformer model (singleton pattern)."""
-    return EmbeddingModelManager.get_instance().get_model()
+    quantize = is_quantization_enabled()
+    return EmbeddingModelManager.get_instance(quantize_model=quantize).get_model()
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
@@ -475,8 +507,9 @@ def embed_chunks(
         empty array of shape (0, 384) if the input list is empty.
     """
     if not chunks:
-        return np.empty((0, 384), dtype=np.float32)
-
+        model = _get_model()
+        dimension = model.get_sentence_embedding_dimension()
+        return np.empty((0, dimension), dtype=np.float32)
     if batch_size is None:
         batch_size = _get_embedding_batch_size()
 
@@ -551,9 +584,14 @@ def embed_documents(
     doc_names: list[str] = []
 
     # Initialize all documents with empty arrays to ensure consistent return types
-    for doc_name in chunked_docs.keys():
-        embeddings[doc_name] = np.empty((0, 384), dtype=np.float32)
+    model = _get_model()
+    embedding_dimension = model.get_sentence_embedding_dimension()
 
+    for doc_name in chunked_docs.keys():
+        embeddings[doc_name] = np.empty(
+            (0, embedding_dimension),
+            dtype=np.float32,
+        )
     # Flatten all chunks while tracking document boundaries
     for doc_name, chunks in chunked_docs.items():
         if not chunks:

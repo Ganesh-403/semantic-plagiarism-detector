@@ -629,17 +629,60 @@ def add_chunks(chunks_to_add: list) -> None:
     mem_before = process.memory_info().rss / (1024 * 1024)
     logger.info("Memory usage before batch chunk insertion: %.2f MB", mem_before)
 
+    from src.core.embedding_compatibility import get_embedding_model_metadata
+
     formatted_chunks = []
+    generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
     for vid, fname, idx, text, emb in chunks_to_add:
-        emb_blob = emb.astype(np.float32).tobytes()
-        formatted_chunks.append((vid, fname, idx, text, emb_blob))
+        emb_array = np.asarray(emb, dtype=np.float32)
+
+        if emb_array.ndim != 1:
+            raise ValueError("Each stored embedding must be a 1-dimensional vector.")
+
+        metadata = get_embedding_model_metadata(
+            emb_array.shape[0],
+            generated_at=generated_at,
+        )
+
+        emb_blob = emb_array.tobytes()
+
+        formatted_chunks.append(
+            (
+                vid,
+                fname,
+                idx,
+                text,
+                emb_blob,
+                metadata.model_identifier,
+                metadata.model_version,
+                metadata.dimension,
+                metadata.normalization_strategy,
+                metadata.generated_at,
+                metadata.vector_schema_version,
+            )
+        )
 
     with _connect() as conn:
         conn.executemany(
-            "INSERT OR REPLACE INTO chunks (vector_id, filename, chunk_index, chunk_text, embedding) VALUES (?, ?, ?, ?, ?)",
+            """
+            INSERT OR REPLACE INTO chunks (
+                vector_id,
+                filename,
+                chunk_index,
+                chunk_text,
+                embedding,
+                model_identifier,
+                model_version,
+                embedding_dimension,
+                normalization_strategy,
+                embedding_generated_at,
+                vector_schema_version
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
             formatted_chunks,
         )
-
     mem_after = process.memory_info().rss / (1024 * 1024)
     logger.info("Memory usage after batch chunk insertion: %.2f MB", mem_after)
 
@@ -657,18 +700,143 @@ def get_chunk_registry() -> list:
 
 def get_all_embeddings() -> np.ndarray:
     """Load all chunk embeddings from the database to rebuild the FAISS index."""
+    from src.core.embedding_compatibility import (
+        ensure_compatible_metadata,
+        get_active_embedding_metadata,
+        metadata_from_row,
+    )
+
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT embedding FROM chunks ORDER BY vector_id ASC"
+            """
+            SELECT
+                embedding,
+                model_identifier,
+                model_version,
+                embedding_dimension,
+                normalization_strategy,
+                embedding_generated_at,
+                vector_schema_version
+            FROM chunks
+            ORDER BY vector_id ASC
+            """
         ).fetchall()
 
     if not rows:
-        return np.empty((0, 384), dtype=np.float32)
+        return np.empty((0, 0), dtype=np.float32)
 
-    embeddings = [np.frombuffer(r[0], dtype=np.float32) for r in rows]
+    expected = get_active_embedding_metadata()
+    embeddings = []
+
+    for row in rows:
+        actual = metadata_from_row(row)
+        ensure_compatible_metadata(expected, actual)
+
+        vector = np.frombuffer(
+            row["embedding"],
+            dtype=np.float32,
+        )
+
+        if vector.shape[0] != actual.dimension:
+            raise ValueError(
+                "Stored embedding dimension does not match its metadata: "
+                f"{vector.shape[0]} != {actual.dimension}"
+            )
+
+        embeddings.append(vector)
+
     return np.vstack(embeddings)
+@with_sqlite_retry
+def update_document_embeddings(
+    filename: str,
+    embeddings: np.ndarray,
+    *,
+    model_identifier: str,
+    model_version: str,
+    normalization_strategy: str,
+    vector_schema_version: int,
+    generated_at: str,
+) -> int:
+    """Replace one document's embeddings while preserving document metadata."""
+    if embeddings.ndim != 2:
+        raise ValueError("Embeddings must be a 2-dimensional matrix.")
 
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT vector_id, chunk_index
+            FROM chunks
+            WHERE filename = ?
+            ORDER BY chunk_index ASC
+            """,
+            (filename,),
+        ).fetchall()
 
+        if len(rows) != embeddings.shape[0]:
+            raise ValueError(
+                f"Embedding/chunk count mismatch for {filename}: "
+                f"{embeddings.shape[0]} != {len(rows)}"
+            )
+
+        for row, vector in zip(rows, embeddings):
+            vector = np.asarray(vector, dtype=np.float32)
+
+            if vector.ndim != 1:
+                raise ValueError("Each embedding must be one-dimensional.")
+
+            if vector.shape[0] != embeddings.shape[1]:
+                raise ValueError("Inconsistent embedding dimensions.")
+            conn.execute(
+                """
+                UPDATE chunks
+                SET
+                    embedding = ?,
+                    model_identifier = ?,
+                    model_version = ?,
+                    embedding_dimension = ?,
+                    normalization_strategy = ?,
+                    embedding_generated_at = ?,
+                    vector_schema_version = ?
+                WHERE vector_id = ?
+                """,
+                (
+                    vector.tobytes(),
+                    model_identifier,
+                    model_version,
+                    embeddings.shape[1],
+                    normalization_strategy,
+                    generated_at,
+                    vector_schema_version,
+                    row["vector_id"],
+                ),
+            )
+
+        return len(rows)
+def get_document_embeddings_for_migration(
+    filename: str,
+) -> tuple[list[str], np.ndarray]:
+    """Load one document's chunk text for controlled re-embedding."""
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT chunk_text, embedding
+            FROM chunks
+            WHERE filename = ?
+            ORDER BY chunk_index ASC
+            """,
+            (filename,),
+        ).fetchall()
+
+    texts = [row["chunk_text"] for row in rows]
+    if not rows:
+        return [], np.empty((0, 0), dtype=np.float32)
+
+    vectors = [
+        np.frombuffer(row["embedding"], dtype=np.float32)
+        for row in rows
+    ]
+
+    return texts, np.vstack(vectors)
 @with_sqlite_retry
 def delete_document(filename: str) -> None:
     """Delete a document and all its associated chunks (cascade)."""
@@ -1519,3 +1687,16 @@ def get_embedding_storage_footprint() -> dict[str, int | float]:
         "embedding_percentage": float(percentage),
         "chunk_count": chunk_count,
     }
+
+
+def get_documents_with_embeddings() -> list[str]:
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT filename
+            FROM chunks
+            WHERE embedding IS NOT NULL
+            ORDER BY filename ASC
+            """
+        ).fetchall()
+    return [row["filename"] for row in rows]

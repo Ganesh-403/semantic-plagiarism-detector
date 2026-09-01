@@ -29,18 +29,39 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class HybridScore:
-    """Hybrid similarity score for a document pair."""
+    """Explainable hybrid similarity evidence for a document pair."""
 
     doc_a: str
     doc_b: str
     semantic_score: float
     lexical_score: float
+    semantic_contribution: float
+    lexical_contribution: float
     hybrid_score: float
-    alpha: float  # semantic weight
+    alpha: float
     lexical_method: str
-    is_flagged: bool = False
     threshold: float = 0.59
+    threshold_margin: float = 0.0
+    is_flagged: bool = False
+    severity: str = "Low"
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Return the complete score decomposition as structured data."""
+        return {
+            "doc_a": self.doc_a,
+            "doc_b": self.doc_b,
+            "semantic_score": self.semantic_score,
+            "lexical_score": self.lexical_score,
+            "semantic_contribution": self.semantic_contribution,
+            "lexical_contribution": self.lexical_contribution,
+            "hybrid_score": self.hybrid_score,
+            "alpha": self.alpha,
+            "lexical_method": self.lexical_method,
+            "threshold": self.threshold,
+            "threshold_margin": self.threshold_margin,
+            "is_flagged": self.is_flagged,
+            "severity": self.severity,
+        }
 
 @dataclass
 class HybridConfig:
@@ -173,7 +194,66 @@ class HybridScorer:
         # Cache result
         self._lexical_cache[cache_key] = float(score)
         return float(score)
+    def compute_hybrid_score(
+        self,
+        text_a: str,
+        text_b: str,
+        semantic_score: float,
+        alpha: Optional[float] = None,
+        lexical_method: Optional[str] = None,
+        threshold: float = 0.59,
+    ) -> HybridScore:
+        """Compute hybrid similarity and expose its full score decomposition."""
+        alpha = alpha if alpha is not None else self.config.alpha
+        lexical_method = lexical_method or self.config.lexical_method
 
+        if not 0.0 <= alpha <= 1.0:
+            raise ValueError("alpha must be between 0.0 and 1.0")
+
+        lexical_score = self._compute_lexical_score(
+            text_a,
+            text_b,
+            lexical_method,
+        )
+
+        semantic_score = float(np.clip(semantic_score, 0.0, 1.0))
+        lexical_score = float(np.clip(lexical_score, 0.0, 1.0))
+
+        semantic_contribution = alpha * semantic_score
+        lexical_contribution = (1.0 - alpha) * lexical_score
+
+        hybrid_score = float(
+            np.clip(
+                semantic_contribution + lexical_contribution,
+                0.0,
+                1.0,
+            )
+        )
+
+        threshold_margin = hybrid_score - threshold
+
+        if hybrid_score >= 0.90:
+            severity = "High"
+        elif hybrid_score >= 0.75:
+            severity = "Medium"
+        else:
+            severity = "Low"
+
+        return HybridScore(
+            doc_a="",
+            doc_b="",
+            semantic_score=semantic_score,
+            lexical_score=lexical_score,
+            semantic_contribution=semantic_contribution,
+            lexical_contribution=lexical_contribution,
+            hybrid_score=hybrid_score,
+            alpha=alpha,
+            lexical_method=lexical_method,
+            threshold=threshold,
+            threshold_margin=threshold_margin,
+            is_flagged=hybrid_score >= threshold,
+            severity=severity,
+        )
     def compute_hybrid_similarity(
         self,
         text_a: str,
@@ -200,11 +280,16 @@ class HybridScorer:
         alpha = alpha if alpha is not None else self.config.alpha
         lexical_method = lexical_method or self.config.lexical_method
 
-        lexical_score = self._compute_lexical_score(text_a, text_b, lexical_method)
-        hybrid_score = alpha * semantic_score + (1 - alpha) * lexical_score
+        evidence = self.compute_hybrid_score(
+            text_a=text_a,
+            text_b=text_b,
+            semantic_score=semantic_score,
+            alpha=alpha,
+            lexical_method=lexical_method,
+            threshold=self.config.min_threshold,
+        )
 
-        return min(1.0, max(0.0, hybrid_score))
-
+        return evidence.hybrid_score
     def compute_hybrid_matrix(
         self,
         texts: dict[str, str],
@@ -300,19 +385,34 @@ class HybridScorer:
         for i in range(len(doc_names)):
             for j in range(i + 1, len(doc_names)):
                 score = float(hybrid_df.iloc[i, j])
-                if score >= threshold:
-                    flagged.append(
-                        {
-                            "doc_a": doc_names[i],
-                            "doc_b": doc_names[j],
-                            "hybrid_score": score,
-                            "threshold": threshold,
-                        }
-                    )
 
-        flagged.sort(key=lambda x: x["hybrid_score"], reverse=True)
+                if score < threshold:
+                    continue
+
+                if score >= 0.90:
+                    severity = "High"
+                elif score >= 0.75:
+                    severity = "Medium"
+                else:
+                    severity = "Low"
+
+                flagged.append(
+                    {
+                        "doc_a": doc_names[i],
+                        "doc_b": doc_names[j],
+                        "hybrid_score": score,
+                        "threshold": threshold,
+                        "threshold_margin": score - threshold,
+                        "severity": severity,
+                        "is_flagged": True,
+                    }
+                )
+
+        flagged.sort(
+            key=lambda x: x["hybrid_score"],
+            reverse=True,
+        )
         return flagged
-
     def compute_pair_stats(
         self,
         text_a: str,
@@ -334,26 +434,51 @@ class HybridScorer:
         Returns:
             Dictionary with detailed scores
         """
-        lexical_score = self._compute_lexical_score(text_a, text_b, lexical_method)
-        hybrid_score = alpha * semantic_score + (1 - alpha) * lexical_score
+        evidence = self.compute_hybrid_score(
+            text_a=text_a,
+            text_b=text_b,
+            semantic_score=semantic_score,
+            alpha=alpha,
+            lexical_method=lexical_method,
+            threshold=self.config.min_threshold,
+        )
 
-        # Compute individual lexical method scores for comparison
-        methods = ["tfidf", "jaccard", "dice", "overlap", "ngram", "char_ngram"]
-        method_scores = {}
-        for method in methods:
-            method_scores[method] = self._compute_lexical_score(text_a, text_b, method)
-
-        return {
-            "doc_a_preview": text_a[:100] + "..." if len(text_a) > 100 else text_a,
-            "doc_b_preview": text_b[:100] + "..." if len(text_b) > 100 else text_b,
-            "semantic_score": semantic_score,
-            "lexical_score": lexical_score,
-            "hybrid_score": hybrid_score,
-            "alpha": alpha,
-            "lexical_method": lexical_method,
-            "method_scores": method_scores,
+        # Compute individual lexical method scores for comparison.
+        methods = [
+            "tfidf",
+            "jaccard",
+            "dice",
+            "overlap",
+            "ngram",
+            "char_ngram",
+        ]
+        method_scores = {
+            method: self._compute_lexical_score(
+                text_a,
+                text_b,
+                method,
+            )
+            for method in methods
         }
 
+        result = evidence.to_dict()
+        result.update(
+            {
+                "doc_a_preview": (
+                    text_a[:100] + "..."
+                    if len(text_a) > 100
+                    else text_a
+                ),
+                "doc_b_preview": (
+                    text_b[:100] + "..."
+                    if len(text_b) > 100
+                    else text_b
+                ),
+                "method_scores": method_scores,
+            }
+        )
+
+        return result
     def get_recommended_alpha(
         self, scores: List[float], labels: List[int], method: str = "f1"
     ) -> float:
@@ -436,11 +561,81 @@ def compute_hybrid_plagiarism_flags(
             hybrid_df = np.clip(hybrid_df, 0.0, 1.0)
     elif texts is not None:
         hybrid_df = scorer.compute_hybrid_matrix(
-            texts, similarity_df, alpha, lexical_method, normalize
+            texts,
+            similarity_df,
+            alpha,
+            lexical_method,
+            normalize,
         )
+
+        flagged = []
+
+        doc_names = list(texts.keys())
+
+        for i, doc_a in enumerate(doc_names):
+            for j in range(i + 1, len(doc_names)):
+                doc_b = doc_names[j]
+                hybrid_score = float(hybrid_df.iloc[i, j])
+
+                if hybrid_score < threshold:
+                    continue
+
+                semantic_score = float(similarity_df.iloc[i, j])
+                lexical_score = scorer._compute_lexical_score(
+                    texts[doc_a],
+                    texts[doc_b],
+                    lexical_method,
+                )
+
+                semantic_contribution = alpha * semantic_score
+                lexical_contribution = (
+                    (1.0 - alpha) * lexical_score
+                )
+
+                if hybrid_score >= 0.90:
+                    severity = "High"
+                elif hybrid_score >= 0.75:
+                    severity = "Medium"
+                else:
+                    severity = "Low"
+
+                flagged.append(
+                    {
+                        "doc_a": doc_a,
+                        "doc_b": doc_b,
+                        "semantic_score": semantic_score,
+                        "lexical_score": lexical_score,
+                        "semantic_contribution": semantic_contribution,
+                        "lexical_contribution": lexical_contribution,
+                        "hybrid_score": hybrid_score,
+                        "alpha": alpha,
+                        "lexical_method": lexical_method,
+                        "threshold": threshold,
+                        "threshold_margin": hybrid_score - threshold,
+                        "severity": severity,
+                        "is_flagged": True,
+                    }
+                )
     else:
         raise ValueError("Either lexical_scores or texts must be provided")
 
-    flagged = scorer.flag_plagiarism_hybrid(hybrid_df, threshold)
+    flagged = scorer.flag_plagiarism_hybrid(
+        hybrid_df,
+        threshold,
+    )
+
+    for flag in flagged:
+        flag["score_decomposition"] = {
+            "semantic_score": None,
+            "lexical_score": None,
+            "semantic_contribution": None,
+            "lexical_contribution": None,
+            "alpha": alpha,
+            "lexical_method": lexical_method,
+            "hybrid_score": flag["hybrid_score"],
+            "threshold": flag["threshold"],
+            "threshold_margin": flag["threshold_margin"],
+            "severity": flag["severity"],
+        }
 
     return hybrid_df, flagged

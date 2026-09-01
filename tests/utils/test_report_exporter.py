@@ -269,7 +269,38 @@ class TestFlaggedPairFormatting:
         assert "doc_a" in d
         assert "severity" in d
 
+def test_format_flagged_pairs_preserves_hybrid_decomposition():
+    from src.utils.report_exporter import format_flagged_pairs
 
+    flags = [
+        {
+            "doc_a": "document-a",
+            "doc_b": "document-b",
+            "hybrid_score": 0.84,
+            "semantic_score": 0.90,
+            "lexical_score": 0.70,
+            "semantic_contribution": 0.63,
+            "lexical_contribution": 0.21,
+            "alpha": 0.70,
+            "threshold": 0.59,
+            "threshold_margin": 0.25,
+            "severity": "Medium",
+        }
+    ]
+
+    records = format_flagged_pairs(flags)
+
+    assert len(records) == 1
+
+    record = records[0]
+
+    assert record.semantic_score == 0.90
+    assert record.lexical_score == 0.70
+    assert record.semantic_contribution == 0.63
+    assert record.lexical_contribution == 0.21
+    assert record.hybrid_weight == 0.70
+    assert record.threshold_margin == 0.25
+    assert record.severity == "Medium"
 # ---------------------------------------------------------------------------
 # Build analytics report
 # ---------------------------------------------------------------------------

@@ -110,6 +110,27 @@ def test_cleanup_logs_warning_on_oserror_dir():
             assert temp_dir in call_args[0][1]
 
 
+def test_cleanup_logs_warning_on_rmtree_callback_error(tmp_path):
+    """Verify warning is logged via on_exc/onerror callback when shutil.rmtree encounters an error on a subpath."""
+    import src.utils.temp_manager as temp_manager_module
+
+    temp_dir = str(tmp_path / "test_dir")
+    os.makedirs(temp_dir, exist_ok=True)
+    file_path = os.path.join(temp_dir, "locked.txt")
+    with open(file_path, "w") as f:
+        f.write("content")
+
+    register_temp_path(temp_dir)
+
+    with patch.object(temp_manager_module.logger, "warning") as mock_warning:
+        with patch("os.unlink", side_effect=OSError("Permission denied")):
+            cleanup_registered_temp_paths()
+
+        mock_warning.assert_called()
+        logged_paths = [call[0][1] for call in mock_warning.call_args_list]
+        assert any(file_path in p or temp_dir in p for p in logged_paths)
+
+
 def test_cleanup_removes_path_from_registry_even_on_error():
     """Verify path is removed from registry even when cleanup fails."""
     import src.utils.temp_manager as temp_manager_module
@@ -695,3 +716,25 @@ def test_managed_ocr_temp_dir_restores_environment_and_tempdir():
 
     assert tempfile.tempdir == orig_tempdir
     assert os.environ.get("TMPDIR") == orig_tmpdir_env
+
+
+def test_create_managed_temp_file_atomic_cleanup_on_failure():
+    """Verify that if temp file registration fails, the temp file is deleted and exception is re-raised."""
+    from unittest.mock import patch
+
+    with patch("src.utils.temp_manager.register_temp_path", side_effect=RuntimeError("Registration failed")):
+        original_mkstemp = tempfile.mkstemp
+        created_paths = []
+
+        def spy_mkstemp(*args, **kwargs):
+            fd, path = original_mkstemp(*args, **kwargs)
+            created_paths.append(path)
+            return fd, path
+
+        with patch("src.utils.temp_manager.tempfile.mkstemp", side_effect=spy_mkstemp):
+            with pytest.raises(RuntimeError, match="Registration failed"):
+                create_managed_temp_file()
+
+        assert len(created_paths) == 1
+        assert not os.path.exists(created_paths[0])
+

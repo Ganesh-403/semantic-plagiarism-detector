@@ -436,3 +436,85 @@ class TestHybridScoreBlendProperties:
         # Pre-clamp: 0.3 * s + 0.7 * lex + 0.7 * s + 0.3 * lex = s + lex
         # Post-clamp: each term is in [0, 1] so sum is in [0, 2]
         assert 0.0 <= h_low + h_high <= 2.0
+def test_hybrid_score_decomposition_reproduces_final_score():
+    from src.core.hybrid_scorer import HybridConfig, HybridScorer
+
+    scorer = HybridScorer(
+        HybridConfig(
+            alpha=0.7,
+            lexical_method="jaccard",
+        )
+    )
+
+    evidence = scorer.compute_hybrid_score(
+        "machine learning algorithms process data",
+        "machine learning algorithms analyze data",
+        semantic_score=0.80,
+        threshold=0.59,
+    )
+
+    expected = (
+        evidence.semantic_contribution
+        + evidence.lexical_contribution
+    )
+
+    assert evidence.hybrid_score == pytest.approx(expected)
+    assert evidence.semantic_contribution == pytest.approx(
+        evidence.alpha * evidence.semantic_score
+    )
+    assert evidence.lexical_contribution == pytest.approx(
+        (1.0 - evidence.alpha) * evidence.lexical_score
+    )
+
+
+def test_hybrid_score_threshold_margin_and_severity():
+    from src.core.hybrid_scorer import HybridConfig, HybridScorer
+
+    scorer = HybridScorer(
+        HybridConfig(
+            alpha=0.7,
+            lexical_method="jaccard",
+        )
+    )
+
+    evidence = scorer.compute_hybrid_score(
+        "machine learning algorithms process data",
+        "machine learning algorithms process data",
+        semantic_score=0.95,
+        threshold=0.59,
+    )
+
+    assert evidence.is_flagged is True
+    assert evidence.threshold_margin == pytest.approx(
+        evidence.hybrid_score - 0.59
+    )
+    assert evidence.severity == "High"
+
+
+def test_compute_hybrid_similarity_uses_same_decomposition():
+    from src.core.hybrid_scorer import HybridConfig, HybridScorer
+
+    scorer = HybridScorer(
+        HybridConfig(
+            alpha=0.6,
+            lexical_method="jaccard",
+        )
+    )
+
+    evidence = scorer.compute_hybrid_score(
+        "natural language processing",
+        "natural language processing models",
+        semantic_score=0.82,
+        alpha=0.6,
+        threshold=0.59,
+    )
+
+    score = scorer.compute_hybrid_similarity(
+        "natural language processing",
+        "natural language processing models",
+        semantic_score=0.82,
+        alpha=0.6,
+        lexical_method="jaccard",
+    )
+
+    assert score == pytest.approx(evidence.hybrid_score)

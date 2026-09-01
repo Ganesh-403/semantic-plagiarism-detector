@@ -117,16 +117,21 @@ class ClusterSummary:
         return asdict(self)
 
 
-@dataclass(frozen=True)
+@dataclass
 class FlaggedPairRecord:
-    """A single flagged document-pair record."""
+    """A single flagged document-pair record with explainable scoring."""
 
     doc_a: str
     doc_b: str
     similarity: float
     severity: str
     threshold_at_flag: float
-
+    semantic_score: Optional[float] = None
+    lexical_score: Optional[float] = None
+    semantic_contribution: Optional[float] = None
+    lexical_contribution: Optional[float] = None
+    hybrid_weight: Optional[float] = None
+    threshold_margin: Optional[float] = None
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
@@ -466,9 +471,51 @@ def format_flagged_pairs(
                 similarity=round(score, 6),
                 severity=str(sev),
                 threshold_at_flag=round(thr_at_flag, 6),
+                semantic_score=(
+                    round(_safe_float(flag["semantic_score"]), 6)
+                    if flag.get("semantic_score") is not None
+                    else None
+                ),
+                lexical_score=(
+                    round(_safe_float(flag["lexical_score"]), 6)
+                    if flag.get("lexical_score") is not None
+                    else None
+                ),
+                semantic_contribution=(
+                    round(
+                        _safe_float(
+                            flag["semantic_contribution"]
+                        ),
+                        6,
+                    )
+                    if flag.get("semantic_contribution") is not None
+                    else None
+                ),
+                lexical_contribution=(
+                    round(
+                        _safe_float(
+                            flag["lexical_contribution"]
+                        ),
+                        6,
+                    )
+                    if flag.get("lexical_contribution") is not None
+                    else None
+                ),
+                hybrid_weight=(
+                    round(_safe_float(flag["alpha"]), 6)
+                    if flag.get("alpha") is not None
+                    else None
+                ),
+                threshold_margin=(
+                    round(
+                        _safe_float(flag["threshold_margin"]),
+                        6,
+                    )
+                    if flag.get("threshold_margin") is not None
+                    else None
+                ),
             )
         )
-
     records.sort(key=lambda r: -r.similarity)
     return records
 

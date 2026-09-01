@@ -6,6 +6,14 @@ Unit tests for src.utils.pdf_highlighter.highlight_pdf_matches on encrypted PDFs
 
 from __future__ import annotations
 
+import sys
+from unittest.mock import MagicMock
+
+try:
+    import magic
+except Exception:
+    sys.modules["magic"] = MagicMock()
+
 import fitz
 import pytest
 

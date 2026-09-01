@@ -1,3 +1,11 @@
+import sys
+from unittest.mock import MagicMock
+
+try:
+    import magic
+except Exception:
+    sys.modules["magic"] = MagicMock()
+
 import fitz
 import pytest
 from src.utils.pdf_highlighter import highlight_pdf_matches as highlight_hl

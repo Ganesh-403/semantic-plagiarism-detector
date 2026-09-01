@@ -13,6 +13,11 @@ from typing import Any, Dict, List, Optional, Tuple
 import faiss  # type: ignore
 import numpy as np
 
+from src.core.embedding_compatibility import (
+    ensure_compatible_metadata,
+    get_active_embedding_metadata,
+    get_embedding_model_metadata,
+)
 from src.core.faiss_index_metadata import FAISSIndexMetadata
 from src.core.metrics import faiss_vectors_gauge
 from src.core.text_chunking import ChunkString
@@ -102,6 +107,12 @@ class FaissIndexManager:
         arr = np.ascontiguousarray(vectors, dtype=np.float32)
         if arr.ndim == 1:
             arr = arr.reshape(1, -1)
+
+        if arr.shape[1] != self.dimension:
+            raise ValueError(
+                "Embedding dimension is incompatible with this FAISS index: "
+                f"{arr.shape[1]} != {self.dimension}"
+            )
         norms = np.linalg.norm(arr, axis=1, keepdims=True)
         norms = np.where(norms == 0, 1.0, norms)
         arr = arr / norms
@@ -164,16 +175,20 @@ def build_index(
         (index, registry) — the FAISS index and a list mapping each vector
         position to its source ChunkRecord.
     """
-    dim = 384
     all_vectors: list[np.ndarray] = []
     registry: list[ChunkRecord] = []
-
+    dim: int | None = None
     for doc_name, emb in embeddings.items():
         chunks = chunked_docs.get(doc_name, [])
         if emb.ndim != 2 or emb.shape[0] == 0:
             continue
-        if emb.shape[1] != dim:
-            raise ValueError(f"Embedding dimension mismatch: {emb.shape[1]} != {dim}")
+        if dim is None:
+            dim = int(emb.shape[1])
+        elif emb.shape[1] != dim:
+            raise ValueError(
+                "Embedding dimension mismatch across documents: "
+                f"{emb.shape[1]} != {dim}"
+            )
         for i, (vec, chunk) in enumerate(zip(emb, chunks)):
             all_vectors.append(vec.astype("float32"))
             if isinstance(chunk, ChunkString):
@@ -184,8 +199,9 @@ def build_index(
                 registry.append(ChunkRecord(doc_name, i, chunk))
 
     if not all_vectors:
+        active_metadata = get_active_embedding_metadata()
         faiss_vectors_gauge.set(0)
-        return faiss.IndexFlatIP(dim), registry
+        return faiss.IndexFlatIP(active_metadata.dimension), registry
     matrix = np.vstack(all_vectors)
     norms = np.linalg.norm(matrix, axis=1, keepdims=True)
     norms = np.where(norms == 0, 1.0, norms)
@@ -812,13 +828,19 @@ def build_index_from_matrix(
     so that ``add_to_index()`` and ``remove_vectors_by_doc()`` can be used later
     without a full rebuild.
     """
-    dim = 384
+    active_metadata = get_active_embedding_metadata()
+
     if matrix.size == 0 or matrix.shape[0] == 0:
-        return faiss.IndexFlatIP(dim)
+        return faiss.IndexFlatIP(active_metadata.dimension)
 
-    if matrix.shape[1] != dim:
-        raise ValueError(f"Embedding dimension mismatch: {matrix.shape[1]} != {dim}")
+    dim = int(matrix.shape[1])
 
+    if dim != active_metadata.dimension:
+        raise ValueError(
+            "Embedding dimension is incompatible with the active model: "
+            f"{dim} != {active_metadata.dimension}. "
+            "Run the embedding migration before rebuilding FAISS."
+        )
     n_vectors = matrix.shape[0]
     mat = matrix.astype("float32")
     norms = np.linalg.norm(mat, axis=1, keepdims=True)
@@ -905,29 +927,99 @@ def load_or_rebuild_index(filepath: str) -> tuple[faiss.Index, list[ChunkRecord]
 
     matrix = get_all_embeddings()
     registry = get_chunk_registry()
+    active_metadata = get_active_embedding_metadata()
 
-    n_matrix = matrix.shape[0] if (matrix is not None and matrix.size > 0) else 0
+    n_matrix = (
+        matrix.shape[0]
+        if (matrix is not None and matrix.size > 0)
+        else 0
+    )
     n_registry = len(registry)
 
     if n_matrix != n_registry:
         from src.errors import FAISS_EMB_REGISTRY_MISMATCH
 
         raise ValueError(
-            FAISS_EMB_REGISTRY_MISMATCH.format(emb_count=n_matrix, reg_count=n_registry)
+            FAISS_EMB_REGISTRY_MISMATCH.format(
+                emb_count=n_matrix,
+                reg_count=n_registry,
+            )
         )
+
+    if matrix is not None and matrix.size > 0:
+        if matrix.shape[1] != active_metadata.dimension:
+            raise ValueError(
+                "Stored embeddings are incompatible with the active model. "
+                f"Stored dimension={matrix.shape[1]}, "
+                f"active dimension={active_metadata.dimension}. "
+                "Run the embedding migration before rebuilding the index."
+            )
+
+    metadata_manager = FAISSIndexMetadata()
 
     if os.path.exists(filepath):
         try:
             index = load_index(filepath)
-            if validate_index(index, n_matrix, 384):
+
+            stored_index_metadata = metadata_manager.metadata
+
+            if (
+                stored_index_metadata is not None
+                and stored_index_metadata.embedding_model_identifier
+            ):
+                index_metadata = get_embedding_model_metadata(
+                    stored_index_metadata.embedding_dimension or index.d,
+                )
+
+                index_metadata = type(active_metadata)(
+                    model_identifier=(
+                        stored_index_metadata.embedding_model_identifier
+                    ),
+                    model_version=(
+                        stored_index_metadata.embedding_model_version
+                        or "unknown"
+                    ),
+                    dimension=(
+                        stored_index_metadata.embedding_dimension
+                        or index.d
+                    ),
+                    normalization_strategy=(
+                        stored_index_metadata.embedding_normalization_strategy
+                        or "unknown"
+                    ),
+                    generated_at=active_metadata.generated_at,
+                    vector_schema_version=(
+                        stored_index_metadata.vector_schema_version or 0
+                    ),
+                )
+
+                ensure_compatible_metadata(
+                    active_metadata,
+                    index_metadata,
+                )
+
+            if validate_index(
+                index,
+                n_matrix,
+                active_metadata.dimension,
+            ):
                 return index, registry, False
+        except ValueError:
+            raise
         except Exception:
             pass
 
-    index = build_index_from_matrix(matrix)
+    index = build_index_from_matrix(
+        matrix,
+        use_id_map=True,
+    )
+
+    metadata_manager.set_embedding_metadata(active_metadata)
+    metadata_manager.metadata.total_vectors = index.ntotal
+    metadata_manager.save()
+
     save_index(index, filepath)
     return index, registry, True
-
 
 # ── FAISS Index Optimization Helper (Issue #1354) ───────────────────────────
 

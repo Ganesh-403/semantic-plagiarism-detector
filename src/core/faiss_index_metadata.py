@@ -32,16 +32,21 @@ class VectorMapping:
 
 @dataclass
 class IndexMetadata:
-    """State and version information for incremental FAISS index."""
+    """State, embedding schema, and version information for a FAISS index."""
 
     index_id: str
     created_at: str
     last_updated: str
     total_vectors: int
-    vector_mappings: Dict[int, Dict[str, Any]]  # vector_id -> mapping dict
+    vector_mappings: Dict[int, Dict[str, Any]]
     deleted_vector_ids: List[int]
-    corpus_hash: Optional[str]  # Hash of corpus state for consistency checks
+    corpus_hash: Optional[str]
 
+    embedding_model_identifier: Optional[str] = None
+    embedding_model_version: Optional[str] = None
+    embedding_dimension: Optional[int] = None
+    embedding_normalization_strategy: Optional[str] = None
+    vector_schema_version: Optional[int] = None
 
 class FAISSIndexMetadata:
     """
@@ -50,7 +55,18 @@ class FAISSIndexMetadata:
     Enables incremental operations: add, update, delete vectors without
     rebuilding the entire index.
     """
+    def set_embedding_metadata(self, metadata: Any) -> None:
+        """Attach the embedding schema used by this FAISS index."""
+        if self.metadata is None:
+            self._init_new()
 
+        self.metadata.embedding_model_identifier = metadata.model_identifier
+        self.metadata.embedding_model_version = metadata.model_version
+        self.metadata.embedding_dimension = metadata.dimension
+        self.metadata.embedding_normalization_strategy = (
+            metadata.normalization_strategy
+        )
+        self.metadata.vector_schema_version = metadata.vector_schema_version
     def __init__(self, metadata_path: Optional[str] = None):
         """
         Initialize metadata manager.
@@ -88,6 +104,19 @@ class FAISSIndexMetadata:
                     },
                     deleted_vector_ids=data.get("deleted_vector_ids", []),
                     corpus_hash=data.get("corpus_hash"),
+                    embedding_model_identifier=data.get(
+                        "embedding_model_identifier"
+                    ),
+                    embedding_model_version=data.get(
+                        "embedding_model_version"
+                    ),
+                    embedding_dimension=data.get("embedding_dimension"),
+                    embedding_normalization_strategy=data.get(
+                        "embedding_normalization_strategy"
+                    ),
+                    vector_schema_version=data.get(
+                        "vector_schema_version"
+                    ),
                 )
                 logger.info("Loaded FAISS index metadata from %s", self.metadata_path)
                 return True
@@ -108,9 +137,21 @@ class FAISSIndexMetadata:
             total_vectors=0,
             vector_mappings={},
             deleted_vector_ids=[],
-            corpus_hash=None,
-        )
-
+                    corpus_hash=data.get("corpus_hash"),
+                    embedding_model_identifier=data.get(
+                        "embedding_model_identifier"
+                    ),
+                    embedding_model_version=data.get(
+                        "embedding_model_version"
+                    ),
+                    embedding_dimension=data.get("embedding_dimension"),
+                    embedding_normalization_strategy=data.get(
+                        "embedding_normalization_strategy"
+                    ),
+                    vector_schema_version=data.get(
+                        "vector_schema_version"
+                    ),
+                )
     def save(self) -> str:
         """
         Persist metadata to disk.
@@ -131,8 +172,16 @@ class FAISSIndexMetadata:
             "vector_mappings": self.metadata.vector_mappings,
             "deleted_vector_ids": self.metadata.deleted_vector_ids,
             "corpus_hash": self.metadata.corpus_hash,
+            "embedding_model_identifier": (
+                self.metadata.embedding_model_identifier
+            ),
+            "embedding_model_version": self.metadata.embedding_model_version,
+            "embedding_dimension": self.metadata.embedding_dimension,
+            "embedding_normalization_strategy": (
+                self.metadata.embedding_normalization_strategy
+            ),
+            "vector_schema_version": self.metadata.vector_schema_version,
         }
-
         with open(self.metadata_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 

@@ -234,7 +234,9 @@ DEFAULT_CROSS_ENCODER_MODEL: Final[str] = os.getenv(
 )
 DEFAULT_CROSS_ENCODER_TOP_K: Final[int] = int(os.getenv("CROSS_ENCODER_TOP_K", "50"))
 
-
+CORPUS_NEAR_DUPLICATE_THRESHOLD = float(
+    os.getenv("CORPUS_NEAR_DUPLICATE_THRESHOLD", "0.92")
+)
 @dataclass(frozen=True)
 class SimilarityThresholds:
     """Validated plagiarism and severity boundaries."""
