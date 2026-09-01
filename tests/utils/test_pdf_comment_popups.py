@@ -50,7 +50,7 @@ def test_highlight_pdf_matches_popup_info():
 
     res_bytes = highlight_pdf_matches(
         pdf_bytes,
-        matching_phrases=["Plagiarism detection"],
+        matching_phrases=["Artificial Intelligence and Machine Learning"],
         source_doc=source_doc,
         similarity=similarity,
     )
