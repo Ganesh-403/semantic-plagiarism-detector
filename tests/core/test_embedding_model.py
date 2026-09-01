@@ -418,14 +418,15 @@ class TestEmbeddingModelQuantization:
         # Simulate a module structure
         mock_model.modules.return_value = [torch.nn.Linear(10, 10)]
 
-        with patch("torch.quantization.quantize_dynamic") as mock_quantize:
-            mock_quantize.return_value = MagicMock()
-            _apply_dynamic_quantization(mock_model)
+        with patch("src.core.embedding_model._detect_device", return_value="cpu"):
+            with patch("torch.quantization.quantize_dynamic") as mock_quantize:
+                mock_quantize.return_value = MagicMock()
+                _apply_dynamic_quantization(mock_model)
 
-            mock_quantize.assert_called_once()
-            args, kwargs = mock_quantize.call_args
-            assert torch.nn.Linear in args[1]
-            assert kwargs["dtype"] == torch.qint8
+                mock_quantize.assert_called_once()
+                args, kwargs = mock_quantize.call_args
+                assert torch.nn.Linear in args[1]
+                assert kwargs["dtype"] == torch.qint8
 
     def test_dynamic_quantization_skips_mps(self, caplog):
         """MPS models must bypass dynamic INT8 quantization."""
@@ -444,12 +445,13 @@ class TestEmbeddingModelQuantization:
         """If quantization fails, the original float32 model should be returned."""
         mock_model = MagicMock()
 
-        with patch(
-            "torch.quantization.quantize_dynamic",
-            side_effect=RuntimeError("Quantization failed"),
-        ):
-            with caplog.at_level("WARNING"):
-                result = _apply_dynamic_quantization(mock_model)
+        with patch("src.core.embedding_model._detect_device", return_value="cpu"):
+            with patch(
+                "torch.quantization.quantize_dynamic",
+                side_effect=RuntimeError("Quantization failed"),
+            ):
+                with caplog.at_level("WARNING"):
+                    result = _apply_dynamic_quantization(mock_model)
 
         assert result is mock_model
         assert "Failed to apply dynamic quantization" in caplog.text

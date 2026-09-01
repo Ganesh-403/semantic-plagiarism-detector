@@ -53,8 +53,41 @@ except ImportError:
 
 # ── Singleton model loader ─────────────────────────────────────────────────────
 _DEFAULT_MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
+_LOW_MEMORY_RAM_THRESHOLD_BYTES = int(1.5 * 1024 * 1024 * 1024)  # 1.5 GB
 _model: SentenceTransformer | None = None
 _quantized_model: SentenceTransformer | None = None
+
+
+def _check_system_memory_for_model_fallback(target_model: str) -> str:
+    """Check available system RAM and fall back to all-MiniLM-L6-v2 if RAM < 1.5GB.
+
+    Acceptance Criteria (Issue #4013):
+    Check available RAM on startup. If available RAM < 1.5GB, fall back to
+    'all-MiniLM-L6-v2' with a warning log to prevent OOM errors.
+    """
+    fallback_model = os.getenv("SEMANTIC_PLAGIARISM_FALLBACK_MODEL", "all-MiniLM-L6-v2")
+    if target_model == fallback_model:
+        return target_model
+
+    try:
+        import psutil
+
+        vm = psutil.virtual_memory()
+        available_bytes = vm.available
+        if available_bytes < _LOW_MEMORY_RAM_THRESHOLD_BYTES:
+            available_gb = available_bytes / (1024**3)
+            logger.warning(
+                "[embedding_model] Low available system RAM detected (%.2f GB < 1.5 GB). "
+                "Falling back from '%s' to lightweight embedding model '%s' to prevent OOM errors.",
+                available_gb,
+                target_model,
+                fallback_model,
+            )
+            return fallback_model
+    except Exception as exc:
+        logger.debug("Failed to check system memory via psutil: %s", exc)
+
+    return target_model
 
 
 def _apply_dynamic_quantization(model: SentenceTransformer) -> SentenceTransformer:
@@ -225,7 +258,8 @@ class EmbeddingModelManager:
             if _model is not None:
                 return _model
 
-        primary = _get_model_name()
+        configured_primary = _get_model_name()
+        primary = _check_system_memory_for_model_fallback(configured_primary)
         fallback = os.getenv("SEMANTIC_PLAGIARISM_FALLBACK_MODEL", "all-MiniLM-L6-v2")
         cache_dir = _get_cache_dir()
         logger.info(f"[embedding_model] Loading model: {primary} ...")
