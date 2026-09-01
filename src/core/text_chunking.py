@@ -74,7 +74,7 @@ def mask_citation_initials(text: str) -> str:
     # ([A-Z]) : capture a single uppercase letter (Group 1)
     # \.      : match the literal period
     # (?=\s|\(): lookahead to ensure it's followed by a space or opening parenthesis
-    return re.sub(r'\b([A-Z])\.(?=\s|\()', r'\1\x00', text)
+    return re.sub(r'\b([A-Z])\.(?=\s|\()', lambda m: m.group(1) + '\x00', text)
 
 def unmask_citation_initials(text: str) -> str:
     """Restores the masked periods back to their original state."""
