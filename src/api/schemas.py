@@ -164,6 +164,23 @@ class TwoFactorDisableResponse(BaseModel):
     )
 
 
+class TwoFactorVerifyRequest(BaseModel):
+    """Request schema for 2FA TOTP verification."""
+
+    username: str = Field(..., description="Username to verify 2FA code for")
+    otp_code: str = Field(..., description="6-digit TOTP verification code")
+
+
+class TwoFactorVerifyResponse(BaseModel):
+    """Response schema for successful 2FA verification."""
+
+    verified: bool = Field(default=True, description="Verification status flag")
+    message: str = Field(
+        default="2FA code verified successfully.", description="Status message"
+    )
+
+
+
 # ============================================================================
 # Health Check Schemas
 # ============================================================================

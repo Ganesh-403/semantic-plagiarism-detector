@@ -26,20 +26,15 @@ import base64
 import io
 import logging
 
-from fastapi import APIRouter, HTTPException, Request, Security, status
-from src.api.middleware import get_current_user
-
 import pyotp
 import qrcode
+from fastapi import APIRouter, HTTPException, Request, status
 
 from src.api.dependencies import limiter
 from src.api.schemas import (
     ErrorResponse,
-    ForgotPasswordRequest,
     LoginResponse,
-    PasswordChangeSchema,
     RefreshRequest,
-    ResetPasswordRequest,
     RevokeRequest,
     RevokeResponse,
     TokenResponse,
@@ -47,6 +42,8 @@ from src.api.schemas import (
     TwoFactorDisableResponse,
     TwoFactorSetupRequest,
     TwoFactorSetupResponse,
+    TwoFactorVerifyRequest,
+    TwoFactorVerifyResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -70,14 +67,6 @@ def generate_totp_qr_code_data_uri(otpauth_url: str) -> str:
     img.save(buffer, format="PNG")
     b64_png = base64.b64encode(buffer.getvalue()).decode("utf-8")
     return f"data:image/png;base64,{b64_png}"
-
-
-def get_client_ip(request: Request) -> str:
-    """Extract client IP address from request headers or client host."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
 
 
 @router.post(
@@ -104,52 +93,8 @@ def get_client_ip(request: Request) -> str:
 )
 @limiter.limit("5/minute")
 async def login(request: Request):
-    """Authenticate user and return a session token. Records security audit log events."""
-    from src.db.auth import authenticate_user, log_security_event
-
-    client_ip = get_client_ip(request)
-    username = "unknown"
-    password = None
-
-    try:
-        body = await request.json()
-        if isinstance(body, dict):
-            username = body.get("username") or body.get("user") or "unknown"
-            password = body.get("password")
-    except Exception:
-        logger.debug("Failed to parse request payload for login")
-
-    if password is not None:
-        auth_result = authenticate_user(username, password, return_details=True)
-        if isinstance(auth_result, dict) and auth_result.get("authenticated"):
-            import datetime
-            expires_in_sec = 86400
-            expires_at_dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expires_in_sec)
-            expires_at_iso = expires_at_dt.isoformat().replace("+00:00", "Z")
-            return {
-                "token": "dummy-token",
-                "expires_in": expires_in_sec,
-                "expires_at": expires_at_iso,
-            }  # nosec B105
-        else:
-            log_security_event("LOGIN_FAILED", username, f"Client IP: {client_ip}")
-            log_security_event("login_failed", username, f"Client IP: {client_ip}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid username or password.",
-            )
-
-    log_security_event("LOGIN_SUCCESS", username, f"Client IP: {client_ip}")
-    log_security_event("login_success", username, f"Client IP: {client_ip}")
-    import datetime
-    expires_in_sec = 86400
-    expires_at_dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expires_in_sec)
-    expires_at_iso = expires_at_dt.isoformat().replace("+00:00", "Z")
-    return {
-        "token": "dummy-token",
-        "expires_in": expires_in_sec,
-        "expires_at": expires_at_iso,
-    }  # nosec B105
+    """Authenticate user and return a session token."""
+    return {"token": "dummy-token"}  # nosec B105
 
 
 @router.post(
@@ -268,14 +213,11 @@ async def revoke_token_endpoint(
         )
 
     try:
-        from src.db.auth import log_security_event, revoke_token
+        from src.db.auth import revoke_token
 
         revoke_token(
             token_to_revoke, details="Revoked via API endpoint /api/v1/auth/revoke"
         )
-        client_ip = get_client_ip(request)
-        log_security_event("LOGOUT", "unknown", f"Client IP: {client_ip} | Token revoked")
-        log_security_event("logout", "unknown", f"Client IP: {client_ip} | Token revoked")
         return {
             "status": "success",
             "message": "Token revoked successfully.",
@@ -287,188 +229,26 @@ async def revoke_token_endpoint(
         )
 
 
-def create_reset_token(email: str) -> str:
-    """Generates a secure, cryptographically signed short-lived reset token (15-minute expiration)."""
-    from src.security.jwt_utils import create_jwt_token
-    return create_jwt_token(
-        {"sub": email, "type": "reset", "action": "password_reset"},
-        expires_in_seconds=900,
-    )
-
-
-def verify_reset_token(token: str) -> str:
-    """Verifies signature bounds and expiration limits of the reset token."""
-    from src.security.jwt_utils import _verify_jwt_token
-    try:
-        payload = _verify_jwt_token(token, expected_type="reset")
-        email = payload.get("sub")
-        action = payload.get("action")
-        if not email or action != "password_reset":
-            raise ValueError("Invalid token payload.")
-        return email
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Reset token has expired or is cryptographically invalid.",
-        )
-
-
 @router.post(
-    "/api/v1/auth/change-password",
-    summary="Change user password",
-    status_code=status.HTTP_200_OK,
-    responses={
-        400: {"model": ErrorResponse, "description": "Bad Request"},
-        401: {"model": ErrorResponse, "description": "Unauthorized"},
-        500: {"model": ErrorResponse, "description": "Internal Server Error"},
-    },
-)
-async def change_password(
-    payload: PasswordChangeSchema,
-    current_user: dict = Security(get_current_user, scopes=["write"]),
-):
-    """
-    Update the authenticated user's password and invalidate all active sessions.
-    """
-    from src.security.jwt_utils import verify_access_token
-    
-    token = current_user.get("token")
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required.",
-        )
-    
-    try:
-        payload_data = verify_access_token(token)
-        username = payload_data.get("sub")
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token.",
-        )
-        
-    if not username:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid user session.",
-        )
-
-    # 1. Verify old password matches
-    from src.db.auth import authenticate_user, update_password, revoke_all_user_refresh_tokens
-    
-    if not authenticate_user(username, payload.old_password):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Incorrect old password provisioned.",
-        )
-        
-    # 2. Update password and revoke tokens
-    try:
-        update_password(username, payload.new_password)
-        revoke_all_user_refresh_tokens(username)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update password: {str(exc)}",
-        )
-
-    return {"message": "Password changed successfully. All active device sessions have been terminated."}
-
-
-@router.post(
-    "/api/v1/auth/forgot-password",
-    summary="Forgot Password / Reset Request",
+    "/auth/2fa/setup",
+    summary="Initialize 2FA setup and return TOTP secret, otpauth URL, and base64 PNG QR code data URI",
+    response_model=TwoFactorSetupResponse,
     status_code=status.HTTP_200_OK,
     responses={
         400: {"model": ErrorResponse, "description": "Bad Request"},
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
-async def forgot_password(payload: ForgotPasswordRequest):
-    """
-    Accepts user email, verifies account context existence, generates a 
-    15-minute token payload, and sends an absolute reset URL link via email.
-    """
-    from src.db.auth import _connect
-    
-    username = payload.email.lower()
-    user_exists = False
-    try:
-        with _connect() as conn:
-            row = conn.execute(
-                "SELECT 1 FROM users WHERE username = ?",
-                (username,),
-            ).fetchone()
-            user_exists = bool(row)
-    except Exception:
-        pass
-        
-    if user_exists:
-        token = create_reset_token(username)
-        reset_link = f"https://openprep.ai/reset-password?token={token}"
-        # Async email dispatch invocation / logger
-        print(f"[SECURITY] Password reset link dispatched safely to: {username}")
-        logger.info(f"Password reset link generated for {username}: {reset_link}")
-
-    return {"message": "If the account exists, a password reset link has been dispatched to your email."}
-
-
 @router.post(
-    "/api/v1/auth/reset-password",
-    summary="Reset User Password",
+    "/api/v1/auth/2fa/setup",
+    summary="Initialize 2FA setup and return TOTP secret, otpauth URL, and base64 PNG QR code data URI",
+    response_model=TwoFactorSetupResponse,
     status_code=status.HTTP_200_OK,
     responses={
         400: {"model": ErrorResponse, "description": "Bad Request"},
-        404: {"model": ErrorResponse, "description": "Not Found"},
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
-async def reset_password(payload: ResetPasswordRequest):
-    """
-    Validates token payload fields and updates user password hashes.
-    """
-    email = verify_reset_token(payload.token)
-    
-    from src.db.auth import _connect, update_password
-    
-    user_exists = False
-    try:
-        with _connect() as conn:
-            row = conn.execute(
-                "SELECT 1 FROM users WHERE username = ?",
-                (email.lower(),),
-            ).fetchone()
-            user_exists = bool(row)
-    except Exception:
-        pass
-        
-    if not user_exists:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User account context not found.",
-        )
-        
-    try:
-        update_password(email, payload.new_password)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to reset password: {str(exc)}",
-        )
-        
-    return {"message": "Password updated successfully. You can now login with your new credentials."}
-
 async def setup_two_factor_auth_endpoint(
     request: Request,
     payload: TwoFactorSetupRequest | None = None,
@@ -767,5 +547,86 @@ async def disable_two_factor_auth_endpoint(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to disable 2FA: {str(e)}",
+        )
+
+
+@router.post(
+    "/auth/2fa/verify",
+    summary="Verify TOTP 2FA code",
+    response_model=TwoFactorVerifyResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad Request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized / Invalid 2FA Code"},
+        429: {"model": ErrorResponse, "description": "Rate limit exceeded (max 5 attempts per minute)"},
+        500: {"model": ErrorResponse, "description": "Internal Server Error"},
+    },
+)
+@router.post(
+    "/api/v1/auth/2fa/verify",
+    summary="Verify TOTP 2FA code",
+    response_model=TwoFactorVerifyResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad Request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized / Invalid 2FA Code"},
+        429: {"model": ErrorResponse, "description": "Rate limit exceeded (max 5 attempts per minute)"},
+        500: {"model": ErrorResponse, "description": "Internal Server Error"},
+    },
+)
+@limiter.limit("5/minute")
+async def verify_two_factor_auth_endpoint(
+    request: Request,
+    payload: TwoFactorVerifyRequest,
+):
+    """
+    Verify a Time-based One-Time Password (TOTP) 2FA code for a user.
+    Enforces a strict rate limit of max 5 verification attempts per minute to prevent brute-force attacks.
+    Returns HTTP 429 Too Many Requests when threshold is exceeded.
+    """
+    username = payload.username
+    otp_code = payload.otp_code
+
+    if not username or not otp_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Both username and otp_code are required.",
+        )
+
+    try:
+        import pyotp
+        from src.db.auth import get_2fa_status, init_db, log_security_event
+
+        init_db()
+        client_ip = get_client_ip(request)
+
+        enabled, existing_secret = get_2fa_status(username)
+        if not enabled or not existing_secret:
+            log_security_event("2FA_VERIFY_FAILED", username, f"Client IP: {client_ip} | 2FA not enabled")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="2FA is not enabled for this user.",
+            )
+
+        totp = pyotp.TOTP(existing_secret)
+        if not totp.verify(otp_code):
+            log_security_event("2FA_VERIFY_FAILED", username, f"Client IP: {client_ip} | Invalid OTP code")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid 2FA verification code.",
+            )
+
+        log_security_event("2FA_VERIFY_SUCCESS", username, f"Client IP: {client_ip}")
+        return {
+            "verified": True,
+            "message": "2FA code verified successfully.",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to verify 2FA code for user %s: %s", username, e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to verify 2FA code: {str(e)}",
         )
 

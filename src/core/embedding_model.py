@@ -174,6 +174,24 @@ def _detect_device(model: SentenceTransformer | None = None) -> str:
     return "cpu"
 
 
+def get_device(model: SentenceTransformer | None = None) -> str:
+    """Public helper function to inspect and get the target hardware compute device.
+
+    Checks available hardware backends in priority order:
+    1. Intel XPU acceleration
+    2. NVIDIA CUDA / AMD ROCm HIP GPU acceleration
+    3. Apple Silicon Metal Performance Shaders (MPS) acceleration via torch.backends.mps.is_available()
+    4. CPU fallback
+
+    Args:
+        model: Optional SentenceTransformer model instance to inspect active device attribute.
+
+    Returns:
+        Device string identifier ("cuda", "mps", "xpu", or "cpu").
+    """
+    return _detect_device(model)
+
+
 def _get_model_name() -> str:
     """Return the configured sentence-transformers model name."""
     return os.getenv("SEMANTIC_PLAGIARISM_MODEL", _DEFAULT_MODEL_NAME)

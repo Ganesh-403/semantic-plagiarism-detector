@@ -18,6 +18,7 @@ from contextlib import contextmanager
 import logging
 import os
 import shutil
+import sys
 import tempfile
 import threading
 import time
@@ -47,6 +48,12 @@ def unregister_temp_path(path: str) -> None:
             _REGISTERED_TEMP_PATHS.remove(path)
 
 
+def _on_rmtree_error(func, path, exc_info):
+    """Callback for shutil.rmtree to log errors when removing temp files/directories."""
+    exc = exc_info[1] if isinstance(exc_info, tuple) else exc_info
+    logger.warning("Failed to clean up temp file %s: %s", path, exc)
+
+
 def cleanup_registered_temp_paths() -> None:
     """
     Cleans up all registered temporary files and directories.
@@ -60,7 +67,10 @@ def cleanup_registered_temp_paths() -> None:
             if os.path.isfile(path) or os.path.islink(path):
                 os.remove(path)
             elif os.path.isdir(path):
-                shutil.rmtree(path, ignore_errors=True)
+                if sys.version_info >= (3, 12):
+                    shutil.rmtree(path, on_exc=_on_rmtree_error)
+                else:
+                    shutil.rmtree(path, onerror=_on_rmtree_error)
         except OSError as exc:
             logger.warning("Failed to clean up temp file %s: %s", path, exc)
         finally:
