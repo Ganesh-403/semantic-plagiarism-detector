@@ -751,6 +751,8 @@ def highlight_pdf_matches(
     pdf_source: str | bytes,
     matching_chunks: list[str],
     highlight_color: tuple[float, float, float] = (1.0, 0.85, 0.0),
+    source_doc: str | None = None,
+    similarity: float | None = None,
 ) -> bytes:
     """Opens an original PDF, searches for matching plagiarized text chunks,
     applies yellow highlight annotations on exact coordinate boxes,
@@ -774,6 +776,31 @@ def highlight_pdf_matches(
     if isinstance(pdf_source, bytes):
         doc_ctx = fitz.open(stream=pdf_source, filetype="pdf")
     else:
+ feat/pdf-comment-popups
+        doc = fitz.open(pdf_source)
+
+    for page in doc:
+        for chunk in matching_chunks:
+            chunk_clean = str(chunk).strip()
+            if len(chunk_clean) < 3:
+                continue
+
+            quad_matches = page.search_for(chunk_clean)
+            for rect in quad_matches:
+                annot = page.add_highlight_annot(rect)
+                s_doc = source_doc if source_doc else "Source Document"
+                s_sim = similarity if similarity is not None else 1.0
+                annot.set_info(
+                    content=f"Matched with {s_doc} ({s_sim:.1%})",
+                    title="Plagiarism Match",
+                )
+                annot.set_colors(stroke=highlight_color)
+                annot.update()
+
+    output_bytes = doc.tobytes()
+    doc.close()
+    return output_bytes
+
         doc_ctx = fitz.open(pdf_source)
 
     with doc_ctx as doc:
@@ -790,6 +817,7 @@ def highlight_pdf_matches(
                     annot.update()
 
         return doc.tobytes()
+ main
 
 
 def generate_audit_summary_html(

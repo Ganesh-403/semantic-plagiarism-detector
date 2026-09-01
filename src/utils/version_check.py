@@ -120,10 +120,17 @@ async def fetch_latest_github_version(
             headers["Authorization"] = f"Bearer {token}"
 
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        custom_headers = {
+            "User-Agent": f"SemanticPlagiarismDetector/{APP_VERSION}",
+            "Accept": "application/vnd.github+json",
+        }
+        async with httpx.AsyncClient(headers=custom_headers, timeout=timeout) as client:
             response = await client.get(
                 url,
+ chore/github-api-user-agent
+
                 headers=headers,
+ main
                 follow_redirects=True,
             )
             response.raise_for_status()

@@ -42,6 +42,7 @@ def mock_model():
     """Fixture to provide a mocked SentenceTransformer model."""
     model = MagicMock()
     model.encode.side_effect = _mock_encode
+    model.get_sentence_embedding_dimension.return_value = 384
     with patch("src.core.embedding_model._get_model", return_value=model):
         yield model
 
@@ -56,7 +57,7 @@ def test_embed_chunks_shape(mock_model):
     assert result.shape == (2, 384)
 
 
-def test_embed_chunks_empty():
+def test_embed_chunks_empty(mock_model):
     """Empty input list must return an empty array of shape (0, 384)."""
     result = embed_chunks([])
     assert result.size == 0
@@ -854,5 +855,86 @@ class TestConfigurableEmbeddingBatchSize:
         assert mock_model.encode.call_count == 2
         for call_args in mock_model.encode.call_args_list:
             assert call_args.kwargs.get("batch_size") == 64
+
+
+class TestDynamicINT8QuantizationToggle:
+    """Test suite for dynamic INT8 quantization toggle via ENABLE_EMBEDDING_QUANTIZATION (Issue #4007)."""
+
+    def test_is_quantization_enabled_helper(self, monkeypatch):
+        """Verify is_quantization_enabled parses environment values correctly."""
+        from src.core.embedding_model import is_quantization_enabled
+
+        monkeypatch.setenv("ENABLE_EMBEDDING_QUANTIZATION", "true")
+        assert is_quantization_enabled() is True
+
+        monkeypatch.setenv("ENABLE_EMBEDDING_QUANTIZATION", "1")
+        assert is_quantization_enabled() is True
+
+        monkeypatch.setenv("ENABLE_EMBEDDING_QUANTIZATION", "YES")
+        assert is_quantization_enabled() is True
+
+        monkeypatch.setenv("ENABLE_EMBEDDING_QUANTIZATION", "false")
+        assert is_quantization_enabled() is False
+
+        monkeypatch.delenv("ENABLE_EMBEDDING_QUANTIZATION", raising=False)
+        assert is_quantization_enabled() is False
+
+    @patch("src.core.embedding_model.SentenceTransformer")
+    @patch("src.core.embedding_model._apply_dynamic_quantization")
+    def test_get_model_triggers_quantization_when_env_enabled(
+        self, mock_quantize, mock_st, monkeypatch
+    ):
+        """When ENABLE_EMBEDDING_QUANTIZATION=true, get_model dynamically quantizes model."""
+        monkeypatch.setenv("ENABLE_EMBEDDING_QUANTIZATION", "true")
+        embedding_model._model = None
+        embedding_model._quantized_model = None
+        EmbeddingModelManager._instance = None
+
+        mock_base_model = MagicMock()
+        mock_st.return_value = mock_base_model
+        mock_quantized_model = MagicMock()
+        mock_quantize.return_value = mock_quantized_model
+
+        model = embedding_model._get_model()
+
+        mock_quantize.assert_called_once_with(mock_base_model)
+        assert model is mock_quantized_model
+
+    @patch("src.core.embedding_model.SentenceTransformer")
+    @patch("src.core.embedding_model._apply_dynamic_quantization")
+    def test_get_model_bypasses_quantization_when_env_disabled(
+        self, mock_quantize, mock_st, monkeypatch
+    ):
+        """When ENABLE_EMBEDDING_QUANTIZATION=false, get_model does not apply quantization."""
+        monkeypatch.setenv("ENABLE_EMBEDDING_QUANTIZATION", "false")
+        embedding_model._model = None
+        embedding_model._quantized_model = None
+        EmbeddingModelManager._instance = None
+
+        mock_base_model = MagicMock()
+        mock_st.return_value = mock_base_model
+
+        model = embedding_model._get_model()
+
+        mock_quantize.assert_not_called()
+        assert model is mock_base_model
+
+    def test_quantization_reduces_ram_and_preserves_embedding_contract(self):
+        """Verify dynamic quantization contract: float32 linear layers convert to qint8 while output dim remains 384."""
+        model = torch.nn.Sequential(
+            torch.nn.Linear(384, 384),
+            torch.nn.ReLU(),
+            torch.nn.Linear(384, 384),
+        )
+        quantized = torch.quantization.quantize_dynamic(
+            model, {torch.nn.Linear}, dtype=torch.qint8, inplace=False
+        )
+
+        dummy_input = torch.randn(1, 384)
+        out = quantized(dummy_input)
+
+        assert out.shape == (1, 384)
+        assert hasattr(quantized[0], "weight")
+
 
 

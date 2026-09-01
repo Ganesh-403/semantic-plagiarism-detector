@@ -615,7 +615,8 @@ def compute_hybrid_plagiarism_flags(
                         "severity": severity,
                         "is_flagged": True,
                     }
-                )    else:
+                )
+    else:
         raise ValueError("Either lexical_scores or texts must be provided")
 
     flagged = scorer.flag_plagiarism_hybrid(

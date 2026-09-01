@@ -206,7 +206,10 @@ class EmbeddingModelManager:
         self._quantized_model = None
 
     @classmethod
-    def get_instance(cls, quantize_model: bool = False) -> "EmbeddingModelManager":
+    def get_instance(cls, quantize_model: bool | None = None) -> "EmbeddingModelManager":
+        if quantize_model is None:
+            quantize_model = is_quantization_enabled()
+            
         if cls._instance is None:
             cls._instance = cls(quantize_model=quantize_model)
         elif quantize_model and not cls._instance.quantize_model:
@@ -293,9 +296,20 @@ class EmbeddingModelManager:
         return _model
 
 
+def is_quantization_enabled() -> bool:
+    """Check if dynamic INT8 quantization is enabled via ENABLE_EMBEDDING_QUANTIZATION environment variable.
+
+    Returns:
+        True if ENABLE_EMBEDDING_QUANTIZATION is set to 'true', '1', or 'yes' (case-insensitive).
+    """
+    env_val = os.getenv("ENABLE_EMBEDDING_QUANTIZATION", "false").lower().strip()
+    return env_val in ("true", "1", "yes")
+
+
 def _get_model() -> SentenceTransformer:
     """Lazy-load the Sentence Transformer model (singleton pattern)."""
-    return EmbeddingModelManager.get_instance().get_model()
+    quantize = is_quantization_enabled()
+    return EmbeddingModelManager.get_instance(quantize_model=quantize).get_model()
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
