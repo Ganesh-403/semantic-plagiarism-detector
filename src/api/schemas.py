@@ -44,6 +44,12 @@ class LoginResponse(BaseModel):
     """Response schema for authentication login."""
 
     token: str = Field(..., description="Authentication session token")
+    expires_in: int = Field(
+        default=86400, description="Token validity duration in seconds (default: 86400 / 24 hours)"
+    )
+    expires_at: str | None = Field(
+        default=None, description="ISO 8601 UTC timestamp when the authentication session token expires"
+    )
 
 
 class RefreshRequest(BaseModel):
@@ -627,7 +633,31 @@ class AsyncScanStatusResponse(BaseModel):
 
 
 class MetricSample(BaseModel):
-    " \Schema for an individual Prometheus metric sample.\\n
+    """Schema for an individual Prometheus metric sample."""
+
+    labels: dict[str, str] = Field(
+        default_factory=dict, description="Label name/value pairs for this metric sample"
+    )
+    value: float = Field(..., description="Numeric value of this metric sample")
+    timestamp: float | None = Field(
+        default=None, description="Optional Unix timestamp (seconds) for this sample"
+    )
+
+
+class MetricFamily(BaseModel):
+    """Schema for a Prometheus metric family (a group of related metric samples)."""
+
+    name: str = Field(..., description="Metric family name (e.g. 'process_cpu_seconds_total')")
+    help: str = Field(default="", description="Metric description / HELP text")
+    type: str = Field(
+        default="gauge",
+        description="Metric type: gauge, counter, histogram, summary, untyped",
+    )
+    samples: list[MetricSample] = Field(
+        default_factory=list, description="List of metric samples in this family"
+    )
+
+
 # ============================================================================
 # Example Paginated Response for Documents
 # ============================================================================
