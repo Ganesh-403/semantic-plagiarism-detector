@@ -142,7 +142,7 @@ tomlkit==0.15.1
 torch==2.13.0
 tqdm==4.69.1
 transformers==5.14.1
-typer==0.27.0
+typer==0.27.2
 typing-inspection==0.4.2
 typing_extensions==4.16.0
 tzdata==2026.3
