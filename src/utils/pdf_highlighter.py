@@ -4,9 +4,16 @@ src/utils/pdf_highlighter.py
 Highlights overlapping phrases/sentences in a PDF file using PyMuPDF (fitz).
 """
 
+import logging
 from typing import List, Optional
 
 import fitz  # PyMuPDF
+
+from src.errors import PDFEncryptedError
+
+logger = logging.getLogger(__name__)
+
+__all__ = ["highlight_pdf_matches", "PDFEncryptedError"]
 
 
 def highlight_pdf_matches(
@@ -22,10 +29,18 @@ def highlight_pdf_matches(
     with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
         # Authenticate if encrypted
         if doc.is_encrypted:
+            authenticated = False
             if password:
-                doc.authenticate(password)
+                authenticated = bool(doc.authenticate(password))
             else:
-                return pdf_bytes
+                # Try empty password in case PDF only has an owner password set
+                authenticated = bool(doc.authenticate(""))
+
+            if not authenticated:
+                logger.warning("PDF is encrypted and password was not provided or invalid.")
+                raise PDFEncryptedError(
+                    "PDF is encrypted and password was not provided or invalid."
+                )
 
         if not matching_phrases:
             # Fallback: if no specific phrases provided, return unmodified PDF

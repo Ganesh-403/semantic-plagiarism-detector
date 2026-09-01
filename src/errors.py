@@ -91,9 +91,11 @@ __all__ = [
     "CLI_PIPELINE_FAILED",
     "CLI_THRESHOLD_INVALID",
     "CLI_INVALID_COMMAND",
-    "EXPORT_WRITE_FAILED",
     "EXPORT_GENERATION_IO_FAILED",
-]  # Authentication Errors
+    "PDFEncryptedError",
+]
+
+# Authentication Errors
 AUTH_USERNAME_EMPTY = "Username cannot be empty."
 AUTH_PASSWORD_TOO_SHORT = "Password must be at least 6 characters long."
 AUTH_INVALID_ROLE = "Role must be one of: {roles}"
@@ -293,4 +295,18 @@ class SSOConfigurationError(ValueError):
     """
 
     pass
+
+
+class PDFEncryptedError(ValueError):
+    """Raised when a PDF file is encrypted and password authentication fails or is not provided."""
+
+    def __init__(
+        self,
+        message: str = "PDF is encrypted and password was not provided or invalid.",
+    ):
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return self.message
 
