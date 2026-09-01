@@ -110,6 +110,27 @@ def test_cleanup_logs_warning_on_oserror_dir():
             assert temp_dir in call_args[0][1]
 
 
+def test_cleanup_logs_warning_on_rmtree_callback_error(tmp_path):
+    """Verify warning is logged via on_exc/onerror callback when shutil.rmtree encounters an error on a subpath."""
+    import src.utils.temp_manager as temp_manager_module
+
+    temp_dir = str(tmp_path / "test_dir")
+    os.makedirs(temp_dir, exist_ok=True)
+    file_path = os.path.join(temp_dir, "locked.txt")
+    with open(file_path, "w") as f:
+        f.write("content")
+
+    register_temp_path(temp_dir)
+
+    with patch.object(temp_manager_module.logger, "warning") as mock_warning:
+        with patch("os.unlink", side_effect=OSError("Permission denied")):
+            cleanup_registered_temp_paths()
+
+        mock_warning.assert_called()
+        logged_paths = [call[0][1] for call in mock_warning.call_args_list]
+        assert any(file_path in p or temp_dir in p for p in logged_paths)
+
+
 def test_cleanup_removes_path_from_registry_even_on_error():
     """Verify path is removed from registry even when cleanup fails."""
     import src.utils.temp_manager as temp_manager_module
