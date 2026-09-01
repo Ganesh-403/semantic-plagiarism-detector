@@ -339,6 +339,16 @@ class EmbeddingModelManager:
             return _model
 
 
+def is_quantization_enabled() -> bool:
+    """Check if dynamic INT8 quantization is enabled via ENABLE_EMBEDDING_QUANTIZATION environment variable.
+
+    Returns:
+        True if ENABLE_EMBEDDING_QUANTIZATION is set to 'true', '1', or 'yes' (case-insensitive).
+    """
+    env_val = os.getenv("ENABLE_EMBEDDING_QUANTIZATION", "false").lower().strip()
+    return env_val in ("true", "1", "yes")
+
+
 def _get_model() -> SentenceTransformer:
     """Lazy-load the Sentence Transformer model (singleton pattern)."""
     quantize = is_quantization_enabled()

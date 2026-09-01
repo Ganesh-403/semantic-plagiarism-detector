@@ -26,14 +26,11 @@ import base64
 import io
 import logging
 
- feature/invalidate-tokens-on-password-change
 from fastapi import APIRouter, HTTPException, Request, Security, status
 from src.api.middleware import get_current_user
 
 import pyotp
 import qrcode
-from fastapi import APIRouter, HTTPException, Request, status
- main
 
 from src.api.dependencies import limiter
 from src.api.schemas import (
@@ -125,9 +122,15 @@ async def login(request: Request):
     if password is not None:
         auth_result = authenticate_user(username, password, return_details=True)
         if isinstance(auth_result, dict) and auth_result.get("authenticated"):
-            log_security_event("LOGIN_SUCCESS", username, f"Client IP: {client_ip}")
-            log_security_event("login_success", username, f"Client IP: {client_ip}")
-            return {"token": "dummy-token"}  # nosec B105
+            import datetime
+            expires_in_sec = 86400
+            expires_at_dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expires_in_sec)
+            expires_at_iso = expires_at_dt.isoformat().replace("+00:00", "Z")
+            return {
+                "token": "dummy-token",
+                "expires_in": expires_in_sec,
+                "expires_at": expires_at_iso,
+            }  # nosec B105
         else:
             log_security_event("LOGIN_FAILED", username, f"Client IP: {client_ip}")
             log_security_event("login_failed", username, f"Client IP: {client_ip}")
@@ -138,7 +141,15 @@ async def login(request: Request):
 
     log_security_event("LOGIN_SUCCESS", username, f"Client IP: {client_ip}")
     log_security_event("login_success", username, f"Client IP: {client_ip}")
-    return {"token": "dummy-token"}  # nosec B105
+    import datetime
+    expires_in_sec = 86400
+    expires_at_dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expires_in_sec)
+    expires_at_iso = expires_at_dt.isoformat().replace("+00:00", "Z")
+    return {
+        "token": "dummy-token",
+        "expires_in": expires_in_sec,
+        "expires_at": expires_at_iso,
+    }  # nosec B105
 
 
 @router.post(
@@ -276,7 +287,6 @@ async def revoke_token_endpoint(
         )
 
 
- feature/password-reset-token-email
 def create_reset_token(email: str) -> str:
     """Generates a secure, cryptographically signed short-lived reset token (15-minute expiration)."""
     from src.security.jwt_utils import create_jwt_token
@@ -304,11 +314,6 @@ def verify_reset_token(token: str) -> str:
 
 
 @router.post(
-    "/api/v1/auth/forgot-password",
-    summary="Forgot Password / Reset Request",
-
-@router.post(
- feature/invalidate-tokens-on-password-change
     "/api/v1/auth/change-password",
     summary="Change user password",
     status_code=status.HTTP_200_OK,
@@ -375,27 +380,16 @@ async def change_password(
 
     return {"message": "Password changed successfully. All active device sessions have been terminated."}
 
-    "/auth/2fa/setup",
-    summary="Initialize 2FA setup and return TOTP secret, otpauth URL, and base64 PNG QR code data URI",
-    response_model=TwoFactorSetupResponse,
-    status_code=status.HTTP_200_OK,
-    responses={
-        400: {"model": ErrorResponse, "description": "Bad Request"},
-        500: {"model": ErrorResponse, "description": "Internal Server Error"},
-    },
-)
+
 @router.post(
-    "/api/v1/auth/2fa/setup",
-    summary="Initialize 2FA setup and return TOTP secret, otpauth URL, and base64 PNG QR code data URI",
-    response_model=TwoFactorSetupResponse,
- main
+    "/api/v1/auth/forgot-password",
+    summary="Forgot Password / Reset Request",
     status_code=status.HTTP_200_OK,
     responses={
         400: {"model": ErrorResponse, "description": "Bad Request"},
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
- feature/password-reset-token-email
 async def forgot_password(payload: ForgotPasswordRequest):
     """
     Accepts user email, verifies account context existence, generates a 
@@ -774,5 +768,4 @@ async def disable_two_factor_auth_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to disable 2FA: {str(e)}",
         )
- main
- main
+

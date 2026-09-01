@@ -1,7 +1,7 @@
 # ── Development & Code Quality ─────────────────────────────────────────────────
 # Development-only dependencies: linters, formatters, and git hooks. Install
 # with `pip install -r requirements-dev.txt`. Not needed for deployment.
-ruff>=0.16.0
+ruff>=0.16.5
 pylint>=3.0.0
 black>=24.1.0
 isort>=5.13.0

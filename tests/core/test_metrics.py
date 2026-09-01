@@ -11,6 +11,7 @@ and ``increase()`` read as a counter reset, inventing a spike of the full
 post-reset value every time.
 """
 
+import json
 from unittest.mock import patch
 
 import pytest
@@ -85,9 +86,8 @@ def test_corpus_and_index_size_gauges_are_populated(fake_telemetry, tmp_path):
     index_file = tmp_path / "corpus.index"
     index_file.write_bytes(b"y" * 4096)
 
-    with (
-        patch("src.db.incidents.DEFAULT_DB_PATH", str(corpus_db)),
-        patch("src.core.app_config.FAISS_INDEX_PATH", index_file),
+    with patch("src.db.incidents.DEFAULT_DB_PATH", str(corpus_db)), patch(
+        "src.core.app_config.FAISS_INDEX_PATH", index_file
     ):
         metrics.sync_telemetry_gauges()
 
@@ -100,9 +100,8 @@ def test_missing_files_do_not_raise(fake_telemetry, tmp_path):
     missing_db = tmp_path / "nope.db"
     missing_index = tmp_path / "nope.index"
 
-    with (
-        patch("src.db.incidents.DEFAULT_DB_PATH", str(missing_db)),
-        patch("src.core.app_config.FAISS_INDEX_PATH", missing_index),
+    with patch("src.db.incidents.DEFAULT_DB_PATH", str(missing_db)), patch(
+        "src.core.app_config.FAISS_INDEX_PATH", missing_index
     ):
         metrics.sync_telemetry_gauges()  # must not raise
 
@@ -181,7 +180,7 @@ def test_timed_decorator_records_even_when_the_stage_raises():
     payload = metrics.generate_metrics_json()
     counts = [
         sample["value"]
-        for sample in payload["spd_pipeline_duration_seconds"]["metrics"]
+        for sample in payload["pipeline_duration_seconds"]["metrics"]
         if sample["labels"].get("stage") == "unit_test_failing_stage"
         and sample["labels"].get("le") is None
     ]
@@ -206,16 +205,36 @@ def test_generate_metrics_json_includes_the_new_gauges(fake_telemetry):
 
     payload = metrics.generate_metrics_json()
 
-    assert "spd_corpus_documents" in payload
-    assert "spd_active_users" in payload
-    assert payload["spd_corpus_documents"]["type"] == "gauge"
+    assert "corpus_documents" in payload
+    assert "active_users" in payload
+    assert payload["corpus_documents"]["type"] == "gauge"
 
 
 def test_generate_metrics_json_reports_the_counter_as_a_counter():
     payload = metrics.generate_metrics_json()
 
-    assert payload["spd_documents"]["type"] == "counter"
+    assert payload["documents"]["type"] == "counter"
 
+
+def test_generate_metrics_json_is_json_serializable():
+    """Issue #3760: the payload must be valid, JSON-serializable output."""
+    payload = metrics.generate_metrics_json()
+
+    serialized = json.dumps(payload)  # must not raise TypeError
+
+    assert isinstance(payload, dict)
+    for family_name, family in payload.items():
+        assert isinstance(family_name, str)
+        assert "type" in family
+        assert "help" in family
+        assert "metrics" in family
+        for sample in family["metrics"]:
+            assert "labels" in sample
+            assert "value" in sample
+
+    # Round-tripping should reproduce an equivalent structure.
+    assert json.loads(serialized) == payload
+    
 
 # ── Scan Stage Duration Histogram ──────────────────────────────────────────────
 
