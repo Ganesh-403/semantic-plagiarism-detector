@@ -91,9 +91,18 @@ class TestDottedAcronyms:
     def test_acronym_periods_do_not_end_sentences(self, text, expected):
         assert count_sentences(text) == expected
 
+    def test_three_letter_acronym_at_sentence_end_counts_once(self):
+        """Issue #3709: a dotted acronym followed by a plain word is one sentence."""
+        assert count_sentences("Visit the U.S.A. today.") == 1
+
+    def test_three_letter_acronym_mid_sentence_counts_once(self):
+        """The interior periods of a three-letter acronym never split the sentence."""
+        assert count_sentences("The U.S.A. economy grew. Inflation fell.") == 2
+
     def test_acronym_rule_is_generic(self):
         """An acronym absent from the abbreviation list is still handled."""
         assert count_sentences("She works at the C.I.A. now. He does not.") == 2
+        assert count_sentences("She works at the C.I.A.S. now. He does not.") == 2
 
 
 class TestDecimalNumbers:
