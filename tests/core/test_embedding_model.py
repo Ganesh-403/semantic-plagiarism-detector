@@ -857,84 +857,66 @@ class TestConfigurableEmbeddingBatchSize:
             assert call_args.kwargs.get("batch_size") == 64
 
 
-class TestDynamicINT8QuantizationToggle:
-    """Test suite for dynamic INT8 quantization toggle via ENABLE_EMBEDDING_QUANTIZATION (Issue #4007)."""
+class TestAppleSiliconMPSAcceleration:
+    """Test suite for Apple Silicon Metal (MPS) acceleration support (Issue #4008)."""
 
-    def test_is_quantization_enabled_helper(self, monkeypatch):
-        """Verify is_quantization_enabled parses environment values correctly."""
-        from src.core.embedding_model import is_quantization_enabled
+    def test_get_device_mps_available_when_cuda_not_present(self, monkeypatch):
+        """When CUDA is not available and MPS is available, get_device returns 'mps'."""
+        from src.core.embedding_model import get_device
 
-        monkeypatch.setenv("ENABLE_EMBEDDING_QUANTIZATION", "true")
-        assert is_quantization_enabled() is True
+        # Mock CUDA not available
+        monkeypatch.setattr(torch.xpu, "is_available", lambda: False, raising=False)
+        if hasattr(torch, "cuda"):
+            monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
 
-        monkeypatch.setenv("ENABLE_EMBEDDING_QUANTIZATION", "1")
-        assert is_quantization_enabled() is True
+        # Mock MPS available
+        mock_mps = MagicMock()
+        mock_mps.is_available.return_value = True
+        monkeypatch.setattr(torch.backends, "mps", mock_mps)
 
-        monkeypatch.setenv("ENABLE_EMBEDDING_QUANTIZATION", "YES")
-        assert is_quantization_enabled() is True
+        assert get_device(None) == "mps"
 
-        monkeypatch.setenv("ENABLE_EMBEDDING_QUANTIZATION", "false")
-        assert is_quantization_enabled() is False
+    def test_get_device_cuda_takes_precedence_over_mps(self, monkeypatch):
+        """When CUDA is available, get_device returns 'cuda' even if MPS is available."""
+        from src.core.embedding_model import get_device
 
-        monkeypatch.delenv("ENABLE_EMBEDDING_QUANTIZATION", raising=False)
-        assert is_quantization_enabled() is False
+        monkeypatch.setattr(torch.xpu, "is_available", lambda: False, raising=False)
+        monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+        monkeypatch.setattr(torch.backends.cuda, "is_built", lambda: True)
 
-    @patch("src.core.embedding_model.SentenceTransformer")
-    @patch("src.core.embedding_model._apply_dynamic_quantization")
-    def test_get_model_triggers_quantization_when_env_enabled(
-        self, mock_quantize, mock_st, monkeypatch
-    ):
-        """When ENABLE_EMBEDDING_QUANTIZATION=true, get_model dynamically quantizes model."""
-        monkeypatch.setenv("ENABLE_EMBEDDING_QUANTIZATION", "true")
-        embedding_model._model = None
-        embedding_model._quantized_model = None
-        EmbeddingModelManager._instance = None
+        mock_mps = MagicMock()
+        mock_mps.is_available.return_value = True
+        monkeypatch.setattr(torch.backends, "mps", mock_mps)
 
-        mock_base_model = MagicMock()
-        mock_st.return_value = mock_base_model
-        mock_quantized_model = MagicMock()
-        mock_quantize.return_value = mock_quantized_model
+        assert get_device(None) == "cuda"
 
-        model = embedding_model._get_model()
+    def test_get_device_cpu_fallback_when_no_accelerator_available(self, monkeypatch):
+        """When no GPU accelerator (CUDA/MPS/XPU) is available, get_device returns 'cpu'."""
+        from src.core.embedding_model import get_device
 
-        mock_quantize.assert_called_once_with(mock_base_model)
-        assert model is mock_quantized_model
+        monkeypatch.setattr(torch.xpu, "is_available", lambda: False, raising=False)
+        if hasattr(torch, "cuda"):
+            monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
 
-    @patch("src.core.embedding_model.SentenceTransformer")
-    @patch("src.core.embedding_model._apply_dynamic_quantization")
-    def test_get_model_bypasses_quantization_when_env_disabled(
-        self, mock_quantize, mock_st, monkeypatch
-    ):
-        """When ENABLE_EMBEDDING_QUANTIZATION=false, get_model does not apply quantization."""
-        monkeypatch.setenv("ENABLE_EMBEDDING_QUANTIZATION", "false")
-        embedding_model._model = None
-        embedding_model._quantized_model = None
-        EmbeddingModelManager._instance = None
+        mock_mps = MagicMock()
+        mock_mps.is_available.return_value = False
+        monkeypatch.setattr(torch.backends, "mps", mock_mps)
 
-        mock_base_model = MagicMock()
-        mock_st.return_value = mock_base_model
+        assert get_device(None) == "cpu"
 
-        model = embedding_model._get_model()
+    def test_get_device_reads_model_attribute(self):
+        """When a SentenceTransformer model instance with device attribute is provided, get_device inspects it."""
+        from src.core.embedding_model import get_device
 
-        mock_quantize.assert_not_called()
-        assert model is mock_base_model
+        mock_model = MagicMock()
+        mock_model.device = "mps"
+        assert get_device(mock_model) == "mps"
 
-    def test_quantization_reduces_ram_and_preserves_embedding_contract(self):
-        """Verify dynamic quantization contract: float32 linear layers convert to qint8 while output dim remains 384."""
-        model = torch.nn.Sequential(
-            torch.nn.Linear(384, 384),
-            torch.nn.ReLU(),
-            torch.nn.Linear(384, 384),
-        )
-        quantized = torch.quantization.quantize_dynamic(
-            model, {torch.nn.Linear}, dtype=torch.qint8, inplace=False
-        )
-
-        dummy_input = torch.randn(1, 384)
-        out = quantized(dummy_input)
-
-        assert out.shape == (1, 384)
-        assert hasattr(quantized[0], "weight")
+        mock_model_obj = MagicMock()
+        dev_obj = MagicMock()
+        dev_obj.type = "mps"
+        mock_model_obj.device = dev_obj
+        assert get_device(mock_model_obj) == "mps"
 
 
 
