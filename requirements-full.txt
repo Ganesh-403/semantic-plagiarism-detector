@@ -76,7 +76,7 @@ pdfminer.six==20260107
 pdfplumber==0.11.10
 pillow==12.3.0
 platformdirs==4.11.0
-plotly==6.9.0
+plotly==7.0.0
 pluggy==1.6.0
 pre_commit==4.6.1
 proto-plus==1.28.2
@@ -87,7 +87,7 @@ pyasn1==0.6.4
 pyasn1_modules==0.4.2
 pycparser==3.0
 pydantic==2.13.4
-pydantic_core==2.46.4
+pydantic_core==2.48.0
 pydeck==0.9.3
 Pygments==2.20.0
 pylint==4.0.6
@@ -117,7 +117,7 @@ requests==2.34.2
 responses==0.26.2
 rich==15.0.0
 rpds-py==2026.6.3
-ruff==0.16.0
+ruff==0.16.5
 safetensors==0.8.0
 scikit-learn==1.9.0
 scipy==1.18.0
@@ -132,7 +132,7 @@ starlette==1.3.1
 streamlit==1.60.0
 streamlit-plotly-events==0.0.6
 streamlit-tour==1.1.0
-striprtf==0.0.32
+striprtf==0.0.33
 sympy==1.14.0
 tenacity==9.1.4
 threadpoolctl==3.6.0
@@ -142,7 +142,7 @@ tomlkit==0.15.1
 torch==2.13.0
 tqdm==4.69.1
 transformers==5.14.1
-typer==0.27.0
+typer==0.27.2
 typing-inspection==0.4.2
 typing_extensions==4.16.0
 tzdata==2026.3

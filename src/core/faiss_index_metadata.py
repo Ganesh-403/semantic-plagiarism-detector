@@ -117,7 +117,8 @@ class FAISSIndexMetadata:
                     vector_schema_version=data.get(
                         "vector_schema_version"
                     ),
-                )                logger.info("Loaded FAISS index metadata from %s", self.metadata_path)
+                )
+                logger.info("Loaded FAISS index metadata from %s", self.metadata_path)
                 return True
             except Exception as e:
                 logger.warning("Failed to load metadata: %s. Starting fresh.", e)

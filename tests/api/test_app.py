@@ -1171,3 +1171,29 @@ def test_custom_http_exception_handler_string_detail():
 
     assert response.status_code == 400
     assert body["message"] == "string error"
+
+
+class TestLoginResponseTokenExpiration:
+    """Test suite verifying login endpoint returns token expiration metadata #4038."""
+
+    def test_login_returns_token_expiration_fields(self):
+        from fastapi.testclient import TestClient
+        from src.api.app import app
+
+        client = TestClient(app)
+        response = client.post("/auth/login")
+        assert response.status_code == 200
+        data = response.json()
+        assert "token" in data
+        assert "expires_in" in data
+        assert "expires_at" in data
+        assert isinstance(data["expires_in"], int)
+        assert data["expires_in"] == 86400
+        assert data["expires_at"].endswith("Z")
+
+    def test_login_schema_validation_includes_expiration(self):
+        from src.api.schemas import LoginResponse
+        login_resp = LoginResponse(token="test-token", expires_in=3600, expires_at="2026-08-31T23:59:59Z")
+        assert login_resp.expires_in == 3600
+        assert login_resp.expires_at == "2026-08-31T23:59:59Z"
+

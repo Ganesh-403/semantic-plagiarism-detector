@@ -21,6 +21,7 @@
 # SOFTWARE.
 
 import sqlite3
+import time
 import uuid
 
 import pytest

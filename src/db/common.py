@@ -32,6 +32,7 @@ def get_read_connection(
     connection = sqlite3.connect(
         database_uri,
         uri=True,
+        timeout=15.0,
         check_same_thread=False,
     )
     connection.row_factory = sqlite3.Row

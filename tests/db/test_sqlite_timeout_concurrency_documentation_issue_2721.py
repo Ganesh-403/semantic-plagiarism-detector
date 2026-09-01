@@ -186,6 +186,9 @@ def test_simulated_bulk_faiss_sync_write_lock_contention():
             )
             conn.commit()
 
+        import threading
+        sync_started = threading.Event()
+
         def _bulk_faiss_sync():
             with get_connection(db_path, timeout=15.0) as conn:
                 conn.execute("BEGIN EXCLUSIVE TRANSACTION;")
@@ -194,11 +197,12 @@ def test_simulated_bulk_faiss_sync_write_lock_contention():
                         "INSERT INTO embeddings (id, vector_data) VALUES (?, ?);",
                         (i, f"vector_embedding_{i}"),
                     )
+                sync_started.set()
                 time.sleep(0.3)  # Hold exclusive transaction for 300ms
                 conn.commit()
 
         def _concurrent_read():
-            time.sleep(0.05)  # Let FAISS sync start first
+            sync_started.wait()
             with get_connection(db_path, timeout=15.0) as conn:
                 cursor = conn.execute("SELECT COUNT(*) FROM embeddings;")
                 return cursor.fetchone()[0]
