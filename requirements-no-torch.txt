@@ -17,7 +17,7 @@ reportlab>=5.0.0                 # PDF document generation
 pytesseract>=0.3.13              # OCR text extraction from scanned images
 Pillow>=10.0.0                   # Image processing library
 python-magic>=0.4.27             # File magic bytes verification
-striprtf>=0.0.32                 # Extract text from RTF documents
+striprtf>=0.0.33                 # Extract text from RTF documents
 EbookLib>=0.18                   # Extract text from EPUB documents
 # ── Web UI ────────────────────────────────────────────────────────────────────
 streamlit>=1.61.1                # Dashboard framework
