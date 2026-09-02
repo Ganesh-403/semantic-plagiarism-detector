@@ -674,6 +674,127 @@ def chunk_text(
 chunk_document = chunk_text
 
 
+# ── Token-aware Chunking (Issue #3998) ───────────────────────────────────────
+
+
+def chunk_document_by_tokens(
+    text: str,
+    max_tokens: int = 256,
+    overlap_tokens: int = 32,
+    tokenizer: Optional[Any] = None,
+    min_words: int = 0,
+) -> list[str]:
+    """Splits a document text string into overlapping chunks based on Hugging Face token count.
+
+    Acceptance Criteria (Issue #3998):
+    Implement chunk_document_by_tokens(text: str, max_tokens: int = 256, overlap_tokens: int = 32, tokenizer=None)
+    using the model's tokenizer.
+
+    Args:
+        text: Input raw text string to chunk.
+        max_tokens: Maximum number of tokens allowed per chunk (default: 256).
+        overlap_tokens: Number of overlapping tokens between consecutive chunks (default: 32).
+        tokenizer: Hugging Face tokenizer instance or object with `encode` and `decode` methods.
+            If None, attempts to fetch the tokenizer from the active embedding model manager or
+            falls back to a default word-tokenization encoder.
+        min_words: Optional minimum word count for included chunks (default: 0).
+
+    Returns:
+        List of text chunks as strings.
+
+    Raises:
+        ValueError: If max_tokens <= 0 or overlap_tokens >= max_tokens or overlap_tokens < 0.
+    """
+    if max_tokens <= 0:
+        raise ValueError("max_tokens must be greater than 0")
+    if overlap_tokens < 0:
+        raise ValueError("overlap_tokens must be non-negative")
+    if overlap_tokens >= max_tokens:
+        raise ValueError("overlap_tokens must be strictly less than max_tokens")
+
+    raw_text = _chunking_text(text)
+    if not raw_text or not raw_text.strip():
+        return []
+
+    clean_text = raw_text.strip()
+
+    # Resolve tokenizer if not provided
+    if tokenizer is None:
+        try:
+            from src.core.embedding_model import EmbeddingModelManager
+
+            model = EmbeddingModelManager.get_instance().get_model()
+            tokenizer = getattr(model, "tokenizer", None)
+        except Exception as exc:
+            logger.debug("Could not automatically retrieve model tokenizer: %s", exc)
+            tokenizer = None
+
+    # Tokenize input text
+    token_ids: list[Any] = []
+    if tokenizer is not None:
+        if hasattr(tokenizer, "encode"):
+            try:
+                token_ids = tokenizer.encode(clean_text, add_special_tokens=False)
+            except TypeError:
+                token_ids = tokenizer.encode(clean_text)
+        elif callable(tokenizer):
+            token_ids = tokenizer(clean_text)
+        elif hasattr(tokenizer, "tokenize"):
+            token_ids = tokenizer.tokenize(clean_text)
+
+    # Fallback to word-based tokens if no tokenizer available or tokenization produced empty results
+    if not token_ids:
+        words = clean_text.split()
+        if not words:
+            return []
+        token_ids = words
+        is_word_fallback = True
+    else:
+        is_word_fallback = False
+
+    total_tokens = len(token_ids)
+    if total_tokens <= max_tokens:
+        if min_words > 0 and count_words(clean_text) < min_words:
+            return []
+        return [clean_text]
+
+    step = max_tokens - overlap_tokens
+    chunks: list[str] = []
+    start = 0
+
+    while start < total_tokens:
+        end = min(total_tokens, start + max_tokens)
+        chunk_token_ids = token_ids[start:end]
+
+        if is_word_fallback:
+            chunk_str = " ".join(chunk_token_ids).strip()
+        else:
+            if hasattr(tokenizer, "decode"):
+                try:
+                    chunk_str = tokenizer.decode(
+                        chunk_token_ids, skip_special_tokens=True
+                    ).strip()
+                except TypeError:
+                    chunk_str = tokenizer.decode(chunk_token_ids).strip()
+            elif hasattr(tokenizer, "convert_tokens_to_string"):
+                chunk_str = tokenizer.convert_tokens_to_string(
+                    chunk_token_ids
+                ).strip()
+            else:
+                chunk_str = " ".join(str(t) for t in chunk_token_ids).strip()
+
+        if chunk_str:
+            if min_words <= 0 or count_words(chunk_str) >= min_words:
+                chunks.append(chunk_str)
+
+        if end >= total_tokens:
+            break
+
+        start += step
+
+    return chunks
+
+
 # ── Sentence-boundary-aware chunking (Issue #919 & #2054) ────────────────────────────
 
 
