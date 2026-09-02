@@ -3,6 +3,14 @@
 import ast
 from pathlib import Path
 
+import sys
+from unittest.mock import MagicMock
+
+try:
+    import magic
+except Exception:
+    sys.modules["magic"] = MagicMock()
+
 from src.core import text_chunking
 
 SOURCE = Path(text_chunking.__file__).read_text(encoding="utf-8")

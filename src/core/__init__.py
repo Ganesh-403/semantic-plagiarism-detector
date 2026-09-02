@@ -53,7 +53,14 @@ from .similarity_engines import (
     SimilarityEngineFactory,
 )
 from .tag_manager import TagManager, sanitize_tag_name
-from .text_chunking import Chunk, ChunkString, chunk_by_sentences, chunk_document, chunk_documents
+from .text_chunking import (
+    Chunk,
+    ChunkString,
+    chunk_by_sentences,
+    chunk_document,
+    chunk_document_by_tokens,
+    chunk_documents,
+)
 from .translator import translate_text
 from .webhook import (
     EventDispatcher,
@@ -90,6 +97,7 @@ __all__ = [
     "calculate_paragraph_similarity_breakdown",
     "chunk_by_sentences",
     "chunk_document",
+    "chunk_document_by_tokens",
     "chunk_documents",
     "chunk_similarity_matrix",
     "dispatch_plagiarism_alert",
