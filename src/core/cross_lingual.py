@@ -385,17 +385,32 @@ def verify_semantic_fidelity(
         translated_embedding: Embedding vector of the back-translated text.
 
     Returns:
-        Cosine similarity score between 0.0 and 1.0.
+        Cosine similarity score between 0.0 and 1.0. Returns 0.0 for any input
+        that cannot produce a meaningful score: ``None``, empty vectors,
+        mismatched dimensions, non-finite (NaN / inf) components, or a
+        zero-magnitude vector.
     """
     if original_embedding is None or translated_embedding is None:
         return 0.0
 
-    if original_embedding.size == 0 or translated_embedding.size == 0:
+    # Coerce to 1-D float arrays so lists and integer arrays behave the same
+    # way, and so np.isfinite / np.linalg.norm below are always well defined.
+    vec_a = np.asarray(original_embedding, dtype=float).flatten()
+    vec_b = np.asarray(translated_embedding, dtype=float).flatten()
+
+    # Empty vectors carry no semantic content.
+    if vec_a.size == 0 or vec_b.size == 0:
         return 0.0
 
-    # Ensure vectors are 1D and normalized
-    vec_a = original_embedding.flatten()
-    vec_b = translated_embedding.flatten()
+    # Vectors of different lengths cannot be compared; np.dot would otherwise
+    # raise "shapes not aligned".
+    if vec_a.shape != vec_b.shape:
+        return 0.0
+
+    # NaN or infinite components make the cosine similarity undefined and would
+    # otherwise propagate as NaN through np.dot / np.clip.
+    if not np.all(np.isfinite(vec_a)) or not np.all(np.isfinite(vec_b)):
+        return 0.0
 
     norm_a = np.linalg.norm(vec_a)
     norm_b = np.linalg.norm(vec_b)
@@ -404,6 +419,8 @@ def verify_semantic_fidelity(
         return 0.0
 
     cosine_sim = np.dot(vec_a, vec_b) / (norm_a * norm_b)
+    if not np.isfinite(cosine_sim):
+        return 0.0
     return float(np.clip(cosine_sim, 0.0, 1.0))
 
 
