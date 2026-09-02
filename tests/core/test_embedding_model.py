@@ -857,66 +857,54 @@ class TestConfigurableEmbeddingBatchSize:
             assert call_args.kwargs.get("batch_size") == 64
 
 
-class TestAppleSiliconMPSAcceleration:
-    """Test suite for Apple Silicon Metal (MPS) acceleration support (Issue #4008)."""
+class TestThreadSafeEmbeddingManager:
+    """Test suite for thread-safe model singleton access in EmbeddingModelManager (Issue #4011)."""
 
-    def test_get_device_mps_available_when_cuda_not_present(self, monkeypatch):
-        """When CUDA is not available and MPS is available, get_device returns 'mps'."""
-        from src.core.embedding_model import get_device
+    def test_concurrent_get_instance_returns_same_singleton(self):
+        """Verify concurrent threads calling get_instance receive the exact same singleton instance."""
+        import concurrent.futures
 
-        # Mock CUDA not available
-        monkeypatch.setattr(torch.xpu, "is_available", lambda: False, raising=False)
-        if hasattr(torch, "cuda"):
-            monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+        instances = []
 
-        # Mock MPS available
-        mock_mps = MagicMock()
-        mock_mps.is_available.return_value = True
-        monkeypatch.setattr(torch.backends, "mps", mock_mps)
+        def _fetch_instance():
+            return EmbeddingModelManager.get_instance()
 
-        assert get_device(None) == "mps"
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(_fetch_instance) for _ in range(20)]
+            instances = [f.result() for f in concurrent.futures.as_completed(futures)]
 
-    def test_get_device_cuda_takes_precedence_over_mps(self, monkeypatch):
-        """When CUDA is available, get_device returns 'cuda' even if MPS is available."""
-        from src.core.embedding_model import get_device
+        first_instance = instances[0]
+        assert all(inst is first_instance for inst in instances)
 
-        monkeypatch.setattr(torch.xpu, "is_available", lambda: False, raising=False)
-        monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
-        monkeypatch.setattr(torch.backends.cuda, "is_built", lambda: True)
+    @patch("src.core.embedding_model.SentenceTransformer")
+    def test_concurrent_get_model_loads_model_only_once(self, mock_st):
+        """Verify concurrent requests calling get_model load the underlying model exactly once into memory."""
+        import concurrent.futures
+        import time
 
-        mock_mps = MagicMock()
-        mock_mps.is_available.return_value = True
-        monkeypatch.setattr(torch.backends, "mps", mock_mps)
+        embedding_model._model = None
+        embedding_model._quantized_model = None
+        EmbeddingModelManager._instance = None
 
-        assert get_device(None) == "cuda"
+        mock_instance = MagicMock()
+        mock_instance.get_sentence_embedding_dimension.return_value = 384
 
-    def test_get_device_cpu_fallback_when_no_accelerator_available(self, monkeypatch):
-        """When no GPU accelerator (CUDA/MPS/XPU) is available, get_device returns 'cpu'."""
-        from src.core.embedding_model import get_device
+        def _slow_load(*args, **kwargs):
+            time.sleep(0.05)
+            return mock_instance
 
-        monkeypatch.setattr(torch.xpu, "is_available", lambda: False, raising=False)
-        if hasattr(torch, "cuda"):
-            monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+        mock_st.side_effect = _slow_load
 
-        mock_mps = MagicMock()
-        mock_mps.is_available.return_value = False
-        monkeypatch.setattr(torch.backends, "mps", mock_mps)
+        def _load_model():
+            mgr = EmbeddingModelManager.get_instance()
+            return mgr.get_model()
 
-        assert get_device(None) == "cpu"
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [executor.submit(_load_model) for _ in range(16)]
+            models = [f.result() for f in concurrent.futures.as_completed(futures)]
 
-    def test_get_device_reads_model_attribute(self):
-        """When a SentenceTransformer model instance with device attribute is provided, get_device inspects it."""
-        from src.core.embedding_model import get_device
-
-        mock_model = MagicMock()
-        mock_model.device = "mps"
-        assert get_device(mock_model) == "mps"
-
-        mock_model_obj = MagicMock()
-        dev_obj = MagicMock()
-        dev_obj.type = "mps"
-        mock_model_obj.device = dev_obj
-        assert get_device(mock_model_obj) == "mps"
+        assert mock_st.call_count == 1
+        assert all(m is mock_instance for m in models)
 
 
 

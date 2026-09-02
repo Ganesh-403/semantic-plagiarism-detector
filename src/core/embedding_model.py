@@ -32,6 +32,7 @@ import gc
 import logging
 import os
 import shutil
+import threading
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
@@ -55,6 +56,8 @@ except ImportError:
 _DEFAULT_MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 _model: SentenceTransformer | None = None
 _quantized_model: SentenceTransformer | None = None
+_model_lock = threading.Lock()
+
 
 
 def _apply_dynamic_quantization(model: SentenceTransformer) -> SentenceTransformer:
@@ -207,10 +210,39 @@ def get_embedding_model_info() -> tuple[str, int]:
     return _get_model_name(), model.get_sentence_embedding_dimension()
 
 
+def is_quantization_enabled() -> bool:
+    """Check if dynamic INT8 quantization is enabled via ENABLE_EMBEDDING_QUANTIZATION environment variable.
+
+    Returns:
+        True if ENABLE_EMBEDDING_QUANTIZATION is set to 'true', '1', or 'yes' (case-insensitive).
+    """
+    env_val = os.getenv("ENABLE_EMBEDDING_QUANTIZATION", "false").lower().strip()
+    return env_val in ("true", "1", "yes")
+
+
+def get_device(model: "SentenceTransformer | None" = None) -> str:
+    """Public helper function to inspect and get the target hardware compute device.
+
+    Checks available hardware backends in priority order:
+    1. Intel XPU acceleration
+    2. NVIDIA CUDA / AMD ROCm HIP GPU acceleration
+    3. Apple Silicon Metal Performance Shaders (MPS) acceleration via torch.backends.mps.is_available()
+    4. CPU fallback
+
+    Args:
+        model: Optional SentenceTransformer model instance to inspect active device attribute.
+
+    Returns:
+        Device string identifier ("cuda", "mps", "xpu", or "cpu").
+    """
+    return _detect_device(model)
+
+
 class EmbeddingModelManager:
     """Manages the SentenceTransformer embedding model lifecycle, fallbacks, and quantization."""
 
     _instance = None
+    _instance_lock = threading.Lock()
 
     def __init__(self, quantize_model: bool = False):
         """Initialize the EmbeddingModelManager.
@@ -227,13 +259,16 @@ class EmbeddingModelManager:
     def get_instance(cls, quantize_model: bool | None = None) -> "EmbeddingModelManager":
         if quantize_model is None:
             quantize_model = is_quantization_enabled()
-            
+
         if cls._instance is None:
-            cls._instance = cls(quantize_model=quantize_model)
+            with cls._instance_lock:
+                if cls._instance is None:
+                    cls._instance = cls(quantize_model=quantize_model)
         elif quantize_model and not cls._instance.quantize_model:
-            # Update instance if quantization is requested but not yet applied
-            cls._instance.quantize_model = True
-            cls._instance._quantized_model = None  # Force reload/quantize
+            with cls._instance_lock:
+                if quantize_model and not cls._instance.quantize_model:
+                    cls._instance.quantize_model = True
+                    cls._instance._quantized_model = None  # Force reload/quantize
         return cls._instance
 
     def get_model(self) -> SentenceTransformer:
@@ -246,72 +281,80 @@ class EmbeddingModelManager:
             if _model is not None:
                 return _model
 
-        primary = _get_model_name()
-        fallback = os.getenv("SEMANTIC_PLAGIARISM_FALLBACK_MODEL", "all-MiniLM-L6-v2")
-        cache_dir = _get_cache_dir()
-        logger.info(f"[embedding_model] Loading model: {primary} ...")
-        logger.info(
-            f"[embedding_model] Model cache target: {cache_dir or 'default (~/.cache/huggingface)'}"
-        )
+        with _model_lock:
+            if self.quantize_model:
+                if _quantized_model is not None:
+                    return _quantized_model
+            else:
+                if _model is not None:
+                    return _model
 
-        try:
-            _repair_corrupted_model_cache(_resolve_cache_root(), primary)
-            kwargs = {}
-            if _ONNX_AVAILABLE:
-                kwargs["backend"] = "onnx"
-                logger.info("[embedding_model] optimum[onnxruntime] detected. Enabling ONNX backend for 2x-3x CPU speedup.")
-            
-            loaded_model = SentenceTransformer(primary, cache_folder=cache_dir, **kwargs)
-            device = _detect_device(loaded_model)
+            primary = _get_model_name()
+            fallback = os.getenv("SEMANTIC_PLAGIARISM_FALLBACK_MODEL", "all-MiniLM-L6-v2")
+            cache_dir = _get_cache_dir()
+            logger.info(f"[embedding_model] Loading model: {primary} ...")
             logger.info(
-                "Initialized Embedding Model: %s | Dimensions: %d | Target Device: %s",
-                primary,
-                loaded_model.get_sentence_embedding_dimension(),
-                device,
+                f"[embedding_model] Model cache target: {cache_dir or 'default (~/.cache/huggingface)'}"
             )
-            logger.info("[embedding_model] Model loaded successfully.")
-        except Exception as primary_exc:
-            logger.warning(
-                "Primary embedding model %s unavailable. Falling back to %s",
-                primary,
-                fallback,
-            )
+
             try:
-                kwargs_fallback = {}
+                _repair_corrupted_model_cache(_resolve_cache_root(), primary)
+                kwargs = {}
                 if _ONNX_AVAILABLE:
-                    kwargs_fallback["backend"] = "onnx"
-                loaded_model = SentenceTransformer(fallback, cache_folder=cache_dir, **kwargs_fallback)
-            except Exception as fallback_exc:
-                raise ModelInitializationError(
-                    "Unable to initialize the embedding model. Both the configured "
-                    f"primary model '{primary}' and fallback model '{fallback}' "
-                    "failed to load. This usually means the models are unavailable "
-                    "from the configured Hugging Face cache or cannot be downloaded. "
-                    "For offline or air-gapped deployments, download both models "
-                    "on an internet-connected machine with 'hf download', copy "
-                    "the model directories into the deployment environment, and "
-                    "configure SEMANTIC_PLAGIARISM_MODEL to point to the local "
-                    "primary model directory. For example: `hf download "
-                    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 "
-                    "--local-dir /opt/models/paraphrase-multilingual-MiniLM-L12-v2` "
-                    "and `hf download sentence-transformers/all-MiniLM-L6-v2 "
-                    "--local-dir /opt/models/all-MiniLM-L6-v2`. "
-                    f"Primary error: {primary_exc!r}; fallback error: {fallback_exc!r}"
-                ) from fallback_exc
-            device = _detect_device(loaded_model)
-            logger.info(
-                "Initialized Fallback Embedding Model: %s | Dimensions: %d | Target Device: %s",
-                fallback,
-                loaded_model.get_sentence_embedding_dimension(),
-                device,
-            )
+                    kwargs["backend"] = "onnx"
+                    logger.info("[embedding_model] optimum[onnxruntime] detected. Enabling ONNX backend for 2x-3x CPU speedup.")
 
-        if self.quantize_model:
-            _quantized_model = _apply_dynamic_quantization(loaded_model)
-            return _quantized_model
+                loaded_model = SentenceTransformer(primary, cache_folder=cache_dir, **kwargs)
+                device = _detect_device(loaded_model)
+                logger.info(
+                    "Initialized Embedding Model: %s | Dimensions: %d | Target Device: %s",
+                    primary,
+                    loaded_model.get_sentence_embedding_dimension(),
+                    device,
+                )
+                logger.info("[embedding_model] Model loaded successfully.")
+            except Exception as primary_exc:
+                logger.warning(
+                    "Primary embedding model %s unavailable. Falling back to %s",
+                    primary,
+                    fallback,
+                )
+                try:
+                    kwargs_fallback = {}
+                    if _ONNX_AVAILABLE:
+                        kwargs_fallback["backend"] = "onnx"
+                    loaded_model = SentenceTransformer(fallback, cache_folder=cache_dir, **kwargs_fallback)
+                except Exception as fallback_exc:
+                    raise ModelInitializationError(
+                        "Unable to initialize the embedding model. Both the configured "
+                        f"primary model '{primary}' and fallback model '{fallback}' "
+                        "failed to load. This usually means the models are unavailable "
+                        "from the configured Hugging Face cache or cannot be downloaded. "
+                        "For offline or air-gapped deployments, download both models "
+                        "on an internet-connected machine with 'hf download', copy "
+                        "the model directories into the deployment environment, and "
+                        "configure SEMANTIC_PLAGIARISM_MODEL to point to the local "
+                        "primary model directory. For example: `hf download "
+                        "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 "
+                        "--local-dir /opt/models/paraphrase-multilingual-MiniLM-L12-v2` "
+                        "and `hf download sentence-transformers/all-MiniLM-L6-v2 "
+                        "--local-dir /opt/models/all-MiniLM-L6-v2`. "
+                        f"Primary error: {primary_exc!r}; fallback error: {fallback_exc!r}"
+                    ) from fallback_exc
+                device = _detect_device(loaded_model)
+                logger.info(
+                    "Initialized Fallback Embedding Model: %s | Dimensions: %d | Target Device: %s",
+                    fallback,
+                    loaded_model.get_sentence_embedding_dimension(),
+                    device,
+                )
 
-        _model = loaded_model
-        return _model
+            if self.quantize_model:
+                _quantized_model = _apply_dynamic_quantization(loaded_model)
+                return _quantized_model
+
+            _model = loaded_model
+            return _model
 
 
 def is_quantization_enabled() -> bool:
