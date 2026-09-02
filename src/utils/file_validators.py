@@ -3,7 +3,10 @@ File validators for the Semantic Plagiarism Detector
 """
 
 import os
-import magic
+try:
+    import magic
+except (ImportError, Exception):
+    magic = None
 from pathlib import Path
 from typing import Tuple, Optional, List
 from dataclasses import dataclass
@@ -71,9 +74,12 @@ class FileValidator:
                 error_message=f"File extension '{extension}' is not allowed. Allowed: {', '.join(self.allowed_extensions)}"
             )
         
-        # Check MIME type using python-magic
+        # Check MIME type using python-magic if available
         try:
-            mime_type = magic.from_file(str(file_path), mime=True)
+            if magic:
+                mime_type = magic.from_file(str(file_path), mime=True)
+            else:
+                mime_type = None
             
             # If mime type detection fails, fallback to mimetypes
             if not mime_type:
