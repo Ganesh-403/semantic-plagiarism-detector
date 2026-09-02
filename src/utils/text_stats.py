@@ -15,7 +15,21 @@ import re
 from typing import Dict, List
 
 
-def count_words(text: str) -> int:
+# Token patterns shared by :func:`count_words`.
+#
+# ``_WORD_RE`` is the historical rule: a maximal run of word characters
+# (letters, digits, underscore). A hyphen is not a word character, so it ends
+# the token and "state-of-the-art" is counted as four separate words.
+#
+# ``_HYPHENATED_WORD_RE`` also keeps single internal hyphens inside a token, so
+# "state-of-the-art" counts as one lexical unit. ``[\w]`` is just an explicit
+# spelling of ``\w``; the ``(?:-[\w]+)*`` tail matches zero or more "-word"
+# groups that follow the first run.
+_WORD_RE = re.compile(r"\b\w+\b")
+_HYPHENATED_WORD_RE = re.compile(r"\b[\w]+(?:-[\w]+)*\b")
+
+
+def count_words(text: str, count_hyphenated_as_single: bool = False) -> int:
     """
     Count the number of words in the given text.
 
@@ -25,22 +39,29 @@ def count_words(text: str) -> int:
 
     Args:
         text: The text to analyze
+        count_hyphenated_as_single: When ``True``, a hyphenated compound such
+            as ``"state-of-the-art"`` is counted as a single word rather than
+            one word per hyphen-separated part. Defaults to ``False`` so the
+            original behaviour is unchanged for every existing caller.
 
     Returns:
-        Number of words in the text
+        Number of words in the text. With ``count_hyphenated_as_single=True``,
+        ``"state-of-the-art"`` contributes 1 to the count instead of 4.
     """
     if not text:
         return 0
+
+    pattern = _HYPHENATED_WORD_RE if count_hyphenated_as_single else _WORD_RE
 
     cjk_chars = re.findall(r"[\u4e00-\u9fff]", text)
     if cjk_chars:
         # Replace CJK characters with space to avoid merging adjacent English words
         non_cjk_text = re.sub(r"[\u4e00-\u9fff]", " ", text)
-        words = re.findall(r"\b\w+\b", non_cjk_text.lower())
+        words = pattern.findall(non_cjk_text.lower())
         return len(cjk_chars) + len(words)
 
     # Remove punctuation and split on whitespace
-    words = re.findall(r"\b\w+\b", text.lower())
+    words = pattern.findall(text.lower())
     return len(words)
 
 
