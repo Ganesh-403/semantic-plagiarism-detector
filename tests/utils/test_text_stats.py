@@ -73,6 +73,29 @@ def test_count_words():
     assert count_words("日本語漢字") == 5
 
 
+def test_count_words_hyphenated_as_single():
+    # Default behaviour is unchanged: each hyphen-separated part is its own word.
+    assert count_words("state-of-the-art") == 4
+    assert count_words("state-of-the-art", count_hyphenated_as_single=False) == 4
+
+    # Opt-in: a hyphenated compound counts as one lexical unit.
+    assert count_words("state-of-the-art", count_hyphenated_as_single=True) == 1
+    assert count_words("A well-being survey", count_hyphenated_as_single=True) == 3
+    assert (
+        count_words(
+            "decision-making and problem-solving", count_hyphenated_as_single=True
+        )
+        == 3
+    )
+
+    # Plain (non-hyphenated) text is unaffected by the flag.
+    assert count_words("hello world", count_hyphenated_as_single=True) == 2
+    assert count_words("", count_hyphenated_as_single=True) == 0
+
+    # The flag also applies on the CJK code path: 1 compound word + 2 CJK chars.
+    assert count_words("state-of-the-art 测试", count_hyphenated_as_single=True) == 3
+
+
 def test_get_word_count_matches_count_words():
     """Regression test for #2005: get_word_count() is now an alias for
     count_words() and both entry points must produce identical results,
