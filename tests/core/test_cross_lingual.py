@@ -618,6 +618,26 @@ class TestVerifySemanticFidelity:
         vec_b = np.array([0.0, 1.0])
         assert pytest.approx(verify_semantic_fidelity(vec_a, vec_b), rel=1e-5) == 0.0
 
+    def test_fidelity_nan_or_inf_embedding(self):
+        """NaN / inf components return 0.0 instead of propagating a NaN score."""
+        nan_vec = np.array([np.nan, 1.0])
+        inf_vec = np.array([np.inf, 1.0])
+        valid_vec = np.array([1.0, 2.0])
+        assert verify_semantic_fidelity(nan_vec, valid_vec) == 0.0
+        assert verify_semantic_fidelity(valid_vec, nan_vec) == 0.0
+        assert verify_semantic_fidelity(inf_vec, valid_vec) == 0.0
+        assert verify_semantic_fidelity(nan_vec, nan_vec) == 0.0
+
+    def test_fidelity_mismatched_dimensions(self):
+        """Vectors of different lengths return 0.0 without a NumPy ValueError."""
+        assert (
+            verify_semantic_fidelity(np.array([1.0, 0.0]), np.array([1.0, 0.0, 0.0]))
+            == 0.0
+        )
+        assert (
+            verify_semantic_fidelity(np.array([1.0, 2.0, 3.0]), np.array([1.0])) == 0.0
+        )
+
 
 class TestBackTranslateChunkRealTranslation:
     """Test suite for real translation call implementation (Issue #2219)."""
