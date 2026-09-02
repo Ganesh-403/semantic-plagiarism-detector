@@ -129,6 +129,19 @@ def test_get_sentence_count():
     assert get_sentence_count("Dr. Smith arrived. He stayed.") == 2
 
 
+def test_get_sentence_count_with_dotted_acronyms():
+    """Issue #3709: interior periods of dotted acronyms are not sentence breaks."""
+    assert get_sentence_count("Visit the U.S.A. today.") == 1
+    assert get_sentence_count("The U.S.A. economy grew. Inflation fell.") == 2
+    assert get_sentence_count("She works at the C.I.A.S. now. He does not.") == 2
+
+
+def test_get_sentence_count_with_decimals():
+    """Issue #3709: a period between digits is a decimal point, not a break."""
+    assert get_sentence_count("Pi is 3.14. It is exact.") == 2
+    assert get_sentence_count("The score was 9.75 out of 10.0 overall") == 1
+
+
 def test_count_sentence_without_ending_punctuation():
     assert get_sentence_count("The cat sat on the mat") == 1
 
