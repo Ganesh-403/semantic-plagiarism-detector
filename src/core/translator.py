@@ -2,14 +2,46 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import re
 import time
 
+import requests
 from deep_translator import DeeplTranslator, GoogleTranslator
 
 logger = logging.getLogger(__name__)
+
+# Socket timeout (in seconds) for outbound translation HTTP requests, configurable
+# via the TRANSLATION_TIMEOUT_SECONDS environment variable (Issue #3990).
+# deep-translator 1.11.4 issues requests.get() without a timeout, so a stalled
+# translation endpoint would otherwise block document processing indefinitely.
+TRANSLATION_TIMEOUT_SECONDS = float(os.getenv("TRANSLATION_TIMEOUT_SECONDS", "10.0"))
+
+
+@contextlib.contextmanager
+def _request_timeout(seconds: float | None = None):
+    """Apply a default socket timeout to HTTP requests made within the block.
+
+    deep-translator does not expose a timeout parameter, so this patches
+    ``requests.sessions.Session.request`` for the duration of the block to add
+    a default ``timeout`` when the caller did not set one explicitly. The
+    original method is always restored on exit.
+    """
+    timeout = TRANSLATION_TIMEOUT_SECONDS if seconds is None else seconds
+    original_request = requests.sessions.Session.request
+
+    def _request_with_timeout(self, *args, **kwargs):
+        kwargs.setdefault("timeout", timeout)
+        return original_request(self, *args, **kwargs)
+
+    requests.sessions.Session.request = _request_with_timeout
+    try:
+        yield
+    finally:
+        requests.sessions.Session.request = original_request
+
 
 # In-memory pipeline cache for MarianMT models: (source_lang, target_lang) -> pipeline
 _MARIAN_PIPELINES: dict[tuple[str, str], object] = {}
@@ -334,11 +366,12 @@ def translate_text(
         try:
             # DeeplTranslator uses api_key parameter
             deepl_source = "auto" if not source_lang or source_lang == "auto" else source_lang
-            translated = DeeplTranslator(
-                api_key=deepl_api_key,
-                source=deepl_source,
-                target=target_lang,
-            ).translate(original)
+            with _request_timeout():
+                translated = DeeplTranslator(
+                    api_key=deepl_api_key,
+                    source=deepl_source,
+                    target=target_lang,
+                ).translate(original)
         except Exception as exc:
             logger.warning("DeepL translation failed, falling back to GoogleTranslator: %s", exc)
             translated = None
@@ -349,10 +382,11 @@ def translate_text(
 
         for attempt in range(max_retries):
             try:
-                translated = GoogleTranslator(
-                    source=source_lang or "auto",
-                    target=target_lang,
-                ).translate(original)
+                with _request_timeout():
+                    translated = GoogleTranslator(
+                        source=source_lang or "auto",
+                        target=target_lang,
+                    ).translate(original)
                 break
             except Exception as exc:
                 last_exc = exc
@@ -392,10 +426,11 @@ def translate_text_secondary(
 
     try:
         from deep_translator import MyMemoryTranslator
-        translated = MyMemoryTranslator(
-            source=source_lang or "auto",
-            target=target_lang,
-        ).translate(text)
+        with _request_timeout():
+            translated = MyMemoryTranslator(
+                source=source_lang or "auto",
+                target=target_lang,
+            ).translate(text)
         if translated:
             return str(translated).strip()
     except Exception:
@@ -428,20 +463,22 @@ def translate_text_batch(
     if deepl_api_key:
         try:
             deepl_source = "auto" if not source_lang or source_lang == "auto" else source_lang
-            translated = DeeplTranslator(
-                api_key=deepl_api_key,
-                source=deepl_source,
-                target=target_lang,
-            ).translate_batch(texts)
+            with _request_timeout():
+                translated = DeeplTranslator(
+                    api_key=deepl_api_key,
+                    source=deepl_source,
+                    target=target_lang,
+                ).translate_batch(texts)
             return [str(t or "").strip() for t in translated]
         except Exception as exc:
             logger.warning("DeepL batch translation failed, falling back to GoogleTranslator: %s", exc)
 
     try:
-        translated = GoogleTranslator(
-            source=source_lang or "auto",
-            target=target_lang,
-        ).translate_batch(texts)
+        with _request_timeout():
+            translated = GoogleTranslator(
+                source=source_lang or "auto",
+                target=target_lang,
+            ).translate_batch(texts)
         return [str(t or "").strip() for t in translated]
     except Exception as exc:
         logger.error("Batch translation error: %s", exc)
