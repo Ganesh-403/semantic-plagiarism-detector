@@ -465,13 +465,22 @@ def dice_coefficient(
     Returns
     -------
     float
-        Sørensen-Dice coefficient score bounded between 0.0 and 1.0.
+        Sørensen-Dice coefficient score bounded between 0.0 and 1.0. By
+        convention, two texts that both tokenize to an empty set (empty,
+        punctuation-only, or entirely stopwords) are treated as identical
+        (``1.0``) rather than dividing zero by zero; a single empty text
+        against a non-empty one scores ``0.0``.
     """
     set_a: set[str] = tokenize(text_a, stopwords=stopwords)
     set_b: set[str] = tokenize(text_b, stopwords=stopwords)
     total_len = len(set_a) + len(set_b)
     if total_len == 0:
-        return 0.0
+        # Both sides have no content to compare (Issue #4022): there is
+        # nothing to compute here (0 / 0 is undefined), so this is a
+        # deliberate convention, not a derived result. If only one side were
+        # empty, total_len would be > 0 and the formula below already
+        # produces 0.0 on its own, since the empty set never intersects.
+        return 1.0
     intersection_len = len(set_a & set_b)
     return float((2.0 * intersection_len) / total_len)
 
