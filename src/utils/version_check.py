@@ -39,8 +39,10 @@ from src.version import APP_VERSION
 logger = logging.getLogger(__name__)
 
 # ── GitHub repository coordinates ─────────────────────────────────────────────
-GITHUB_OWNER: str = "Ganesh-403"
-GITHUB_REPO: str = "semantic-plagiarism-detector"
+# Overridable via env vars (Issue #3964) so forks and enterprise mirrors can
+# point the update check at their own repository without a code change.
+GITHUB_OWNER: str = os.getenv("GITHUB_OWNER", "Ganesh-403")
+GITHUB_REPO: str = os.getenv("GITHUB_REPO", "semantic-plagiarism-detector")
 GITHUB_RELEASES_URL: str = (
     f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
 )
@@ -127,10 +129,7 @@ async def fetch_latest_github_version(
         async with httpx.AsyncClient(headers=custom_headers, timeout=timeout) as client:
             response = await client.get(
                 url,
- chore/github-api-user-agent
-
                 headers=headers,
- main
                 follow_redirects=True,
             )
             response.raise_for_status()
@@ -150,12 +149,45 @@ async def fetch_latest_github_version(
         return None
 
 
+def _parse_semver_tuple(version: str) -> tuple[int, int, int]:
+    """Parse the ``major.minor.patch`` core of *version* as a 3-int tuple.
+
+    Used only as the fallback comparison for :func:`is_update_available` when
+    ``packaging`` is unavailable, so this is deliberately basic: it looks at
+    the first three dot-separated numeric components and ignores everything
+    else (pre-release/build suffixes such as ``-rc1`` or ``+build.5``).
+    A missing or non-numeric component defaults to ``0`` rather than raising,
+    so a malformed tag degrades gracefully instead of crashing the comparison.
+
+    Parameters
+    ----------
+    version:
+        A normalised version string, e.g. ``"1.2.0"`` or ``"1.2.0-rc1"``.
+
+    Returns
+    -------
+    tuple[int, int, int]
+        The ``(major, minor, patch)`` components.
+    """
+    core = version.split("-", 1)[0].split("+", 1)[0]
+    parts = core.split(".")
+    major, minor, patch = (
+        int(parts[i]) if i < len(parts) and parts[i].isdigit() else 0
+        for i in range(3)
+    )
+    return (major, minor, patch)
+
+
 def is_update_available(local_version: str, remote_tag: str) -> bool:
     """Return ``True`` when *remote_tag* is strictly newer than *local_version*.
 
     Both strings are normalised (leading ``v`` stripped) before comparison.
-    Falls back to a plain string inequality check when ``packaging`` is not
-    installed.
+    Falls back to a basic ``(major, minor, patch)`` integer-tuple comparison
+    when ``packaging`` is not installed (or a tag fails to parse as a
+    ``packaging.version.Version``), rather than a plain string inequality
+    check — a string-inequality fallback would report an update as available
+    for *any* difference, including when the remote version is actually
+    older than the local one.
 
     Parameters
     ----------
@@ -177,7 +209,7 @@ def is_update_available(local_version: str, remote_tag: str) -> bool:
 
         return Version(remote) > Version(local)
     except Exception:  # noqa: BLE001 – packaging not installed or bad tag
-        return remote != local
+        return _parse_semver_tuple(remote) > _parse_semver_tuple(local)
 
 
 def check_for_update_sync(
