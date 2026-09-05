@@ -226,7 +226,6 @@ class TestFetchLatestGithubVersion:
         call_args = mock_client.get.call_args
         assert call_args[0][0] == custom_url
 
- chore/github-api-user-agent
     def test_uses_custom_user_agent_header(self) -> None:
         """AsyncClient should be initialized with User-Agent and Accept headers."""
         mock_response = MagicMock()
@@ -270,7 +269,6 @@ class TestFetchLatestGithubVersion:
                 tag = self._run(fetch_latest_github_version())
 
             assert tag is None
- main
 
 
 # ── check_for_update_sync ──────────────────────────────────────────────────────
