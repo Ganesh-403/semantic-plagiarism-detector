@@ -127,10 +127,7 @@ async def fetch_latest_github_version(
         async with httpx.AsyncClient(headers=custom_headers, timeout=timeout) as client:
             response = await client.get(
                 url,
- chore/github-api-user-agent
-
                 headers=headers,
- main
                 follow_redirects=True,
             )
             response.raise_for_status()
