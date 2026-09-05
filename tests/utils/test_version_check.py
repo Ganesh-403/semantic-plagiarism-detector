@@ -54,6 +54,7 @@ _normalise_tag = _vc_mod._normalise_tag
 check_for_update_sync = _vc_mod.check_for_update_sync
 fetch_latest_github_version = _vc_mod.fetch_latest_github_version
 is_update_available = _vc_mod.is_update_available
+_parse_semver_tuple = _vc_mod._parse_semver_tuple
 
 
 # ── _normalise_tag ─────────────────────────────────────────────────────────────
@@ -132,6 +133,80 @@ class TestIsUpdateAvailable:
 
     def test_equal_versions_mixed_v_prefix(self) -> None:
         assert is_update_available("1.0.0", "v1.0.0") is False
+
+
+# ── is_update_available fallback (Issue #3965) ─────────────────────────────────
+# These force the ``from packaging.version import Version`` import to fail
+# (``packaging`` uninstalled, or any other ImportError) by registering
+# ``None`` for the submodule in ``sys.modules`` -- Python raises
+# ``ImportError`` for any import of a module that maps to ``None`` there --
+# so ``is_update_available`` falls through to ``_parse_semver_tuple``.
+
+
+def _without_packaging(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(sys.modules, "packaging.version", None)
+    monkeypatch.setitem(sys.modules, "packaging", None)
+
+
+class TestIsUpdateAvailableFallback:
+    def test_local_newer_is_not_reported_as_update(self, monkeypatch) -> None:
+        """Issue #3965: remote older than local must not report an update.
+
+        The old fallback (``remote != local``) reported True here, which is
+        backwards -- the local version is the newer one.
+        """
+        _without_packaging(monkeypatch)
+        assert is_update_available("1.1.0", "1.0.0") is False
+
+    def test_remote_newer_patch_reports_update(self, monkeypatch) -> None:
+        _without_packaging(monkeypatch)
+        assert is_update_available("1.0.0", "1.0.1") is True
+
+    def test_remote_newer_minor_reports_update(self, monkeypatch) -> None:
+        _without_packaging(monkeypatch)
+        assert is_update_available("1.0.5", "1.1.0") is True
+
+    def test_remote_newer_major_reports_update(self, monkeypatch) -> None:
+        _without_packaging(monkeypatch)
+        assert is_update_available("1.9.9", "2.0.0") is True
+
+    def test_equal_versions_no_update(self, monkeypatch) -> None:
+        _without_packaging(monkeypatch)
+        assert is_update_available("1.2.3", "v1.2.3") is False
+
+    def test_numeric_sort_not_lexicographic(self, monkeypatch) -> None:
+        """"1.10.0" must sort after "1.2.0" numerically, not lexicographically."""
+        _without_packaging(monkeypatch)
+        assert is_update_available("1.2.0", "1.10.0") is True
+        assert is_update_available("1.10.0", "1.2.0") is False
+
+    def test_malformed_tag_does_not_raise(self, monkeypatch) -> None:
+        _without_packaging(monkeypatch)
+        assert is_update_available("1.0.0", "not-a-version") is False
+        assert is_update_available("not-a-version", "1.0.0") is True
+
+
+class TestParseSemverTuple:
+    def test_basic_triple(self) -> None:
+        assert _parse_semver_tuple("1.2.3") == (1, 2, 3)
+
+    def test_missing_patch_defaults_to_zero(self) -> None:
+        assert _parse_semver_tuple("1.2") == (1, 2, 0)
+
+    def test_missing_minor_and_patch_default_to_zero(self) -> None:
+        assert _parse_semver_tuple("1") == (1, 0, 0)
+
+    def test_pre_release_suffix_is_ignored(self) -> None:
+        assert _parse_semver_tuple("1.2.3-rc1") == (1, 2, 3)
+
+    def test_build_metadata_suffix_is_ignored(self) -> None:
+        assert _parse_semver_tuple("1.2.3+build.5") == (1, 2, 3)
+
+    def test_non_numeric_component_defaults_to_zero(self) -> None:
+        assert _parse_semver_tuple("abc") == (0, 0, 0)
+
+    def test_extra_components_beyond_patch_are_ignored(self) -> None:
+        assert _parse_semver_tuple("1.2.3.4") == (1, 2, 3)
 
 
 # ── fetch_latest_github_version ────────────────────────────────────────────────
@@ -226,7 +301,6 @@ class TestFetchLatestGithubVersion:
         call_args = mock_client.get.call_args
         assert call_args[0][0] == custom_url
 
- chore/github-api-user-agent
     def test_uses_custom_user_agent_header(self) -> None:
         """AsyncClient should be initialized with User-Agent and Accept headers."""
         mock_response = MagicMock()
@@ -270,7 +344,6 @@ class TestFetchLatestGithubVersion:
                 tag = self._run(fetch_latest_github_version())
 
             assert tag is None
- main
 
 
 # ── check_for_update_sync ──────────────────────────────────────────────────────
