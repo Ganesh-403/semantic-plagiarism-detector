@@ -595,10 +595,11 @@ async def verify_two_factor_auth_endpoint(
 
     try:
         import pyotp
+        from slowapi.util import get_remote_address
         from src.db.auth import get_2fa_status, init_db, log_security_event
 
         init_db()
-        client_ip = get_client_ip(request)
+        client_ip = get_remote_address(request)
 
         enabled, existing_secret = get_2fa_status(username)
         if not enabled or not existing_secret:

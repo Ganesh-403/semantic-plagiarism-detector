@@ -1,9 +1,25 @@
+import pyotp
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 from src.api.app import app
+from src.api.dependencies import limiter
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _reset_2fa_rate_limit():
+    """Issue #4045: /auth/2fa/verify is rate-limited to 5/minute, keyed by
+    client address. TestClient reuses the same fake client identity for every
+    request in this process, so without resetting the limiter's storage
+    between tests, later tests would eventually get HTTP 429 instead of the
+    status code they're actually asserting on, regardless of whether their
+    OTP code was valid.
+    """
+    limiter.reset()
+    yield
+    limiter.reset()
 
 def test_refresh_token_rotation_success():
     """
@@ -67,3 +83,70 @@ def test_refresh_token_rotation_fails_if_invalid():
             
             # Validation Checks
             assert response.status_code == 401
+
+
+# ── Issue #4045: 2FA TOTP verification workflow ────────────────────────────────
+
+
+class TestTwoFactorAuthWorkflow:
+    """Enable 2FA, generate a real TOTP code, verify it, reject a bad one."""
+
+    def test_enable_2fa_then_verify_valid_totp_code_succeeds(self):
+        """A code freshly generated from the user's own secret is accepted."""
+        secret = pyotp.random_base32()
+        valid_code = pyotp.TOTP(secret).now()
+
+        with patch("src.db.auth.get_2fa_status", return_value=(True, secret)), \
+             patch("src.db.auth.init_db", return_value=None), \
+             patch("src.db.auth.log_security_event") as mock_log:
+            response = client.post(
+                "/auth/2fa/verify",
+                json={"username": "alice", "otp_code": valid_code},
+            )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "verified": True,
+            "message": "2FA code verified successfully.",
+        }
+        assert mock_log.call_args[0][0] == "2FA_VERIFY_SUCCESS"
+
+    def test_invalid_totp_code_is_rejected(self):
+        """A 6-digit code that does not match the user's secret is rejected."""
+        secret = pyotp.random_base32()
+        real_code = pyotp.TOTP(secret).now()
+        # Guarantee a code that is actually wrong, not a lucky collision.
+        wrong_code = "000000" if real_code != "000000" else "111111"
+
+        with patch("src.db.auth.get_2fa_status", return_value=(True, secret)), \
+             patch("src.db.auth.init_db", return_value=None), \
+             patch("src.db.auth.log_security_event") as mock_log:
+            response = client.post(
+                "/auth/2fa/verify",
+                json={"username": "bob", "otp_code": wrong_code},
+            )
+
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Invalid 2FA verification code."
+        assert mock_log.call_args[0][0] == "2FA_VERIFY_FAILED"
+
+    def test_verify_rejects_when_2fa_not_enabled(self):
+        """Verifying a code for a user who never enabled 2FA is rejected."""
+        with patch("src.db.auth.get_2fa_status", return_value=(False, None)), \
+             patch("src.db.auth.init_db", return_value=None), \
+             patch("src.db.auth.log_security_event"):
+            response = client.post(
+                "/auth/2fa/verify",
+                json={"username": "carol", "otp_code": "123456"},
+            )
+
+        assert response.status_code == 400
+        assert "not enabled" in response.json()["detail"]
+
+    def test_missing_username_or_code_is_rejected(self):
+        """Both fields are required before any 2FA lookup is attempted."""
+        response = client.post(
+            "/auth/2fa/verify",
+            json={"username": "", "otp_code": ""},
+        )
+        assert response.status_code == 400
