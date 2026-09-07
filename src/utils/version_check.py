@@ -39,8 +39,10 @@ from src.version import APP_VERSION
 logger = logging.getLogger(__name__)
 
 # ── GitHub repository coordinates ─────────────────────────────────────────────
-GITHUB_OWNER: str = "Ganesh-403"
-GITHUB_REPO: str = "semantic-plagiarism-detector"
+# Overridable via env vars (Issue #3964) so forks and enterprise mirrors can
+# point the update check at their own repository without a code change.
+GITHUB_OWNER: str = os.getenv("GITHUB_OWNER", "Ganesh-403")
+GITHUB_REPO: str = os.getenv("GITHUB_REPO", "semantic-plagiarism-detector")
 GITHUB_RELEASES_URL: str = (
     f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
 )

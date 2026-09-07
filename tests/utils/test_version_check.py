@@ -57,6 +57,63 @@ is_update_available = _vc_mod.is_update_available
 _parse_semver_tuple = _vc_mod._parse_semver_tuple
 
 
+def _reload_version_check_with_env(monkeypatch, owner=None, repo=None):
+    """Import a fresh copy of version_check.py with GITHUB_OWNER/GITHUB_REPO
+    applied from the environment (Issue #3964).
+
+    GITHUB_OWNER, GITHUB_REPO, and GITHUB_RELEASES_URL are module-level
+    constants resolved once at import time, so exercising the env-var
+    override means importing the module again after setting the env var --
+    reusing the already-loaded ``_vc_mod`` above would just show the values
+    it was first imported with. A distinct module name keeps this out of
+    ``sys.modules`` under the name every other test in this file relies on.
+    """
+    if owner is not None:
+        monkeypatch.setenv("GITHUB_OWNER", owner)
+    else:
+        monkeypatch.delenv("GITHUB_OWNER", raising=False)
+    if repo is not None:
+        monkeypatch.setenv("GITHUB_REPO", repo)
+    else:
+        monkeypatch.delenv("GITHUB_REPO", raising=False)
+
+    spec = importlib.util.spec_from_file_location(
+        "src.utils.version_check_env_override_test", _MOD_PATH
+    )
+    module = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+    spec.loader.exec_module(module)  # type: ignore[union-attr]
+    return module
+
+
+class TestGithubRepoCoordinatesEnvOverride:
+    """Issue #3964: GITHUB_OWNER / GITHUB_REPO are configurable via env vars."""
+
+    def test_defaults_when_env_unset(self, monkeypatch) -> None:
+        mod = _reload_version_check_with_env(monkeypatch)
+        assert mod.GITHUB_OWNER == "Ganesh-403"
+        assert mod.GITHUB_REPO == "semantic-plagiarism-detector"
+
+    def test_owner_overridden_by_env(self, monkeypatch) -> None:
+        mod = _reload_version_check_with_env(monkeypatch, owner="my-fork-org")
+        assert mod.GITHUB_OWNER == "my-fork-org"
+        assert mod.GITHUB_REPO == "semantic-plagiarism-detector"
+
+    def test_repo_overridden_by_env(self, monkeypatch) -> None:
+        mod = _reload_version_check_with_env(monkeypatch, repo="my-mirror")
+        assert mod.GITHUB_OWNER == "Ganesh-403"
+        assert mod.GITHUB_REPO == "my-mirror"
+
+    def test_both_overridden_reflected_in_releases_url(self, monkeypatch) -> None:
+        mod = _reload_version_check_with_env(
+            monkeypatch, owner="my-fork-org", repo="my-mirror"
+        )
+        assert mod.GITHUB_OWNER == "my-fork-org"
+        assert mod.GITHUB_REPO == "my-mirror"
+        assert mod.GITHUB_RELEASES_URL == (
+            "https://api.github.com/repos/my-fork-org/my-mirror/releases/latest"
+        )
+
+
 # ── _normalise_tag ─────────────────────────────────────────────────────────────
 
 
