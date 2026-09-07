@@ -107,6 +107,23 @@ def test_dice_coefficient():
     assert score > 0.0
 
 
+def test_dice_coefficient_both_empty_returns_one():
+    """Issue #4022: two texts with no content are treated as identical (1.0),
+    not a 0/0 crash and not the "completely different" 0.0."""
+    assert dice_coefficient("", "") == 1.0
+    assert dice_coefficient("   ", "\t\n") == 1.0
+    # Punctuation-only and all-stopword text also tokenize to an empty set.
+    assert dice_coefficient("...!!!???", ",,,;;;") == 1.0
+    assert dice_coefficient("the a an", "is of to") == 1.0
+
+
+def test_dice_coefficient_one_empty_returns_zero():
+    """Only one side having no content means zero shared tokens: 0.0."""
+    assert dice_coefficient("", "deep learning networks") == 0.0
+    assert dice_coefficient("deep learning networks", "") == 0.0
+    assert dice_coefficient("...", "deep learning networks") == 0.0
+
+
 def test_overlap_coefficient_subset_returns_one():
     text1 = "the cat sat"
     text2 = "the cat sat on the mat"
