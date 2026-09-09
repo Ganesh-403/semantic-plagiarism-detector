@@ -7,7 +7,7 @@ for batched deletions in a single network round-trip (Issue #2816).
 
 from unittest.mock import MagicMock, patch
 
-from src.utils.redis_cache import RedisCache, clear_all_large_data, clear_session
+from src.utils.redis_cache import RedisCache, CacheNamespace, clear_all_large_data, clear_session
 
 
 def test_clear_pattern_uses_redis_pipeline():
@@ -39,7 +39,7 @@ def test_clear_session_delegates_to_pipelined_clear_pattern():
     with patch("src.utils.redis_cache._cache") as mock_cache:
         mock_cache.clear_pattern.return_value = 10
         result = clear_session("session_abc")
-        mock_cache.clear_pattern.assert_called_once_with("spd:v1:session:session_abc:*")
+        mock_cache.clear_pattern.assert_called_once_with(CacheNamespace.build_key(CacheNamespace.SESSION, "session_abc", "*"))
         assert result is True
 
 
@@ -84,5 +84,6 @@ def test_clear_all_large_data_uses_pipeline():
         clear_all_large_data("sess1")
 
         mock_client.pipeline.assert_called_once()
-        mock_pipeline.delete.assert_called_once_with(*test_keys)
+        mock_pipeline.delete.assert_called_once()
+        assert set(mock_pipeline.delete.call_args.args) == set(test_keys)
         mock_pipeline.execute.assert_called_once()

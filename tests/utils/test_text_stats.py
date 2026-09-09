@@ -1,3 +1,11 @@
+"""Unit tests for src/utils/text_stats.py.
+
+This module could not be collected at all until Issue #2556: line 41 asserted
+against ``2.0.0``, which is not a valid Python number, so the whole file was a
+syntax error. That in turn hid two functions that raised ``NameError`` on every
+call -- see ``get_reading_time_minutes`` and ``get_readability_metrics``.
+"""
+
 from src.utils.text_stats import (
     count_words,
     format_text_stats,
@@ -10,13 +18,6 @@ from src.utils.text_stats import (
     get_text_stats,
 )
 
-"""Unit tests for src/utils/text_stats.py.
-
-This module could not be collected at all until Issue #2556: line 41 asserted
-against ``2.0.0``, which is not a valid Python number, so the whole file was a
-syntax error. That in turn hid two functions that raised ``NameError`` on every
-call -- see ``get_reading_time_minutes`` and ``get_readability_metrics``.
-"""
 
 import pytest
 

@@ -436,3 +436,19 @@ def test_export_to_json_numpy_types_with_metadata_wrapper():
     assert parsed["data"]["total"] == 3
     assert parsed["data"]["average"] == 1.5
     assert "exported_at" in parsed["metadata"]
+
+
+@pytest.mark.parametrize("include_metadata", [True, False])
+def test_nested_nonfinite_values_produce_strict_json(include_metadata):
+    payload = {"scores": [float("nan"), np.float64("inf"), -float("inf")],
+               "nested": {"array": np.array([0.25, np.nan]), "enabled": np.bool_(True)}}
+    def reject_constant(value):
+        raise AssertionError(f"Non-standard JSON constant: {value}")
+    encoded = export_to_json(payload, include_metadata=include_metadata)
+    parsed = json.loads(encoded, parse_constant=reject_constant)
+    result = parsed["data"] if include_metadata else parsed
+    assert result == {"scores": [0.0, 0.0, 0.0], "nested": {"array": [0.25, 0.0], "enabled": True}}
+
+
+def test_report_schema_rejects_invalid_timestamp():
+    assert not validate_report_json({"metadata": {"exported_at": "yesterday"}, "data": []})

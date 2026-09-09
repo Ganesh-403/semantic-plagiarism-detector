@@ -100,4 +100,4 @@ class TestFingerprintingAndSimilarity:
         assert ")" in fp
         assert "{" in fp
         assert "}" in fp
-        assert "STR_CONST" in fp
+        assert "CHAR_CONST" in fp

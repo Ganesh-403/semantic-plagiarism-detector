@@ -704,7 +704,7 @@ async def test_unlink_fails_on_internal_server_error():
 
     # We need stream_upload_file_to_disk to hit arbitrary Exception
     with patch(
-        "tempfile.NamedTemporaryFile", side_effect=RuntimeError("Arbitrary OS Error!")
+        "tempfile.NamedTemporaryFile", side_effect=OSError("Arbitrary OS Error!")
     ):
         with patch("os.unlink", side_effect=Exception("Could not unlink!")):
             with patch("os.path.exists", return_value=True):
@@ -714,7 +714,7 @@ async def test_unlink_fails_on_internal_server_error():
                     await stream_upload_file_to_disk(m_file)
 
                 assert ctx.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-                assert "Arbitrary OS Error!" in ctx.value.detail
+                assert "Unable to create temporary upload storage" in ctx.value.detail
 
 
 @pytest.mark.asyncio

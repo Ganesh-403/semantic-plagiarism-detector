@@ -172,14 +172,7 @@ def build_network_data(
             for edge, score in edge_similarities.items()
             if edge[0] in retained_nodes and edge[1] in retained_nodes
         }
-    # Keep only the top max_nodes highest-degree documents when the graph is large
-    hidden_nodes = 0
-    if max_nodes and len(G) > max_nodes:
-        ranked = sorted(G.degree(), key=lambda item: item[1], reverse=True)
-        keep = {node for node, _ in ranked[:max_nodes]}
-        drop = [node for node in list(G.nodes()) if node not in keep]
-        hidden_nodes = len(drop)
-        G.remove_nodes_from(drop)
+    hidden_nodes = hidden_node_count
 
     # Compute force-directed layout coordinates with physics customization
     num_nodes = len(G.nodes())
@@ -392,7 +385,11 @@ def build_network_data(
         else:
             node_size.append(base_size)
             comm_idx = community_map.get(node, 0)
-            node_color.append(DEFAULT_TAG_COLORS[comm_idx % len(DEFAULT_TAG_COLORS)])
+            if theme_colors and "danger" in theme_colors:
+                severity = "danger" if max_score >= 0.9 else "warning" if max_score >= 0.75 else "success"
+                node_color.append(theme_colors.get(severity, DEFAULT_TAG_COLORS[comm_idx % len(DEFAULT_TAG_COLORS)]))
+            else:
+                node_color.append(DEFAULT_TAG_COLORS[comm_idx % len(DEFAULT_TAG_COLORS)])
 
         # Determine cluster size for suspicion indicator
         cluster_id = cluster_map.get(node, -1)
@@ -467,6 +464,7 @@ def build_network_data(
         "document_tags": document_tags,
         "cluster_map": cluster_map,
         "hidden_nodes": hidden_nodes,
+        "hidden_node_count": hidden_node_count,
     }
 
 
@@ -517,25 +515,10 @@ def render_network_plotly(
 
     hidden_nodes = network_data.get("hidden_nodes", 0)
     annotations = []
-    if hidden_nodes:
-        annotations.append(
-            dict(
-                text=f"{hidden_nodes} nodes hidden",
-                showarrow=False,
-                xref="paper",
-                yref="paper",
-                x=0.5,
-                y=-0.06,
-                xanchor="center",
-                yanchor="top",
-                font=dict(size=12, color=ink_color),
-            )
-        )
-
     # Issue #2350: If the graph is completely empty (no nodes/traces),
     # add a fallback annotation so the user sees a message rather than
     # a blank canvas.
-    if not traces and not shapes:
+    if not shapes and (node_trace is None or len(node_trace.x or []) == 0):
         annotations.append(
             dict(
                 text="No documents or plagiarism connections to display.",
@@ -674,6 +657,7 @@ def plot_similarity_network(
     repulsion: float = 1.0,
     max_label_len: int = 15,
     max_nodes: int = 50,
+    font_scale: float = 1.0,
 ) -> go.Figure:
     """Builds a NetworkX graph from the similarity matrix and returns an interactive Plotly figure."""
     network_data = build_network_data(
@@ -696,6 +680,7 @@ def plot_similarity_network(
         network_data=network_data,
         title=title,
         theme_colors=theme_colors,
+        font_scale=font_scale,
     )
 
 
@@ -713,6 +698,7 @@ def plot_plagiarism_network_graph(
     repulsion: float = 1.0,
     max_label_len: int = 15,
     max_nodes: int = 50,
+    font_scale: float = 1.0,
 ) -> go.Figure:
     """Renders an interactive force-directed plagiarism network graph with custom physics controls and label truncation."""
     return plot_similarity_network(
@@ -729,12 +715,13 @@ def plot_plagiarism_network_graph(
         repulsion=repulsion,
         max_label_len=max_label_len,
         max_nodes=max_nodes,
+        font_scale=font_scale,
     )
 
 
 def export_graph_to_gexf(graph: nx.Graph) -> str:
     """Serialize a NetworkX graph to GEXF XML format string."""
-    return "".join(nx.generate_gexf(graph))
+    return '<?xml version="1.0" encoding="utf-8"?>\n' + "\n".join(nx.generate_gexf(graph))
 
 
 def export_network_to_gexf_bytes(

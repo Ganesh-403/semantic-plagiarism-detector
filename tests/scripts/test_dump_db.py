@@ -127,7 +127,9 @@ class TestDumpDbCLI:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
         """Run the script as a subprocess and verify it exits 0."""
-        corpus_db = tmp_path / "corpus.db"
+        monkeypatch.setenv("SPD_STATE_DIR", str(tmp_path))
+        corpus_db = tmp_path / "data" / "corpus.db"
+        corpus_db.parent.mkdir()
         auth_db = tmp_path / "users.db"
 
         for db_path in (corpus_db, auth_db):
@@ -158,7 +160,7 @@ class TestDumpDbCLI:
             cwd=str(SCRIPT_PATH.parents[1]),
         )
 
-        assert result.returncode == 0, f"stderr: {result.stderr}"
+        assert result.returncode == 0, f"result: {result!r}; stdout: {result.stdout!r}; run: {subprocess.run!r}"
         assert output_dir.exists()
 
         sql_files = list(output_dir.glob("*.sql"))
@@ -168,6 +170,7 @@ class TestDumpDbCLI:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
         """Verify the script exits with error when no DBs exist."""
+        monkeypatch.setenv("SPD_STATE_DIR", str(tmp_path))
         monkeypatch.setattr(
             "src.core.app_config.CORPUS_DB_PATH",
             tmp_path / "nonexistent_corpus.db",

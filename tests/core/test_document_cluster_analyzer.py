@@ -81,8 +81,9 @@ class TestConnectedComponents:
     def test_single_component(self):
         graph = {"a": [("b", 0.9)], "b": [("a", 0.9)], "c": []}
         comps = _connected_components(graph)
-        assert len(comps) == 1
+        assert len(comps) == 2
         assert set(comps[0]) == {"a", "b"}
+        assert comps[1] == ["c"]
 
     def test_multiple_components(self):
         graph = {

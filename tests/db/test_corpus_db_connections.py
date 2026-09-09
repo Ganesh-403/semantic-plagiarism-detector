@@ -1,4 +1,4 @@
-﻿import gc
+import gc
 import sqlite3
 import threading
 from unittest.mock import patch
@@ -13,6 +13,15 @@ from src.db.corpus_db import (
     WeakConnection,
     _connection_pool
 )
+
+@pytest.fixture(autouse=True)
+def isolated_pool(tmp_path, monkeypatch):
+    import src.db.corpus_db as corpus
+    close_connections(all_threads=True)
+    monkeypatch.setattr(corpus, "_DB_PATH", str(tmp_path / "corpus.db"))
+    yield
+    close_connections(all_threads=True)
+
 
 def test_connections_registered():
     """Test that new connections are registered in _all_connections."""
@@ -47,9 +56,17 @@ def test_connections_not_strongly_retained():
 
 def test_multiple_connections():
     """Test multiple connections across threads are tracked."""
+    # Establish WAL before simultaneous readers open their connections.
+    with _connect() as initial:
+        initial.execute("CREATE TABLE ready (id INTEGER)")
+    close_connections()
+    connections = []
+    barrier = threading.Barrier(5)
     def worker():
         with _connect() as conn:
+            connections.append(conn)
             assert conn in _all_connections
+            barrier.wait(timeout=10)
 
     threads = [threading.Thread(target=worker) for _ in range(5)]
     for t in threads:
@@ -100,8 +117,7 @@ def test_cleanup_behavior():
     assert len(_all_connections) == 0
     # Also verify connection is closed
     with pytest.raises(sqlite3.ProgrammingError):
-        # We need a reference to the conn to test it, so let's get it again
-        pass
+        conn.execute("SELECT 1")
 
 def test_cleanup_behavior_close():
     with _connect() as conn:

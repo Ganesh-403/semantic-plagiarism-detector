@@ -43,7 +43,7 @@ os.environ["SPD_STATE_DIR"] = tempfile.mkdtemp(prefix="spd-tests-")
 # the test suite does not flush the active development session cache.
 os.environ.setdefault("REDIS_DB", "1")
 os.environ.setdefault("APP_ENV", "test")
-os.environ.setdefault("ADMIN_BOOTSTRAP_PASSWORD", "Admin123!")
+os.environ.setdefault("ADMIN_BOOTSTRAP_PASSWORD", "Bootstrap-Test-Password!984")
 os.environ.setdefault("JWT_SECRET_KEY", "test-only-secret-which-is-never-used-in-production")
 
 # ── Headless Renderer Configuration (Issue #504) ──────────────────────────────
@@ -141,7 +141,6 @@ if "faiss" not in sys.modules:
 
 
 for mod_name in [
-    "fitz",
     "redis",
     "bs4",
     "faker",
@@ -732,5 +731,7 @@ def isolate_cached_application_state(monkeypatch):
     monkeypatch.setattr(translator, "_translations", {})
     translator._load_translation_dictionary.clear()
     get_valid_tokens.cache_clear()
+    from src.db.auth import clear_revocation_cache
+    clear_revocation_cache()
     limiter._storage.reset()
     get_token_bucket_limiter().reset()

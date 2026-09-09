@@ -102,8 +102,8 @@ def test_get_google_auth_url_challenge_matches_verifier_in_state(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-@patch("src.utils.sso.requests.get")
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.get")
+@patch("src.utils.sso.requests.Session.post")
 def test_exchange_google_code_sends_code_verifier(mock_post, mock_get, monkeypatch):
     """When code_verifier is provided, it must be included in the token exchange POST data."""
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "test_client_id")
@@ -120,7 +120,7 @@ def test_exchange_google_code_sends_code_verifier(mock_post, mock_get, monkeypat
         json=lambda: {
             "email": "pkce@example.com",
             "name": "PKCE User",
-            "picture": "",
+            "verified_email": True, "id": "google-user-123", "picture": "",
         },
     )
 
@@ -131,8 +131,8 @@ def test_exchange_google_code_sends_code_verifier(mock_post, mock_get, monkeypat
     assert kwargs["data"]["code_verifier"] == "test_verifier_value"
 
 
-@patch("src.utils.sso.requests.get")
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.get")
+@patch("src.utils.sso.requests.Session.post")
 def test_exchange_google_code_omits_code_verifier_when_none(mock_post, mock_get, monkeypatch):
     """When code_verifier is None (default), it must NOT appear in the token exchange POST data."""
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "test_client_id")
@@ -149,7 +149,7 @@ def test_exchange_google_code_omits_code_verifier_when_none(mock_post, mock_get,
         json=lambda: {
             "email": "user@example.com",
             "name": "User",
-            "picture": "",
+            "verified_email": True, "id": "google-user-123", "picture": "",
         },
     )
 

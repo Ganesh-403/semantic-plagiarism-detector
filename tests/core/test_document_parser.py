@@ -27,7 +27,7 @@ import zipfile
 from unittest.mock import MagicMock, patch
 
 import docx
-import fitz  # PyMuPDF
+from src.utils import pdf_backend as fitz
 import pytest
 
 from src.core.document_parser import (
@@ -219,8 +219,9 @@ class TestEncryptedPDFHandling:
         encrypted_pdf_bytes = _make_encrypted_pdf_bytes(
             text="Protected Content", password="pass"
         )
-        result = extract_text(encrypted_pdf_bytes, "encrypted_submission.pdf")
-        assert isinstance(result, str)
+        from src.errors import EmptyDocumentError
+        with pytest.raises(EmptyDocumentError):
+            extract_text(encrypted_pdf_bytes, "encrypted_submission.pdf")
 
 
 def test_extract_from_docx_bytes():
@@ -357,8 +358,8 @@ def test_extract_text_routing(mock_ocr):
     assert isinstance(extract_text(pdf_bytes, "test.pdf"), str)
     assert extract_text(docx_bytes, "test.docx") == "Hello DOCX"
     assert extract_text(txt_bytes, "test.txt") == "Hello TXT"
-    # Fallback case (now rejected by security check)
-    assert extract_text(txt_bytes, "test.unknown") == ""
+    # The parser fallback handles text; upload validation enforces allowed extensions.
+    assert extract_text(txt_bytes, "test.unknown") == "Hello TXT"
 
 
 def test_extract_texts_mixed():
@@ -811,18 +812,7 @@ def test_get_supported_file_extensions():
     from src.core.document_parser import get_supported_file_extensions
 
     extensions = get_supported_file_extensions()
-    assert extensions == [
-        ".csv",
-        ".docx",
-        ".epub",
-        ".html",
-        ".markdown",
-        ".md",
-        ".mdown",
-        ".pdf",
-        ".rtf",
-        ".txt",
-    ]
+    assert extensions == sorted({".csv", ".doc", ".docx", ".epub", ".html", ".jpg", ".jpeg", ".png", ".markdown", ".md", ".mdown", ".pdf", ".pptx", ".odt", ".rtf", ".txt", ".zip"})
 
 
 @pytest.mark.skip(reason="Known failure")

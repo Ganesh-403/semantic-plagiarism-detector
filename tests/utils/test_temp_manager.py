@@ -261,29 +261,12 @@ def test_get_temp_directory_size_bytes_non_negative():
     assert result >= 0
 
 
-def test_get_temp_directory_size_bytes_increases_with_files():
-    """Adding files to the temp directory should increase the reported size."""
-    # Get baseline size
-    baseline_size = get_temp_directory_size_bytes()
-
-    # Create a file with known content in the temp directory
-    temp_dir = tempfile.gettempdir()
-    test_file = os.path.join(temp_dir, "test_size_calc_file.bin")
-    test_content = b"x" * 10000  # 10 KB of data
-
-    with open(test_file, "wb") as f:
-        f.write(test_content)
-
-    try:
-        new_size = get_temp_directory_size_bytes()
-        # The new size should be at least 10000 bytes larger than baseline
-        assert new_size >= baseline_size + 10000
-    finally:
-        # Clean up the test file
-        try:
-            os.remove(test_file)
-        except OSError:
-            pass
+def test_get_temp_directory_size_bytes_increases_with_files(tmp_path, monkeypatch):
+    """Measure an isolated directory, unaffected by other workers' cleanup."""
+    monkeypatch.setattr("src.utils.temp_manager.tempfile.gettempdir", lambda: str(tmp_path))
+    assert get_temp_directory_size_bytes() == 0
+    (tmp_path / "measured.bin").write_bytes(b"x" * 10000)
+    assert get_temp_directory_size_bytes() == 10000
 
 
 def test_get_temp_directory_size_bytes_includes_subdirectories():

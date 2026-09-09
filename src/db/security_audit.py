@@ -122,6 +122,7 @@ def log_security_event(
 
         db_path = str(get_auth_db_path())
 
+    username = username.strip().lower() if username else username
     timestamp = datetime.utcnow().isoformat()
 
     try:

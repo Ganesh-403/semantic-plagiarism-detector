@@ -9,7 +9,7 @@ from hypothesis import strategies as st
 
 from src.utils.filename import MAX_FILENAME_LENGTH, sanitize_filename
 
-_SAFE_PATTERN = re.compile(r"^[A-Za-z0-9._ -]+$")
+_SAFE_PATTERN = re.compile(r"^[\w. -]+$")
 _ILLEGAL_CHARS = {"<", ">", '"', "/", "\\"}
 
 

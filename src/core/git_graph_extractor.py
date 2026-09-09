@@ -42,64 +42,49 @@ class GitGraph:
 
 
 def parse_git_log(log_content: str) -> GitGraph:
-    """Parse standard `git log --stat` output to extract commits and churn."""
+    """Parse `git log --stat` into commits, churn, and reverse-log adjacency.
+
+    Without parent hashes, edges describe log order rather than merge topology.
+    """
     commits = []
-
-    # Regex for commit header: commit <hash> \n Author: <name> \n Date: <date>
-    commit_pattern = re.compile(
-        r"commit\s+([a-f0-9]+)\nAuthor:\s+(.*?)\nDate:\s+(.*?)\n", re.MULTILINE
-    )
-
-    # Regex for stat lines: <file> | <changes>
-    stat_pattern = re.compile(r"\|\s+(\d+)\s+([+-]*)")
-
-    current_commit = None
-    lines = log_content.split("\n")
-
-    for line in lines:
-        header_match = commit_pattern.match(line)
-        if header_match:
-            if current_commit:
-                commits.append(current_commit)
-
-            hash_val = header_match.group(1)
-            author = header_match.group(2).strip()
-            date_str = header_match.group(3).strip()
-
-            # Parse date: "Thu Jan 1 12:00:00 2024 +0000"
+    normalized = log_content.replace("\r\n", "\n")
+    headers = list(re.finditer(
+        r"^commit\s+([a-fA-F0-9]+)\s*\n(?:Merge:[^\n]*\n)?Author:\s*([^\n]+)\nDate:\s*([^\n]+)",
+        normalized, re.MULTILINE,
+    ))
+    for index, header in enumerate(headers):
+        end = headers[index + 1].start() if index + 1 < len(headers) else len(normalized)
+        body = normalized[header.end():end]
+        date_text = header.group(3).strip()
+        try:
+            dt = datetime.strptime(date_text, "%a %b %d %H:%M:%S %Y %z")
+        except ValueError:
             try:
-                # Simplified parsing for timestamp and timezone
-                parts = date_str.rsplit(" ", 1)
-                tz_offset = parts[1] if len(parts) > 1 else "+0000"
-                dt = datetime.strptime(parts[0].strip(), "%a %b %d %H:%M:%S %Y")
-                timestamp = int(dt.timestamp())
+                dt = datetime.fromisoformat(date_text)
+                if dt.tzinfo is None:
+                    raise ValueError("Missing timezone")
             except ValueError:
-                timestamp = 0
-                tz_offset = "+0000"
-
-            current_commit = GitCommit(
-                commit_hash=hash_val,
-                author=author,
-                timestamp=timestamp,
-                timezone_offset=tz_offset,
-            )
-            continue
-
-        if current_commit:
-            stat_match = stat_pattern.search(line)
-            if stat_match:
-                changes = int(stat_match.group(1))
-                symbols = stat_match.group(2)
-                adds = symbols.count("+")
-                dels = symbols.count("-")
-
-                # Proportional estimation based on total changes
-                if adds + dels > 0:
-                    current_commit.additions += int(changes * (adds / (adds + dels)))
-                    current_commit.deletions += int(changes * (dels / (adds + dels)))
-
-    if current_commit:
-        commits.append(current_commit)
+                logger.warning("Skipping commit with invalid date: %s", header.group(1))
+                continue
+        additions = deletions = 0
+        for stat in re.finditer(r"\|\s+(\d+)\s+([+-]+)", body):
+            changes = int(stat.group(1))
+            symbols = stat.group(2)
+            added = round(changes * symbols.count("+") / len(symbols))
+            additions += added
+            deletions += changes - added
+        # The summary provides exact counts; graphical --stat bars are scaled.
+        summary = re.search(r"^\s*\d+ files? changed[^\n]*", body, re.MULTILINE)
+        if summary:
+            added = re.search(r"(\d+) insertions?\(\+\)", summary.group(0))
+            deleted = re.search(r"(\d+) deletions?\(-\)", summary.group(0))
+            additions = int(added.group(1)) if added else 0
+            deletions = int(deleted.group(1)) if deleted else 0
+        commits.append(GitCommit(
+            commit_hash=header.group(1), author=header.group(2).strip(),
+            timestamp=int(dt.timestamp()), timezone_offset=dt.strftime("%z"),
+            additions=additions, deletions=deletions,
+        ))
 
     # Build simple linear DAG edges (parent -> child)
     edges = []

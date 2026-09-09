@@ -9,6 +9,11 @@ from src.api.app import app
 client = TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def configured_redis(monkeypatch):
+    monkeypatch.setenv("REDIS_HOST", "redis.example.com")
+
+
 def test_health_live_endpoint_returns_200_ok():
     """Verify /health/live returns 200 OK immediately with status 'alive'."""
     for path in ["/health/live", "/api/v1/health/live"]:
@@ -80,3 +85,11 @@ def test_health_ready_endpoint_503_when_redis_fails():
         assert data["status"] == "not_ready"
         assert data["db"] == "connected"
         assert data["redis"] == "disconnected"
+
+
+def test_readiness_without_optional_redis(monkeypatch, mock_db):
+    monkeypatch.delenv("REDIS_HOST", raising=False)
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    response = client.get("/health/ready")
+    assert response.status_code == 200
+    assert response.json()["redis"] == "disabled"

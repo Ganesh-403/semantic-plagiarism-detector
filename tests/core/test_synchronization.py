@@ -1,7 +1,15 @@
 import os
+import pytest
+from contextlib import nullcontext
 from unittest.mock import MagicMock, patch
 
 from src.core.synchronization import _backup_corrupted_index, verify_and_repair_index
+
+
+@pytest.fixture(autouse=True)
+def isolated_file_lock(monkeypatch):
+    # These unit tests use imaginary paths; real lock behavior is covered separately.
+    monkeypatch.setattr("src.core.synchronization.faiss_write_lock", lambda path: nullcontext())
 
 # ---------------------------------------------------------------------------
 # Test Verification & Desync Scenarios
@@ -133,10 +141,8 @@ def test_backup_corrupted_index_mechanics():
 
         _backup_corrupted_index("/fake/data/corpus.index")
 
-        mock_makedirs.assert_called_once_with(os.path.normpath("/fake/data/backups"))
-        expected_dest = os.path.normpath(
-            "/fake/data/backups/corpus_20240101_120000.index.bak"
-        )
+        mock_makedirs.assert_called_once_with(os.path.join("/fake/data", "backups"))
+        expected_dest = os.path.join("/fake/data", "backups", "corpus_20240101_120000.index.bak")
         mock_copy.assert_called_once_with("/fake/data/corpus.index", expected_dest)
 
 
@@ -169,13 +175,12 @@ def test_atexit_graceful_shutdown_registered():
 
     from src.core.synchronization import background_tasks
 
-    found = False
-    for handler in atexit._exithandlers:
-        # atexit handlers are tuples of (func, args, kwargs)
-        func, args, kwargs = handler[0], handler[1], handler[2]  # noqa: F841
-        if func == background_tasks.shutdown:
-            assert kwargs.get("wait") is True
-            found = True
-            break
-
-    assert found, "Graceful shutdown callback was not registered with atexit"
+    from pathlib import Path
+    import runpy
+    import src.core.synchronization as module
+    with patch.object(atexit, "register") as register:
+        namespace = runpy.run_path(str(Path(module.__file__)))
+    try:
+        register.assert_called_once_with(namespace["background_tasks"].shutdown, wait=True)
+    finally:
+        namespace["background_tasks"].shutdown(wait=True)

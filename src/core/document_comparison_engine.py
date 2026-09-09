@@ -91,7 +91,7 @@ class ComparisonResult:
 
 def _tokenize(text: str) -> List[str]:
     """Lowercase and split text into word tokens."""
-    return re.findall(r"\b[a-z0-9]+\b", text.lower())
+    return re.findall(r"\b\w+(?:['’]\w+)*\b", text.lower())
 
 
 def _split_paragraphs(text: str, min_words: int = 5) -> List[str]:

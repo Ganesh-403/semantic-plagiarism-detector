@@ -37,7 +37,7 @@ from src.core.app_config import get_pdf_footer_text
 from src.utils.text_stats import compute_text_stats
 
 try:
-    import fitz  # PyMuPDF
+    from src.utils import pdf_backend as fitz
 
     _HAS_FITZ = True
 except Exception:
@@ -144,7 +144,7 @@ def break_long_urls(text: str) -> str:
     def _insert_zwsp(match: re.Match) -> str:
         url = match.group(0)
         # Break after slashes, dots, query parameters, dashes, underscores, and ampersands
-        broken_url = re.sub(r"([/\.\?=&_\-#~:])", r"\1\u200b", url)
+        broken_url = re.sub(r"([/\.\?=&_\-#~:])", lambda part: part.group(1) + "\u200b", url)
         return broken_url
 
     # Regex detecting http(s) URLs or ftp URLs
@@ -633,16 +633,12 @@ def generate_plagiarism_report(
 
             backcolor_hex = "#FEF08A" if not dark_mode else "#854D0E"
             textcolor_hex = "#1E293B" if not dark_mode else "#FFFFFF"
-            mark_start = "<mark style='background-color: rgba(250, 204, 21, 0.3); color: inherit; padding: 1px 3px; border-radius: 3px;'>"
+            def pdf_markup(value):
+                # Accept the highlighter's mark tag independently of CSS spelling.
+                value = re.sub(r"<mark\b[^>]*>", f"<font backcolor='{backcolor_hex}' color='{textcolor_hex}'>", value)
+                return value.replace("</mark>", "</font>")
 
-            hl_a = hl_a.replace(
-                mark_start,
-                f"<font backcolor='{backcolor_hex}' color='{textcolor_hex}'>",
-            ).replace("</mark>", "</font>")
-            hl_b = hl_b.replace(
-                mark_start,
-                f"<font backcolor='{backcolor_hex}' color='{textcolor_hex}'>",
-            ).replace("</mark>", "</font>")
+            hl_a, hl_b = pdf_markup(hl_a), pdf_markup(hl_b)
 
             for char in ["*", "_", "~", "`", "#", "[", "]", "(", ")"]:
                 hl_a = hl_a.replace(f"\\{char}", char)

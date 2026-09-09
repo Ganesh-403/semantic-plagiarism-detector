@@ -40,7 +40,7 @@ MODULE_PATH = (
 )
 
 STRONG_SECRET = "s" * 48
-SHORT_SECRET = "tooshort"
+SHORT_SECRET = "tooshort"  # pragma: allowlist secret
 
 
 @pytest.fixture()

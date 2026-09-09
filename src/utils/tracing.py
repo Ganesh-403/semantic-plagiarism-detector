@@ -22,6 +22,8 @@ except ImportError:
     SpanExporter = Any
 
 class _NoOpSpan:
+    def update_name(self, *args, **kwargs):
+        pass
     def set_attribute(self, *args, **kwargs):
         pass
     def record_exception(self, *args, **kwargs):

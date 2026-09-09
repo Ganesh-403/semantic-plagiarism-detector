@@ -97,7 +97,7 @@ class TestIncidentRetrieval:
             SELECT * FROM plagiarism_incidents 
             WHERE document_a = ? OR document_b = ?
             """,
-            ("target-doc.pdf", "target-doc.pdf"),
+            ("target_doc.pdf", "target_doc.pdf"),
         )
         rows = cursor.fetchall()
 

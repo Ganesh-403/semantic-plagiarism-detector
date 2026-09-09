@@ -9,7 +9,7 @@ def test_sanitization_removes_invisible_characters():
     clean_output, changes_made = engine.sanitize_and_clean_text(obfuscated_input)
     
     assert clean_output == "Evasion Text"
-    assert changes_made == 5
+    assert changes_made == 6
 
 def test_alignment_vector_precision_scoring():
     engine = NeuralAlignmentEngine()
@@ -18,8 +18,8 @@ def test_alignment_vector_precision_scoring():
     
     score = engine.compute_alignment_vectors(source, target)
     
-    # 8 identical words out of 10 unique elements total cross-union = 80.0%
-    assert score == 80.00
+    # Case-folding merges the two occurrences of "the": 7 shared / 9 unique.
+    assert score == 77.78
 
 def test_orchestrator_pipeline_execution():
     orchestrator = OcrPipelineOrchestrator()

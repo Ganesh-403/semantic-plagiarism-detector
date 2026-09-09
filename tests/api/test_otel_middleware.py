@@ -11,21 +11,21 @@ from src.api.app import app
 
 
 @pytest.fixture(autouse=True)
-def memory_exporter():
+def memory_exporter(monkeypatch):
+    from fastapi import FastAPI
+    import src.api.app as api_module
+    from src.api.app import otel_tracing_middleware, global_exception_handler
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-
-    # Store the original provider
-    original_provider = trace.get_tracer_provider()
-
-    # Set the new test provider
-    trace.set_tracer_provider(provider)
-
+    monkeypatch.setattr("src.utils.tracing.get_tracer", lambda: provider.get_tracer("test"))
+    # Isolate test routes and middleware without changing global auth policy.
+    isolated = FastAPI()
+    isolated.middleware("http")(otel_tracing_middleware)
+    isolated.add_exception_handler(Exception, global_exception_handler)
+    monkeypatch.setitem(globals(), "app", isolated)
     yield exporter
-
-    # Restore the original provider
-    trace.set_tracer_provider(original_provider)
+    provider.shutdown()
 
 
 def test_otel_middleware_records_exception(memory_exporter):

@@ -49,8 +49,7 @@ class TestL2NormalizationEdgeCases:
 
     def test_empty_vector(self):
         """Should handle an empty vector."""
-        with pytest.raises(ZeroDivisionError):
-            l2_normalize([])
+        assert l2_normalize([]) == []
 
     def test_float_values(self):
         """Should handle float values."""

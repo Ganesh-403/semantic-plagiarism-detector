@@ -278,7 +278,7 @@ def test_evidence_with_chunk_similarity_matrix():
 
     assert evidence.metadata["chunk_matrix_shape"] == (3, 3)
     assert evidence.metadata["max_chunk_similarity"] == 1.0
-    assert 0.5 < evidence.metadata["mean_chunk_similarity"] < 0.7
+    assert evidence.metadata["mean_chunk_similarity"] == pytest.approx(6.6 / 9)
 
 
 def test_evidence_chunk_text_truncation_in_dict():

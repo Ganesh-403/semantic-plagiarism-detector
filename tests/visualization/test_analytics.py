@@ -4,6 +4,7 @@ tests/visualization/test_analytics.py
 Unit tests for the analytics visualization functions.
 """
 
+from src.core.config import DEFAULT_THRESHOLDS
 import numpy as np
 import pandas as pd  # noqa: F811
 import plotly.graph_objects as go
@@ -712,9 +713,9 @@ def test_calculate_severity_ratios_empty_incidents():
 
 
 def test_severity_ratios_all_high():
-    """All incidents scoring >= 0.80 should be classified as High only."""
+    """All incidents scoring at or above the configured high boundary should be classified as High only."""
     incidents = [
-        {"similarity_score": 0.80},
+        {"similarity_score": DEFAULT_THRESHOLDS.high},
         {"similarity_score": 0.9},
         {"similarity_score": 1.0},
     ]
@@ -727,8 +728,8 @@ def test_severity_ratios_mixed():
     """Scores spanning all three tiers should split proportionally."""
     incidents = [
         {"similarity_score": 0.95},
-        {"similarity_score": 0.65},
-        {"similarity_score": 0.55},
+        {"similarity_score": DEFAULT_THRESHOLDS.medium},
+        {"similarity_score": DEFAULT_THRESHOLDS.medium},
         {"similarity_score": 0.2},
     ]
     ratios = calculate_severity_ratios(incidents)
@@ -759,7 +760,7 @@ def test_severity_ratios_fallback_key():
     """The 'similarity' key should be used when 'similarity_score' is missing."""
     incidents = [
         {"similarity": 0.9},
-        {"similarity": 0.6},
+        {"similarity": DEFAULT_THRESHOLDS.medium},
     ]
     ratios = calculate_severity_ratios(incidents)
 
@@ -905,8 +906,8 @@ class TestCalculateSeverityRatios:
         """Verify High/Medium/Low ratios are calculated correctly."""
         incidents = [
             {"similarity_score": 0.90},  # High
-            {"similarity_score": 0.85},  # High
-            {"similarity_score": 0.60},  # Medium
+            {"similarity_score": DEFAULT_THRESHOLDS.high},  # High
+            {"similarity_score": DEFAULT_THRESHOLDS.medium},  # Medium
             {"similarity_score": 0.30},  # Low
         ]
 
@@ -938,7 +939,7 @@ class TestCalculateSeverityRatios:
     def test_fallback_to_similarity_key(self):
         """Verify function falls back to 'similarity' key if 'similarity_score' missing."""
         incidents = [
-            {"similarity": 0.55},  # Medium
+            {"similarity": DEFAULT_THRESHOLDS.medium},  # Medium
         ]
 
         ratios = calculate_severity_ratios(incidents)

@@ -51,19 +51,11 @@ def mock_redis_module():
     """Fixture to provide a mocked redis module with exception classes."""
     mock_redis = MagicMock()
 
-    # Create proper exception classes that inherit from BaseException
-    class MockRedisError(Exception):
-        pass
+    from redis.exceptions import RedisError
 
-    class MockConnectionError(MockRedisError):
-        pass
-
-    class MockTimeoutError(MockRedisError):
-        pass
-
-    mock_redis.RedisError = MockRedisError
-    mock_redis.ConnectionError = MockConnectionError
-    mock_redis.TimeoutError = MockTimeoutError
+    mock_redis.RedisError = RedisError
+    mock_redis.ConnectionError = RedisConnectionError
+    mock_redis.TimeoutError = RedisTimeoutError
 
     return mock_redis
 
@@ -91,6 +83,15 @@ def disable_webhook_retry_wait(monkeypatch):
 
 
 # ─── Redis Fault Tolerance Tests ──────────────────────────────────────────────
+
+
+@pytest.fixture(autouse=True)
+def restore_corpus_configuration():
+    from src.db import corpus_db
+    original = corpus_db.get_corpus_db_path()
+    yield
+    corpus_db.close_connections(all_threads=True)
+    corpus_db.configure_db_path(original)
 
 
 class TestRedisFaultTolerance:

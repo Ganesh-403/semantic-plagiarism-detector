@@ -7,7 +7,7 @@ from src.core.processing import run_full_pipeline
 
 @pytest.fixture
 def sample_documents():
-    return {
+    documents = {
         "doc1.txt": b"""Artificial intelligence is transforming education.
 Students use AI for personalized learning.
 Machine learning improves teaching.""",
@@ -21,6 +21,8 @@ Organizations use cloud services to deploy applications.""",
         "doc5.txt": b"""Cybersecurity protects systems from attacks.
 Encryption improves information security.""",
     }
+
+    return {name: content + b" This document provides further context and detailed examples for a careful academic review." for name, content in documents.items()}
 
 
 def fake_embed_documents(chunked_docs, batch_size=None):
@@ -95,7 +97,10 @@ def test_run_full_pipeline(
         registry,
         ai_probabilities,
         flags,
-    ) = run_full_pipeline(sample_documents)
+        language_metadata,
+    ) = run_full_pipeline(sample_documents, enable_ai_detection=True)
+
+    assert set(language_metadata) == set(sample_documents)
 
     # ---------- Raw extraction ----------
 

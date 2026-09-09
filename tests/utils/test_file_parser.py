@@ -6,7 +6,7 @@ Includes tests for password-protected PDF parsing and MIME categorization.
 
 import logging
 
-import fitz
+from src.utils import pdf_backend as fitz
 import pytest
 
 from src.utils.file_parser import (
@@ -260,21 +260,9 @@ class TestPDFPageCountValidation:
         self,
         monkeypatch,
     ):
-        calls = []
-
-        def fake_guard(file_bytes, max_pages=500):
-            calls.append((file_bytes, max_pages))
-            raise ValueError("PDF exceeds maximum allowed page limit (500 pages)")
-
-        monkeypatch.setattr(
-            "src.utils.file_parser.validate_pdf_page_count",
-            fake_guard,
-        )
-
-        with pytest.raises(
-            ValueError,
-            match=(r"^PDF exceeds maximum allowed page limit " r"\(500 pages\)$"),
-        ):
-            extract_text_from_pdf(b"oversized")
-
-        assert calls == [(b"oversized", 500)]
+        with fitz.open() as doc:
+            for _ in range(501):
+                doc.new_page()
+            oversized = doc.tobytes()
+        with pytest.raises(ValueError, match="maximum allowed page limit"):
+            extract_text_from_pdf(oversized)

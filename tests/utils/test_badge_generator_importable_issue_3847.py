@@ -143,11 +143,11 @@ class TestValidateHexColorBehaviour:
     """The validator works now that it is reachable."""
 
     @pytest.mark.parametrize(
-        "value",
-        ["#fff", "#ffff", "#ffffff", "#ffffffff", "#123abc", "#0f0"],
+        "value,expected",
+        [("#fff", "#ffffff"), ("#ffff", "#ffffffff"), ("#ffffff", "#ffffff"), ("#ffffffff", "#ffffffff"), ("#123abc", "#123abc"), ("#0f0", "#00ff00")],
     )
-    def test_hex_forms_pass_through(self, value: str) -> None:
-        assert validate_hex_color(value) == value
+    def test_hex_forms_are_normalized(self, value: str, expected: str) -> None:
+        assert validate_hex_color(value) == expected
 
     def test_hex_is_lowercased(self) -> None:
         assert validate_hex_color("#ABCDEF") == "#abcdef"

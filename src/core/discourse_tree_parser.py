@@ -76,6 +76,14 @@ def classify_paragraph(paragraph: str) -> str:
     Returns:
         The rhetorical node type string.
     """
+    heading = paragraph.strip().rstrip(".:").casefold()
+    heading_types = {
+        "intro": "INTRODUCTION", "introduction": "INTRODUCTION",
+        "claim": "CLAIM", "evidence": "EVIDENCE", "rebuttal": "REBUTTAL",
+        "conclusion": "CONCLUSION",
+    }
+    if heading in heading_types:
+        return heading_types[heading]
     if any(p.search(paragraph) for p in CONCLUSION_PATTERNS):
         return "CONCLUSION"
     if any(p.search(paragraph) for p in REBUTTAL_PATTERNS):

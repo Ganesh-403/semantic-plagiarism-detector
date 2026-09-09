@@ -8,7 +8,7 @@ import os
 import re
 import unicodedata
 from collections.abc import Collection, Mapping
-from pathlib import PurePath
+from pathlib import PurePosixPath
 from typing import IO, TypeVar
 
 DEFAULT_FILENAME = os.getenv("DEFAULT_FALLBACK_FILENAME", "document")
@@ -40,7 +40,7 @@ T = TypeVar("T")
 def _basename(filename: str) -> str:
     """Return the last component for both POSIX and Windows paths."""
     normalized = filename.replace("\\", "/")
-    return PurePath(normalized).name
+    return PurePosixPath(normalized).name
 
 
 def _safe_extension(filename: str) -> str:
@@ -140,7 +140,7 @@ def sanitize_filename(
 
     The function treats filenames as untrusted input. It removes directory
     components, HTML tags, control characters, and shell/HTML punctuation,
-    while retaining a conservative extension and a readable ASCII stem.
+    while retaining a conservative extension and a readable Unicode stem.
     """
     if isinstance(max_length, bool) or not isinstance(max_length, int):
         raise TypeError("max_length must be an integer.")
@@ -201,6 +201,14 @@ def sanitize_filename(
             stem_fallback = DEFAULT_FILENAME
         sanitized = f"{stem_fallback}{sanitized}"
 
+    # POSIX filesystems limit a component to 255 bytes, including its suffix.
+    # Preserve Unicode names while retaining a stable collision-resistant suffix.
+    if len(sanitized.encode("utf-8")) > 255:
+        stem, extension = os.path.splitext(sanitized)
+        hash_suffix = "_" + hashlib.sha256(sanitized.encode("utf-8")).hexdigest()[:8]
+        budget = 255 - len((extension + hash_suffix).encode("utf-8"))
+        stem = stem.encode("utf-8")[:budget].decode("utf-8", errors="ignore")
+        sanitized = stem.rstrip(" ._-") + hash_suffix + extension
     return sanitized
 
 
@@ -250,6 +258,8 @@ def unique_filename(
             )
 
         candidate_stem = stem[:allowed_stem].rstrip(" ._-")
+        byte_budget = 255 - len((suffix + extension).encode("utf-8"))
+        candidate_stem = candidate_stem.encode("utf-8")[:byte_budget].decode("utf-8", errors="ignore")
         candidate = f"{candidate_stem}{suffix}{extension}"
 
         if candidate.casefold() not in existing:

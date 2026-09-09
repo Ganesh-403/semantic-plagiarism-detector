@@ -73,7 +73,7 @@ def test_semantic_similarity_engine_matrix(dummy_embeddings):
 
 def test_lexical_similarity_engine_algorithms():
     doc1 = "The quick brown fox jumps over the lazy dog"
-    doc2 = "A quick brown fox jumps over a lazy dog"
+    doc2 = "A quick brown fox leaps over a lazy dog"
     doc3 = "Hello world from python unit tests"
 
     # 1. Jaccard
@@ -101,7 +101,7 @@ def test_lexical_similarity_engine_algorithms():
     # 5. Char N-gram
     char_ngram_engine = LexicalSimilarityEngine(algorithm="char_ngram", ngram_size=5)
     sim_ab_char = char_ngram_engine.compute_pairwise_similarity(doc1, doc2)
-    assert sim_ab_char > 0.5
+    assert sim_ab_char == pytest.approx(11 / 26)
 
     # 6. Levenshtein
     lev_engine = LexicalSimilarityEngine(algorithm="levenshtein")
@@ -135,7 +135,15 @@ def test_lexical_similarity_engine_matrix():
     assert list_matrix[0, 2] == 0.0
 
 
-def test_hybrid_similarity_engine(dummy_embeddings):
+def test_hybrid_similarity_engine(monkeypatch):
+    from src.core import embedding_model
+
+    encoded = []
+    def embed(texts):
+        encoded.extend(texts)
+        return np.array([[1.0, 0.0] if text.startswith("The") else [0.8, 0.6] for text in texts])
+
+    monkeypatch.setattr(embedding_model, "embed_chunks", embed)
     # Setup mock or helper to get embeddings or strings
     # We can mock lexical engine to return 0.5 and semantic to return 0.8
     sem_engine = SemanticSimilarityEngine()
@@ -152,7 +160,8 @@ def test_hybrid_similarity_engine(dummy_embeddings):
 
     # Compute pairwise
     score = hybrid_engine.compute_pairwise_similarity(doc1, doc2)
-    assert 0.0 <= score <= 1.0
+    assert score == pytest.approx(0.7 * 0.8 + 0.3)
+    assert encoded == [doc1, doc2]
 
     # Compute matrix on strings
     docs = {

@@ -1,150 +1,77 @@
-"""
-tests/scripts/test_benchmark_chunking.py
-----------------------------------------
-Unit tests for the text chunking benchmark script.
+"""Exercise benchmarks against production chunkers with small input samples."""
+import random
+import tracemalloc
+from unittest.mock import Mock
 
-Validates:
-- Synthetic data generation
-- Benchmark execution logic
-- Results table formatting
-"""
-
-import sys
-from pathlib import Path
-from unittest.mock import patch
-
-# Add scripts directory to path
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent
-SCRIPTS_DIR = ROOT_DIR / "scripts"
-if str(SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS_DIR))
-
-import benchmark_chunking
+import pytest
+from scripts import benchmark_chunking as benchmark
 
 
-class TestSyntheticDataGeneration:
-    """Test suite for synthetic corpus generation."""
-
-    def test_generate_synthetic_sentence_length(self):
-        """Verify sentence generation respects min/max word constraints."""
-        sentence = benchmark_chunking.generate_synthetic_sentence(
-            min_words=5, max_words=5
-        )
-        words = sentence[:-1].split()  # Remove punctuation
-        assert len(words) == 5
-
-    def test_generate_synthetic_sentence_punctuation(self):
-        """Verify sentences end with valid punctuation."""
-        sentence = benchmark_chunking.generate_synthetic_sentence()
-        assert sentence[-1] in [".", "!", "?"]
-
-    def test_generate_synthetic_corpus_count(self):
-        """Verify corpus generation creates the requested number of sentences."""
-        corpus = benchmark_chunking.generate_synthetic_corpus(num_sentences=100)
-        assert len(corpus) == 100
-        assert all(isinstance(s, str) for s in corpus)
+@pytest.mark.parametrize("size", [0, 0.001, 0.01])
+def test_synthetic_corpus_has_requested_byte_size(size):
+    text = benchmark.generate_synthetic_text(size)
+    assert len(text.encode("utf-8")) == int(size * 1024 * 1024)
+    if size:
+        assert " " in text
+        assert len(text.split()) > 1
 
 
-class TestBenchmarkExecution:
-    """Test suite for benchmark execution logic."""
-
-    @patch("benchmark_chunking.chunk_documents")
-    def test_benchmark_chunking_calculates_metrics(self, mock_chunk):
-        """Verify benchmark calculates time, chunks, and throughput correctly."""
-        mock_chunk.return_value = ["chunk1", "chunk2", "chunk3"]
-        sentences = ["word " * 10] * 100  # 100 sentences
-
-        # Mock time.perf_counter to simulate 0.5 seconds elapsed
-        with patch("benchmark_chunking.time.perf_counter", side_effect=[0.0, 0.5]):
-            results = benchmark_chunking.benchmark_chunking(
-                sentences=sentences,
-                chunk_sizes=[500],
-                overlap=50,
-            )
-
-        assert 500 in results
-        metrics = results[500]
-
-        assert metrics["time_ms"] == 500.0
-        assert metrics["chunks_created"] == 3
-        assert metrics["sentences_per_sec"] == 200.0  # 100 sentences / 0.5 sec
-
-    @patch("benchmark_chunking.chunk_documents")
-    def test_benchmark_multiple_chunk_sizes(self, mock_chunk):
-        """Verify benchmark tests all requested chunk sizes."""
-        mock_chunk.return_value = ["chunk"]
-        sentences = ["test"] * 10
-
-        results = benchmark_chunking.benchmark_chunking(
-            sentences=sentences,
-            chunk_sizes=[250, 500, 1000],
-        )
-
-        assert set(results.keys()) == {250, 500, 1000}
-        assert mock_chunk.call_count == 3
+def test_reproducible_sample():
+    random.seed(42)
+    first = benchmark.generate_synthetic_text(0.01)
+    random.seed(42)
+    assert benchmark.generate_synthetic_text(0.01) == first
 
 
-class TestResultsReporting:
-    """Test suite for results table formatting."""
-
-    def test_print_results_table_output(self, capsys):
-        """Verify print_results_table produces formatted ASCII output."""
-        results = {
-            250: {
-                "time_ms": 10.5,
-                "chunks_created": 50,
-                "sentences_per_sec": 1000.0,
-                "chars_per_sec": 5000.0,
-            },
-            500: {
-                "time_ms": 15.2,
-                "chunks_created": 25,
-                "sentences_per_sec": 800.0,
-                "chars_per_sec": 4000.0,
-            },
-        }
-
-        benchmark_chunking.print_results_table(results)
-
-        captured = capsys.readouterr()
-        assert "250" in captured.out
-        assert "500" in captured.out
-        assert "10.50" in captured.out
-        assert "1,000" in captured.out  # Formatted with comma
+def test_negative_sample_rejected():
+    with pytest.raises(ValueError):
+        benchmark.generate_synthetic_text(-1)
 
 
-class TestCLIArguments:
-    """Test suite for CLI argument parsing."""
+def test_benchmark_calculates_metrics(monkeypatch):
+    ticks = iter([0., 0.5])
+    monkeypatch.setattr(benchmark.time, "perf_counter", lambda: next(ticks))
+    chunker = Mock(return_value=["one", "two"])
+    result = benchmark.benchmark_algorithm("example", chunker, "a" * 1024 * 1024, 1)
+    assert result["Time (s)"] == "0.5000s"
+    assert result["Throughput (MB/s)"] == "2.00 MB/s"
+    assert result["Chunks"] == 2
+    chunker.assert_called_once()
+    assert not tracemalloc.is_tracing()
 
-    def test_parse_arguments_defaults(self):
-        """Verify default CLI argument values."""
-        with patch("sys.argv", ["benchmark_chunking.py"]):
-            args = benchmark_chunking.parse_arguments()
 
-        assert args.num_sentences == 10000
-        assert args.chunk_sizes == [250, 500, 1000]
-        assert args.overlap == 50
-        assert args.seed == 42
+def test_algorithm_failure_is_reported_and_tracing_stops():
+    result = benchmark.benchmark_algorithm("broken", Mock(side_effect=ValueError), "text", 1)
+    assert result["Time (s)"] == "FAILED"
+    assert result["Throughput (MB/s)"] == "N/A"
+    assert result["Chunks"] == 0
+    assert not tracemalloc.is_tracing()
 
-    def test_parse_arguments_custom(self):
-        """Verify custom CLI argument values are parsed correctly."""
-        test_args = [
-            "benchmark_chunking.py",
-            "--num-sentences",
-            "5000",
-            "--chunk-sizes",
-            "100",
-            "200",
-            "--overlap",
-            "20",
-            "--seed",
-            "123",
-        ]
 
-        with patch("sys.argv", test_args):
-            args = benchmark_chunking.parse_arguments()
+def test_real_algorithms_and_report(capsys):
+    results = benchmark.run_benchmarks(sizes=[0.001, 0.002])
+    assert len(results) == 6
+    assert {r["Algorithm"] for r in results} == {
+        "chunk_text", "chunk_by_sentences", "ContextPreservingChunker",
+    }
+    assert all(r["Time (s)"] != "FAILED" and r["Chunks"] > 0 for r in results)
+    benchmark.print_markdown_table(results)
+    output = capsys.readouterr().out
+    assert "Throughput (MB/s)" in output
+    for row in results:
+        assert row["Algorithm"] in output and row["Size"] in output
 
-        assert args.num_sentences == 5000
-        assert args.chunk_sizes == [100, 200]
-        assert args.overlap == 20
-        assert args.seed == 123
+
+@pytest.mark.parametrize("args, expected", [([], 42), (["--seed", "123"], 123)])
+def test_cli_arguments(monkeypatch, args, expected):
+    monkeypatch.setattr("sys.argv", ["benchmark_chunking.py", *args])
+    assert benchmark.parse_arguments().seed == expected
+
+
+def test_main_runs_and_reports(monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["benchmark_chunking.py"])
+    runner = Mock(return_value=[])
+    monkeypatch.setattr(benchmark, "run_benchmarks", runner)
+    benchmark.main()
+    runner.assert_called_once_with()
+    assert "Chunking Benchmark Results" in capsys.readouterr().out

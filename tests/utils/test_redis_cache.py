@@ -59,11 +59,12 @@ class TestRedisCache:
         return client
 
     @pytest.fixture
-    def cache_with_mock(self, mock_redis_client):
+    def cache_with_mock(self, mock_redis_client, monkeypatch):
         """Create a RedisCache instance with mocked client."""
 
         cache = RedisCache.__new__(RedisCache)
         cache._client = mock_redis_client
+        monkeypatch.setattr("src.utils.redis_cache._cache", cache)
 
         yield cache
 
@@ -143,13 +144,11 @@ class TestRedisCache:
             CacheNamespace.SESSION.build_key("test_session", "key1").encode("utf-8"),
             CacheNamespace.SESSION.build_key("test_session", "key2").encode("utf-8"),
         ]
-        mock_redis_client.delete.return_value = 2
+        mock_redis_client.pipeline.return_value.execute.return_value = [2]
 
         result = clear_session(session_id)
         assert result is True
-        mock_redis_client.keys.assert_called_once_with(
-            CacheNamespace.SESSION.build_key(session_id, "*")
-        )
+        mock_redis_client.scan_iter.assert_called_once_with(match=CacheNamespace.SESSION.build_key(session_id, "*"), count=1000)
 
     def test_faiss_index_caching(self, cache_with_mock, mock_redis_client):
         """Test FAISS index caching."""
@@ -807,7 +806,7 @@ class TestHitRateTracking:
         return client
 
     @pytest.fixture
-    def cache_with_mock(self, mock_redis_client):
+    def cache_with_mock(self, mock_redis_client, monkeypatch):
         """Create a RedisCache instance with mocked client and reset counters."""
         from src.utils.redis_cache import _cache
 
@@ -855,7 +854,7 @@ class TestHitRateTracking:
 
     def test_hit_rate_tracks_get_json(self, cache_with_mock, mock_redis_client):
         """get_json() hits/misses are counted toward the same hit rate."""
-        mock_redis_client.get.return_value = '{"a": 1}'
+        mock_redis_client.get.return_value = PayloadCompressor.compress(b'{"a": 1}')
         cache_with_mock.get_json("json_key")
         assert True
 
@@ -953,6 +952,7 @@ class TestRedisUrlPasswordInjection:
 
         monkeypatch.setenv("REDIS_HOST", "myhost.example.com")
         monkeypatch.setenv("REDIS_PORT", "6380")
+        monkeypatch.setattr("src.core.app_config.REDIS_PORT", 6380)
         monkeypatch.setenv("REDIS_DB", "2")
         monkeypatch.setenv("REDIS_PASSWORD", "s3cr3tP@ss")
         # Remove REDIS_URL so the fallback is used.
@@ -961,7 +961,7 @@ class TestRedisUrlPasswordInjection:
         importlib.reload(redis_cache_module)
 
         assert redis_cache_module.REDIS_URL == (
-            "redis://:s3cr3tP@ss@myhost.example.com:6380/2"
+            "redis://:s3cr3tP%40ss@myhost.example.com:6380/2"
         )
 
     def test_redis_url_omits_password_when_not_set(self, monkeypatch):
@@ -1001,7 +1001,7 @@ class TestRedisUrlPasswordInjection:
         )
 
     def test_redis_url_with_special_chars_in_password(self, monkeypatch):
-        """Passwords with special characters are included as-is."""
+        """Credentials are URL-encoded so delimiters cannot change URL components."""
         import importlib
 
         import src.utils.redis_cache as redis_cache_module
@@ -1014,10 +1014,10 @@ class TestRedisUrlPasswordInjection:
 
         importlib.reload(redis_cache_module)
 
-        # The password is inserted as-is (URL encoding is the caller's
-        # responsibility — redis-py handles it via from_url).
-        assert "p@ss:w0rd#123" in redis_cache_module.REDIS_URL
-        assert redis_cache_module.REDIS_URL.startswith("redis://:p@ss:w0rd#123@")
+        from urllib.parse import urlsplit, unquote
+        parsed = urlsplit(redis_cache_module.REDIS_URL)
+        assert parsed.hostname == "redis.example.com"
+        assert unquote(parsed.password) == "p@ss:w0rd#123"
 
     def test_redis_url_empty_password_falls_back_to_no_auth(self, monkeypatch):
         """An empty REDIS_PASSWORD string should be treated as 'no password'."""

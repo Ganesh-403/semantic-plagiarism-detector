@@ -5,7 +5,7 @@ from prometheus_client import REGISTRY, CollectorRegistry, Counter, Gauge, Histo
 @pytest.fixture
 def clean_registry(monkeypatch):
     registry = CollectorRegistry()
-    monkeypatch.setattr('prometheus_client.REGISTRY', registry)
+    monkeypatch.setattr('src.core.metrics.REGISTRY', registry)
     # Also need to monkey patch generate_latest since generate_metrics_json calls it without args, using global REGISTRY
     import prometheus_client
     monkeypatch.setattr(prometheus_client, 'generate_latest', lambda: prometheus_client.exposition.generate_latest(registry))
@@ -16,7 +16,7 @@ def test_generate_metrics_json_empty(clean_registry):
     assert payload == {}
 
 def test_generate_metrics_json_counter(clean_registry):
-    c = Counter('test_counter', 'A test counter', ['label1'])
+    c = Counter('test_counter', 'A test counter', ['label1'], registry=clean_registry)
     c.labels(label1='value1').inc(5.5)
     
     payload = generate_metrics_json()
@@ -35,7 +35,7 @@ def test_generate_metrics_json_counter(clean_registry):
     assert sample['value'] == 5.5
 
 def test_generate_metrics_json_gauge(clean_registry):
-    g = Gauge('test_gauge', 'A test gauge')
+    g = Gauge('test_gauge', 'A test gauge', registry=clean_registry)
     g.set(42.0)
     
     payload = generate_metrics_json()
@@ -52,7 +52,7 @@ def test_generate_metrics_json_gauge(clean_registry):
     assert sample['value'] == 42.0
 
 def test_generate_metrics_json_histogram(clean_registry):
-    h = Histogram('test_hist', 'A test histogram', ['method'])
+    h = Histogram('test_hist', 'A test histogram', ['method'], registry=clean_registry)
     h.labels(method='get').observe(0.5)
     
     payload = generate_metrics_json()
@@ -84,7 +84,7 @@ def test_generate_metrics_json_histogram(clean_registry):
     assert sums[0]['value'] == 0.5
 
 def test_generate_metrics_json_multiple_labels(clean_registry):
-    c = Counter('multi_label', 'Multi label', ['method', 'path', 'status'])
+    c = Counter('multi_label', 'Multi label', ['method', 'path', 'status'], registry=clean_registry)
     c.labels(method='GET', path='/api', status='200').inc()
     c.labels(method='POST', path='/api', status='500').inc(2)
     
@@ -103,7 +103,7 @@ def test_generate_metrics_json_multiple_labels(clean_registry):
     assert post_sample['value'] == 2.0
 
 def test_generate_metrics_json_summary(clean_registry):
-    s = Summary('test_summary', 'A test summary')
+    s = Summary('test_summary', 'A test summary', registry=clean_registry)
     s.observe(1.0)
     s.observe(2.0)
     
@@ -120,10 +120,10 @@ def test_generate_metrics_json_summary(clean_registry):
     assert sum_sample['value'] == 3.0
 
 def test_generate_metrics_json_info_and_enum(clean_registry):
-    i = Info('test_info', 'A test info')
+    i = Info('test_info', 'A test info', registry=clean_registry)
     i.info({'version': '1.0.0'})
     
-    e = Enum('test_enum', 'A test enum', states=['starting', 'running', 'stopped'])
+    e = Enum('test_enum', 'A test enum', states=['starting', 'running', 'stopped'], registry=clean_registry)
     e.state('running')
     
     payload = generate_metrics_json()

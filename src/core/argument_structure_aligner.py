@@ -30,9 +30,9 @@ def compute_role_sequence_similarity(
         Dictionary containing structural similarity scores.
     """
     if not triples_a and not triples_b:
-        return {"structural_similarity": 1.0, "is_paraphrase": False}
+        return {"structural_similarity": 1.0, "lexical_similarity": 0.0, "is_paraphrase": False, "is_deep_paraphrase": False}
     if not triples_a or not triples_b:
-        return {"structural_similarity": 0.0, "is_paraphrase": False}
+        return {"structural_similarity": 0.0, "lexical_similarity": 0.0, "is_paraphrase": False, "is_deep_paraphrase": False}
 
     # Extract role sequences (e.g., ['A', 'V', 'P'])
     seq_a = []
@@ -85,6 +85,11 @@ def compute_role_sequence_similarity(
         if role
         for t in role.normalized_tokens
     )
+
+    # Articles and determiners carry no lexical evidence of copied content.
+    determiners = {"the", "a", "an", "this", "that", "these", "those"}
+    tokens_a -= determiners
+    tokens_b -= determiners
 
     intersection = len(tokens_a.intersection(tokens_b))
     union = len(tokens_a.union(tokens_b))

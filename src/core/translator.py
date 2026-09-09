@@ -9,7 +9,7 @@ import re
 import time
 
 import requests
-from deep_translator import DeeplTranslator, GoogleTranslator
+from src.utils.translation_providers import DeeplTranslator, GoogleTranslator, request_timeout
 
 logger = logging.getLogger(__name__)
 
@@ -22,25 +22,12 @@ TRANSLATION_TIMEOUT_SECONDS = float(os.getenv("TRANSLATION_TIMEOUT_SECONDS", "10
 
 @contextlib.contextmanager
 def _request_timeout(seconds: float | None = None):
-    """Apply a default socket timeout to HTTP requests made within the block.
-
-    deep-translator does not expose a timeout parameter, so this patches
-    ``requests.sessions.Session.request`` for the duration of the block to add
-    a default ``timeout`` when the caller did not set one explicitly. The
-    original method is always restored on exit.
-    """
-    timeout = TRANSLATION_TIMEOUT_SECONDS if seconds is None else seconds
-    original_request = requests.sessions.Session.request
-
-    def _request_with_timeout(self, *args, **kwargs):
-        kwargs.setdefault("timeout", timeout)
-        return original_request(self, *args, **kwargs)
-
-    requests.sessions.Session.request = _request_with_timeout
+    """Set a translation timeout in the current thread/task without global patches."""
+    token = request_timeout.set(TRANSLATION_TIMEOUT_SECONDS if seconds is None else seconds)
     try:
         yield
     finally:
-        requests.sessions.Session.request = original_request
+        request_timeout.reset(token)
 
 
 # In-memory pipeline cache for MarianMT models: (source_lang, target_lang) -> pipeline
@@ -338,6 +325,7 @@ def translate_text(
     if text is None:
         return None
 
+    validate_target_language_code(target_lang)
     original = str(text)
     if not original.strip():
         return original
@@ -418,14 +406,13 @@ def translate_text_secondary(
 ) -> str:
     """Fallback translation service using an offline/secondary translator.
 
-    If MyMemoryTranslator is available, it uses it. Swaps to a mock
-    offline fallback translation string on connection/provider failures.
+    Provider failures remain explicit errors rather than fabricated translations.
     """
     if not text:
         return ""
 
     try:
-        from deep_translator import MyMemoryTranslator
+        from src.utils.translation_providers import MyMemoryTranslator
         with _request_timeout():
             translated = MyMemoryTranslator(
                 source=source_lang or "auto",
@@ -436,7 +423,7 @@ def translate_text_secondary(
     except Exception:
         pass
 
-    return f"[Offline Fallback -> {target_lang}]: {text}"
+    return "(Translation Error: secondary provider unavailable)"
 
 
 def translate_text_batch(

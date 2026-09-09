@@ -43,15 +43,10 @@ class TestMaxFilenameLengthConstant:
         ],
     )
     def test_result_fits_the_filesystem_byte_cap(self, raw):
-        """The sanitizer emits ASCII, so the limit holds in bytes as well.
-
-        Most filesystems cap a name at 255 *bytes*, not characters. Because the
-        stem is reduced to ``[A-Za-z0-9._ -]``, one character is one byte and
-        the character limit is the binding one.
-        """
+        """Unicode names must also fit the filesystem byte limit."""
         result = sanitize_filename(raw)
 
-        assert len(result.encode("utf-8")) == len(result)
+        assert len(result) <= MAX_FILENAME_LENGTH
         assert len(result.encode("utf-8")) <= 255
 
     @pytest.mark.parametrize("length", [130, 200, 400, 1000])

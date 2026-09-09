@@ -14,6 +14,6 @@ def test_add_document_sanitizes_filename_before_storage(
         "security-hash",
     )
 
-    assert inserted is True
+    assert isinstance(inserted, int) and inserted > 0
     documents = corpus_db.get_all_documents()
     assert documents[0]["filename"] == "alert_1.pdf"

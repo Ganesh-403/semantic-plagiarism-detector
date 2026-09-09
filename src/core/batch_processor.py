@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 
-class BatchStatus(Enum):
+class BatchStatus(str, Enum):
     """Status of a batch processing job."""
 
     PENDING = "pending"
@@ -60,7 +60,7 @@ class BatchJob:
     name: str = ""
     file_paths: list[str] = field(default_factory=list)
     document_paths: list[str] = field(default_factory=list)
-    status: Any = "pending"
+    status: BatchStatus = BatchStatus.PENDING
     priority: BatchPriority = BatchPriority.NORMAL
     created_at: Any = field(default_factory=lambda: datetime.now().isoformat())
     started_at: Optional[Any] = None
@@ -83,7 +83,7 @@ class BatchJob:
         elif not self.document_paths and self.file_paths:
             self.document_paths = self.file_paths
 
-        self.total_files = len(self.file_paths)
+        self.total_files = len(self.file_paths) or self.total_files or self.total_documents
         self.total_documents = self.total_files
 
     def get_duration(self) -> Optional[float]:
@@ -112,6 +112,7 @@ class BatchJob:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "BatchJob":
         """Create job from dictionary."""
+        data = data.copy()
         if "status" in data and isinstance(data["status"], str):
             try:
                 data["status"] = BatchStatus(data["status"])
@@ -184,6 +185,7 @@ class BatchProcessor:
         self._jobs: dict[str, BatchJob] = self.jobs
         self._active_job: Optional[str] = None
         self._lock = threading.RLock()
+        self._condition = threading.Condition(self._lock)
         self._callbacks: list[Callable] = []
         self._progress_callbacks: list[Callable] = self._callbacks
         self._stop_processing = False
@@ -293,14 +295,67 @@ class BatchProcessor:
             ):
                 return False
             job.status = BatchStatus.CANCELLED
-            job.completed_at = datetime.now().isoformat()
+            job.completed_at = time.time()
+            self._condition.notify_all()
         self._notify_callbacks("cancelled", job)
         logger.info(f"Cancelled batch job {job_id}")
         return True
 
     def stop_processing(self) -> None:
         """Stop ongoing processing."""
-        self._stop_processing = True
+        with self._condition:
+            self._stop_processing = True
+            self._condition.notify_all()
+
+    def pause_job(self, job_id: str) -> bool:
+        """Pause a running job at its next batch boundary."""
+        with self._condition:
+            job = self.jobs.get(job_id)
+            if job is None or job.status != BatchStatus.PROCESSING:
+                return False
+            job.status = BatchStatus.PAUSED
+        self._notify_callbacks("paused", job)
+        return True
+
+    def resume_job(self, job_id: str) -> bool:
+        with self._condition:
+            job = self.jobs.get(job_id)
+            if job is None or job.status != BatchStatus.PAUSED:
+                return False
+            job.status = BatchStatus.PROCESSING
+            self._condition.notify_all()
+        self._notify_callbacks("resumed", job)
+        return True
+
+    def get_statistics(self) -> dict[str, Any]:
+        with self._lock:
+            return {
+                "total_jobs": len(self.jobs),
+                "total_documents": sum(j.total_documents for j in self.jobs.values()),
+                **{status.value: sum(j.status == status for j in self.jobs.values())
+                   for status in BatchStatus},
+            }
+
+    def clear_completed(self) -> int:
+        with self._lock:
+            completed = [key for key, job in self.jobs.items()
+                         if job.status == BatchStatus.COMPLETED and key != self._active_job]
+            for key in completed:
+                del self.jobs[key]
+            return len(completed)
+
+    def export_results(self, job_id: str, path: str) -> bool:
+        with self._lock:
+            job = self.jobs.get(job_id)
+            if job is None:
+                return False
+            data = job.to_dict()
+        try:
+            Path(path).write_text(json.dumps(data, indent=2), encoding="utf-8")
+            return True
+        except (OSError, TypeError):
+            logger.exception("Failed to export batch job %s", job_id)
+            return False
 
     def _process_single_document(
         self, file_path: str, file_bytes: bytes, config: BatchConfig
@@ -416,7 +471,7 @@ class BatchProcessor:
             raise ValueError("No documents to process")
 
         if job_id is None:
-            job_id = f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            job_id = f"batch_{uuid.uuid4().hex}"
 
         files = list(file_bytes_dict.keys())
         job = BatchJob(
@@ -445,11 +500,13 @@ class BatchProcessor:
         job.started_at = start_time
 
         for batch_index, batch in enumerate(batches):
-            if self._stop_processing:
-                logger.warning(f"Processing stopped for job {job_id}")
-                break
-
-            job.status = "processing"
+            with self._condition:
+                while job.status == BatchStatus.PAUSED and not self._stop_processing:
+                    self._condition.wait()
+                if self._stop_processing or job.status == BatchStatus.CANCELLED:
+                    job.status = BatchStatus.CANCELLED
+                    break
+                job.status = BatchStatus.PROCESSING
             job.progress = (batch_index / len(batches)) * 100
 
             self._notify_progress(
@@ -487,8 +544,16 @@ class BatchProcessor:
                 pass
 
         job.completed_at = time.time()
-        job.status = "completed"
-        job.progress = 100.0
+        with self._lock:
+            if self._stop_processing or job.status == BatchStatus.CANCELLED:
+                job.status = BatchStatus.CANCELLED
+            elif job.errors:
+                job.status = BatchStatus.FAILED
+            else:
+                job.status = BatchStatus.COMPLETED
+            job.progress = ((job.processed_files + len(job.errors)) / job.total_files) * 100
+            if self._active_job == job_id:
+                self._active_job = None
 
         self.metrics["total_documents"] += job.total_files
         self.metrics["total_time"] += job.get_duration() or 0
@@ -497,7 +562,7 @@ class BatchProcessor:
                 self.metrics["total_time"] / self.metrics["total_documents"]
             )
 
-        self._notify_progress(job_id, 100.0, "Processing complete")
+        self._notify_progress(job_id, job.progress, f"Processing {job.status.value}")
 
         if self.config.save_progress:
             self._save_progress(job)

@@ -13,22 +13,6 @@ import types
 from unittest.mock import MagicMock, patch
 import pytest
 
-# Stub out the heavy framework dependencies that cause import errors in this environment
-ld = types.ModuleType("langdetect")
-ld.DetectorFactory = type("DF", (object,), {})
-ld.LangDetectException = Exception
-ld.detect = lambda x: "en"
-ld.detect_langs = lambda x: []
-sys.modules["langdetect"] = ld
-
-f = types.ModuleType("faiss")
-f.Index = None
-sys.modules["faiss"] = f
-
-dt = types.ModuleType("deep_translator")
-dt.GoogleTranslator = None
-sys.modules["deep_translator"] = dt
-
 from src.utils.sso import exchange_google_code, exchange_github_code, SSOUserProfile
 
 
@@ -52,7 +36,7 @@ def test_exchange_google_code_avatar_fallback(mock_session_factory, mock_verify,
     mock_user_resp.json.return_value = {
         "email": "empty-avatar@gmail.com",
         "name": "Jane Doe",
-        "picture": None,  # Missing picture
+        "verified_email": True, "id": "google-user-123", "picture": None,  # Missing picture
     }
     mock_session.get.return_value = mock_user_resp
 
@@ -86,7 +70,9 @@ def test_exchange_github_code_avatar_fallback(mock_session_factory, mock_verify,
         "name": "Jane Smith",
         "avatar_url": None,  # Missing avatar_url
     }
-    mock_session.get.return_value = mock_user_resp
+    mock_emails_resp = MagicMock(status_code=200, ok=True)
+    mock_emails_resp.json.return_value = [{"email": "janesmith@github.com", "verified": True, "primary": True}]
+    mock_session.get.side_effect = [mock_user_resp, mock_emails_resp]
 
     profile, error = exchange_github_code("valid_code", state="github_state")
 

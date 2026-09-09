@@ -83,23 +83,9 @@ def tree(source):
 
 @pytest.fixture(scope="module")
 def module(tree):
-    """Execute the module body against stubbed ``src.*`` dependencies."""
-    saved = {name: sys.modules.get(name) for name in STUBBED_MODULES}
-    for name in STUBBED_MODULES:
-        sys.modules[name] = MagicMock()
-
-    try:
-        namespace = {"__name__": "processing_isolated"}
-        exec(  # noqa: S102 - deliberately loading the module without its ML deps
-            compile(tree, MODULE_PATH.name, "exec"), namespace
-        )
-        yield namespace
-    finally:
-        for name, saved_module in saved.items():
-            if saved_module is None:
-                sys.modules.pop(name, None)
-            else:
-                sys.modules[name] = saved_module
+    """Use the recovered module without replacing shared parent packages."""
+    import importlib
+    return vars(importlib.import_module("src.core.processing"))
 
 
 @pytest.fixture(scope="module")
@@ -210,7 +196,7 @@ def test_pipeline_result_kept_its_docstring(pipeline_result_cls):
 
 
 def test_pipeline_result_declares_every_field(pipeline_result_cls):
-    """All nine outputs must be real tuple slots, in order.
+    """All ten outputs must be real tuple slots, in order.
 
     While the method sat above them, these annotations were still class-level
     names but no longer fields, so the tuple would have been empty.
@@ -225,6 +211,7 @@ def test_pipeline_result_declares_every_field(pipeline_result_cls):
         "registry",
         "ai_probabilities",
         "flags",
+        "language_metadata",
     )
 
 
@@ -240,6 +227,7 @@ def test_pipeline_result_is_still_unpackable_as_a_tuple(pipeline_result_cls):
         registry=[],
         ai_probabilities={},
         flags=[],
+        language_metadata={},
     )
 
     (
@@ -252,8 +240,10 @@ def test_pipeline_result_is_still_unpackable_as_a_tuple(pipeline_result_cls):
         registry,
         ai_probabilities,
         flags,
+        language_metadata,
     ) = result
 
+    assert language_metadata == {}
     assert raw_texts == {"a.txt": "hello"}
     assert chunked_docs == {"a.txt": ["hello"]}
     assert embeddings["a.txt"].shape == (1, 3)
@@ -304,6 +294,7 @@ def test_is_incremental_update_returns_a_bool_for_a_plain_result(pipeline_result
         registry=[],
         ai_probabilities={},
         flags=[],
+        language_metadata={},
     )
     assert result.is_incremental_update() is False
 
@@ -366,6 +357,7 @@ def test_pipeline_result_is_built_with_every_field(tree):
         "registry",
         "ai_probabilities",
         "flags",
+        "language_metadata",
     }
 
 

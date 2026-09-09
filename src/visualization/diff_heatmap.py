@@ -150,7 +150,7 @@ def generate_evolution_heatmap(diff_tokens: list[dict], block_size: int = 50) ->
         colorscale="YlOrRd",
         zmin=0,
         zmax=100,
-        colorbar=dict(title="Change %", titleside="top")
+        colorbar=dict(title=dict(text="Change %", side="top"))
     ))
 
     fig.update_layout(

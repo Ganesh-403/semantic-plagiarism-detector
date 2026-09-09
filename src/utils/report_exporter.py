@@ -216,13 +216,15 @@ def compute_similarity_statistics(
         for i in range(n):
             for j in range(n):
                 if i != j:
-                    flat.append(_safe_float(arr[i, j]))
+                    flat.append(float(arr[i, j]))
     elif isinstance(scores, np.ndarray):
-        flat = [_safe_float(v) for v in scores.flatten()]
+        flat = [float(v) for v in scores.flatten()]
     elif isinstance(scores, (list, tuple)):
-        flat = [_safe_float(v) for v in scores]
+        flat = [float(v) for v in scores]
     else:
-        flat = [_safe_float(scores)]
+        flat = [float(scores)]
+
+    flat = [value for value in flat if math.isfinite(value)]
 
     if not flat:
         return SimilarityStatistics(

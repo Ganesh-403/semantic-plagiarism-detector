@@ -232,6 +232,15 @@ class FileValidator:
                 error_code="MISSING_EXTENSION",
             )
 
+        if ext not in self.allowed_extensions and any(
+            suffix.lower() in self.allowed_extensions for suffix in Path(filename).suffixes[:-1]
+        ):
+            return ValidationResult(
+                is_valid=False, filename=filename,
+                error_message=f"File '{filename}' disguises unsupported extension '{ext}' behind a document extension.",
+                error_code="DOUBLE_EXTENSION",
+            )
+
         if ext not in self.allowed_extensions:
             error_msg = (
                 f"File extension '{ext}' is not supported. "

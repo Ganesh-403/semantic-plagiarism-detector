@@ -9,7 +9,7 @@ flow properly flags expired passwords.
 """
 
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
@@ -140,7 +140,7 @@ class TestSetPasswordExpiration:
 
         # Verify it's approximately 90 days in the future
         expires_at = datetime.fromisoformat(row[0])
-        expected = datetime.utcnow() + timedelta(days=90)
+        expected = datetime.now(timezone.utc) + timedelta(days=90)
 
         # Allow 1 minute tolerance for test execution time
         assert abs((expires_at - expected).total_seconds()) < 60
@@ -165,37 +165,13 @@ class TestSetPasswordExpiration:
 class TestAuthenticateUserExpiration:
     """Test suite for password expiration integration in authenticate_user."""
 
-    @patch("src.db.auth.get_user_by_username")
-    @patch("src.db.auth.verify_password", return_value=True)
-    @patch("src.db.auth.is_account_locked", return_value=False)
-    def test_flags_expired_password_on_success(
-        self, mock_locked, mock_verify, mock_get_user
-    ):
-        """Verify authenticate_user flags expired passwords even on successful login."""
-        mock_get_user.return_value = {"username": "alice", "password_hash": "hash"}
-
-        with patch("src.db.auth.is_password_expired", return_value=True):
-            with patch("src.db.auth.log_security_event") as mock_log:
-                result = authenticate_user("alice", "correct_password")
-
-        assert result["success"] is True
-        assert result["password_expired"] is True
-
-        # Verify the specific expired login event was logged
-        mock_log.assert_called_once()
-        assert mock_log.call_args[1]["event_type"] == "login_success_password_expired"
-
-    @patch("src.db.auth.get_user_by_username")
-    @patch("src.db.auth.verify_password", return_value=True)
-    @patch("src.db.auth.is_account_locked", return_value=False)
-    def test_no_expiration_flag_when_valid(
-        self, mock_locked, mock_verify, mock_get_user
-    ):
-        """Verify password_expired is False when password is still valid."""
-        mock_get_user.return_value = {"username": "bob", "password_hash": "hash"}
-
-        with patch("src.db.auth.is_password_expired", return_value=False):
-            result = authenticate_user("bob", "correct_password")
-
-        assert result["success"] is True
-        assert result["password_expired"] is False
+    @pytest.mark.parametrize("expired", [True, False])
+    def test_expiration_flag_and_audit_event(self, mock_db, expired):
+        from src.db import auth
+        auth.add_user("expiration-user", "StrongPassword9!")
+        with patch.object(auth, "is_password_expired", return_value=expired):
+            result = auth.authenticate_user("expiration-user", "StrongPassword9!", return_details=True)
+        assert result["authenticated"] is True
+        assert result["password_expired"] is expired
+        event = "login_success_password_expired" if expired else "login_success"
+        assert auth.get_security_audit_logs(username="expiration-user", event_type=event)

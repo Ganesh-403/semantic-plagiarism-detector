@@ -26,7 +26,7 @@ def setup_test_db(mock_db):
 def test_log_security_event_inserts_row():
     """log_security_event should write a row into security_audit_log."""
     username = f"user_{uuid.uuid4().hex[:8]}"
-    add_user(username, "Password1!")
+    add_user(username, "Audit-Test-Password!984")
     auth_repo.log_security_event(event_type="password_change", username=username)
     with _connect() as conn:
         row = conn.execute(
@@ -41,7 +41,7 @@ def test_log_security_event_inserts_row():
 def test_log_security_event_stores_timestamp():
     """log_security_event should store a non-empty ISO 8601 UTC timestamp."""
     username = f"user_{uuid.uuid4().hex[:8]}"
-    add_user(username, "Password1!")
+    add_user(username, "Audit-Test-Password!984")
     auth_repo.log_security_event(event_type="password_change", username=username)
     with _connect() as conn:
         row = conn.execute(
@@ -58,7 +58,7 @@ def test_log_security_event_stores_timestamp():
 def test_log_security_event_stores_optional_details():
     """log_security_event should persist the details field when provided."""
     username = f"user_{uuid.uuid4().hex[:8]}"
-    add_user(username, "Password1!")
+    add_user(username, "Audit-Test-Password!984")
     auth_repo.log_security_event(
         event_type="password_change",
         username=username,
@@ -76,7 +76,7 @@ def test_log_security_event_stores_optional_details():
 def test_log_security_event_with_details_none():
     """Ensure that calling log_security_event with details=None correctly inserts NULL in database."""
     username = f"user_{uuid.uuid4().hex[:8]}"
-    add_user(username, "Password1!")
+    add_user(username, "Audit-Test-Password!984")
     auth_repo.log_security_event(
         event_type="login_failure",
         username=username,
@@ -106,7 +106,7 @@ def test_log_security_event_insertion():
     read could still observe.
     """
     username = f"user_{uuid.uuid4().hex[:8]}"
-    add_user(username, "Password1!")
+    add_user(username, "Audit-Test-Password!984")
 
     auth_repo.log_security_event(
         event_type="login_success",

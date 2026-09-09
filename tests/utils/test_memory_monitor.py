@@ -132,3 +132,9 @@ class TestCheckMemoryThreshold:
         # Sanity: get_memory_usage() itself still returns the expected shape.
         usage = get_memory_usage()
         assert "percent" in usage
+
+
+@pytest.mark.parametrize("threshold", [-1, 101, float("nan"), float("inf")])
+def test_invalid_memory_threshold_is_rejected(threshold):
+    with pytest.raises(ValueError):
+        check_memory_threshold(threshold)

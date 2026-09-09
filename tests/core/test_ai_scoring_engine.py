@@ -5,6 +5,8 @@ Comprehensive test suite covering scoring components, fingerprinting,
 severity classification, and batch processing.
 """
 
+import pytest
+
 from src.core.ai_scoring_engine import (
     AIScoringEngine,
     ContentFingerprint,
@@ -66,7 +68,9 @@ class TestContentFingerprinter:
         fp1 = self.fingerprinter.create_fingerprint(base, "a.txt")
         fp2 = self.fingerprinter.create_fingerprint(modified, "b.txt")
         sim = self.fingerprinter.compare_fingerprints(fp1, fp2)
-        assert sim > 0.7
+        # Repeating a sentence does not add distinct shingles. Seven added
+        # shingles leave 11 shared shingles out of 18 in the union.
+        assert sim == pytest.approx(11 / 18)
 
 
 class TestScoringComponents:

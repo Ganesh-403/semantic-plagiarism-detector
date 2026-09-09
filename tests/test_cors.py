@@ -1,15 +1,11 @@
-import sys
+import importlib
 import pytest
 from fastapi.testclient import TestClient
 
 
 def get_fresh_app(monkeypatch, cors_origins):
     monkeypatch.setenv("CORS_ALLOWED_ORIGINS", cors_origins)
-    sys.modules.pop("src.api.app", None)
-    sys.modules.pop("src.api", None)
-    from src.api.app import app
-
-    return app
+    return importlib.reload(importlib.import_module("src.api.app")).app
 
 
 def test_cors_headers(monkeypatch):

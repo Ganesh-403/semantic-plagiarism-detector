@@ -11,11 +11,11 @@ from unittest.mock import patch
 
 import pytest
 
-from src.utils.warning_list import FUZZY_THRESHOLD, THEFUZZ_AVAILABLE, filter_warnings
+from src.utils.warning_list import FUZZY_THRESHOLD, filter_warnings, fuzz
 
 # Skip all fuzzy tests if thefuzz is not installed
 pytestmark = pytest.mark.skipif(
-    not THEFUZZ_AVAILABLE, reason="thefuzz library not installed"
+    fuzz is None, reason="thefuzz library not installed"
 )
 
 
@@ -54,8 +54,9 @@ class TestFilterWarningsFuzzy:
         # We mock fuzz.partial_ratio to return exactly the threshold - 1
         with patch("src.utils.warning_list.fuzz") as mock_fuzz:
             mock_fuzz.partial_ratio.return_value = FUZZY_THRESHOLD - 1
+            mock_fuzz.token_set_ratio.return_value = FUZZY_THRESHOLD - 1
 
-            result = filter_warnings(warnings, "doc", use_fuzzy=True)
+            result = filter_warnings(warnings, "dox", use_fuzzy=True)
             assert len(result) == 0
 
     def test_filter_fuzzy_includes_at_threshold(self):
@@ -64,8 +65,9 @@ class TestFilterWarningsFuzzy:
 
         with patch("src.utils.warning_list.fuzz") as mock_fuzz:
             mock_fuzz.partial_ratio.return_value = FUZZY_THRESHOLD
+            mock_fuzz.token_set_ratio.return_value = FUZZY_THRESHOLD
 
-            result = filter_warnings(warnings, "doc", use_fuzzy=True)
+            result = filter_warnings(warnings, "dox", use_fuzzy=True)
             assert len(result) == 1
 
     def test_filter_fuzzy_disabled_falls_back_to_exact(self):
@@ -100,7 +102,7 @@ class TestFilterWarningsFallback:
         warnings = [{"doc_a": "plagiarism_essay.pdf", "doc_b": "source.pdf"}]
 
         # Mock THEFUZZ_AVAILABLE to False
-        with patch("src.utils.warning_list.THEFUZZ_AVAILABLE", False):
+        with patch("src.utils.warning_list.fuzz", None):
             # Typo should NOT match because fuzzy is unavailable
             result = filter_warnings(warnings, "plagirism", use_fuzzy=True)
             assert len(result) == 0

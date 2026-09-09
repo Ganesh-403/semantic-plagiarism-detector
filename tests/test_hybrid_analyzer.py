@@ -3,6 +3,9 @@ Unit tests for the Hybrid Similarity Analysis Pipeline
 """
 
 import pytest
+import hashlib
+import numpy as np
+from unittest.mock import Mock
 import os
 import tempfile
 from pathlib import Path
@@ -18,6 +21,18 @@ from src.analysis.semantic_analyzer import SemanticAnalyzer
 from src.analysis.hybrid_analyzer import HybridAnalyzer
 
 
+@pytest.fixture(autouse=True)
+def embedding_provider(monkeypatch):
+    def encode(texts, **kwargs):
+        vectors = np.array([list(hashlib.sha256(text.encode()).digest()) for text in texts], dtype=np.float32) - 127.5
+        return vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
+    def load_model(self):
+        self._model = Mock()
+        self._model.encode.side_effect = encode
+        self._model_loaded = True
+    monkeypatch.setattr(SemanticAnalyzer, "_load_model", load_model)
+
+
 class TestSimilarityMetrics:
     """Test similarity metrics calculations."""
 
@@ -26,7 +41,7 @@ class TestSimilarityMetrics:
         vec1 = [1.0, 0.0, 0.0]
         vec2 = [1.0, 0.0, 0.0]
         result = SimilarityMetrics.cosine_similarity(vec1, vec2)
-        assert result == 1.0
+        assert result == pytest.approx(1.0)
 
         vec2 = [0.0, 1.0, 0.0]
         result = SimilarityMetrics.cosine_similarity(vec1, vec2)
@@ -35,7 +50,7 @@ class TestSimilarityMetrics:
         vec1 = [1.0, 1.0, 0.0]
         vec2 = [1.0, 1.0, 0.0]
         result = SimilarityMetrics.cosine_similarity(vec1, vec2)
-        assert result == 1.0
+        assert result == pytest.approx(1.0)
 
     def test_jaccard_similarity(self):
         """Test Jaccard similarity calculation."""
@@ -52,7 +67,7 @@ class TestSimilarityMetrics:
         set1 = {1, 2, 3}
         set2 = {1, 2, 3}
         result = SimilarityMetrics.jaccard_similarity(set1, set2)
-        assert result == 1.0
+        assert result == pytest.approx(1.0)
 
     def test_levenshtein_distance(self):
         """Test Levenshtein distance calculation."""
@@ -71,7 +86,7 @@ class TestSimilarityMetrics:
         assert 0.5 < result < 0.6
 
         result = SimilarityMetrics.levenshtein_similarity("hello", "hello")
-        assert result == 1.0
+        assert result == pytest.approx(1.0)
 
         result = SimilarityMetrics.levenshtein_similarity("", "hello")
         assert result == 0.0
@@ -79,10 +94,10 @@ class TestSimilarityMetrics:
     def test_ngram_similarity(self):
         """Test n-gram similarity calculation."""
         result = SimilarityMetrics.ngram_similarity("hello world", "hello world", n=3)
-        assert result == 1.0
+        assert result == pytest.approx(1.0)
 
         result = SimilarityMetrics.ngram_similarity("hello world", "goodbye world", n=3)
-        assert 0.3 < result < 0.5
+        assert result == pytest.approx(4 / 16)
 
         result = SimilarityMetrics.ngram_similarity("hello", "", n=3)
         assert result == 0.0
@@ -90,10 +105,10 @@ class TestSimilarityMetrics:
     def test_lcs_similarity(self):
         """Test LCS similarity calculation."""
         result = SimilarityMetrics.lcs_similarity("hello", "hello")
-        assert result == 1.0
+        assert result == pytest.approx(1.0)
 
         result = SimilarityMetrics.lcs_similarity("hello", "hallo")
-        assert 0.8 < result < 0.9
+        assert result == pytest.approx(4 / 5)
 
         result = SimilarityMetrics.lcs_similarity("abc", "def")
         assert result == 0.0
@@ -117,17 +132,17 @@ class TestSimilarityMetrics:
         scores = [0.8, 0.6, 0.9]
         result = SimilarityMetrics.combine_scores(scores)
         expected = (0.8 + 0.6 + 0.9) / 3
-        assert result == expected
+        assert result == pytest.approx(expected)
 
         weights = [0.5, 0.3, 0.2]
         result = SimilarityMetrics.combine_scores(scores, weights)
         expected = 0.8 * 0.5 + 0.6 * 0.3 + 0.9 * 0.2
-        assert result == expected
+        assert result == pytest.approx(expected)
 
     def test_confidence_score(self):
         """Test confidence score calculation."""
         result = SimilarityMetrics.confidence_score(0.8, 5)
-        assert 0.8 <= result <= 0.85
+        assert result == pytest.approx(0.85)
 
         result = SimilarityMetrics.confidence_score(0.5, 0)
         assert result == 0.5

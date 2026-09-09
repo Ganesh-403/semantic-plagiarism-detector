@@ -142,7 +142,7 @@ OCR_DPI_OUT_OF_RANGE = "OCR DPI must be between {min_dpi} and {max_dpi}."
 OCR_LANGUAGE_UNSUPPORTED = (
     "Unsupported OCR language '{language}'. Supported values: {supported}."
 )
-OCR_DEPENDENCIES_MISSING = "OCR dependencies are missing. Install pytesseract, PyMuPDF and Pillow using: python -m pip install pytesseract pymupdf pillow"
+OCR_DEPENDENCIES_MISSING = "OCR dependencies are missing. Install pytesseract, PDFium and Pillow using: python -m pip install pytesseract pypdfium2 pillow"
 OCR_TESSERACT_NOT_FOUND = "Tesseract OCR was not found. Install Tesseract and either add it to PATH or set TESSERACT_CMD to tesseract.exe."
 BADGE_PIL_REQUIRED = "PIL/Pillow is required for PNG badge generation"
 PARSER_BATCH_LIMIT_EXCEEDED = "Batch size exceeds maximum limit of {limit} files."

@@ -192,7 +192,7 @@ def test_load_branding_config_missing_file_fallback():
     result = load_branding_config("nonexistent_path_123.json")
 
     # Assert no FileNotFoundError is raised (handled implicitly by successful execution) and returns defaults
-    assert result == BrandingConfig()
+    assert result.to_dict() == BrandingConfig().to_dict()
 
 
 def test_get_valid_roles_default_and_override(monkeypatch):

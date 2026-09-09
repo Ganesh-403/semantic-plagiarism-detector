@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.core.ai_detector import (
+    _FALLBACK_SENTINEL,
     calculate_text_perplexity,
     categorize_ai_probability,
     detect_ai_generated_text,
@@ -72,6 +73,7 @@ def test_categorize_at_1_0():
 def test_ai_probability_categorization_consistency():
     """Verify that both categorize_ai_probability and detect_ai_generated_text use the same thresholds."""
     from src.core.ai_detector import (
+    _FALLBACK_SENTINEL,
         AI_HIGH_THRESHOLD,
         AI_MEDIUM_THRESHOLD,
         categorize_ai_probability,

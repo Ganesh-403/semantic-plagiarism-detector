@@ -18,35 +18,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# ---------------------------------------------------------------------------
-# Import version_check directly to avoid pulling in the heavy src/__init__.py
-# chain (which transitively requires docx, faiss, etc.)
-# ---------------------------------------------------------------------------
-# version_check.py imports `APP_VERSION` from `src.version` (the
-# centralized single-source-of-truth version module). Resolving that
-# import still requires a `src` package to exist in sys.modules -- so a
-# lightweight namespace stub is registered here (mirroring version_check
-# itself being hand-loaded below) rather than letting Python fall through
-# to the real src/__init__.py, which is exactly the heavy chain this
-# test file exists to avoid.
-if "src" not in sys.modules:
-    _src_stub = types.ModuleType("src")
-    _src_stub.__path__ = [str(pathlib.Path(__file__).parent.parent.parent / "src")]
-    sys.modules["src"] = _src_stub
+# Package exports are lazy; importing this helper no longer loads ML dependencies.
+import importlib
+_vc_mod = importlib.import_module("src.utils.version_check")
 
-_VERSION_MOD_PATH = pathlib.Path(__file__).parent.parent.parent / "src" / "version.py"
-_version_spec = importlib.util.spec_from_file_location("src.version", _VERSION_MOD_PATH)
-_version_mod = importlib.util.module_from_spec(_version_spec)  # type: ignore[arg-type]
-sys.modules.setdefault("src.version", _version_mod)
-_version_spec.loader.exec_module(_version_mod)  # type: ignore[union-attr]
-
-_MOD_PATH = (
-    pathlib.Path(__file__).parent.parent.parent / "src" / "utils" / "version_check.py"
-)
-_spec = importlib.util.spec_from_file_location("src.utils.version_check", _MOD_PATH)
-_vc_mod = importlib.util.module_from_spec(_spec)  # type: ignore[arg-type]
-sys.modules.setdefault("src.utils.version_check", _vc_mod)
-_spec.loader.exec_module(_vc_mod)  # type: ignore[union-attr]
 
 APP_VERSION = _vc_mod.APP_VERSION
 GITHUB_RELEASES_URL = _vc_mod.GITHUB_RELEASES_URL
@@ -78,7 +53,7 @@ def _reload_version_check_with_env(monkeypatch, owner=None, repo=None):
         monkeypatch.delenv("GITHUB_REPO", raising=False)
 
     spec = importlib.util.spec_from_file_location(
-        "src.utils.version_check_env_override_test", _MOD_PATH
+        "src.utils.version_check_env_override_test", _vc_mod.__file__
     )
     module = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
     spec.loader.exec_module(module)  # type: ignore[union-attr]

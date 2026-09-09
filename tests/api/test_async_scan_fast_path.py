@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import uuid
 from datetime import datetime, timezone
 from unittest import mock
@@ -97,8 +98,8 @@ def test_no_hash_match_fallback(tmp_path):
                         mock_calc.return_value = "fake_sha256"
                         mock_get_hash.return_value = None  # No match
                         
-                        mock_embed.return_value = mock.MagicMock()
-                        mock_doc_embed.return_value = mock.MagicMock()
+                        mock_embed.return_value = np.ones((1, 384), dtype=np.float32)
+                        mock_doc_embed.return_value = np.ones(384, dtype=np.float32)
                         mock_corpus.return_value = {}
                         
                         _process_scan_job(
@@ -116,3 +117,21 @@ def test_no_hash_match_fallback(tmp_path):
                         assert mock_embed.called
                         assert mock_doc_embed.called
                         assert mock_corpus.called
+
+
+@pytest.fixture(autouse=True)
+def isolated_jobs():
+    scan_jobs.clear()
+    yield
+    scan_jobs.clear()
+
+
+def test_cancelled_queued_scan_does_not_restart(tmp_path):
+    upload = tmp_path / "cancelled.txt"
+    upload.write_text("Do not process this cancelled upload")
+    scan_jobs["cancelled"] = {"status": "cancelled"}
+    with mock.patch("src.api.routers.analysis.extract_text") as extract:
+        _process_scan_job("cancelled", upload, upload.name, 0.59, 3)
+    extract.assert_not_called()
+    assert scan_jobs["cancelled"]["status"] == "cancelled"
+    assert not upload.exists()

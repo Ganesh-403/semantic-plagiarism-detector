@@ -77,7 +77,7 @@ class TestExportTrendMarkdown:
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "trend.md")
             export_trend_markdown(result, path)
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 content = f.read()
             assert "Plagiarism Trend Analysis Report" in content
             assert "avg_similarity" in content
@@ -87,7 +87,7 @@ class TestExportTrendMarkdown:
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "trend.md")
             export_trend_markdown(result, path, title="Custom Title")
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 content = f.read()
             assert "Custom Title" in content
 
@@ -96,7 +96,7 @@ class TestExportTrendMarkdown:
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "trend.md")
             export_trend_markdown(result, path)
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 content = f.read()
             if result.alerts:
                 assert "Alerts" in content
@@ -113,7 +113,7 @@ class TestExportTrendHtml:
             path = os.path.join(tmp, "trend.html")
             export_trend_html(result, path)
             assert os.path.exists(path)
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 content = f.read()
             assert "<!DOCTYPE html>" in content
             assert "avg_similarity" in content
@@ -123,7 +123,7 @@ class TestExportTrendHtml:
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "trend.html")
             export_trend_html(result, path)
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 content = f.read()
             assert "chart-data" in content
 
@@ -138,7 +138,7 @@ class TestExportTrendHtml:
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "trend.html")
             export_trend_html(result, path)
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 content = f.read()
             assert "No active alerts" in content
 

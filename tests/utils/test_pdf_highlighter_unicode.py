@@ -1,4 +1,4 @@
-import fitz
+from src.utils import pdf_backend as fitz
 import pytest
 from src.utils.pdf_highlighter import highlight_pdf_matches as highlight_hl
 from src.utils.pdf_report import highlight_pdf_matches as highlight_rep

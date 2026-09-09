@@ -56,13 +56,13 @@ import weakref
 _DB_PATH = os.path.abspath(str(CORPUS_DB_PATH))
 
 _connection_pool = threading.local()
-_all_connections = set()
-_pool_lock = threading.Lock()
+_all_connections = weakref.WeakSet()
+_pool_lock = threading.RLock()
 
 
 def _cleanup_all_connections():
     with _pool_lock:
-        for conn in _all_connections:
+        for conn in list(_all_connections):
             try:
                 conn.close()
             except Exception:
@@ -119,7 +119,10 @@ def get_corpus_db_path() -> Path:
 class WeakConnection(sqlite3.Connection):
     """Subclass of sqlite3.Connection that supports weak references."""
 
-    pass
+    def close(self) -> None:
+        super().close()
+        with _pool_lock:
+            _all_connections.discard(self)
 
 
 def _pool() -> dict[str, sqlite3.Connection]:
@@ -555,7 +558,7 @@ def get_document_by_hash(file_hash: str) -> str | None:
     """Check if a file with this hash is already indexed and return its filename."""
     with _connect() as conn:
         row = conn.execute(
-            "SELECT filename FROM documents WHERE file_hash = ?", (file_hash,)
+            "SELECT filename FROM documents WHERE file_hash = ? AND (is_deleted IS NULL OR is_deleted = 0)", (file_hash,)
         ).fetchone()
         return row[0] if row else None
 
@@ -711,7 +714,9 @@ def get_all_embeddings() -> np.ndarray:
     )
 
     with _connect() as conn:
-        rows = conn.execute(
+        cursor = conn.cursor()
+        cursor.row_factory = sqlite3.Row
+        rows = cursor.execute(
             """
             SELECT
                 embedding,
@@ -766,7 +771,9 @@ def update_document_embeddings(
         raise ValueError("Embeddings must be a 2-dimensional matrix.")
 
     with _connect() as conn:
-        rows = conn.execute(
+        cursor = conn.cursor()
+        cursor.row_factory = sqlite3.Row
+        rows = cursor.execute(
             """
             SELECT vector_id, chunk_index
             FROM chunks
@@ -821,7 +828,9 @@ def get_document_embeddings_for_migration(
 ) -> tuple[list[str], np.ndarray]:
     """Load one document's chunk text for controlled re-embedding."""
     with _connect() as conn:
-        rows = conn.execute(
+        cursor = conn.cursor()
+        cursor.row_factory = sqlite3.Row
+        rows = cursor.execute(
             """
             SELECT chunk_text, embedding
             FROM chunks
@@ -869,8 +878,8 @@ def soft_delete_document(filename: str) -> bool:
             return False
         conn.execute(
             """
-            INSERT INTO deleted_chunks (vector_id, filename, chunk_index, chunk_text, embedding)
-            SELECT vector_id, filename, chunk_index, chunk_text, embedding
+            INSERT INTO deleted_chunks (vector_id, filename, chunk_index, chunk_text, embedding, model_identifier, model_version, embedding_dimension, normalization_strategy, embedding_generated_at, vector_schema_version)
+            SELECT vector_id, filename, chunk_index, chunk_text, embedding, model_identifier, model_version, embedding_dimension, normalization_strategy, embedding_generated_at, vector_schema_version
             FROM chunks
             WHERE filename = ?
             """,
@@ -926,7 +935,7 @@ def restore_document(filename: str) -> bool:
         if cursor.rowcount == 0:
             return False
         restored = conn.execute(
-            "SELECT filename, chunk_index, chunk_text, embedding FROM deleted_chunks WHERE filename = ?",
+            "SELECT filename, chunk_index, chunk_text, embedding, model_identifier, model_version, embedding_dimension, normalization_strategy, embedding_generated_at, vector_schema_version FROM deleted_chunks WHERE filename = ? ORDER BY chunk_index",
             (filename,),
         ).fetchall()
         max_id_row = conn.execute(
@@ -935,8 +944,8 @@ def restore_document(filename: str) -> bool:
         next_id = max_id_row[0] + 1
         for i, row in enumerate(restored):
             conn.execute(
-                "INSERT INTO chunks (vector_id, filename, chunk_index, chunk_text, embedding) VALUES (?, ?, ?, ?, ?)",
-                (next_id + i, row[0], row[1], row[2], row[3]),
+                "INSERT INTO chunks (vector_id, filename, chunk_index, chunk_text, embedding, model_identifier, model_version, embedding_dimension, normalization_strategy, embedding_generated_at, vector_schema_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (next_id + i, *row),
             )
         conn.execute("DELETE FROM deleted_chunks WHERE filename = ?", (filename,))
         _compact_vector_ids()
@@ -986,8 +995,8 @@ def batch_soft_delete_documents(doc_ids: list[int]) -> int:
     with _connect() as conn:
         conn.execute(
             f"""
-            INSERT INTO deleted_chunks (vector_id, filename, chunk_index, chunk_text, embedding)
-            SELECT vector_id, filename, chunk_index, chunk_text, embedding
+            INSERT INTO deleted_chunks (vector_id, filename, chunk_index, chunk_text, embedding, model_identifier, model_version, embedding_dimension, normalization_strategy, embedding_generated_at, vector_schema_version)
+            SELECT vector_id, filename, chunk_index, chunk_text, embedding, model_identifier, model_version, embedding_dimension, normalization_strategy, embedding_generated_at, vector_schema_version
             FROM chunks
             WHERE filename IN (SELECT filename FROM documents WHERE id IN ({placeholders}))
             """,
@@ -1066,20 +1075,16 @@ def batch_permanently_delete_documents(doc_ids: list[int]) -> int:
 
 @with_sqlite_retry
 def _compact_vector_ids() -> None:
-    """Re-index the vector_id column to remove any gaps left by deleted documents."""
+    """Renumber vectors in place, preserving embeddings and all model metadata."""
     with _connect() as conn:
-        chunks = conn.execute(
-            "SELECT filename, chunk_index, chunk_text, embedding FROM chunks ORDER BY vector_id ASC"
-        ).fetchall()
-
-        conn.execute("DELETE FROM chunks")
-
-        if chunks:
-            formatted = [(i, r[0], r[1], r[2], r[3]) for i, r in enumerate(chunks)]
-            conn.executemany(
-                "INSERT INTO chunks (vector_id, filename, chunk_index, chunk_text, embedding) VALUES (?, ?, ?, ?, ?)",
-                formatted,
-            )
+        ids = [row[0] for row in conn.execute("SELECT vector_id FROM chunks ORDER BY vector_id")]
+        if not ids:
+            return
+        temporary_start = min(0, min(ids)) - len(ids) - 1
+        conn.executemany("UPDATE chunks SET vector_id = ? WHERE vector_id = ?",
+            [(temporary_start + i, old_id) for i, old_id in enumerate(ids)])
+        conn.executemany("UPDATE chunks SET vector_id = ? WHERE vector_id = ?",
+            [(i, temporary_start + i) for i in range(len(ids))])
 
 
 def get_document_chunks_count(filename: str) -> int:
@@ -1407,7 +1412,7 @@ def vacuum_corpus_database() -> None:
     close_connections(all_threads=True)
 
     path = get_corpus_db_path()
-    conn = sqlite3.connect(os.path.abspath(path))
+    conn = sqlite3.connect(os.path.abspath(path), isolation_level=None)
     conn.isolation_level = None
     try:
         conn.execute("VACUUM")
@@ -1422,7 +1427,7 @@ def optimize_database() -> dict[str, any]:
     try:
         size_before = path.stat().st_size if path.exists() else 0
 
-        conn = sqlite3.connect(os.path.abspath(path))
+        conn = sqlite3.connect(os.path.abspath(path), isolation_level=None)
         conn.isolation_level = None
         try:
             conn.execute("VACUUM")

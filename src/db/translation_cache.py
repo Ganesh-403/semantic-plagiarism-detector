@@ -66,8 +66,8 @@ def _connect(db_path: Optional[Path] = None):
     path = db_path or _CACHE_DB_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path), check_same_thread=False)
-    conn.execute("PRAGMA journal_mode=WAL")
     try:
+        conn.execute("PRAGMA journal_mode=WAL")
         yield conn
         conn.commit()
     except Exception:
@@ -112,7 +112,7 @@ def _ensure_translation_cache_schema(db_path: Path) -> None:
     """Create the modern translation-cache schema at ``db_path`` if needed."""
     db_path = Path(db_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(str(db_path)) as conn:
+    with closing(sqlite3.connect(str(db_path))) as conn, conn:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS translation_cache (
@@ -228,7 +228,7 @@ def migrate_legacy_cache(
     _ensure_translation_cache_schema(target_path)
 
     try:
-        with sqlite3.connect(str(source_path)) as legacy_conn:
+        with closing(sqlite3.connect(str(source_path))) as legacy_conn:
             legacy_conn.row_factory = sqlite3.Row
             try:
                 rows = legacy_conn.execute(
@@ -245,7 +245,7 @@ def migrate_legacy_cache(
         stats = {"scanned": len(rows), "migrated": 0, "skipped": 0, "errors": 0}
         now = datetime.utcnow().isoformat()
 
-        with sqlite3.connect(str(target_path)) as cache_conn:
+        with closing(sqlite3.connect(str(target_path))) as cache_conn, cache_conn:
             for row in rows:
                 source_text = row["foreign_text"]
                 translated_text = row["translated_text"]
@@ -332,7 +332,16 @@ def _recover_corrupted_cache() -> None:
         logger.info("Recreated translation cache schema at %s", _CACHE_DB_PATH)
 
 
-def get_cached_translation(
+def get_cached_translation(*args, **kwargs) -> Optional[str]:
+    """Read either cache format and record one hit or miss for the lookup."""
+    result = _get_cached_translation(*args, **kwargs)
+    from src.core.metrics import cache_hits_total, cache_misses_total
+    counter = cache_hits_total if result is not None else cache_misses_total
+    counter.labels(cache_type="translation").inc()
+    return result
+
+
+def _get_cached_translation(
     source_text: str,
     source_lang: str = "auto",
     target_lang: str = "en",
@@ -418,9 +427,6 @@ def get_cached_translation(
 
             return None
 
-    except sqlite3.Error as exc:
-        logger.error("Failed to query translation cache: %s", exc)
-        return None
     except sqlite3.DatabaseError as exc:
         if _CORRUPTION_MESSAGE in str(exc).lower():
             _recover_corrupted_cache()
@@ -735,11 +741,11 @@ def purge_expired_translation_cache(days_old: int = 60) -> int:
     Returns:
         int: The number of rows successfully deleted from the cache.
     """
-    _init_db()
     if days_old < 0:
         raise ValueError("days_old must be a non-negative integer.")
 
     try:
+        _init_db()
         with closing(sqlite3.connect(DB_PATH)) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -773,7 +779,6 @@ def purge_translation_cache_older_than(days: int = 30) -> int:
     Returns:
         int: The number of rows successfully deleted from the cache.
     """
-    _init_db()
     if days < 0:
         raise ValueError("days must be a non-negative integer.")
 
@@ -782,6 +787,7 @@ def purge_translation_cache_older_than(days: int = 30) -> int:
     cutoff_str = cutoff_dt.strftime("%Y-%m-%d %H:%M:%S")
 
     try:
+        _init_db()
         with closing(sqlite3.connect(DB_PATH)) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -812,16 +818,20 @@ def get_translation_cache_stats() -> dict[str, int]:
     try:
         with closing(sqlite3.connect(DB_PATH)) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM translation_cache")
+            cursor.execute("SELECT COUNT(*) FROM legacy_translation_cache")
             row = cursor.fetchone()
             total_count = row[0] if row else 0
 
-            return {
-                "total_entries": int(total_count),
-            }
+            cursor.execute("SELECT MIN(created_at) FROM legacy_translation_cache")
+            oldest = cursor.fetchone()[0]
+            oldest_days = 0
+            if oldest:
+                created = datetime.fromisoformat(str(oldest)).replace(tzinfo=timezone.utc)
+                oldest_days = max(0, (datetime.now(timezone.utc) - created).days)
+            return {"total_entries": int(total_count), "oldest_entry_days": oldest_days}
     except sqlite3.Error as e:
         logger.error(f"Failed to get translation cache stats: {e}")
-        return {"total_entries": 0}
+        return {"total_entries": 0, "oldest_entry_days": 0}
 
 
 # Fix: Original code referenced undefined `_cache_hits` / `_cache_misses`.

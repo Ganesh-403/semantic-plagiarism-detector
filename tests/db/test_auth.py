@@ -63,7 +63,7 @@ def setup_test_db(mock_db):
 
 def test_init_db():
     init_db()
-    assert verify_user("admin", "Admin123!") is True
+    assert verify_user("admin", "Bootstrap-Test-Password!984") is True
     assert verify_user("admin", "wrongpassword") is False
 
 
@@ -99,7 +99,7 @@ def test_verify_user_rejects_suspended_user():
 @pytest.mark.skip(reason="Broken on main")
 def test_get_user_role():
     user = f"user_{uuid.uuid4().hex[:8]}"
-    add_user(user, "P@ssw0rd123!")
+    add_user(user, "Fixture-Test-Password!984")
     assert get_user_role(user) is not None
     assert get_user_role("non_existent_user_999") is None
 
@@ -130,7 +130,7 @@ def test_get_user_last_login_set_after_successful_login():
 
 def test_update_password():
     user = f"user_{uuid.uuid4().hex[:8]}"
-    add_user(user, "P@ssw0rd123!")
+    add_user(user, "Fixture-Test-Password!984")
     update_password(user, "N3w_s3cr3t_123!")
     assert verify_user(user, "N3w_s3cr3t_123!") is True
 
@@ -216,7 +216,7 @@ def test_get_security_audit_logs_invalid_limit_offset(mock_audit_db):
 @pytest.mark.skip(reason="Broken on main")
 def test_get_security_audit_logs_negative_limit(mock_audit_db):
     with pytest.raises(ValueError):
-        get_security_audit_logs(limit=-1)
+        auth_repo.get_security_audit_logs(limit=-1)
 
 
 @pytest.mark.skip(reason="Broken on main")
@@ -292,7 +292,7 @@ def test_get_distinct_audit_event_types_caching_and_invalidation():
 
 def test_2fa_flow():
     username = f"user2fa_{uuid.uuid4().hex[:8]}"
-    add_user(username, "P@ssw0rd123!")
+    add_user(username, "Fixture-Test-Password!984")
 
     enabled, secret = get_2fa_status(username)
     assert enabled is False
@@ -317,7 +317,7 @@ def test_2fa_flow():
 def test_enable_disable_2fa():
     """Verify enable_2fa saves a secret and disable_2fa removes the secret."""
     username = f"user2fa_{uuid.uuid4().hex[:8]}"
-    add_user(username, "P@ssw0rd123!")
+    add_user(username, "Fixture-Test-Password!984")
 
     # Verify initial state: 2FA disabled and secret is None
     enabled, secret = get_2fa_status(username)
@@ -343,7 +343,7 @@ def test_enable_disable_2fa():
 def test_get_2fa_status():
     """Verify get_2fa_status returns False initially and True after calling enable_2fa."""
     username = f"user_2fa_{uuid.uuid4().hex[:8]}"
-    add_user(username, "P@ssw0rd123!")
+    add_user(username, "Fixture-Test-Password!984")
 
     enabled, secret = get_2fa_status(username)
     assert enabled is False
@@ -365,7 +365,7 @@ def test_otp_secret_is_encrypted_at_rest():
     from src.db.auth import get_auth_db_path
 
     username = f"user_2fa_enc_{uuid.uuid4().hex[:8]}"
-    add_user(username, "P@ssw0rd123!")
+    add_user(username, "Fixture-Test-Password!984")
 
     test_secret = "MY_OTP_SECRET_12345"
     enable_2fa(username, test_secret)
@@ -397,7 +397,7 @@ def test_otp_secret_legacy_plaintext_fallback():
     from src.db.auth import get_auth_db_path
 
     username = f"user_2fa_legacy_{uuid.uuid4().hex[:8]}"
-    add_user(username, "P@ssw0rd123!")
+    add_user(username, "Fixture-Test-Password!984")
 
     # Force insert a plaintext secret into the database
     db_path = get_auth_db_path()
@@ -418,7 +418,7 @@ def test_otp_secret_legacy_plaintext_fallback():
 
 def test_suspend_account():
     username = f"user_{uuid.uuid4().hex[:8]}"
-    add_user(username, "P@ssw0rd123!")
+    add_user(username, "Fixture-Test-Password!984")
 
     # Verify default is active
     assert get_user_active_status(username) is True
@@ -447,10 +447,10 @@ def test_sqlite_file_lock_exception(mock_db):
 
     conn = sqlite3.connect(src.db.auth._DB_PATH, timeout=0.1)
     conn.execute("BEGIN EXCLUSIVE TRANSACTION")
-    conn.execute("INSERT INTO users (username, password) VALUES ('lock_dummy', 'P@ssw0rd123!')")
+    conn.execute("INSERT INTO users (username, password) VALUES ('lock_dummy', 'Fixture-Test-Password!984')")
     try:
         with pytest.raises(sqlite3.Error) as exc_info:
-            add_user("locked_user", "P@ssw0rd123!")
+            add_user("locked_user", "Fixture-Test-Password!984")
         assert "Failed to add user" in str(exc_info.value) or "locked" in str(
             exc_info.value
         )
@@ -462,7 +462,7 @@ def test_sqlite_file_lock_exception(mock_db):
 def test_user_theme(mock_db):
     """Test get and set theme for a user."""
     user = f"theme_user_{uuid.uuid4().hex[:8]}"
-    add_user(user, "P@ssw0rd123!")
+    add_user(user, "Fixture-Test-Password!984")
 
     # Default should be light
     assert get_user_theme(user) == "light"
@@ -477,7 +477,7 @@ def test_delete_user_removes_user_row_and_audit_log(mock_db):
     """delete_user() must remove the user row and associated security_audit_log entries."""
 
     user = f"user_{uuid.uuid4().hex[:8]}"
-    add_user(user, "P@ssw0rd123!")
+    add_user(user, "Fixture-Test-Password!984")
 
     # Seed an audit log entry for this user
     auth_repo.log_security_event("password_change", user, "test entry")
@@ -508,7 +508,7 @@ def test_delete_user_removes_matching_session_and_authorization_rows(mock_db):
     import src.db.auth
 
     user = f"user_{uuid.uuid4().hex[:8]}"
-    add_user(user, "P@ssw0rd123!")
+    add_user(user, "Fixture-Test-Password!984")
 
     with sqlite3.connect(src.db.auth._DB_PATH) as conn:
         conn.execute(
@@ -671,7 +671,7 @@ def test_get_active_users_count():
 def test_update_user_profile():
     """Verify that update_user_profile correctly updates user role and active status in the database."""
     username = f"user_update_{uuid.uuid4().hex[:8]}"
-    add_user(username, "P@ssw0rd123!", "teacher")
+    add_user(username, "Fixture-Test-Password!984", "teacher")
 
     # Fetch initial state
     users = get_all_users()

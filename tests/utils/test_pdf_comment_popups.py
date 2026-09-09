@@ -1,5 +1,5 @@
 import os
-import fitz
+from src.utils import pdf_backend as fitz
 import pytest
 from src.utils.pdf_highlighter import highlight_pdf_matches, apply_highlight_with_popup_note
 

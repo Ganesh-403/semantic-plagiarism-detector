@@ -1,3 +1,4 @@
+import builtins
 import json
 import sqlite3
 import subprocess
@@ -10,9 +11,6 @@ import pytest
 from tests.conftest import MockDataFactory
 from src.core.similarity import PLAGIARISM_THRESHOLD
 
-# Mock ML libraries to prevent pytest segmentation faults on Apple Silicon
-sys.modules["transformers"] = MagicMock()
-sys.modules["sentence_transformers"] = MagicMock()
 
 from src.cli import _natural_sort_key, main, run_prewarm, run_scan  # noqa: E402
 
@@ -101,7 +99,7 @@ def test_cli_scan_success_csv_format(
     captured = capsys.readouterr()
 
     # Filter out commented metadata lines for parsing validation, or inspect metadata explicitly
-    lines = [line for line in captured.out.strip().split("\n") if line.strip()]
+    lines = [line for line in captured.out.strip().splitlines() if line.strip()]
 
     # Verify metadata header lines start with '#'
     assert lines[0].startswith("#")
@@ -237,6 +235,7 @@ def test_cli_scan_default_threshold(temp_assignments_dir):
                 str(temp_assignments_dir),
                 PLAGIARISM_THRESHOLD,
                 output_format="text",
+                recursive=False,
             )
 
 
@@ -391,6 +390,8 @@ def test_seed_data_database_matches_active_corpus_schema(tmp_path):
             sys.executable,
             str(repository_root / "scripts" / "generate_seed_data.py"),
             "--seed-dir",
+            str(generated_dir),
+            "--state-dir",
             str(generated_dir),
         ],
         cwd=repository_root,

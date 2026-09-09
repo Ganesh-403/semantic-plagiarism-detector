@@ -21,7 +21,7 @@ from __future__ import annotations
 import ast
 import inspect
 
-import fitz
+from src.utils import pdf_backend as fitz
 import pytest
 
 from src.utils import file_parser
@@ -111,18 +111,9 @@ def test_public_helpers_are_defined_exactly_once():
     assert not duplicates, f"functions defined more than once: {duplicates}"
 
 
-def test_fitz_imported_exactly_once():
-    """``import fitz`` appeared twice, once mid-module between functions."""
-    tree = ast.parse(inspect.getsource(file_parser))
-
-    fitz_imports = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Import)
-        and any(alias.name == "fitz" for alias in node.names)
-    ]
-
-    assert len(fitz_imports) == 1, "fitz should be imported once, in the header block"
+def test_pdf_backend_is_shared():
+    """Extraction uses the project's permissively licensed PDF adapter."""
+    assert file_parser.fitz is fitz
 
 
 def test_collateral_exports_are_importable():
@@ -174,15 +165,15 @@ def test_encrypted_pdf_with_correct_password_is_read():
 
 
 def test_page_limit_is_enforced_before_extraction(monkeypatch):
-    """The page-count guard runs first, so oversized PDFs never get opened."""
-    monkeypatch.setattr(
-        file_parser,
-        "validate_pdf_page_count",
-        lambda *_a, **_k: (_ for _ in ()).throw(ValueError("too many pages")),
-    )
+    """Reject oversized documents before extracting a single page."""
+    from unittest.mock import MagicMock
 
-    with pytest.raises(ValueError, match="too many pages"):
-        extract_text_from_pdf(make_pdf())
+    document = MagicMock(is_encrypted=False, needs_pass=False, page_count=501)
+    monkeypatch.setattr(file_parser.fitz, "open", lambda **kwargs: document)
+    with pytest.raises(ValueError, match="page limit"):
+        extract_text_from_pdf(b"unused")
+    document.__iter__.assert_not_called()
+    document.close.assert_called_once()
 
 
 # ── Document handle lifetime ─────────────────────────────────────────────────

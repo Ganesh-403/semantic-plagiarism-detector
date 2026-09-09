@@ -11,6 +11,7 @@ Verifies that release_large_batch_memory():
 * is invoked by _process_scan_job once a large scan job finishes.
 """
 
+import io
 from unittest.mock import patch
 
 import numpy as np
@@ -115,7 +116,7 @@ def test_process_scan_job_releases_memory_for_large_batches():
     ) as release_mock:
         _process_scan_job(
             job_id=job_id,
-            file_input="fake_path",
+            file_input=io.BytesIO(b"sample document text"),
             filename="large.txt",
             threshold=0.59,
             top_k=3,
@@ -159,11 +160,11 @@ def test_process_scan_job_skips_release_for_small_batches():
     ) as release_mock:
         _process_scan_job(
             job_id=job_id,
-            file_input="fake_path",
+            file_input=io.BytesIO(b"sample document text"),
             filename="small.txt",
             threshold=0.59,
             top_k=3,
         )
 
-    release_mock.assert_called_once_with(5)
+    release_mock.assert_not_called()
     assert scan_jobs[job_id]["status"] == "completed"

@@ -9,11 +9,12 @@ Includes tests for token validation, security headers, and JSON parsing.
 import json
 import logging
 import os
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.api.middleware import _is_public_path, get_valid_tokens
+from src.api.middleware import _is_public_path, get_valid_tokens, get_current_user, verify_bearer_token
+from fastapi.security import HTTPAuthorizationCredentials
 
 
 class TestGetValidTokens:
@@ -335,7 +336,7 @@ class TestIsPublicPath:
         """Verify configured public paths are accessible."""
         assert _is_public_path("/health")
         assert _is_public_path("/metrics")
-        assert _is_public_path("/metrics/json")
+        assert not _is_public_path("/metrics/json")
         assert _is_public_path("/api/v1/auth/login")
         assert _is_public_path("/api/v1/auth/refresh")
         assert _is_public_path("/api/v1/auth/revoke")
@@ -350,7 +351,7 @@ class TestIsPublicPath:
         """Verify public paths remain accessible with trailing slashes."""
         assert _is_public_path("/health/")
         assert _is_public_path("/metrics/")
-        assert _is_public_path("/metrics/json/")
+        assert not _is_public_path("/metrics/json/")
         assert _is_public_path("/api/v1/auth/login/")
         assert _is_public_path("/api/v1/healthz/")
         assert _is_public_path("/api/v1/status/")
@@ -487,9 +488,9 @@ class TestGetCurrentUserScopes:
             ):
                 with caplog.at_level(logging.ERROR):
                     with pytest.raises(HTTPException) as exc_info:
-                        await get_current_user(security_scopes, token="token_jwt")
-                    assert exc_info.value.status_code == 403
-                    assert "Forbidden: Insufficient privileges" in exc_info.value.detail
+                        await verify_bearer_token(request, creds)
+                    assert exc_info.value.status_code == 401
+                    assert "Unexpected error while verifying bearer token" in caplog.text
 
         asyncio.run(_test())
 

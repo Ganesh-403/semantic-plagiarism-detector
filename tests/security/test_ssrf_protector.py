@@ -77,7 +77,7 @@ def test_ssrf_dns_resolution_failed_formatting(mock_getaddrinfo):
 def test_validate_webhook_url_loopback(mock_getaddrinfo):
     mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 443))]
     with pytest.raises(SSRFSecurityException, match="Blocked loopback IP: 127.0.0.1"):
-        SSRFProtector.validate_webhook_url("https://localhost:8080/hook")
+        SSRFProtector.validate_webhook_url("https://localhost:443/hook")
 
 
 @patch("src.security.ssrf_protector.socket.getaddrinfo")
@@ -560,10 +560,9 @@ class TestUserAgentHeaderInspection:
         assert call_kwargs["headers"]["User-Agent"] == custom_ua
 
     @patch("src.security.ssrf_protector.requests.head")
-    @patch.object(SSRFProtector, "_check_redirect_depth", return_value=None)
     @patch.object(SSRFProtector, "_validate_url_target", return_value="93.184.216.34")
     def test_user_agent_attached_to_redirect_validation(
-        self, mock_validate, mock_redirect, mock_head
+        self, mock_validate, mock_head
     ):
         """Verify User-Agent is attached to requests during redirect chain validation."""
         mock_head.return_value = MagicMock(status_code=200)
@@ -637,7 +636,7 @@ class TestURLValidation:
 
     def test_missing_hostname_rejected(self):
         """Verify URLs without hostname are rejected."""
-        with pytest.raises(SSRFSecurityException, match="Missing hostname"):
+        with pytest.raises(SSRFSecurityException, match="(?i)missing hostname"):
             SSRFProtector._validate_url_target("https://")
 
     @patch.object(SSRFProtector, "_resolve_hostname", return_value="127.0.0.1")
@@ -694,11 +693,9 @@ class TestRedirectChainValidation:
     def test_max_redirects_exceeded_raises(self, mock_validate, mock_head):
         """Verify exceeding max redirects raises exception."""
         # Always return redirect
-        mock_head.return_value = MagicMock(
-            status_code=301, headers={"Location": "https://example.com/loop"}
-        )
+        mock_head.side_effect = [MagicMock(status_code=301, headers={"Location": f"https://example.com/hop-{i}"}) for i in range(3)]
 
-        with pytest.raises(SSRFSecurityException, match="max redirects"):
+        with pytest.raises(SSRFSecurityException, match="(?i)maximum|(?i:max redirects)"):
             SSRFProtector.validate_url_safety(
                 "https://example.com/start", max_redirects=2
             )
@@ -713,7 +710,7 @@ class TestRedirectChainValidation:
             MagicMock(status_code=301, headers={"Location": "https://example.com/a"}),
         ]
 
-        with pytest.raises(SSRFSecurityException, match="circular"):
+        with pytest.raises(SSRFSecurityException, match="(?i)circular"):
             SSRFProtector.validate_url_safety("https://example.com/a")
 
 

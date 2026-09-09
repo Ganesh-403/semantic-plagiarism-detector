@@ -51,8 +51,13 @@ PASSIVE_VOICE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# This remains a lightweight heuristic, not a grammatical dependency parser.
+# Require a plausible verb instead of letting a greedy subject consume it and
+# misclassify the following article ("the") as the action.
 ACTIVE_VOICE_PATTERN = re.compile(
-    r"\b(\w+(?:\s+\w+)*)\s+(\w+(?:ed|s|es|ing|en|t)?)\s+(\w+(?:\s+\w+)*)", re.IGNORECASE
+    r"^((?:(?:the|an?|this|that|these|those|my|our|their)\s+\w+(?:\s+\w+)*?)|(?:\w+(?:\s+\w+)*?))"
+    r"\s+(\w+(?:ed|ing|es|s)|ran|ate|wrote|gave|took|made|saw|said|built|read)"
+    r"\b(?:\s+(.+?))?[.!?]*$", re.IGNORECASE,
 )
 
 
@@ -102,15 +107,18 @@ def extract_semantic_roles_from_sentence(sentence: str) -> SemanticTriple:
     if active_match:
         agent_text = active_match.group(1).strip()
         action_text = active_match.group(2).strip()
-        patient_text = active_match.group(3).strip()
+        patient_text = (active_match.group(3) or "").strip()
+        if re.match(r"^(?:away|back|home|outside|inside|here|there|\w+ly)\b", patient_text, re.IGNORECASE):
+            patient_text = ""
 
         triple.agent = SemanticRole("AGENT", agent_text, _normalize_tokens(agent_text))
         triple.action = SemanticRole(
             "ACTION", action_text, _normalize_tokens(action_text)
         )
-        triple.patient = SemanticRole(
-            "PATIENT", patient_text, _normalize_tokens(patient_text)
-        )
+        if patient_text:
+            triple.patient = SemanticRole(
+                "PATIENT", patient_text, _normalize_tokens(patient_text)
+            )
 
     return triple
 

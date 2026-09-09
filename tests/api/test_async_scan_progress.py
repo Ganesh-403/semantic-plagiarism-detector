@@ -4,6 +4,7 @@ tests/api/test_async_scan_progress.py
 Tests for progress percentage and stage in AsyncScanStatusResponse and _process_scan_job (Issue #3224).
 """
 
+import io
 from unittest.mock import patch
 
 import numpy as np
@@ -74,7 +75,7 @@ def test_process_scan_job_progress_progression():
          patch("src.api.routers.analysis.get_corpus_documents_with_embeddings", return_value={}):
         _process_scan_job(
             job_id=job_id,
-            file_input="fake_path",
+            file_input=io.BytesIO(b"sample document text"),
             filename="sample.txt",
             threshold=0.59,
             top_k=3,

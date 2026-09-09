@@ -1,3 +1,12 @@
+"""
+src/db/version_history_db.py
+----------------------------
+SQLite database manager for tracking document version lineage.
+
+Maps document hashes to user IDs and tracks parent/child draft
+relationships, enabling the historical diff analysis engine.
+"""
+
 import hashlib
 from datetime import datetime
 
@@ -50,14 +59,6 @@ def register_document_draft(user_id: str, document_text: str, filename: str) -> 
     VERSION_LINEAGE_CACHE[doc_hash] = draft_record
     return draft_record
 
-"""
-src/db/version_history_db.py
-----------------------------
-SQLite database manager for tracking document version lineage.
-
-Maps document hashes to user IDs and tracks parent/child draft
-relationships, enabling the historical diff analysis engine.
-"""
 
 import sqlite3
 import logging

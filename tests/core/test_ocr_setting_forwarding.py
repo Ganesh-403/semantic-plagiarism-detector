@@ -47,7 +47,7 @@ def test_invalid_settings_fail_before_pdf_processing(monkeypatch):
         parser.extract_text(
             b"%PDF-test",
             "scan.pdf",
-            ocr_language="deu",
+            ocr_language="invalid-language",
             ocr_dpi=250,
         )
     except ValueError:

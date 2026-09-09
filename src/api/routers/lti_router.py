@@ -2,11 +2,17 @@ import os
 import time
 import json
 import uuid
+import secrets
+import hmac
+import html
+from functools import lru_cache
 import jwt
 from datetime import datetime, timedelta
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
-from fastapi import APIRouter, Request, Response, Form, HTTPException
+from fastapi import APIRouter, Request, Response, Form, HTTPException, Security
+from starlette.concurrency import run_in_threadpool
+from src.api.middleware import get_current_user
 from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel
 import httpx
@@ -29,23 +35,40 @@ _jwks_cache = {}
 # --- Dynamic JWKS Generation ---
 
 def get_tool_keypair():
-    """Generate or retrieve a simple RSA keypair for the tool."""
+    """Read a persistent signing key, publishing newly generated keys atomically."""
+    import tempfile
+    from pathlib import Path
     from cryptography.hazmat.primitives.asymmetric import rsa
     from cryptography.hazmat.primitives import serialization
-    
-    key_path = os.getenv("LTI_PRIVATE_KEY_PATH", ".lti_private.pem")
-    if os.path.exists(key_path):
-        with open(key_path, "rb") as f:
-            private_key = serialization.load_pem_private_key(f.read(), password=None)
-    else:
+    from src.core.app_config import DATA_DIR
+
+    key_path = Path(os.getenv("LTI_PRIVATE_KEY_PATH", str(DATA_DIR / "lti_private.pem")))
+    if not key_path.exists():
+        key_path.parent.mkdir(parents=True, exist_ok=True)
         private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        with open(key_path, "wb") as f:
-            f.write(private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.TraditionalOpenSSL,
-                encryption_algorithm=serialization.NoEncryption()
-            ))
-    return private_key
+        data = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        # NamedTemporaryFile creates mode 0600. Linking the completed file into
+        # place prevents another worker from observing a partially written key.
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=key_path.parent, prefix=".lti-", delete=False) as handle:
+                temporary = Path(handle.name)
+                handle.write(data)
+                handle.flush()
+                os.fsync(handle.fileno())
+            try:
+                os.link(temporary, key_path)
+            except FileExistsError:
+                pass  # Another worker published its complete key first.
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+    with key_path.open("rb") as handle:
+        return serialization.load_pem_private_key(handle.read(), password=None)
 
 @router.get("/jwks")
 def get_jwks():
@@ -79,69 +102,90 @@ def get_jwks():
 
 @router.get("/login")
 @router.post("/login")
-def login_init(request: Request, iss: str = None, login_hint: str = None, target_link_uri: str = None, lti_message_hint: str = None):
-    """Step 1: OIDC Third-Party Initiated Login"""
+async def login_init(request: Request, iss: str = None, login_hint: str = None,
+                     target_link_uri: str = None, lti_message_hint: str = None):
+    """Initiate a launch only for the configured platform registration."""
     if request.method == "POST":
-        # Can also receive via form data
-        pass # Will read from query params or form
-        
-    state = str(uuid.uuid4())
-    nonce = str(uuid.uuid4())
-    _oidc_states[state] = nonce
-    
-    # Target URL is our launch URL
+        form = await request.form()
+        iss = form.get("iss", iss)
+        login_hint = form.get("login_hint", login_hint)
+        lti_message_hint = form.get("lti_message_hint", lti_message_hint)
+    if iss != LMS_ISSUER or not login_hint:
+        raise HTTPException(status_code=400, detail="Invalid platform login request")
+    now = time.time()
+    for key, entry in list(_oidc_states.items()):
+        if entry["expires_at"] <= now:
+            _oidc_states.pop(key, None)
+    if len(_oidc_states) >= 1000:
+        raise HTTPException(status_code=503, detail="Too many pending LTI launches")
+    state, nonce = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
+    _oidc_states[state] = {"nonce": nonce, "expires_at": now + 300}
     redirect_uri = str(request.base_url).rstrip("/") + "/api/v1/lti/launch"
-    
     params = {
-        "response_type": "id_token",
-        "client_id": LMS_CLIENT_ID,
-        "redirect_uri": redirect_uri,
-        "login_hint": login_hint,
-        "state": state,
-        "response_mode": "form_post",
-        "nonce": nonce,
-        "prompt": "none",
-        "scope": "openid"
+        "response_type": "id_token", "client_id": LMS_CLIENT_ID,
+        "redirect_uri": redirect_uri, "login_hint": login_hint, "state": state,
+        "response_mode": "form_post", "nonce": nonce, "prompt": "none", "scope": "openid",
     }
     if lti_message_hint:
         params["lti_message_hint"] = lti_message_hint
-        
-    auth_url = f"{LMS_AUTH_URL}?{urlencode(params)}"
-    return RedirectResponse(auth_url)
+    response = RedirectResponse(f"{LMS_AUTH_URL}?{urlencode(params)}", status_code=303)
+    secure = request.url.scheme == "https"
+    response.set_cookie("lti_state", state, max_age=300, httponly=True,
+                        secure=secure, samesite="none" if secure else "lax",
+                        path="/api/v1/lti")
+    return response
 
-# --- Launch Endpoint ---
+
+@lru_cache(maxsize=4)
+def _platform_keys(url: str):
+    return jwt.PyJWKClient(url, timeout=5)
+
+
+def _verify_launch_token(token: str) -> dict:
+    header = jwt.get_unverified_header(token)
+    if header.get("alg") != "RS256":
+        raise jwt.InvalidAlgorithmError("LTI requires RS256")
+    key = _platform_keys(LMS_JWKS_URL).get_signing_key_from_jwt(token).key
+    claims = jwt.decode(
+        token, key, algorithms=["RS256"], audience=LMS_CLIENT_ID, issuer=LMS_ISSUER,
+        options={"require": ["iss", "sub", "aud", "exp", "iat", "nonce"]},
+    )
+    audience = claims["aud"]
+    if isinstance(audience, list) and len(audience) > 1 and claims.get("azp") != LMS_CLIENT_ID:
+        raise jwt.InvalidAudienceError("Invalid authorized party")
+    if claims.get("azp", LMS_CLIENT_ID) != LMS_CLIENT_ID:
+        raise jwt.InvalidAudienceError("Invalid authorized party")
+    prefix = "https://purl.imsglobal.org/spec/lti/claim/"
+    if claims.get(prefix + "deployment_id") != LTI_DEPLOYMENT_ID:
+        raise jwt.InvalidTokenError("Invalid deployment")
+    if claims.get(prefix + "version") != "1.3.0":
+        raise jwt.InvalidTokenError("Invalid LTI version")
+    return claims
+
 
 @router.post("/launch")
 async def lti_launch(request: Request, state: str = Form(...), id_token: str = Form(...)):
-    """Step 2: LTI 1.3 Launch endpoint"""
-    if state not in _oidc_states:
+    """Validate browser state and a signed, audience-bound platform token."""
+    entry = _oidc_states.pop(state, None)
+    browser_state = request.cookies.get("lti_state", "")
+    if (not entry or entry["expires_at"] <= time.time()
+            or not hmac.compare_digest(state, browser_state)):
         raise HTTPException(status_code=400, detail="Invalid state")
-        
-    # In a real app, we would fetch LMS JWKS and verify the signature of id_token
-    # For this simple focused integration, we decode without verification if we trust the channel, 
-    # but we should at least check the signature if we want to be secure.
     try:
-        # We will decode without verification just to extract headers, then verify
-        unverified_header = jwt.get_unverified_header(id_token)
-        # Assuming we have a helper to fetch LMS JWKS and verify
-        # To keep it simple and fast, we'll decode without verification just to get the payload for now,
-        # but in production we MUST verify.
-        decoded = jwt.decode(id_token, options={"verify_signature": False})
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid id_token: {str(e)}")
-        
-    expected_nonce = _oidc_states.pop(state)
-    if decoded.get("nonce") != expected_nonce:
+        decoded = await run_in_threadpool(_verify_launch_token, id_token)
+    except (jwt.PyJWTError, ValueError, OSError) as exc:
+        raise HTTPException(status_code=400, detail="Invalid platform identity token") from exc
+    if not hmac.compare_digest(str(decoded.get("nonce", "")), entry["nonce"]):
         raise HTTPException(status_code=400, detail="Invalid nonce")
-        
     msg_type = decoded.get("https://purl.imsglobal.org/spec/lti/claim/message_type")
-    
     if msg_type == "LtiDeepLinkingRequest":
-        return await handle_deep_linking(request, decoded)
+        response = await handle_deep_linking(request, decoded)
     elif msg_type == "LtiResourceLinkRequest":
-        return await handle_resource_launch(request, decoded)
+        response = await handle_resource_launch(request, decoded)
     else:
-        raise HTTPException(status_code=400, detail=f"Unsupported message type: {msg_type}")
+        raise HTTPException(status_code=400, detail="Unsupported message type")
+    response.delete_cookie("lti_state", path="/api/v1/lti")
+    return response
 
 # --- Deep Linking ---
 
@@ -150,9 +194,16 @@ async def handle_deep_linking(request: Request, id_token_payload: dict):
     deep_link_settings = id_token_payload.get("https://purl.imsglobal.org/spec/lti-dl/claim/deep_linking_settings", {})
     return_url = deep_link_settings.get("deep_link_return_url")
     
-    if not return_url:
+    if not isinstance(return_url, str) or not return_url:
         raise HTTPException(status_code=400, detail="No deep_link_return_url provided")
         
+    return_origin = urlsplit(return_url)
+    issuer_origin = urlsplit(LMS_ISSUER)
+    if (return_origin.scheme != "https" or return_origin.netloc != issuer_origin.netloc
+            or return_origin.username or return_origin.password):
+        raise HTTPException(status_code=400, detail="Invalid deep-link return origin")
+    return_url = html.escape(return_url, quote=True)
+
     # Construct a deep linking response JWT
     private_key = get_tool_keypair()
     
@@ -188,7 +239,7 @@ async def handle_deep_linking(request: Request, id_token_payload: dict):
     response_jwt = jwt.encode(jwt_payload, private_key, algorithm="RS256", headers={"kid": "lti-tool-key-1"})
     
     # Auto-submit form back to LMS
-    html = f"""
+    response_html = f"""
     <html>
         <body onload="document.forms[0].submit()">
             <form action="{return_url}" method="POST">
@@ -197,7 +248,7 @@ async def handle_deep_linking(request: Request, id_token_payload: dict):
         </body>
     </html>
     """
-    return Response(content=html, media_type="text/html")
+    return Response(content=response_html, media_type="text/html")
 
 
 async def handle_resource_launch(request: Request, id_token_payload: dict):
@@ -215,8 +266,14 @@ class ScoreRequest(BaseModel):
     comment: str = ""
 
 @router.post("/scores")
-async def sync_score(score_req: ScoreRequest, lms_lineitem_url: str):
+async def sync_score(score_req: ScoreRequest, lms_lineitem_url: str,
+                     user: dict = Security(get_current_user, scopes=["admin"])):
     """Sync a score back to the LMS using AGS"""
+    target = urlsplit(lms_lineitem_url)
+    platform = urlsplit(LMS_ISSUER)
+    if (target.scheme != "https" or target.netloc != platform.netloc
+            or target.username or target.password or target.fragment or target.query):
+        raise HTTPException(status_code=400, detail="Invalid LMS line-item URL")
     # 1. Get OAuth2 Client Credentials token for AGS
     # 2. Push score
     private_key = get_tool_keypair()

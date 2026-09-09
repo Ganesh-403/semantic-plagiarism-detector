@@ -139,6 +139,7 @@ class TestBatchHistory:
 
     def setup_method(self):
         self.tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        self.tmp.close()
         self.history = BatchHistory(self.tmp.name)
 
     def teardown_method(self):
@@ -260,3 +261,52 @@ class TestReportFormatter:
         assert ReportFormatter.format_status_emoji("completed") == "✅"
         assert ReportFormatter.format_status_emoji("failed") == "❌"
         assert ReportFormatter.format_status_emoji("unknown") == "❓"
+
+
+def test_pause_resume_and_cancel_stop_at_batch_boundaries(monkeypatch, tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    processor = BatchProcessor(BatchConfig(batch_size=1, save_progress=False))
+    entered, release, notified = Event(), Event(), Event()
+    calls = []
+    def process(batch, index):
+        calls.append(index)
+        if index == 0:
+            entered.set()
+            assert release.wait(5)
+        return [{"status": "success", "file_path": name} for name, _ in batch]
+    monkeypatch.setattr(processor, "_process_batch", process)
+    processor.register_progress_callback(lambda *args: notified.set())
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(processor.process_documents, {"a": b"a", "b": b"b"}, "controlled")
+        assert entered.wait(5)
+        assert processor.pause_job("controlled")
+        assert processor.get_job("controlled").status == BatchStatus.PAUSED
+        assert processor.resume_job("controlled")
+        assert processor.pause_job("controlled")
+        assert processor.cancel_job("controlled")
+        release.set()
+        job = future.result(timeout=5)
+    assert calls == [0]
+    assert job.status == BatchStatus.CANCELLED
+    assert job.progress == 50.
+    assert processor.get_active_job() is None
+    assert not processor.resume_job("controlled")
+    assert notified.is_set()
+
+
+def test_failed_documents_do_not_report_completed(monkeypatch):
+    processor = BatchProcessor(BatchConfig(save_progress=False))
+    monkeypatch.setattr(processor, "_process_batch", lambda *args: [
+        {"status": "failed", "file_path": "bad.pdf", "error": "Invalid PDF"}
+    ])
+    job = processor.process_documents({"bad.pdf": b"bad"})
+    assert job.status == BatchStatus.FAILED
+    assert job.errors[0]["error"] == "Invalid PDF"
+    assert processor.get_active_job() is None
+
+
+def test_from_dict_does_not_mutate_input():
+    data = {"job_id": "demo", "status": "pending", "priority": "normal"}
+    BatchJob.from_dict(data)
+    assert data == {"job_id": "demo", "status": "pending", "priority": "normal"}

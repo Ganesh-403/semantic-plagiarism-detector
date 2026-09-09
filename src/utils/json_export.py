@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -9,6 +10,30 @@ from typing import Any, Dict, List, Optional, Union
 import jsonschema
 import numpy as np
 import pandas as pd
+
+
+def load_plagiarism_report_schema() -> dict[str, Any]:
+    """Load the packaged schema used by report consumers."""
+    path = Path(__file__).resolve().parents[1] / "schemas" / "plagiarism_report_schema.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def validate_report_json(report: Any) -> bool:
+    """Validate report structure and timestamp formats against the packaged schema."""
+    checker = jsonschema.FormatChecker()
+
+    @checker.checks("date-time", raises=ValueError)
+    def valid_timestamp(value: Any) -> bool:
+        if not isinstance(value, str):
+            return True  # The schema's type validator handles non-strings.
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})", value):
+            return False
+        return datetime.fromisoformat(value.upper().replace("Z", "+00:00")).tzinfo is not None
+
+    validator = jsonschema.Draft202012Validator(
+        load_plagiarism_report_schema(), format_checker=checker
+    )
+    return validator.is_valid(report)
 
 
 def get_export_timestamp() -> str:
@@ -50,6 +75,25 @@ def json_serializer_fallback(obj: Any) -> Any:
     if hasattr(obj, "to_dict"):
         return obj.to_dict()
     return str(obj)
+
+
+def _json_safe(value: Any) -> Any:
+    """Normalize nested numerical values before the encoder bypasses default()."""
+    if isinstance(value, (bool, np.bool_)):
+        return bool(value)
+    if isinstance(value, (float, np.floating)):
+        return float(value) if math.isfinite(value) else 0.0
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set, np.ndarray)):
+        return [_json_safe(item) for item in value]
+    if value is None or isinstance(value, (str, int)):
+        return value
+    return _json_safe(json_serializer_fallback(value))
+
+
+def _dump_report(value: Any, **kwargs: Any) -> str:
+    return json.dumps(_json_safe(value), allow_nan=False, **kwargs)
 
 
 def export_similarity_matrix_to_json(
@@ -98,7 +142,7 @@ def export_similarity_matrix_to_json(
                 },
                 "pairs": [],
             }
-            return json.dumps(payload, indent=indent, ensure_ascii=False)
+            return _dump_report(payload, indent=indent, ensure_ascii=False)
         return "[]"
 
     doc_names: list[str] = [str(col) for col in df.columns]
@@ -132,14 +176,14 @@ def export_similarity_matrix_to_json(
             },
             "pairs": pairs,
         }
-        return json.dumps(
+        return _dump_report(
             output_data,
             indent=indent,
             ensure_ascii=False,
             default=json_serializer_fallback,
         )
 
-    return json.dumps(
+    return _dump_report(
         pairs, indent=indent, ensure_ascii=False, default=json_serializer_fallback
     )
 
@@ -175,7 +219,7 @@ def export_to_json(
         processed_data = data
 
     if not include_metadata:
-        return json.dumps(
+        return _dump_report(
             processed_data,
             indent=indent,
             ensure_ascii=False,
@@ -203,7 +247,7 @@ def export_to_json(
         "data": processed_data,
     }
 
-    return json.dumps(
+    return _dump_report(
         payload,
         indent=indent,
         ensure_ascii=False,

@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from unittest.mock import Mock
+from starlette.requests import Request
 
 import jsonschema
 import pytest
@@ -98,6 +98,27 @@ INTERNAL_SERVER_ERROR_RESPONSE_SCHEMA = {
 }
 
 
+for schema, status_code in ((VALIDATION_ERROR_RESPONSE_SCHEMA, 422), (INTERNAL_SERVER_ERROR_RESPONSE_SCHEMA, 500)):
+    schema["properties"].update({
+        "type": {"type": "string"}, "title": {"type": "string"},
+        "status": {"const": status_code}, "code": {"const": status_code},
+        "detail": {"type": "string"}, "instance": {"type": ["string", "null"]},
+        "trace_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "request_id": {"type": "string"},
+    })
+    schema["required"].extend(["type", "title", "status", "detail", "instance"])
+
+VALIDATION_ERROR_RESPONSE_SCHEMA["properties"]["invalid_params"] = VALIDATION_ERROR_RESPONSE_SCHEMA["properties"]["details"]
+
+@pytest.fixture(autouse=True)
+def scoped_token(monkeypatch):
+    from src.api.middleware import get_valid_tokens
+    monkeypatch.setenv("API_BEARER_TOKENS_MAPPING", json.dumps({"dummy-token": ["write", "scan"]}))
+    get_valid_tokens.cache_clear()
+    yield
+    get_valid_tokens.cache_clear()
+
+
 # ── 422 (RequestValidationError) ────────────────────────────────────────────
 
 
@@ -151,7 +172,7 @@ def test_500_internal_server_error_conforms_to_schema(monkeypatch):
     """The global exception handler's real output for an unhandled
     exception must conform exactly to INTERNAL_SERVER_ERROR_RESPONSE_SCHEMA."""
     monkeypatch.setenv("APP_ENVIRONMENT", "development")
-    mock_request = Mock()
+    mock_request = Request({"type": "http", "method": "GET", "path": "/error", "headers": []})
 
     response = asyncio.run(global_exception_handler(mock_request, ValueError("boom")))
     body = json.loads(response.body)
@@ -164,7 +185,7 @@ def test_500_internal_server_error_conforms_to_schema_in_production(monkeypatch)
     """The masked production-mode message must still conform to the same
     schema -- masking must not change the payload's shape."""
     monkeypatch.setenv("APP_ENVIRONMENT", "production")
-    mock_request = Mock()
+    mock_request = Request({"type": "http", "method": "GET", "path": "/error", "headers": []})
 
     response = asyncio.run(
         global_exception_handler(mock_request, ValueError("sensitive internal detail"))

@@ -11,8 +11,10 @@ client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
-def override_auth():
+def override_auth(mock_db, monkeypatch):
     """Override auth dependencies for test suite."""
+    import numpy as np
+    monkeypatch.setattr("src.api.routers.analysis.embed_chunks", lambda chunks: np.ones((len(chunks), 384), dtype=np.float32))
     app.dependency_overrides[verify_bearer_token] = lambda: "test-token"
     app.dependency_overrides[get_current_user] = lambda: {"username": "test_user", "scopes": ["write"]}
     yield

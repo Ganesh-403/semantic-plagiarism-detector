@@ -16,22 +16,23 @@ from starlette.testclient import TestClient
 from src.asgi_app import SecurityHeadersMiddleware
 
 
+@pytest.fixture
+def app_with_middleware():
+    """Create a FastAPI app with SecurityHeadersMiddleware."""
+    app = FastAPI()
+
+    @app.get("/test")
+    async def test_endpoint():
+        return {"message": "test"}
+
+    # Add middleware
+    app.add_middleware(SecurityHeadersMiddleware)
+
+    return app
+
+
 class TestSecurityHeadersMiddleware:
     """Test suite for SecurityHeadersMiddleware."""
-
-    @pytest.fixture
-    def app_with_middleware(self):
-        """Create a FastAPI app with SecurityHeadersMiddleware."""
-        app = FastAPI()
-
-        @app.get("/test")
-        async def test_endpoint():
-            return {"message": "test"}
-
-        # Add middleware
-        app.add_middleware(SecurityHeadersMiddleware)
-
-        return app
 
     def test_adds_x_content_type_options_header(self, app_with_middleware):
         """Verify X-Content-Type-Options header is present."""
@@ -126,9 +127,7 @@ class TestSecurityHeadersMiddleware:
 
     def test_middleware_handles_non_http_scope(self):
         """Verify middleware ignores non-HTTP scopes (e.g., websocket)."""
-        app = FastAPI()
-        app.add_middleware(SecurityHeadersMiddleware)
-
+        app = AsyncMock()
         middleware = SecurityHeadersMiddleware(app)
 
         # Create a mock websocket scope
@@ -142,7 +141,8 @@ class TestSecurityHeadersMiddleware:
         asyncio.run(middleware(scope, receive, send))
 
         # Verify app was called
-        assert True  # If we got here without exception, middleware handled it correctly
+        app.assert_awaited_once()
+        assert app.call_args.args[0] is scope
 
 
 class TestCSPSecurity:

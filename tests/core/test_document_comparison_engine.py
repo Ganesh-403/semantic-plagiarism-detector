@@ -44,7 +44,7 @@ class TestTokenize:
 
     def test_punctuation_stripped(self):
         tokens = _tokenize("it's a test, really!")
-        assert "it" in tokens
+        assert "it's" in tokens
         assert "s" not in tokens
 
 

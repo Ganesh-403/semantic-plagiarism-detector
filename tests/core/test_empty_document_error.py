@@ -84,14 +84,10 @@ class TestExtractTextEmptyDocument:
 class TestPipelineIntegration:
     """Test suite for UI and CLI pipeline integration."""
 
-    @patch(
-        "src.core.document_parser.extract_text",
-        side_effect=EmptyDocumentError("bad.pdf"),
-    )
-    def test_streamlit_pipeline_catches_empty_error(self, mock_extract):
+    def test_streamlit_pipeline_catches_empty_error(self):
         """Verify the Streamlit pipeline catches the error and doesn't crash."""
         # Simulate the pipeline logic
-        file_bytes_dict = {"bad.pdf": b"bytes", "good.pdf": b"bytes"}
+        file_bytes_dict = {"bad.txt": b"", "good.txt": b"A readable document about semantic analysis."}
         raw_texts = {}
         failed_documents = []
 
@@ -104,9 +100,10 @@ class TestPipelineIntegration:
             except Exception:
                 pass
 
-        assert "bad.pdf" not in raw_texts
+        assert "bad.txt" not in raw_texts
+        assert raw_texts["good.txt"] == "A readable document about semantic analysis."
         assert len(failed_documents) == 1
-        assert failed_documents[0]["filename"] == "bad.pdf"
+        assert failed_documents[0]["filename"] == "bad.txt"
         assert "no readable text" in failed_documents[0]["error"]
 
     @patch(

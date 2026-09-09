@@ -104,22 +104,22 @@ def _warmup_embedding_model() -> bool:
         return False
 
 
-# Enable CORS for external LMS frontends
-origins = os.getenv("CORS_ALLOWED_ORIGINS", "*")
-if origins.strip() == "*":
-    allowed_origins = ["*"]
-else:
-    allowed_origins = [
-        origin.strip() for origin in origins.split(",") if origin.strip()
-    ]
+# CORS wildcards match subdomains only; escape all other origin characters.
+import re
 
-# Browser spec: allow_credentials cannot be True when wildcard '*' is used in allowed_origins
-allow_credentials = False if "*" in allowed_origins else True
+origins = [value.strip() for value in os.getenv("CORS_ALLOWED_ORIGINS", "*").split(",") if value.strip()]
+allowed_origins = [value for value in origins if "*" not in value or value == "*"]
+subdomain_patterns = []
+for origin in origins:
+    if re.fullmatch(r"https?://\*\.[A-Za-z0-9.-]+(?::[0-9]+)?", origin):
+        scheme, domain = origin.split("*.", 1)
+        subdomain_patterns.append(re.escape(scheme) + r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+" + re.escape(domain))
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_credentials=allow_credentials,
+    allow_origin_regex="(?:" + "|".join(subdomain_patterns) + ")" if subdomain_patterns else None,
+    allow_credentials="*" not in allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
     max_age=3600,
@@ -172,6 +172,13 @@ async def otel_tracing_middleware(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID", "unknown")
     span_name = f"HTTP {request.method} {request.url.path}"
     with tracer.start_as_current_span(span_name) as span:
+        try:
+            from opentelemetry import trace
+            context = span.get_span_context()
+            if context.is_valid:
+                request.state.trace_id = trace.format_trace_id(context.trace_id)
+        except (AttributeError, ImportError):
+            pass
         span.set_attribute("http.method", request.method)
         span.set_attribute("http.url", str(request.url))
         span.set_attribute("http.route", request.url.path)
@@ -208,21 +215,16 @@ async def otel_tracing_middleware(request: Request, call_next):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Handle Pydantic validation errors from malformed API requests adhering to RFC 7807."""
-    # Issue #2564: Log the detailed validation errors for backend debugging
-    logger.warning(
-        "Request validation failed for %s %s: %s",
-        request.method,
-        request.url.path,
-        exc.errors(),
-    )
     errors_list = [
         {
-            "field": ".".join(map(str, err["loc"])),
-            "message": err["msg"],
-            "type": err["type"],
+            "field": ".".join(map(str, err.get("loc", ()))),
+            "message": err.get("msg", "Invalid value"),
+            "type": err.get("type", "value_error"),
         }
         for err in exc.errors()
     ]
+    # Log field diagnostics without passwords, document text, or other input values.
+    logger.warning("Request validation failed for %s %s: %s", request.method, request.url.path, errors_list)
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
@@ -338,7 +340,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     path = getattr(getattr(request, "url", None), "path", None)
 
     request_id = request.headers.get("x-request-id")
-    trace_id = None
+    trace_id = getattr(request.state, "trace_id", None)
     try:
         from opentelemetry import trace
 

@@ -1,63 +1,48 @@
-"""Tests for EPUB document parsing and extraction (Issue #2730)."""
+"""Real EPUB archive regression tests, including ordered chapters and hostile input."""
+import io
+import zipfile
 
-from __future__ import annotations
-
-from unittest.mock import MagicMock, patch
+import pytest
 
 from src.core.document_parser import extract_text, extract_text_from_epub
+from src.utils.epub_reader import extract_epub_text
+
+
+def epub_bytes(href="one.xhtml", content=None):
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("mimetype", "application/epub+zip")
+        z.writestr("META-INF/container.xml", '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OPS/book.opf"/></rootfiles></container>')
+        z.writestr("OPS/book.opf", f'<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="two" href="two.xhtml" media-type="application/xhtml+xml"/><item id="one" href="{href}" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="one"/><itemref idref="two"/></spine></package>')
+        z.writestr("OPS/one.xhtml", content or '<html><body><h1>Chapter 1</h1><p>This is the first chapter text.</p><script>secret_script</script><style>font-size:12px</style></body></html>')
+        z.writestr("OPS/two.xhtml", '<html><body><h2>Chapter 2</h2><p>Second chapter with <em>formatted</em> text.</p></body></html>')
+    return buffer.getvalue()
 
 
 def test_extract_text_from_epub_clean_chapters():
-    """Verify extract_text_from_epub parses XML/HTML structures and extracts clean text."""
-    mock_item1 = MagicMock()
-    mock_item1.get_type.return_value = 9
-    mock_item1.get_content.return_value = b"<html><body><h1>Chapter 1</h1><p>This is the first chapter text.</p></body></html>"
-
-    mock_item2 = MagicMock()
-    mock_item2.get_type.return_value = 9
-    mock_item2.get_content.return_value = b"<html><body><h2>Chapter 2</h2><p>Second chapter with <em>formatted</em> text.</p></body></html>"
-
-    # Item that is not a document (e.g. image or stylesheet)
-    mock_item_other = MagicMock()
-    mock_item_other.get_type.return_value = 1
-    mock_item_other.get_content.return_value = b"body { font-size: 12px; }"
-
-    mock_book = MagicMock()
-    mock_book.get_items.return_value = [mock_item1, mock_item_other, mock_item2]
-
-    with patch("ebooklib.epub.read_epub", return_value=mock_book):
-        extracted = extract_text_from_epub(b"dummy_epub_content")
-
-    assert "Chapter 1 This is the first chapter text." in extracted
-    assert "Chapter 2 Second chapter with formatted text." in extracted
-    assert "font-size" not in extracted
+    text = extract_text_from_epub(epub_bytes())
+    assert text == "Chapter 1 This is the first chapter text.\n\nChapter 2 Second chapter with formatted text."
 
 
 def test_extract_text_from_epub_handles_invalid_or_corrupt_files():
-    """Verify extract_text_from_epub gracefully handles corrupted input without raising unhandled exceptions."""
-    with patch(
-        "ebooklib.epub.read_epub", side_effect=ValueError("Corrupted EPUB archive")
-    ):
-        extracted = extract_text_from_epub(b"corrupted_bytes")
-        assert extracted == ""
-
-    with patch("ebooklib.epub.read_epub", side_effect=OSError("Read error")):
-        extracted = extract_text_from_epub(b"corrupted_bytes")
-        assert extracted == ""
+    assert extract_text_from_epub(b"corrupt zip data") == ""
 
 
 def test_extract_text_pipeline_epub_dispatch():
-    """Verify top-level extract_text function dispatches .epub files to extract_text_from_epub."""
-    mock_item = MagicMock()
-    mock_item.get_type.return_value = 9
-    mock_item.get_content.return_value = (
-        b"<div><p>Testing EPUB pipeline extraction dispatch.</p></div>"
-    )
+    assert "first chapter" in extract_text(epub_bytes(), "book.epub")
 
-    mock_book = MagicMock()
-    mock_book.get_items.return_value = [mock_item]
 
-    with patch("ebooklib.epub.read_epub", return_value=mock_book):
-        result = extract_text(b"mock_epub", "book.epub")
+@pytest.mark.parametrize("href", ["../../secret.txt", "/secret", "https://example.com/data"])
+def test_rejects_unsafe_content_paths(href):
+    with pytest.raises(ValueError):
+        extract_epub_text(epub_bytes(href=href))
 
-    assert "Testing EPUB pipeline extraction dispatch." in result
+
+def test_rejects_excessive_expansion(monkeypatch):
+    monkeypatch.setattr("src.utils.epub_reader.MAX_EXPANDED_BYTES", 100)
+    with pytest.raises(ValueError, match="expanded size"):
+        extract_epub_text(epub_bytes())
+
+
+def test_reads_filelike_without_extracting_files():
+    assert "Chapter 2" in extract_epub_text(io.BytesIO(epub_bytes()))

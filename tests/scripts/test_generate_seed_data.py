@@ -17,6 +17,13 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import generate_seed_data
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def seed_credentials(monkeypatch):
+    monkeypatch.setenv("ADMIN_BOOTSTRAP_PASSWORD", "AdminSeedPassword123!")
+    monkeypatch.setenv("SEED_TEACHER_PASSWORD", "TeacherSeedPassword123!")
 
 
 class TestGenerateSeedData:
@@ -292,9 +299,10 @@ class TestMainFunction:
             "documents_created": 3,
             "incidents_created": 2,
             "dry_run": False,
+            "errors": 0,
         }
 
-        with patch("sys.argv", ["generate_seed_data.py", "--seed-dir", str(tmp_path)]):
+        with patch("sys.argv", ["generate_seed_data.py", "--seed-dir", str(tmp_path), "--skip-index"]):
             exit_code = generate_seed_data.main()
 
         assert exit_code == 0
@@ -304,7 +312,7 @@ class TestMainFunction:
         """Verify main() returns 1 on failure."""
         mock_generate.side_effect = RuntimeError("Database error")
 
-        with patch("sys.argv", ["generate_seed_data.py", "--seed-dir", str(tmp_path)]):
+        with patch("sys.argv", ["generate_seed_data.py", "--seed-dir", str(tmp_path), "--skip-index"]):
             exit_code = generate_seed_data.main()
 
         assert exit_code == 1
@@ -317,6 +325,7 @@ class TestMainFunction:
             "documents_created": 3,
             "incidents_created": 2,
             "dry_run": True,
+            "errors": 0,
         }
 
         with patch(

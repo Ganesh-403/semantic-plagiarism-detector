@@ -321,7 +321,7 @@ class TestTrendAnalysis:
                     matched_against="source.pdf",
                     similarity_score=0.7,
                     severity="medium",
-                    detected_at=base + timedelta(days=month * 30),
+                    detected_at=base.replace(month=month + 1),
                 ))
 
         trend = engine.compute_trend(TimeWindow.MONTHLY)
@@ -339,7 +339,7 @@ class TestTrendAnalysis:
                     matched_against="source.pdf",
                     similarity_score=0.7,
                     severity="medium",
-                    detected_at=base + timedelta(days=month * 30),
+                    detected_at=base.replace(month=month + 1),
                 ))
 
         trend = engine.compute_trend(TimeWindow.MONTHLY)

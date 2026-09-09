@@ -414,8 +414,8 @@ def enable_wal_mode(conn: sqlite3.Connection) -> str:
 
 def get_journal_mode(conn: sqlite3.Connection) -> str:
     """Retrieve the current SQLite journal mode."""
-    cursor = conn.cursor()
     try:
+        cursor = conn.cursor()
         cursor.execute("PRAGMA journal_mode;")
         result = cursor.fetchone()
         return str(result[0]) if result else "unknown"

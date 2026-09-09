@@ -527,18 +527,19 @@ def test_search_similar_chunks_k_larger_than_index_size():
 # ── Dimension mismatch validation tests (#4029) ──────────────────────────────
 
 
-def test_build_index_dimension_mismatch():
+def test_build_index_accepts_consistent_ephemeral_dimensions():
     embeddings = {"doc1": np.random.rand(2, 100).astype("float32")}
     chunked = {"doc1": ["c1", "c2"]}
-    with pytest.raises(ValueError, match=r"Embedding dimension mismatch: 100 != 384"):
-        build_index(embeddings, chunked)
+    index, registry = build_index(embeddings, chunked)
+    assert index.d == 100
+    assert index.ntotal == len(registry) == 2
 
 
 def test_build_index_from_matrix_dimension_mismatch():
     from src.core.faiss_index import build_index_from_matrix
 
     matrix = np.random.rand(2, 100).astype("float32")
-    with pytest.raises(ValueError, match=r"Embedding dimension mismatch: 100 != 384"):
+    with pytest.raises(ValueError, match=r"Embedding dimension is incompatible with the active model: 100 != 384"):
         build_index_from_matrix(matrix)
 
 
@@ -593,8 +594,10 @@ def test_remove_document_from_index_hnsw_fallback(two_doc_data, monkeypatch):
     """Removing a doc from HNSW should not crash, and should fall back to compact_index correctly."""
     embeddings, chunked = two_doc_data
     # First, build an IDMap-wrapped HNSW index using add_to_index (simulating real usage)
-    index = faiss.IndexHNSWFlat(384, 32, faiss.METRIC_INNER_PRODUCT)
-    index, registry = add_to_index(index, [], embeddings, chunked)
+    _, registry = build_index(embeddings, chunked)
+    index = faiss.IndexIDMap(faiss.IndexHNSWFlat(384, 32, faiss.METRIC_INNER_PRODUCT))
+    matrix = np.vstack(list(embeddings.values())).astype("float32")
+    index.add_with_ids(matrix, np.arange(len(matrix), dtype=np.int64))
 
     # Mock compact_index to just return a dummy flat index with the pruned registry
     # to verify that it was called and the fallback logic worked without trying reconstruct.

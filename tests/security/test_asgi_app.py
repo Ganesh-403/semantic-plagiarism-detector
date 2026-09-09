@@ -28,10 +28,9 @@ def test_security_headers_middleware():
 
     assert response.status_code == 200
     assert response.headers["X-Frame-Options"] == "DENY"
-    assert (
-        response.headers["Content-Security-Policy"]
-        == "frame-ancestors 'none'; default-src 'self';"
-    )
+    policy = response.headers["Content-Security-Policy"]
+    assert "frame-ancestors 'none'" in policy
+    assert "default-src 'self'" in policy
     assert "Strict-Transport-Security" not in response.headers
 
 

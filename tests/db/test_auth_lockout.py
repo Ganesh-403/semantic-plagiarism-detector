@@ -168,53 +168,24 @@ class TestIsAccountLocked:
 
 
 class TestAuthenticateUserLockoutIntegration:
-    """Test suite for lockout integration in authenticate_user."""
+    def test_successful_login_when_not_locked(self, mock_db):
+        from src.db import auth
+        auth.add_user("lockout-user", "StrongPassword9!")
+        assert auth.authenticate_user("lockout-user", "StrongPassword9!") is True
+        assert auth.get_security_audit_logs(username="lockout-user", event_type="login_success")
 
-    @patch("src.db.auth.get_user_by_username")
-    @patch("src.db.auth.verify_password", return_value=True)
-    def test_successful_login_when_not_locked(self, mock_verify, mock_get_user):
-        """Verify successful login proceeds normally when account is not locked."""
-        mock_get_user.return_value = {"username": "alice", "password_hash": "hash"}
+    def test_failed_logins_trigger_lockout_before_password_verification(self, mock_db):
+        from src.db import auth
+        auth.add_user("lockout-user", "StrongPassword9!")
+        for _ in range(MAX_FAILED_ATTEMPTS):
+            assert auth.authenticate_user("lockout-user", "WrongPassword9!") is False
+        assert auth.is_account_locked("lockout-user")
+        with patch.object(auth, "_ph") as hasher:
+            assert auth.authenticate_user("lockout-user", "StrongPassword9!") is False
+        hasher.verify.assert_not_called()
+        assert auth.get_security_audit_logs(username="lockout-user", event_type="login_blocked_lockout")
 
-        with patch("src.db.auth.is_account_locked", return_value=False):
-            with patch("src.db.auth.log_security_event") as mock_log:
-                result = authenticate_user("alice", "correct_password")
-
-        assert result is True
-        mock_verify.assert_called_once()
-        # Verify success was logged
-        mock_log.assert_any_call(
-            event_type="login_success",
-            username="alice",
-            details="Successful authentication",
-        )
-
-    @patch("src.db.auth.get_user_by_username")
-    @patch("src.db.auth.verify_password")
-    def test_login_blocked_when_locked(self, mock_verify, mock_get_user):
-        """Verify login is blocked and password is NOT checked when account is locked."""
-        with patch("src.db.auth.is_account_locked", return_value=True):
-            with patch("src.db.auth.log_security_event") as mock_log:
-                result = authenticate_user("alice", "any_password")
-
-        assert result is False
-        # Password verification should NOT even be attempted
-        mock_verify.assert_not_called()
-        mock_get_user.assert_not_called()
-
-        # Verify lockout event was logged
-        mock_log.assert_called_once()
-        call_kwargs = mock_log.call_args[1]
-        assert call_kwargs["event_type"] == "login_blocked_lockout"
-        assert "lockout" in call_kwargs["details"].lower()
-
-    @patch("src.db.auth.get_user_by_username", return_value=None)
-    def test_failed_login_logs_failure(self, mock_get_user):
-        """Verify failed login (user not found) logs a login_failed event."""
-        with patch("src.db.auth.is_account_locked", return_value=False):
-            with patch("src.db.auth.log_security_event") as mock_log:
-                result = authenticate_user("nonexistent", "password")
-
-        assert result is False
-        mock_log.assert_called_once()
-        assert mock_log.call_args[1]["event_type"] == "login_failed"
+    def test_failed_login_logs_failure(self, mock_db):
+        from src.db import auth
+        assert auth.authenticate_user("nonexistent", "StrongPassword9!") is False
+        assert auth.get_security_audit_logs(username="nonexistent", event_type="login_failed")

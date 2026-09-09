@@ -39,7 +39,7 @@ def check_ocr_dependencies() -> None:
             or Tesseract binary are missing/unavailable.
     """
     try:
-        import fitz  # PyMuPDF
+        from src.utils import pdf_backend as fitz
         import pytesseract
         from PIL import Image
     except ImportError as exc:
@@ -66,7 +66,7 @@ def _is_blank_scanned_page(
 ) -> bool:
     """Return True if a rendered page looks blank (very low pixel variance)."""
     try:
-        import fitz  # PyMuPDF
+        from src.utils import pdf_backend as fitz
         from PIL import Image
     except ImportError:
         return False
@@ -111,7 +111,7 @@ def _ocr_pdf_page(
     """Render one PDF page and extract text with Tesseract."""
     check_ocr_dependencies()
 
-    import fitz  # PyMuPDF
+    from src.utils import pdf_backend as fitz
     import pytesseract
     from PIL import Image
 

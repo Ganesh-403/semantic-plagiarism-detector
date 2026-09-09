@@ -1,10 +1,23 @@
 from unittest.mock import patch
+import json
+import pytest
 
 from fastapi.testclient import TestClient
 
 from src.api.app import app
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def healthy_host_and_auth(monkeypatch, mock_db):
+    from src.api.middleware import get_valid_tokens
+    from types import SimpleNamespace
+    monkeypatch.setenv("API_BEARER_TOKENS_MAPPING", json.dumps({"metrics-test-token": ["admin", "read"]}))
+    monkeypatch.setattr("psutil.virtual_memory", lambda: SimpleNamespace(percent=50.0, available=2 * 1024**3))
+    get_valid_tokens.cache_clear()
+    yield
+    get_valid_tokens.cache_clear()
 
 
 def test_healthz_endpoint():
@@ -101,7 +114,7 @@ def test_metrics_prometheus_endpoint():
 
 def test_metrics_json_endpoint():
     """Verify that GET /metrics/json returns valid JSON metrics."""
-    response = client.get("/metrics/json")
+    response = client.get("/metrics/json", headers={"Authorization": "Bearer metrics-test-token"})
     assert response.status_code == 200
     assert "application/json" in response.headers.get("content-type", "")
 
@@ -109,14 +122,14 @@ def test_metrics_json_endpoint():
     assert isinstance(data, dict)
 
 
-def test_cache_prometheus_metrics(tmp_path):
+def test_cache_prometheus_metrics(tmp_path, monkeypatch):
     """Verify that translation and Redis cache hit/miss events register in Prometheus /metrics."""
-    from src.db.translation_cache import get_cached_translation, save_translation, configure_db_path, init_translation_cache
+    from src.db.translation_cache import get_cached_translation, save_translation, init_translation_cache
     from src.utils.redis_cache import get_cache
 
     # 1. Setup a clean translation cache DB file
     db_file = tmp_path / "test_trans_metrics.db"
-    configure_db_path(db_file)
+    monkeypatch.setattr("src.db.translation_cache._CACHE_DB_PATH", db_file)
     init_translation_cache()
 
     # Trigger translation miss

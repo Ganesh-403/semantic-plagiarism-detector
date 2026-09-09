@@ -154,11 +154,12 @@ def test_count_and_page_exclude_soft_deleted_documents(
             INSERT OR REPLACE INTO documents (
                 filename,
                 file_hash,
-                is_deleted
+                is_deleted,
+                upload_date
             )
-            VALUES (?, ?, ?)
+            VALUES (?, ?, ?, ?)
             """,
-            ("deleted-a.pdf", "deleted-a-hash", 1),
+            ("deleted-a.pdf", "deleted-a-hash", 1, "2026-01-01"),
         )
         connection.commit()
 

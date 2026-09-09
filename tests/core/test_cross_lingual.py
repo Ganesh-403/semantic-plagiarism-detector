@@ -141,7 +141,7 @@ def test_detect_language_high_confidence():
 
     with patch("src.core.cross_lingual.detect_langs") as mock_detect_langs:
         mock_detect_langs.return_value = [Language("fr", 0.9)]
-        lang, confident = detect_language("some text in french")
+        lang, confident = detect_language("Some sufficiently long text in French")
 
         assert lang == "fr"
         assert confident is True
@@ -389,7 +389,7 @@ class TestBackTranslateChunk:
 
         # Should call save_translation after mock translation
         mock_save.assert_called_once()
-        assert "[Translated from es]" in result
+        assert result == "The brown fox."
 
     @patch("src.core.cross_lingual.save_translation")
     @patch(
@@ -406,7 +406,7 @@ class TestBackTranslateChunk:
         text = "El zorro marrón."
         # With use_cache=False, it should bypass cache and translate directly
         result = back_translate_chunk(text, source_lang="es", use_cache=False)
-        assert "[Translated from es]" in result
+        assert result == "The brown fox."
 
 
 # ── Issue #2222: Add Italian and Portuguese language detection heuristics ─────

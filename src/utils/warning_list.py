@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import html
 import json
+import logging
 import re
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
@@ -27,6 +28,8 @@ except ImportError:
         fuzz = None
 
 
+logger = logging.getLogger(__name__)
+VALID_SORT_FIELDS = frozenset({"similarity", "doc_a", "doc_b", "severity_rank"})
 FUZZY_THRESHOLD = 75
 MAX_SEARCH_QUERY_LENGTH = 200
 WARNING_SHORT_DOCUMENT = (
@@ -298,6 +301,8 @@ def filter_warnings(
     search_query: str = "",
     min_match_length: int = 0,
     severity: str | None = None,
+    *,
+    use_fuzzy: bool = True,
 ) -> list[dict[str, Any]]:
     """Filter normalized warnings using functional predicate matching."""
     normalised = [_normalise_warning(item) for item in warnings]
@@ -317,7 +322,7 @@ def filter_warnings(
             if str(item.get("severity", "")).strip().casefold() == target
         ]
 
-    predicate = matches_query_predicate(search_query)
+    predicate = matches_query_predicate(search_query, use_fuzzy=use_fuzzy)
     return [item for item in normalised if predicate(item)]
 
 
@@ -341,7 +346,11 @@ def sort_warnings(
 ) -> list[dict[str, Any]]:
     """Sort warning items using secondary and primary sorting keys."""
     items = [_normalise_warning(item) for item in warnings]
-    allowed = {"similarity", "doc_a", "doc_b", "severity_rank"}
+    allowed = VALID_SORT_FIELDS
+    if primary_field not in allowed:
+        logger.warning("Invalid primary_field %r; using similarity", primary_field)
+    if secondary_field not in allowed:
+        logger.warning("Invalid secondary_field %r; using doc_a", secondary_field)
 
     p_field = primary_field if primary_field in allowed else "similarity"
     s_field = secondary_field if secondary_field in allowed else "doc_a"
@@ -543,31 +552,48 @@ def render_copy_button(
     <script>
         document.getElementById("{safe_button_id}").addEventListener("click", function() {{
             const text = "{escaped_text}";
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            textArea.style.top = "0";
-            textArea.style.left = "0";
-            textArea.style.position = "fixed";
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            try {{
-                const successful = document.execCommand('copy');
-                if (successful) {{
-                    const btn = document.getElementById("{safe_button_id}");
-                    btn.innerHTML = "{js_copied_label}";
-                    btn.style.borderColor = "#28a745";
-                    btn.style.color = "#28a745";
-                    setTimeout(function() {{
-                        btn.innerHTML = "{js_copy_label}";
-                        btn.style.borderColor = "#d6d6d8";
-                        btn.style.color = "#31333f";
-                    }}, 2000);
-                }}
-            }} catch (err) {{
-                console.error("Could not copy: ", err);
+            const btn = document.getElementById("{safe_button_id}");
+            function resetButton() {{
+                setTimeout(function() {{
+                    btn.innerHTML = "{js_copy_label}";
+                    btn.style.borderColor = "#d6d6d8";
+                    btn.style.color = "#31333f";
+                }}, 2000);
             }}
-            document.body.removeChild(textArea);
+            function showCopied() {{
+                btn.innerHTML = "{js_copied_label}";
+                btn.style.borderColor = "#28a745";
+                btn.style.color = "#28a745";
+                resetButton();
+            }}
+            function showFailed() {{
+                btn.textContent = "Copy failed — select and copy the text manually";
+                btn.style.color = "#b91c1c";
+                resetButton();
+            }}
+            function legacyCopyFallback() {{
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.opacity = "0";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {{
+                    if (document.execCommand('copy')) {{ showCopied(); }}
+                    else {{ showFailed(); }}
+                }} catch (err) {{ showFailed(); }}
+                finally {{ document.body.removeChild(textArea); }}
+            }}
+            if (navigator.clipboard && navigator.clipboard.writeText) {{
+                navigator.clipboard.writeText(text).then(function() {{
+                    showCopied();
+                }}).catch(function(err) {{
+                    legacyCopyFallback();
+                }});
+            }} else {{
+                legacyCopyFallback();
+            }}
         }});
     </script>
     """
@@ -1204,7 +1230,7 @@ def render_warning_controls(
             st.rerun()
 
 
-def matches_query_predicate(search_query: str) -> Callable[[Mapping[str, Any]], bool]:
+def matches_query_predicate(search_query: str, *, use_fuzzy: bool = True) -> Callable[[Mapping[str, Any]], bool]:
     """
     Return a predicate that checks whether a warning matches the given search query.
     """
@@ -1217,7 +1243,7 @@ def matches_query_predicate(search_query: str) -> Callable[[Mapping[str, Any]], 
         doc_b = str(flag.get("doc_b", "")).casefold()
         if query in doc_a or query in doc_b:
             return True
-        if fuzz is not None:
+        if use_fuzzy and fuzz is not None:
             score_a = max(
                 fuzz.partial_ratio(query, doc_a), fuzz.token_set_ratio(query, doc_a)
             )

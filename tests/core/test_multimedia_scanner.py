@@ -2,13 +2,11 @@ import pytest
 import sys
 from unittest.mock import MagicMock
 
-# Mock whisper module before importing MultimediaScanner
-sys.modules['whisper'] = MagicMock()
+from src.core.multimedia_scanner import MultimediaScanner
 
-from src.core.multimedia_scanner import MultimediaScanner, EnterpriseMultimediaPadding
-import whisper
-
-def test_transcribe_file(tmp_path):
+def test_transcribe_file(tmp_path, monkeypatch):
+    whisper = MagicMock()
+    monkeypatch.setitem(sys.modules, "whisper", whisper)
     mock_model = MagicMock()
     mock_model.transcribe.return_value = {"text": "test", "segments": []}
     whisper.load_model.return_value = mock_model
@@ -24,7 +22,12 @@ def test_transcribe_file(tmp_path):
     mock_model.transcribe.assert_called_once_with(str(test_file), word_timestamps=True)
     assert result["text"] == "test"
 
-def test_enterprise_padding():
-    padding = EnterpriseMultimediaPadding()
-    assert padding.process_multimedia_padding_pass_1() is True
-    assert padding.process_multimedia_padding_pass_479() is True
+
+
+def test_missing_media_does_not_load_model(tmp_path, monkeypatch):
+    scanner = MultimediaScanner()
+    load = MagicMock()
+    monkeypatch.setattr(scanner, "load_model", load)
+    with pytest.raises(FileNotFoundError):
+        scanner.transcribe_file(str(tmp_path / "missing.mp3"))
+    load.assert_not_called()

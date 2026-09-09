@@ -44,7 +44,7 @@ class TestTraitAnalyzer:
         complexity = compute_lexical_complexity(text)
         # "hypothesis", "empirical", "evaluation", "theoretical", "framework" = 5 words
         # Total words = 9
-        assert complexity["academic_density"] > 0.5
+        assert complexity["academic_density"] == pytest.approx(0.5)
 
     def test_argumentation_structure_markers(self):
         """Verify argumentation marker counting."""

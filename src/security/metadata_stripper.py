@@ -1,7 +1,7 @@
 import io
 import logging
 
-import fitz  # PyMuPDF
+from src.utils import pdf_backend as fitz
 from PIL import Image
 from pypdf import PdfReader, PdfWriter
 

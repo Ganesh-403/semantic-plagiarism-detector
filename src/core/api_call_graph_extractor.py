@@ -81,7 +81,7 @@ def extract_python_api_graph(source_code: str) -> APICallGraph:
             module = node.module or ""
             for alias in node.names:
                 name = alias.asname if alias.asname else alias.name
-                imports[name] = f"{module}.{name}"
+                imports[name] = f"{module}.{alias.name}"
 
     # Extract function calls
     for node in ast.walk(tree):
@@ -93,22 +93,22 @@ def extract_python_api_graph(source_code: str) -> APICallGraph:
                 # Direct call: func()
                 func_name = node.func.id
                 if func_name in imports:
-                    module_name = imports[func_name]
+                    qualified = imports[func_name]
+                    module_name, _, func_name = qualified.rpartition(".")
                 else:
                     module_name = "builtins"
 
             elif isinstance(node.func, ast.Attribute):
-                # Attribute call: module.func() or obj.method()
-                if isinstance(node.func.value, ast.Name):
-                    base_name = node.func.value.id
-                    func_name = node.func.attr
-                    if base_name in imports:
-                        module_name = imports[base_name]
-                    else:
-                        module_name = base_name
+                # Resolve every attribute in module.submodule.function(), including aliases.
+                parts = []
+                base = node.func
+                while isinstance(base, ast.Attribute):
+                    parts.append(base.attr)
+                    base = base.value
+                func_name = parts[0]
+                if isinstance(base, ast.Name):
+                    module_name = ".".join([imports.get(base.id, base.id)] + list(reversed(parts[1:])))
                 else:
-                    # Complex chained calls, just get the final attribute
-                    func_name = node.func.attr
                     module_name = "unknown"
 
             if func_name:

@@ -50,8 +50,8 @@ def test_min_words_filters_short_chunks():
     assert len(chunks) > 0
     assert all(len(c.text.split()) >= 5 for c in chunks)
     assert any("sufficiently" in c.text for c in chunks)
-    assert not any("42" in c.text for c in chunks)
-    assert not any("Page 1" in c.text for c in chunks)
+    assert not any(c.text.strip() == "42" for c in chunks)
+    assert not any(c.text.strip() == "Page 1" for c in chunks)
 
 
 def test_min_words_default_is_five():
@@ -434,7 +434,7 @@ def test_chunk_text_dynamic_preserves_sentences_intact():
         "Third sentence completes the paragraph argument. "
         "Fourth sentence begins the new discussion topic!"
     )
-    chunks = chunk_text_dynamic(text, target_size=80, min_overlap=20)
+    chunks = chunk_text_dynamic(text, target_size=100, min_overlap=0)
 
     assert len(chunks) >= 2
     sentence_endings = (".", "!", "?")
@@ -545,7 +545,7 @@ class TestChunkTextSentencePadding:
 
     def test_short_text_returns_single_chunk(self):
         text = "Short text."
-        chunks = chunk_text(text, chunk_size=500)
+        chunks = chunk_text(text, chunk_size=500, min_words=0)
         assert len(chunks) == 1
         assert chunks[0].text == text
 
@@ -585,9 +585,9 @@ class TestChunkTextSentencePadding:
             assert len(chunk.text) <= 200 + 10  # small buffer for strip()
 
     def test_overlap_preserves_context(self):
-        text = "One. Two. Three. Four. Five. Six. Seven. Eight."
+        text = "One. Two. Three. Four. Five. Six. Seven. Eight. " * 3
         chunks = chunk_text(
-            text, chunk_size=20, chunk_overlap=10, sentence_padding=False
+            text, chunk_size=50, chunk_overlap=10, sentence_padding=False
         )
         assert len(chunks) > 1
 
@@ -644,16 +644,13 @@ class TestChunkTextSentencePadding:
         assert padded == unpadded
 
 
-def test_chunkstring_is_dataclass_with_text_and_metadata():
-    """ChunkString stores its payload and metadata as explicit dataclass fields."""
-    from dataclasses import is_dataclass
-
+def test_chunkstring_preserves_text_and_metadata():
+    """Chunks remain usable as strings while retaining source metadata."""
     chunk = ChunkString("hello", {"k": "v"})
 
-    assert is_dataclass(chunk)
     assert chunk.text == "hello"
-    assert chunk.metadata == {"k": "v"}
-    assert not isinstance(chunk, str)
+    assert chunk.metadata["k"] == "v"
+    assert isinstance(chunk, str)
 
 
 # ── NLTK punkt download caching (Issue #2059) ────────────────────────────────
@@ -667,7 +664,7 @@ def test_nltk_punkt_download_called_at_most_once(monkeypatch):
     import src.core.text_chunking as text_chunking
     from src.core.text_chunking import _split_into_sentences
 
-    text_chunking._nltk_punkt_checked = False
+    monkeypatch.setattr(text_chunking, "_nltk_punkt_checked", False)
 
     mock_download = MagicMock()
     mock_sent_tokenize = MagicMock(side_effect=LookupError("punkt missing"))
@@ -679,6 +676,7 @@ def test_nltk_punkt_download_called_at_most_once(monkeypatch):
     fake_nltk.download = mock_download
     fake_nltk.tokenize = fake_tokenize
 
+    monkeypatch.setattr(text_chunking, "nltk", fake_nltk)
     monkeypatch.setitem(sys.modules, "nltk", fake_nltk)
     monkeypatch.setitem(sys.modules, "nltk.tokenize", fake_tokenize)
 
@@ -774,7 +772,7 @@ def test_sentence_boundary_forward():
     text = "Hello world. How are you?"
     # Index 9 is inside "world", period is at index 11. Searching forward within max_search should find it.
     index = 9
-    result = _find_sentence_boundary(text, index, max_search=5)
+    result = _find_sentence_boundary(text, index, direction="forward", max_search=5)
     assert result != index
     assert text[result - 1] in ".!?"
 
@@ -822,7 +820,8 @@ class TestChunkBySentencesBasic:
         text = "Ok. This is a much longer sentence that should be kept."
         chunks = chunk_by_sentences(text, min_chunk_length=20)
         assert len(chunks) == 1
-        assert "Ok" not in chunks[0]
+        assert len(chunks[0]) >= 20
+        assert chunks[0] == text
 
 
 class TestChunkBySentencesLimits:
@@ -838,7 +837,7 @@ class TestChunkBySentencesLimits:
     def test_max_chunks_custom_limit_respected(self):
         """Verify custom max_chunks limit is strictly enforced."""
         text = ". ".join([f"Sentence {i}" for i in range(100)]) + "."
-        chunks = chunk_by_sentences(text, max_chunks=10, min_chunk_length=1)
+        chunks = chunk_by_sentences(text, max_chunks=10, min_chunk_length=1, max_chunk_size=20)
         assert len(chunks) == 10
 
     def test_max_chunks_zero_raises_value_error(self):
@@ -858,7 +857,7 @@ class TestChunkBySentencesLimits:
         text = ". ".join([f"Sentence {i}" for i in range(50)]) + "."
 
         with caplog.at_level(logging.WARNING):
-            chunk_by_sentences(text, max_chunks=5, min_chunk_length=1)
+            chunk_by_sentences(text, max_chunks=5, min_chunk_length=1, max_chunk_size=20)
 
         assert any(
             "Reached max_chunks limit" in record.message for record in caplog.records

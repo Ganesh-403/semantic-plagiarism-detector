@@ -180,7 +180,7 @@ def test_timed_decorator_records_even_when_the_stage_raises():
     payload = metrics.generate_metrics_json()
     counts = [
         sample["value"]
-        for sample in payload["pipeline_duration_seconds"]["metrics"]
+        for sample in payload["spd_pipeline_duration_seconds"]["metrics"]
         if sample["labels"].get("stage") == "unit_test_failing_stage"
         and sample["labels"].get("le") is None
     ]
@@ -205,15 +205,15 @@ def test_generate_metrics_json_includes_the_new_gauges(fake_telemetry):
 
     payload = metrics.generate_metrics_json()
 
-    assert "corpus_documents" in payload
-    assert "active_users" in payload
-    assert payload["corpus_documents"]["type"] == "gauge"
+    assert "spd_corpus_documents" in payload
+    assert "spd_active_users" in payload
+    assert payload["spd_corpus_documents"]["type"] == "gauge"
 
 
 def test_generate_metrics_json_reports_the_counter_as_a_counter():
     payload = metrics.generate_metrics_json()
 
-    assert payload["documents"]["type"] == "counter"
+    assert payload["spd_documents"]["type"] == "counter"
 
 
 def test_generate_metrics_json_is_json_serializable():
@@ -376,7 +376,7 @@ def test_generate_latest_specific_spd_counter_value_is_numeric_and_correct():
     from prometheus_client.parser import text_string_to_metric_families
 
     def _sample_value(metric):
-        return metric.samples[0].value if metric.samples else 0
+        return next(sample.value for family in metric.collect() for sample in family.samples if sample.name == "spd_documents_total")
 
     before = _sample_value(metrics.documents_total)
     metrics.record_documents(7)

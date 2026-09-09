@@ -242,6 +242,21 @@ async def register_diff(
 
 
 @router.get(
+    "/api/v1/versions/diffs/{doc_hash}/all",
+    responses={
+        200: {"description": "All diffs for a version"},
+    },
+)
+async def get_diffs_for_version(
+    doc_hash: str,
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
+):
+    """Get all diffs involving a specific version."""
+    diffs = version_repo.get_diffs_for_version(doc_hash)
+    return {"document_hash": doc_hash, "diffs": diffs, "total": len(diffs)}
+
+
+@router.get(
     "/api/v1/versions/diffs/{parent_hash}/{child_hash}",
     responses={
         200: {"description": "Diff details"},
@@ -258,21 +273,6 @@ async def get_diff(
     if not diff:
         raise HTTPException(status_code=404, detail="Diff not found")
     return diff
-
-
-@router.get(
-    "/api/v1/versions/diffs/{doc_hash}/all",
-    responses={
-        200: {"description": "All diffs for a version"},
-    },
-)
-async def get_diffs_for_version(
-    doc_hash: str,
-    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
-):
-    """Get all diffs involving a specific version."""
-    diffs = version_repo.get_diffs_for_version(doc_hash)
-    return {"document_hash": doc_hash, "diffs": diffs, "total": len(diffs)}
 
 
 # ---------------------------------------------------------------------------

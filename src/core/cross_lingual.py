@@ -59,6 +59,7 @@ TARGET_LANGUAGE = "en"
 # Regex patterns for common stop words and character ranges.
 # Avoids heavy dependencies like langdetect for fast chunk-level detection.
 _LANGUAGE_HEURISTICS = {
+    "en": re.compile(r"\b(the|a|an|and|for|is|are|was|were|of|to|with|this|that)\b", re.IGNORECASE),
     "es": re.compile(
         r"\b(el|la|los|las|de|del|en|que|es|por|con|para|se|su)\b",
         re.IGNORECASE,
@@ -124,12 +125,11 @@ def detect_chunk_language(text: str) -> str:
     cjk_found = False
 
     # Check for script-based languages first as they are highly distinctive
-    for lang, pattern in _LANGUAGE_HEURISTICS.items():
-        if lang in ("zh", "ja", "ar", "hi"):
-            if pattern.search(text):
-                detected_lang = lang
-                cjk_found = True
-                break
+    for lang in ("ja", "zh", "ar", "hi"):
+        if _LANGUAGE_HEURISTICS[lang].search(text):
+            detected_lang = lang
+            cjk_found = True
+            break
 
     if not cjk_found:
         # Count stop word matches for European languages
@@ -150,6 +150,11 @@ def detect_chunk_language(text: str) -> str:
                 # Require at least 15% of words to be stop words to avoid false positives
                 if matches[best_lang] / total_words > 0.15:
                     detected_lang = best_lang
+                    tied = [lang for lang, score in matches.items() if score == matches[best_lang]]
+                    if len(tied) > 1:
+                        candidate, confident = detect_language(text, min_confidence=0.5)
+                        if confident and candidate in tied:
+                            detected_lang = candidate
 
     # Update cache securely
     with _DETECT_LANG_CACHE_LOCK:
@@ -220,7 +225,8 @@ def back_translate_chunk(
         )
 
         # Validate translation result
-        if not translated_text or not isinstance(translated_text, str):
+        if (not isinstance(translated_text, str) or not translated_text.strip()
+                or translated_text.lstrip().lower().startswith("(translation error")):
             logger.warning(
                 "Translation returned empty or invalid result for %s -> %s. "
                 "Falling back to original text.",
@@ -257,7 +263,7 @@ def back_translate_chunk(
                     target_lang=TARGET_LANGUAGE,
                     source_lang=source_lang,
                 )
-                if translated_text:
+                if (translated_text and not translated_text.lstrip().lower().startswith("(translation error")):
                     if use_cache:
                         save_translation(text, source_lang, TARGET_LANGUAGE, translated_text)
                     return translated_text
@@ -660,10 +666,10 @@ def prepare_text_for_embedding(
                     original_text,
                     target_lang=target_language,
                 )
-            except (TypeError, ValueError, ConnectionError) as exc:
+            except Exception as exc:
                 logger.warning("Fallback translation call failed: %s", exc)
                 translated_text = ""
-        except (TypeError, ValueError, ConnectionError) as exc:
+        except Exception as exc:
             logger.warning("Translation call failed: %s", exc)
             translated_text = ""
     translated_text = str(translated_text or "").strip()

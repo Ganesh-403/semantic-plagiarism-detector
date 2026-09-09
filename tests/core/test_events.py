@@ -178,7 +178,7 @@ class TestDeserializeEvent:
         forged = serialize_event(make_event()).replace(
             '"plagiarism_detected"', '"totally_made_up_event"'
         )
-        with pytest.raises(EventSchemaError, match="Unknown webhook event_type"):
+        with pytest.raises(EventSchemaError, match="Unknown webhook event type"):
             deserialize_event(forged)
 
     @pytest.mark.parametrize(

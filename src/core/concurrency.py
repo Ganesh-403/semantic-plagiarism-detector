@@ -69,7 +69,13 @@ class FAISSLock:
                 os.close(fd)
                 logger.debug(f"Acquired FAISS index lock: {self.lock_file}")
                 return
-            except FileExistsError:
+            except OSError as exc:
+                # Win32 can report a sharing violation while another owner is
+                # deleting the lock. Treat that transient race as contention.
+                if not isinstance(exc, FileExistsError) and not (
+                    os.name == "nt" and isinstance(exc, PermissionError)
+                ):
+                    raise
                 if self._is_stale():
                     self._clear_stale_lock()
                     continue  # Retry acquisition immediately

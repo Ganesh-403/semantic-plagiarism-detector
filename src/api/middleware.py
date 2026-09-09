@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from functools import lru_cache
+from hmac import compare_digest
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union
 
 from fastapi import Depends, HTTPException, Request, status
@@ -37,6 +38,10 @@ logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False)
 
 PUBLIC_PATH_PREFIXES = (
+    "/health/live",
+    "/health/ready",
+    "/api/v1/health/live",
+    "/api/v1/health/ready",
     "/health",
     "/healthz",
     "/metrics",
@@ -50,6 +55,9 @@ PUBLIC_PATH_PREFIXES = (
     "/docs",
     "/redoc",
     "/openapi.json",
+    "/api/v1/lti/jwks",
+    "/api/v1/lti/login",
+    "/api/v1/lti/launch",
 )
 
 
@@ -247,7 +255,6 @@ async def verify_bearer_token(
         is_valid = True
     elif credentials and credentials.credentials:
         try:
-            from hmac import compare_digest
             is_valid = compare_digest(credentials.credentials, get_expected_bearer_token())
         except HTTPException:
             pass
@@ -278,7 +285,7 @@ async def verify_bearer_token(
         )
 
     # Perform token-bucket rate limiting per credentials.credentials (Issue #2921)
-    if credentials and credentials.credentials:
+    if credentials and credentials.credentials and getattr(request.state, "rate_limit_charged_token", None) != credentials.credentials:
         token_str = credentials.credentials
         limiter = get_token_bucket_limiter()
 
@@ -293,6 +300,8 @@ async def verify_bearer_token(
                 headers={"Retry-After": "1"},
             )
 
+        request.state.rate_limit_charged_token = token_str
+
     return credentials.credentials
 
 
@@ -306,7 +315,6 @@ def extract_token_scopes(token: Optional[str]) -> list[str]:
         return list(valid_tokens[token])
 
     try:
-        from hmac import compare_digest
         if compare_digest(token, get_expected_bearer_token()):
             return ["read", "write", "scan", "admin"]
     except HTTPException:

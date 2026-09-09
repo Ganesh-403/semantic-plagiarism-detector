@@ -2,6 +2,8 @@
 Unit tests for Enterprise FAISS Vector Embedding Index & Search Engine
 """
 
+import numpy as np
+
 import pytest
 from src.services.faiss_vector_engine import FAISSVectorIndexEngine
 

@@ -9,6 +9,7 @@ import io
 from unittest.mock import patch
 
 import numpy as np
+import pytest
 from fastapi.testclient import TestClient
 
 from src.api.app import app
@@ -18,15 +19,25 @@ from src.version import APP_VERSION
 client = TestClient(app)
 
 
-def test_login_rate_limit():
+@pytest.fixture(autouse=True)
+def isolated_api_database(mock_db):
+    yield
+
+
+
+def test_login_rate_limit(monkeypatch):
     """Verify that /api/v1/auth/login limits requests to 5 per minute per IP."""
+    monkeypatch.setattr("src.db.auth.verify_user", lambda *a, **k: {"authenticated": True})
+    monkeypatch.setattr("src.db.auth.get_2fa_status", lambda *a: (False, None))
+    monkeypatch.setattr("src.db.auth.get_user_role", lambda *a: "teacher")
+    payload = {"username": "teacher", "password": "ValidPassword123!"}  # pragma: allowlist secret
     # Send 5 successful requests
     for _ in range(5):
-        response = client.post("/api/v1/auth/login")
+        response = client.post("/api/v1/auth/login", json=payload)
         assert response.status_code == 200
 
     # The 6th request should fail with 429 Too Many Requests
-    response = client.post("/api/v1/auth/login")
+    response = client.post("/api/v1/auth/login", json=payload)
     assert response.status_code == 429
     assert "detail" in response.json()
 
@@ -69,8 +80,8 @@ def test_scan_invalid_bearer_token():
     assert "Invalid or missing" in response.json()["detail"]
 
 
-@patch("src.api.app.get_corpus_documents_with_embeddings")
-@patch("src.api.app.embed_chunks")
+@patch("src.api.routers.analysis.get_corpus_documents_with_embeddings")
+@patch("src.api.routers.analysis.embed_chunks")
 def test_scan_valid_file_success(mock_embed, mock_corpus):
     """Verify successful document scan with valid Bearer token."""
     # Mock embedding output: 1 chunk x 384 dim vector
@@ -98,8 +109,8 @@ def test_scan_valid_file_success(mock_embed, mock_corpus):
     assert isinstance(data["matched_documents"], list)
 
 
-@patch("src.api.app.get_corpus_documents_with_embeddings")
-@patch("src.api.app.embed_chunks")
+@patch("src.api.routers.analysis.get_corpus_documents_with_embeddings")
+@patch("src.api.routers.analysis.embed_chunks")
 def test_scan_matching_corpus_flag(mock_embed, mock_corpus):
     """Verify scanning against matching corpus document returns plagiarism flag."""
     dummy_vec = np.ones((1, 384), dtype=np.float32)
@@ -159,7 +170,7 @@ def test_clear_all_documents_invalid_token():
     assert response.status_code == 401
 
 
-@patch("src.api.app.get_user_role")
+@patch("src.api.routers.corpus.get_user_role")
 def test_clear_all_documents_non_admin_forbidden(mock_get_role):
     """Verify that a non-administrator receives 403 Forbidden on POST /api/v1/clear."""
     mock_get_role.return_value = "teacher"
@@ -174,61 +185,29 @@ def test_clear_all_documents_non_admin_forbidden(mock_get_role):
     assert "Forbidden" in response.json()["detail"]
 
 
-@patch("src.api.app.get_user_role")
-@patch("src.api.app.clear_all_data")
-@patch("os.path.exists")
-@patch("os.remove")
-def test_clear_all_documents_admin_success(
-    mock_remove, mock_exists, mock_clear_db, mock_get_role
-):
-    """Verify that an administrator can successfully clear all documents."""
-    mock_get_role.return_value = "admin"
-    mock_exists.return_value = True
-
-    expected_token = get_expected_bearer_token()
+@pytest.mark.parametrize("has_index", [True, False])
+def test_clear_all_documents_admin_success(monkeypatch, tmp_path, has_index):
+    """Clearing is idempotent whether or not an index file exists."""
+    from unittest.mock import Mock
+    index_path = tmp_path / "corpus.index"
+    if has_index:
+        index_path.write_bytes(b"index")
+    clear = Mock()
+    monkeypatch.setattr("src.api.routers.corpus.get_user_role", lambda *a: "admin")
+    monkeypatch.setattr("src.api.routers.corpus.clear_all_data", clear)
+    monkeypatch.setattr("src.api.routers.corpus.INDEX_PATH", str(index_path))
     response = client.post(
         "/api/v1/clear?username=admin",
-        headers={"Authorization": f"Bearer {expected_token}"},
+        headers={"Authorization": f"Bearer {get_expected_bearer_token()}"},
     )
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "success"
-    assert "cleared" in data["message"]
-
-    mock_clear_db.assert_called_once()
-    mock_exists.assert_called_once()
-    mock_remove.assert_called_once()
-
-
-@patch("src.api.app.get_user_role")
-@patch("src.api.app.clear_all_data")
-@patch("os.path.exists")
-@patch("os.remove")
-def test_clear_all_documents_already_empty(
-    mock_remove, mock_exists, mock_clear_db, mock_get_role
-):
-    """Verify that clearing an already empty database behaves safely (index doesn't exist)."""
-    mock_get_role.return_value = "admin"
-    mock_exists.return_value = False
-
-    expected_token = get_expected_bearer_token()
-    response = client.post(
-        "/api/v1/clear?username=admin",
-        headers={"Authorization": f"Bearer {expected_token}"},
-    )
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "success"
-
-    mock_clear_db.assert_called_once()
-    mock_exists.assert_called_once()
-    mock_remove.assert_not_called()
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "success"
+    clear.assert_called_once_with()
+    assert not index_path.exists()
 
 
 def test_bearer_token_not_set_in_production():
-    """Verify that when API_BEARER_TOKEN is unset in production, a clean HTTP 500 JSON response is returned."""
+    """JWT-only production deployments reject an unrecognized credential with 401."""
     import os
 
     env_mock = os.environ.copy()
@@ -240,8 +219,5 @@ def test_bearer_token_not_set_in_production():
             "/api/v1/clear?username=admin",
             headers={"Authorization": "Bearer any-token"},
         )
-        assert response.status_code == 500
-        assert (
-            response.json()["detail"]
-            == "Server misconfiguration: API_BEARER_TOKEN not set."
-        )
+        assert response.status_code == 401
+        assert "Invalid or missing" in response.json()["detail"]

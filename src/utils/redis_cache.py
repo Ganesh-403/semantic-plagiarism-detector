@@ -112,7 +112,7 @@ except ValueError:
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 
 if REDIS_PASSWORD:
-    encoded_password = urllib.parse.quote_plus(REDIS_PASSWORD)
+    encoded_password = urllib.parse.quote(REDIS_PASSWORD, safe="")
     REDIS_URL = os.getenv(
         "REDIS_URL",
         f"redis://:{encoded_password}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}",
@@ -325,11 +325,10 @@ class RedisCache:
 
     @classmethod
     def get_instance(cls) -> "RedisCache":
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = cls()
-        return cls._instance
+        # __new__ and __init__ each synchronize their own initialization.
+        # Holding this non-reentrant lock while calling cls() deadlocks on
+        # the first request after startup or a cache reset.
+        return cls()
 
     @property
     def fallback_cache(self) -> dict:
@@ -541,9 +540,9 @@ class RedisCache:
                         except Exception:
                             pass
                     else:
-                        with self._lock:
-                            self._hits += 1
-                        return pickle.loads(decompressed)
+                        value = pickle.loads(decompressed)
+                        self._inc_hits()
+                        return value
 
             except Exception as e:
                 logger.error(
@@ -602,9 +601,9 @@ class RedisCache:
                         except Exception:
                             pass
                     else:
-                        with self._lock:
-                            self._hits += 1
-                        return json.loads(decompressed.decode("utf-8"))
+                        value = json.loads(decompressed.decode("utf-8"))
+                        self._inc_hits()
+                        return value
 
             except Exception as e:
                 logger.error(f"[RedisCache] Error getting JSON key {key}: {e}.")
@@ -909,7 +908,7 @@ def clear_all_large_data(session_id: str | Path) -> None:
             keys_to_remove = [
                 k
                 for k in cache.fallback_cache.keys()
-                if k.startswith(f"spd:v1:large:{session_id}:")
+                if k.startswith((f"spd:v1:large:{sid_str}:", f"spd:v1:large:{sid_str}/"))
             ]
             for key in keys_to_remove:
                 del cache.fallback_cache[key]

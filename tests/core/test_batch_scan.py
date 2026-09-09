@@ -145,7 +145,8 @@ def test_multi_format_batch_scan_pipeline(
         registry,
         ai_probabilities,
         flags,
-    ) = run_full_pipeline(multi_format_batch)
+        language_metadata,
+    ) = run_full_pipeline(multi_format_batch, enable_ai_detection=True)
 
     # ---------- Raw extraction: all four formats must be parsed ----------
 

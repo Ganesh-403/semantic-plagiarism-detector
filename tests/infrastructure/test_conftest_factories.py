@@ -1,6 +1,6 @@
 import numpy as np
 
-from tests.conftest import MockDataFactory, dummy_embeddings
+from tests.conftest import MockDataFactory
 
 
 def test_mock_data_factory_embed_chunks_empty():
@@ -36,9 +36,9 @@ def test_mock_data_factory_embed_chunks_large():
     assert np.allclose(result, expected_val)
 
 
-def test_dummy_embeddings_structure():
+def test_dummy_embeddings_structure(dummy_embeddings):
     """Validate the consolidated dummy embeddings structure."""
-    embeddings = dummy_embeddings()
+    embeddings = dummy_embeddings
     assert isinstance(embeddings, dict)
     assert "doc_A" in embeddings
     assert "doc_B" in embeddings

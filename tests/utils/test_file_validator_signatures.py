@@ -30,7 +30,7 @@ class TestMagicSignaturesValidHeaders:
     )
     def test_valid_signatures_pass_in_strict_mode(self, ext: str, header_data: bytes):
         """Each extension with its proper magic header must pass validation."""
-        validator = FileValidator(strict_mode=True)
+        validator = FileValidator(strict_mode=True, allowed_extensions=set(MAGIC_SIGNATURES) | {".txt", ".md"})
         filename = f"sample_document{ext}"
         result = validator.validate(header_data, filename)
 
@@ -43,7 +43,7 @@ class TestMagicSignaturesMismatchedHeaders:
 
     def test_png_header_with_pdf_extension_fails(self):
         """PNG magic bytes with a .pdf extension must fail with MAGIC_BYTE_MISMATCH."""
-        validator = FileValidator(strict_mode=True)
+        validator = FileValidator(strict_mode=True, allowed_extensions=set(MAGIC_SIGNATURES) | {".txt", ".md"})
         png_data = b"\x89PNG\r\n\x1a\nfake png data"
         result = validator.validate(png_data, "fake_doc.pdf")
 
@@ -53,7 +53,7 @@ class TestMagicSignaturesMismatchedHeaders:
 
     def test_pdf_header_with_png_extension_fails(self):
         """PDF magic bytes with a .png extension must fail with MAGIC_BYTE_MISMATCH."""
-        validator = FileValidator(strict_mode=True)
+        validator = FileValidator(strict_mode=True, allowed_extensions=set(MAGIC_SIGNATURES) | {".txt", ".md"})
         pdf_data = b"%PDF-1.4 fake pdf data"
         result = validator.validate(pdf_data, "fake_image.png")
 
@@ -62,7 +62,7 @@ class TestMagicSignaturesMismatchedHeaders:
 
     def test_jpg_header_with_docx_extension_fails(self):
         """JPG magic bytes with a .docx extension must fail with MAGIC_BYTE_MISMATCH."""
-        validator = FileValidator(strict_mode=True)
+        validator = FileValidator(strict_mode=True, allowed_extensions=set(MAGIC_SIGNATURES) | {".txt", ".md"})
         jpg_data = b"\xff\xd8\xff\xe0fake jpg data"
         result = validator.validate(jpg_data, "fake_word.docx")
 
@@ -71,7 +71,7 @@ class TestMagicSignaturesMismatchedHeaders:
 
     def test_exe_mz_header_with_doc_extension_fails(self):
         """Executable (MZ) header with a .doc extension must fail with MAGIC_BYTE_MISMATCH."""
-        validator = FileValidator(strict_mode=True)
+        validator = FileValidator(strict_mode=True, allowed_extensions=set(MAGIC_SIGNATURES) | {".txt", ".md"})
         exe_data = b"MZ\x90\x00\x03\x00\x00\x00\x04\x00"
         result = validator.validate(exe_data, "disguised_exe.doc")
 
@@ -81,7 +81,7 @@ class TestMagicSignaturesMismatchedHeaders:
     @pytest.mark.parametrize("ext", list(MAGIC_SIGNATURES.keys()))
     def test_garbage_bytes_rejected_for_all_magic_signatures(self, ext: str):
         """Arbitrary garbage bytes must fail validation for every extension in MAGIC_SIGNATURES."""
-        validator = FileValidator(strict_mode=True)
+        validator = FileValidator(strict_mode=True, allowed_extensions=set(MAGIC_SIGNATURES) | {".txt", ".md"})
         garbage_data = b"INVALID_MAGIC_HEADER_GARBAGE_BYTES_1234567890"
         filename = f"corrupt_file{ext}"
         result = validator.validate(garbage_data, filename)

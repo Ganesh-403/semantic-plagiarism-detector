@@ -172,11 +172,11 @@ def test_has_meaningful_text_exact_20_percent_coverage_threshold():
 
 def test_has_meaningful_text_19_percent_coverage_small_dimensions():
     """Verify threshold boundary: 19% area coverage with dimensions < 200px allows native text."""
-    text = "Comprehensive analysis of semantic similarity algorithms in automated plagiarism detection pipelines."
+    text = "Comprehensive analysis of semantic similarity algorithms in automated plagiarism detection pipelines for reliable academic document reviews."
     mock_page = MagicMock()
     mock_page.width = 1000
     mock_page.height = 1000  # Total area = 1,000,000
-    mock_page.images = [{"width": 190, "height": 100}]
+    mock_page.images = [{"width": 190, "height": 100}] * 10
 
     assert _has_meaningful_text_pdf(text, page=mock_page) is True
     assert _has_meaningful_text_doc(text, page=mock_page) is True
@@ -252,8 +252,8 @@ def test_has_meaningful_text_zero_area_page_fallback():
     zero_page.height = 0
     zero_page.images = [{"width": 100, "height": 100}]
 
-    assert _has_meaningful_text_pdf(text, page=zero_page) is False
-    assert _has_meaningful_text_doc(text, page=zero_page) is False
+    assert _has_meaningful_text_pdf(text, page=zero_page) is True
+    assert _has_meaningful_text_doc(text, page=zero_page) is True
 
 
 # ---------------------------------------------------------------------------

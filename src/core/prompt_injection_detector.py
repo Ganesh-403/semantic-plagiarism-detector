@@ -70,6 +70,7 @@ def analyze_steganography(
     from src.core.steganography_extractor import (
         extract_zero_width_payloads,
         extract_hidden_docx_text,
+        ZERO_WIDTH_CHARS,
     )
 
     all_payloads = []
@@ -85,7 +86,12 @@ def analyze_steganography(
 
     from src.core.prompt_injection_detector import detect_prompt_injections
 
-    injection_result = detect_prompt_injections(all_payloads)
+    candidates = list(all_payloads)
+    if zw_payloads:
+        # Zero-width runs themselves contain no readable instructions. Inspect
+        # the surrounding text after removing separators used for obfuscation.
+        candidates.append(text.translate({ord(char): None for char in ZERO_WIDTH_CHARS}))
+    injection_result = detect_prompt_injections(candidates)
 
     return {
         "zero_width_payloads": len(zw_payloads),

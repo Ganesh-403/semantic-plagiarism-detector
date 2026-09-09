@@ -33,25 +33,33 @@ class TestVerifyStructure:
             (tmp_path / dir_path).mkdir(parents=True, exist_ok=True)
 
         # Create required files
-        for file_path in verify_structure.REQUIRED_FILES:
+        for file_path in verify_structure.REQUIRED_FILES + verify_structure.REQUIRED_INIT_FILES:
             (tmp_path / file_path).parent.mkdir(parents=True, exist_ok=True)
             (tmp_path / file_path).touch()
 
-        results = verify_structure.verify_structure(tmp_path)
+        passed, missing, found = verify_structure.verify_project_structure(
+            tmp_path, verify_structure.REQUIRED_DIRECTORIES,
+            verify_structure.REQUIRED_INIT_FILES, verify_structure.REQUIRED_FILES,
+        )
+        results = {"passed": passed, "missing": missing, "found": found}
 
         assert len(results["missing"]) == 0
         expected_count = len(verify_structure.REQUIRED_DIRECTORIES) + len(
-            verify_structure.REQUIRED_FILES
+            verify_structure.REQUIRED_FILES + verify_structure.REQUIRED_INIT_FILES
         )
         assert len(results["found"]) == expected_count
 
     def test_detects_missing_directories(self, tmp_path):
         """Verify missing directories are detected."""
         # Don't create any directories
-        results = verify_structure.verify_structure(tmp_path)
+        passed, missing, found = verify_structure.verify_project_structure(
+            tmp_path, verify_structure.REQUIRED_DIRECTORIES,
+            verify_structure.REQUIRED_INIT_FILES, verify_structure.REQUIRED_FILES,
+        )
+        results = {"passed": passed, "missing": missing, "found": found}
 
         assert len(results["missing"]) > 0
-        assert any("dir:" in item for item in results["missing"])
+        assert any("DIR" in item for item in results["missing"])
 
     def test_detects_missing_files(self, tmp_path):
         """Verify missing files are detected."""
@@ -59,24 +67,36 @@ class TestVerifyStructure:
         for dir_path in verify_structure.REQUIRED_DIRECTORIES:
             (tmp_path / dir_path).mkdir(parents=True, exist_ok=True)
 
-        results = verify_structure.verify_structure(tmp_path)
+        passed, missing, found = verify_structure.verify_project_structure(
+            tmp_path, verify_structure.REQUIRED_DIRECTORIES,
+            verify_structure.REQUIRED_INIT_FILES, verify_structure.REQUIRED_FILES,
+        )
+        results = {"passed": passed, "missing": missing, "found": found}
 
         assert len(results["missing"]) > 0
-        assert any("file:" in item for item in results["missing"])
+        assert any("FILE" in item for item in results["missing"])
 
     def test_distinguishes_files_from_directories(self, tmp_path):
         """Verify files and directories are distinguished correctly."""
         # Create a file where a directory is expected
         (tmp_path / "src").touch()  # Should be a directory
 
-        results = verify_structure.verify_structure(tmp_path)
+        passed, missing, found = verify_structure.verify_project_structure(
+            tmp_path, verify_structure.REQUIRED_DIRECTORIES,
+            verify_structure.REQUIRED_INIT_FILES, verify_structure.REQUIRED_FILES,
+        )
+        results = {"passed": passed, "missing": missing, "found": found}
 
         # "src" should be in missing (it's a file, not a directory)
-        assert "dir:src" in results["missing"]
+        assert "DIR (is file): src" in results["missing"]
 
     def test_results_format(self, tmp_path):
         """Verify results dictionary has correct structure."""
-        results = verify_structure.verify_structure(tmp_path)
+        passed, missing, found = verify_structure.verify_project_structure(
+            tmp_path, verify_structure.REQUIRED_DIRECTORIES,
+            verify_structure.REQUIRED_INIT_FILES, verify_structure.REQUIRED_FILES,
+        )
+        results = {"passed": passed, "missing": missing, "found": found}
 
         assert "found" in results
         assert "missing" in results
@@ -94,10 +114,12 @@ class TestTextFormat:
             "missing": [],
         }
 
-        output = verify_structure.format_text_output(results)
+        output = verify_structure.format_text_report(
+            not results["missing"], results["missing"], results["found"]
+        )
 
-        assert "PASSED" in output
-        assert "2 required items found" in output
+        assert "SUCCESS" in output
+        assert "Found 2 items" in output
         assert "✓ dir:src" in output
         assert "✓ file:README.md" in output
 
@@ -108,10 +130,12 @@ class TestTextFormat:
             "missing": ["dir:tests", "file:README.md"],
         }
 
-        output = verify_structure.format_text_output(results)
+        output = verify_structure.format_text_report(
+            not results["missing"], results["missing"], results["found"]
+        )
 
-        assert "FAILED" in output
-        assert "2 items missing" in output
+        assert "FAILURE" in output
+        assert "2 required path(s) are missing" in output
         assert "dir:tests" in output
         assert "file:README.md" in output
 
@@ -122,7 +146,9 @@ class TestTextFormat:
             "missing": [],
         }
 
-        output = verify_structure.format_text_output(results)
+        output = verify_structure.format_text_report(
+            not results["missing"], results["missing"], results["found"]
+        )
 
         # Check that items appear in sorted order
         lines = output.split("\n")
@@ -145,7 +171,9 @@ class TestJsonFormat:
             "missing": [],
         }
 
-        output = verify_structure.format_json_output(results)
+        output = verify_structure.format_json_report(
+            not results["missing"], results["missing"], results["found"]
+        )
         parsed = json.loads(output)
 
         assert parsed["passed"] is True
@@ -159,7 +187,9 @@ class TestJsonFormat:
             "missing": ["dir:tests", "file:README.md"],
         }
 
-        output = verify_structure.format_json_output(results)
+        output = verify_structure.format_json_report(
+            not results["missing"], results["missing"], results["found"]
+        )
         parsed = json.loads(output)
 
         assert parsed["passed"] is False
@@ -174,7 +204,9 @@ class TestJsonFormat:
             "missing": ["dir:tests"],
         }
 
-        output = verify_structure.format_json_output(results)
+        output = verify_structure.format_json_report(
+            not results["missing"], results["missing"], results["found"]
+        )
 
         # Should not raise
         parsed = json.loads(output)
@@ -187,7 +219,9 @@ class TestJsonFormat:
             "missing": ["dir:tests"],
         }
 
-        output = verify_structure.format_json_output(results)
+        output = verify_structure.format_json_report(
+            not results["missing"], results["missing"], results["found"]
+        )
         parsed = json.loads(output)
 
         # Verify required keys
@@ -209,7 +243,7 @@ class TestArgumentParsing:
         with patch("sys.argv", ["verify_structure.py"]):
             args = verify_structure.parse_arguments()
 
-        assert args.root_dir == verify_structure.ROOT_DIR
+        assert args.root_dir is None
         assert args.format == "text"
 
     def test_parse_json_format(self):
@@ -231,7 +265,7 @@ class TestArgumentParsing:
         with patch("sys.argv", ["verify_structure.py", "--root-dir", str(tmp_path)]):
             args = verify_structure.parse_arguments()
 
-        assert args.root_dir == tmp_path
+        assert Path(args.root_dir) == tmp_path
 
     def test_parse_invalid_format(self):
         """Verify invalid format raises error."""
@@ -248,7 +282,7 @@ class TestMainFunction:
         # Create valid structure
         for dir_path in verify_structure.REQUIRED_DIRECTORIES:
             (tmp_path / dir_path).mkdir(parents=True, exist_ok=True)
-        for file_path in verify_structure.REQUIRED_FILES:
+        for file_path in verify_structure.REQUIRED_FILES + verify_structure.REQUIRED_INIT_FILES:
             (tmp_path / file_path).parent.mkdir(parents=True, exist_ok=True)
             (tmp_path / file_path).touch()
 
@@ -278,7 +312,7 @@ class TestMainFunction:
         # Create valid structure
         for dir_path in verify_structure.REQUIRED_DIRECTORIES:
             (tmp_path / dir_path).mkdir(parents=True, exist_ok=True)
-        for file_path in verify_structure.REQUIRED_FILES:
+        for file_path in verify_structure.REQUIRED_FILES + verify_structure.REQUIRED_INIT_FILES:
             (tmp_path / file_path).parent.mkdir(parents=True, exist_ok=True)
             (tmp_path / file_path).touch()
 
@@ -302,7 +336,7 @@ class TestMainFunction:
         # Create valid structure
         for dir_path in verify_structure.REQUIRED_DIRECTORIES:
             (tmp_path / dir_path).mkdir(parents=True, exist_ok=True)
-        for file_path in verify_structure.REQUIRED_FILES:
+        for file_path in verify_structure.REQUIRED_FILES + verify_structure.REQUIRED_INIT_FILES:
             (tmp_path / file_path).parent.mkdir(parents=True, exist_ok=True)
             (tmp_path / file_path).touch()
 
@@ -326,22 +360,28 @@ class TestIntegration:
         # Create complete valid structure
         for dir_path in verify_structure.REQUIRED_DIRECTORIES:
             (tmp_path / dir_path).mkdir(parents=True, exist_ok=True)
-        for file_path in verify_structure.REQUIRED_FILES:
+        for file_path in verify_structure.REQUIRED_FILES + verify_structure.REQUIRED_INIT_FILES:
             (tmp_path / file_path).parent.mkdir(parents=True, exist_ok=True)
             (tmp_path / file_path).touch()
 
         # Verify structure
-        results = verify_structure.verify_structure(tmp_path)
+        passed, missing, found = verify_structure.verify_project_structure(
+            tmp_path, verify_structure.REQUIRED_DIRECTORIES,
+            verify_structure.REQUIRED_INIT_FILES, verify_structure.REQUIRED_FILES,
+        )
+        results = {"passed": passed, "missing": missing, "found": found}
 
         # Format as JSON
-        json_output = verify_structure.format_json_output(results)
+        json_output = verify_structure.format_json_report(
+            not results["missing"], results["missing"], results["found"]
+        )
         parsed = json.loads(json_output)
 
         # Verify results
         assert parsed["passed"] is True
         assert len(parsed["missing"]) == 0
         expected_count = len(verify_structure.REQUIRED_DIRECTORIES) + len(
-            verify_structure.REQUIRED_FILES
+            verify_structure.REQUIRED_FILES + verify_structure.REQUIRED_INIT_FILES
         )
         assert len(parsed["found"]) == expected_count
 
@@ -352,12 +392,30 @@ class TestIntegration:
         (tmp_path / "README.md").touch()
 
         # Verify structure
-        results = verify_structure.verify_structure(tmp_path)
+        passed, missing, found = verify_structure.verify_project_structure(
+            tmp_path, verify_structure.REQUIRED_DIRECTORIES,
+            verify_structure.REQUIRED_INIT_FILES, verify_structure.REQUIRED_FILES,
+        )
+        results = {"passed": passed, "missing": missing, "found": found}
 
         # Format as JSON
-        json_output = verify_structure.format_json_output(results)
+        json_output = verify_structure.format_json_report(
+            not results["missing"], results["missing"], results["found"]
+        )
         parsed = json.loads(json_output)
 
         # Verify results
         assert parsed["passed"] is False
         assert len(parsed["missing"]) > 0
+
+
+@pytest.mark.parametrize("filename", ["README.md", "src/__init__.py"])
+def test_rejects_directory_in_place_of_required_file(tmp_path, filename):
+    (tmp_path / filename).mkdir(parents=True)
+    valid, missing, found = verify_structure.verify_project_structure(
+        tmp_path, [], [filename] if filename.endswith("__init__.py") else [],
+        [] if filename.endswith("__init__.py") else [filename],
+    )
+    assert not valid
+    assert missing == [f"FILE (is dir): {filename}"]
+    assert not found

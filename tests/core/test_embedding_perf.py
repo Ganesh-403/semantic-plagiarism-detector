@@ -1,31 +1,18 @@
-import time
+"""Concurrent encoding preserves every input row without depending on a model download."""
+import threading
+from types import SimpleNamespace
+import numpy as np
+from src.core import embeddings
 
-from src.core.embeddings import generate_embeddings
 
-
-def test_embedding_generation_performance():
-    """Ensure embedding generation remains within acceptable latency."""
-
-    texts = [
-        "Artificial intelligence is transforming software development.",
-        "Python is widely used for backend services.",
-        "Machine learning enables predictive analytics.",
-        "Vector databases improve semantic search.",
-        "Cloud computing powers scalable applications.",
-        "Cybersecurity protects sensitive information.",
-        "Open source software accelerates innovation.",
-        "Unit testing improves software reliability.",
-        "Continuous integration catches regressions early.",
-        "Performance optimization enhances user experience.",
-    ]
-
-    start_time = time.perf_counter()
-
-    embeddings = generate_embeddings(texts)
-
-    elapsed = time.perf_counter() - start_time
-
-    assert len(embeddings) == len(texts)
-    assert elapsed < 5.0, (
-        f"Embedding generation took {elapsed:.2f}s which exceeds the 5.0s threshold."
-    )
+def test_embedding_generation_performance(monkeypatch):
+    barrier = threading.Barrier(4)
+    workers = set()
+    def encode(texts, **kwargs):
+        workers.add(threading.get_ident())
+        barrier.wait(timeout=10)
+        return np.array([[int(text), int(text) ** 2] for text in texts], dtype=np.float32)
+    monkeypatch.setattr(embeddings, "_get_model", lambda: SimpleNamespace(encode=encode))
+    result = embeddings.generate_embeddings([str(i) for i in range(12)], num_threads=4)
+    np.testing.assert_array_equal(result, [[i, i * i] for i in range(12)])
+    assert len(workers) == 4

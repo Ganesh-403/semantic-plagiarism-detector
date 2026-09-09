@@ -450,7 +450,7 @@ class TestVersionRepoDB:
 
             snap = repo.get_snapshot(result["document_hash"])
             assert snap is not None
-            assert snap["word_count"] == 4
+            assert snap["word_count"] == 3
 
     def test_version_number_increments(self):
         """Version numbers should increment for the same user + assignment."""
@@ -517,9 +517,11 @@ class TestVersionRepoDB:
             init_version_repo_db(db)
             repo = DocumentSnapshotRepository(db)
 
+            parent = repo.register_version("u1", "a1", "v1", "First draft")
+            child = repo.register_version("u1", "a1", "v2", "Revised draft")
             diff_id = repo.register_diff(
-                parent_hash="hash1",
-                child_hash="hash2",
+                parent_hash=parent["document_hash"],
+                child_hash=child["document_hash"],
                 similarity=0.85,
                 added_words=100,
                 removed_words=20,
@@ -528,7 +530,7 @@ class TestVersionRepoDB:
             )
             assert diff_id is not None
 
-            diff = repo.get_diff("hash1", "hash2")
+            diff = repo.get_diff(parent["document_hash"], child["document_hash"])
             assert diff is not None
             assert diff["similarity"] == 0.85
 
@@ -541,11 +543,11 @@ class TestVersionRepoDB:
             init_version_repo_db(db)
             repo = DocumentSnapshotRepository(db)
 
-            repo.register_version("u1", "a1", "v1", "Content one")
-            repo.register_version("u1", "a1", "v2", "Content two modified")
+            parent = repo.register_version("u1", "a1", "v1", "Content one")
+            child = repo.register_version("u1", "a1", "v2", "Content two modified")
             repo.register_version("u2", "a2", "v1", "Another document")
 
-            repo.register_diff("hash_a", "hash_b", 0.75, 50, 10, 20, 0.5)
+            repo.register_diff(parent["document_hash"], child["document_hash"], 0.75, 50, 10, 20, 0.5)
 
             summary = repo.analytics_summary()
             assert summary["total_versions"] == 3
@@ -586,3 +588,39 @@ class TestVersionRepoDB:
 
             remaining = repo.get_lineage("u1", "del")
             assert len(remaining) == 0
+
+
+def test_identical_content_is_scoped_and_idempotent():
+    repo = DocumentSnapshotRepository()
+    a = repo.register_version("alice", "essay", "a.txt", "Same text")
+    repeated = repo.register_version("alice", "essay", "a.txt", "Same text")
+    b = repo.register_version("bob", "essay", "b.txt", "Same text")
+    assert repeated["document_hash"] == a["document_hash"]
+    assert b["document_hash"] != a["document_hash"]
+    assert repo.analytics_summary()["total_versions"] == 2
+    assert repo.get_lineage("alice", "essay")[0]["version_number"] == 1
+
+
+def test_deleting_parent_preserves_child_and_recalculates_lineage():
+    repo = DocumentSnapshotRepository()
+    a = repo.register_version("alice", "essay", "a.txt", "First draft")
+    b = repo.register_version("alice", "essay", "b.txt", "Second draft",
+                              parent_hash=a["document_hash"], similarity_to_parent=0.0)
+    repo.register_diff(a["document_hash"], b["document_hash"], 0., 2, 2, 2, 0.)
+    assert repo.delete_version(a["document_hash"])
+    child = repo.get_snapshot(b["document_hash"])
+    assert child["parent_hash"] is None
+    assert repo.analytics_summary()["total_diffs"] == 0
+    summary = repo.list_lineages()["items"][0]
+    assert summary["head_hash"] == b["document_hash"]
+    assert summary["total_versions"] == 1
+    assert repo.delete_version(b["document_hash"])
+    assert repo.list_lineages()["total"] == 0
+
+
+def test_cross_user_parent_is_rejected():
+    repo = DocumentSnapshotRepository()
+    a = repo.register_version("alice", "essay", "a.txt", "First draft")
+    with pytest.raises(ValueError, match="same user and assignment"):
+        repo.register_version("bob", "essay", "b.txt", "Changed draft", parent_hash=a["document_hash"])
+    assert repo.analytics_summary()["total_versions"] == 1

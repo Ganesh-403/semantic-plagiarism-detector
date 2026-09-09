@@ -5,7 +5,8 @@ from src.core.translator import translate_text_marian, translate_text, _MARIAN_P
 
 
 def setup_function():
-    _MARIAN_PIPELINES.clear()
+    from src.core import translator
+    translator._MARIAN_PIPELINES.clear()
 
 
 def test_translate_text_marian_invokes_transformers_pipeline():

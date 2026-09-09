@@ -84,7 +84,7 @@ def test_plot_similarity_distribution_axis_titles():
 
     fig = plot_similarity_distribution(sim_matrix)
 
-    assert fig.layout.xaxis.title.text == "Similarity Score Range (%)"
+    assert fig.layout.xaxis.title.text == "Similarity Score"
     assert fig.layout.yaxis.title.text == "Number of Document Pairs"
 
 
@@ -93,7 +93,7 @@ def test_plot_similarity_distribution_empty_axis_titles():
     empty_df = pd.DataFrame()
     fig = plot_similarity_distribution(empty_df)
 
-    assert fig.layout.xaxis.title.text == "Similarity Score Range (%)"
+    assert fig.layout.xaxis.title.text == "Similarity Score"
     assert fig.layout.yaxis.title.text == "Number of Document Pairs"
 
 
@@ -111,5 +111,5 @@ def test_plot_similarity_distribution_custom_title():
     fig = plot_similarity_distribution(sim_matrix, title="My Custom Title")
 
     assert fig.layout.title.text == "My Custom Title"
-    assert fig.layout.xaxis.title.text == "Similarity Score Range (%)"
+    assert fig.layout.xaxis.title.text == "Similarity Score"
     assert fig.layout.yaxis.title.text == "Number of Document Pairs"
