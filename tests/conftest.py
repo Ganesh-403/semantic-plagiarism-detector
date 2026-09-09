@@ -43,7 +43,7 @@ os.environ["SPD_STATE_DIR"] = tempfile.mkdtemp(prefix="spd-tests-")
 # the test suite does not flush the active development session cache.
 os.environ.setdefault("REDIS_DB", "1")
 os.environ.setdefault("APP_ENV", "test")
-os.environ.setdefault("ADMIN_BOOTSTRAP_PASSWORD", "Admin123!")
+os.environ.setdefault("ADMIN_BOOTSTRAP_PASSWORD", "Bootstrap-Test-Password!984")
 os.environ.setdefault("JWT_SECRET_KEY", "test-only-secret-which-is-never-used-in-production")
 
 # ── Headless Renderer Configuration (Issue #504) ──────────────────────────────
@@ -141,7 +141,6 @@ if "faiss" not in sys.modules:
 
 
 for mod_name in [
-    "fitz",
     "redis",
     "bs4",
     "faker",
@@ -724,6 +723,25 @@ def isolate_embedding_singletons(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def isolate_redis_singleton(monkeypatch):
+    """Keep clients, corruption fixtures, counters and cached data local to a test.
+
+    Construct the real cache in its supported no-Redis mode. Restore the Redis
+    dependency before the test so connection, failover and cold-start checks can
+    exercise their own transport. Both public access paths share this instance.
+    """
+    import src.utils.redis_cache as module
+
+    monkeypatch.setattr(module.RedisCache, "_instance", None)
+    with monkeypatch.context() as initialization:
+        initialization.setattr(module, "redis", None)
+        cache = module.RedisCache()
+    monkeypatch.setattr(module, "_cache", cache)
+    yield
+    cache.close()
+
+
+@pytest.fixture(autouse=True)
 def isolate_cached_application_state(monkeypatch):
     from src.i18n import translator
     from src.api.dependencies import limiter
@@ -732,5 +750,7 @@ def isolate_cached_application_state(monkeypatch):
     monkeypatch.setattr(translator, "_translations", {})
     translator._load_translation_dictionary.clear()
     get_valid_tokens.cache_clear()
+    from src.db.auth import clear_revocation_cache
+    clear_revocation_cache()
     limiter._storage.reset()
     get_token_bucket_limiter().reset()

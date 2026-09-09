@@ -9,13 +9,49 @@ Asserts that the context manager overhead is negligible:
 """
 
 import time
+from functools import wraps
+import os
+from pathlib import Path
+import subprocess
+import sys
 
 from src.utils.processing_time import ProcessingTimer
+
+
+def _without_coverage_overhead(test):
+    """Measure production overhead without the coverage tracer's per-line cost.
+
+    Keep the original iteration counts and timing budgets. Functional timer tests
+    still run in the covered pytest process; this child runs only the benchmark.
+    """
+    @wraps(test)
+    def run(self):
+        if os.environ.get("SPD_TIMER_BENCHMARK_CHILD") == "1":
+            return test(self)
+        environment = {
+            key: value for key, value in os.environ.items()
+            if not key.startswith(("COVERAGE_", "COV_CORE_"))
+            and key != "PYTEST_CURRENT_TEST"
+        }
+        environment["SPD_TIMER_BENCHMARK_CHILD"] = "1"
+        code = (
+            "import runpy,sys; "
+            "namespace=runpy.run_path(sys.argv[1]); "
+            "getattr(namespace['TestProcessingTimerBenchmark'](),sys.argv[2])()"
+        )
+        result = subprocess.run(
+            [sys.executable, "-X", "utf8", "-c", code, str(Path(__file__).resolve()), test.__name__],
+            cwd=Path(__file__).resolve().parents[2], env=environment,
+            capture_output=True, text=True, encoding="utf-8", timeout=30,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+    return run
 
 
 class TestProcessingTimerBenchmark:
     """Benchmark tests for ProcessingTimer.time_block overhead (Issue #1864)."""
 
+    @_without_coverage_overhead
     def test_10000_time_block_executions_under_1_second(self):
         """10,000 timer context block executions must complete in under 1 second.
 
@@ -40,6 +76,7 @@ class TestProcessingTimerBenchmark:
             f"exceeding the 1.0s budget."
         )
 
+    @_without_coverage_overhead
     def test_single_time_block_overhead_under_0_1ms(self):
         """Per-block overhead must be under 0.1ms (100 microseconds).
 
@@ -64,6 +101,7 @@ class TestProcessingTimerBenchmark:
             f"exceeding the 0.1ms threshold."
         )
 
+    @_without_coverage_overhead
     def test_nested_time_block_overhead_under_0_1ms(self):
         """Nested time_block overhead must also be under 0.1ms per block.
 
@@ -107,6 +145,7 @@ class TestProcessingTimerBenchmark:
         assert summary["sleep_test"] >= 0.04  # Allow ~10ms tolerance
         assert summary["sleep_test"] <= 0.15  # Upper bound sanity check
 
+    @_without_coverage_overhead
     def test_time_block_aggregation_does_not_degrade(self):
         """Aggregating many blocks should not cause performance degradation.
 

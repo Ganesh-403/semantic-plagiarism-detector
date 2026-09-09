@@ -8,7 +8,7 @@ with support for sliding n-grams, popup comment notes, encrypted PDFs, and page 
 import logging
 from typing import List, Optional, Tuple, Union
 
-import fitz  # PyMuPDF
+from src.utils import pdf_backend as fitz
 
 from src.errors import PDFEncryptedError
 

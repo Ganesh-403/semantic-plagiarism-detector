@@ -40,7 +40,7 @@ class TestPurgeOldTranslations:
         with sqlite3.connect(temp_cache_db) as conn:
             conn.execute(
                 """
-                INSERT INTO translations 
+                INSERT INTO translation_cache
                 (source_hash, source_text, source_lang, target_lang, translated_text, created_at, last_accessed_at)
                 VALUES ('hash1', 'old text', 'es', 'en', 'old translated', ?, ?)
                 """,
@@ -70,7 +70,7 @@ class TestPurgeOldTranslations:
             with sqlite3.connect(temp_cache_db) as conn:
                 conn.execute(
                     """
-                    INSERT INTO translations 
+                    INSERT INTO translation_cache
                     (source_hash, source_text, source_lang, target_lang, translated_text, created_at, last_accessed_at)
                     VALUES (?, 'text', 'es', 'en', 'translated', ?, ?)
                     """,
@@ -86,15 +86,21 @@ class TestPurgeOldTranslations:
         stats = get_cache_stats(db_path=temp_cache_db)
         assert stats["total_entries"] == 3
 
-    def test_purge_exact_boundary(self, temp_cache_db):
+    def test_purge_exact_boundary(self, temp_cache_db, monkeypatch):
         """Verify entries exactly at the boundary are handled correctly."""
         # Insert entry exactly 30 days ago
-        boundary_date = (datetime.utcnow() - timedelta(days=30)).isoformat()
+        now = datetime.utcnow()
+        class FixedDatetime(datetime):
+            @classmethod
+            def utcnow(cls):
+                return now
+        monkeypatch.setattr("src.db.translation_cache.datetime", FixedDatetime)
+        boundary_date = (now - timedelta(days=30)).isoformat()
 
         with sqlite3.connect(temp_cache_db) as conn:
             conn.execute(
                 """
-                INSERT INTO translations 
+                INSERT INTO translation_cache
                 (source_hash, source_text, source_lang, target_lang, translated_text, created_at, last_accessed_at)
                 VALUES ('hash_boundary', 'text', 'es', 'en', 'translated', ?, ?)
                 """,

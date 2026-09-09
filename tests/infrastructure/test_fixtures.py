@@ -5,9 +5,7 @@ import sys
 
 import numpy as np
 
-from src.db.auth import _DB_PATH as AUTH_DB_PATH
-from src.db.corpus_db import _DB_PATH as CORPUS_DB_PATH
-from src.db.incidents import DEFAULT_DB_PATH as INCIDENTS_DB_PATH
+from src.db import auth, corpus_db, incidents
 
 # ---------------------------------------------------------------------------
 # Mock Database Fixture Tests
@@ -20,10 +18,10 @@ def test_mock_db_provides_isolated_schema(mock_db):
     writable schema in an isolated temporary file.
     """
     # 1. Verify paths are patched to the temporary file
-    assert CORPUS_DB_PATH == mock_db
-    assert INCIDENTS_DB_PATH == mock_db
-    assert AUTH_DB_PATH != mock_db
-    assert AUTH_DB_PATH.endswith("test_users.db")
+    assert corpus_db._DB_PATH == mock_db
+    assert incidents.DEFAULT_DB_PATH == mock_db
+    assert auth._DB_PATH != mock_db
+    assert auth._DB_PATH.endswith("test_users.db")
 
     # 2. Verify we can connect and write
     conn = sqlite3.connect(mock_db)
@@ -37,12 +35,12 @@ def test_mock_db_provides_isolated_schema(mock_db):
 
     # Check that incidents table exists (from init_incidents_db)
     cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='incidents'"
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='plagiarism_incidents'"
     )
     assert cursor.fetchone() is not None
 
     # Connect to the auth database for testing the users table
-    auth_conn = sqlite3.connect(AUTH_DB_PATH)
+    auth_conn = sqlite3.connect(auth._DB_PATH)
     auth_cursor = auth_conn.cursor()
 
     # Check that users table exists (from init_auth_db)
@@ -55,10 +53,10 @@ def test_mock_db_provides_isolated_schema(mock_db):
     cursor.execute("SELECT COUNT(*) FROM documents")
     assert cursor.fetchone()[0] == 0
 
-    cursor.execute("SELECT COUNT(*) FROM incidents")
+    cursor.execute("SELECT COUNT(*) FROM plagiarism_incidents")
     assert cursor.fetchone()[0] == 0
 
-    auth_cursor.execute("SELECT COUNT(*) FROM users")
+    auth_cursor.execute("SELECT COUNT(*) FROM users WHERE username = ?", ("test_admin",))
     assert auth_cursor.fetchone()[0] == 0
 
     # 4. Verify writability
@@ -68,7 +66,7 @@ def test_mock_db_provides_isolated_schema(mock_db):
     )
     auth_conn.commit()
 
-    auth_cursor.execute("SELECT username FROM users")
+    auth_cursor.execute("SELECT username FROM users WHERE username = ?", ("test_admin",))
     assert auth_cursor.fetchone()[0] == "test_admin"
 
     conn.close()
@@ -196,7 +194,6 @@ def test_sentence_transformer_mock():
     """
     import sentence_transformers
 
-    assert isinstance(
-        sentence_transformers.SentenceTransformer,
-        type(sys.modules["unittest.mock"].MagicMock),
-    )
+    model = sentence_transformers.SentenceTransformer("fixture-only")
+    assert callable(model.encode)
+    assert model.get_sentence_embedding_dimension() == 384

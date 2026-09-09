@@ -68,7 +68,7 @@ class TestColumnExistence:
         
         # Find the chunk_count column
         chunk_count_col = [column for column in columns if column[1] == "chunk_count"][0]
-        assert chunk_count_col[4] == 0  # Default value is 0
+        assert chunk_count_col[4] == "0"  # Default value is 0
         
         conn.close()
 

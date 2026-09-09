@@ -88,7 +88,7 @@ class TestAlignSemanticSequences:
 
         assert len(alignment) == 1
         assert alignment[0]["type"] == "insert_b"
-        assert alignment[0]["chunk_b"] == "chunk"
+        assert alignment[0]["text_b"] == "chunk"
 
     def test_only_b_empty(self):
         """Aligning (['chunk'], []) should produce 'insert_a' operations for sequence A."""
@@ -99,7 +99,7 @@ class TestAlignSemanticSequences:
 
         assert len(alignment) == 1
         assert alignment[0]["type"] == "insert_a"
-        assert alignment[0]["chunk_a"] == "chunk"
+        assert alignment[0]["text_a"] == "chunk"
 
     def test_single_chunk_inputs_match(self):
         """Aligning single identical chunks should produce a 'match' operation."""
@@ -114,8 +114,8 @@ class TestAlignSemanticSequences:
 
         assert len(alignment) == 1
         assert alignment[0]["type"] == "match"
-        assert alignment[0]["chunk_a"] == "a"
-        assert alignment[0]["chunk_b"] == "a"
+        assert alignment[0]["text_a"] == "a"
+        assert alignment[0]["text_b"] == "a"
 
     def test_single_chunk_inputs_mismatch(self):
         """Aligning single distinct chunks (['a'], ['b']) should handle mismatch gracefully."""
@@ -129,7 +129,7 @@ class TestAlignSemanticSequences:
         )
 
         assert len(alignment) > 0
-        valid_types = {"match", "mismatch", "insert_a", "insert_b"}
+        valid_types = {"match", "paraphrase", "insert_a", "insert_b"}
         assert all(op["type"] in valid_types for op in alignment)
 
 

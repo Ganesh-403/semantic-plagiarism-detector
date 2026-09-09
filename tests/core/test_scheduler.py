@@ -84,7 +84,7 @@ def test_scheduler_survives_a_failed_pass():
         scheduler = RescanScheduler(interval_minutes=0.002)
         call_count = {"n": 0}
 
-        async def _flaky_run_once():
+        async def _flaky_run_once(self):
             call_count["n"] += 1
             if call_count["n"] == 1:
                 raise RuntimeError("simulated rescan failure")

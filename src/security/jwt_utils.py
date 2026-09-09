@@ -99,7 +99,7 @@ def base64url_encode(data: bytes) -> str:
 def base64url_decode(data: str) -> bytes:
     """Decode base64url string back to bytes after restoring '=' padding."""
     padding = "=" * ((4 - len(data) % 4) % 4)
-    return base64.urlsafe_b64decode(data + padding)
+    return base64.b64decode(data + padding, altchars=b"-_", validate=True)
 
 
 def create_jwt_token(
@@ -158,7 +158,7 @@ def create_jwt_token(
             raise ValueError("JWT secret key must be at least 32 characters long in production.")
 
     header = {"alg": alg, "typ": "JWT"}
-    now = int(time.time())
+    now = time.time()
     payload = {
         **data,
         "iat": now,
@@ -616,7 +616,7 @@ def create_jwt_token_with_kid(
     secret = registry.get_key(kid)
     # Inject kid into the token creation flow
     header = {"alg": JWT_ALGORITHM, "typ": "JWT", "kid": kid}
-    now = int(time.time())
+    now = time.time()
     payload = {
         **data,
         "iat": now,

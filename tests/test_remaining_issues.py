@@ -128,7 +128,7 @@ def test_academic_stats():
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_encrypted_rotated_pdf_colors(angle):
-    import fitz
+    from src.utils import pdf_backend as fitz
     from src.utils.pdf_highlighter import highlight_pdf_matches
 
     with fitz.open() as doc:
@@ -148,7 +148,7 @@ def test_encrypted_rotated_pdf_colors(angle):
         page = doc[0]
         annotations = list(page.annots())
         assert len(annotations) == 1
-        assert annotations[0].colors["stroke"] == [1.0, 0.0, 0.0]
+        assert tuple(annotations[0].colors["stroke"]) == (1.0, 0.0, 0.0)
         vertices = annotations[0].vertices
         assert abs(vertices[0][1] - original_rect.y0) < 1
 

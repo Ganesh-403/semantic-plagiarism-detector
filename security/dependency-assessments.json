@@ -1,0 +1,26 @@
+{
+  "assessments": [
+    {
+      "package": "nltk",
+      "version": "3.10.3",
+      "vulnerability": "GHSA-8mgp-746c-j5xp",
+      "status": "not_affected",
+      "reviewed_on": "2026-09-09",
+      "review_by": "2026-10-09",
+      "justification": "The application exposes text inference only, never caller-selected NLTK model import/export paths. None of the six affected model-artifact APIs are called. Fixed-name corpus downloads do not use those APIs.",
+      "advisory": "https://github.com/advisories/GHSA-8mgp-746c-j5xp",
+      "source_sha256": {
+        "src/core/document_parser.py": "ed33b2244f25617bd548ec30d9713b730234ebf2e5586c97321730161d5d532a",
+        "src/core/lexical_similarity.py": "4ad1e261be2556f702ce3fe9fc79455ac0ca8bf84c6ac1bfa20c79f97a087faf",
+        "src/core/pos_normalizer.py": "a4f02343daac77dd70d251f49f1ea09f2e83efc37e6e585687da1069bd2373c2",
+        "src/core/text_chunking.py": "1689363697d46550b9389d7ff82edb5748fd6d30f4b130c9bd734b66d90df797",
+        "src/utils/diff_highlighter.py": "8d66a75db14dc549209c5da05af11afb6705304dbfe47730342cd5e786d71949",
+        "src/core/parsers/cleaners.py": "1ddd6ff43e3ec95b8afca02475c2e5d58d4a36cb3061a547b86cefc3e45a19f4",
+        "app/components/Advanced_text_analysis.py": "81c6b3194ba8156b430c0f1c25bd5c612170f172ff400ab6b407e8ffe35c27db",
+        "app/components/Adv_doc_version.py": "48a1adf6f5ba77b6501e7d3e322cc367d67d94c2d72828ec7d7f301e82b0f406",
+        "app/components/smart_search.py": "6bf9e88d900536ac46f19c0f971604ed58780b106baaaede642ab352b41821c1",
+        "scripts/setup_dev.py": "14fdb52fc0a753ac81c5e2f80bb91b918b00e3377fc81533531eb60a5694d0b1"
+      }
+    }
+  ]
+}

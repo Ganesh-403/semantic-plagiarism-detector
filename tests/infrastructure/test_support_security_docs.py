@@ -60,10 +60,10 @@ def test_support_md_links_and_issue_templates_exist():
 
         parsed = urlparse(link_url)
         if parsed.scheme in ("http", "https"):
-            assert "github.com" in parsed.netloc
-            assert "semantic-plagiarism-detector" in parsed.path
+            assert parsed.scheme == "https"
+            assert parsed.hostname and not parsed.username
         else:
             # Relative file link
-            target_path = (REPO_ROOT / link_url).resolve()
+            target_path = (REPO_ROOT / parsed.path).resolve()
             assert target_path.exists(), f"Target link '{link_url}' referenced in SUPPORT.md does not exist at {target_path}"
 

@@ -111,6 +111,7 @@ def configure_db_path(db_path: str | os.PathLike) -> None:
     global _DB_PATH
     close_connections()
     _DB_PATH = os.path.abspath(os.fspath(db_path))
+    heatmap_repo.configure_db_path(_DB_PATH)
 
 
 # ---------------------------------------------------------------------------
@@ -197,8 +198,8 @@ def init_heatmap_db() -> None:
 class HeatmapRepository(BaseRepository):
     """Data access object for heatmap and clustering tables."""
 
-    def __init__(self, db_path: str | os.PathLike = _DB_PATH) -> None:
-        super().__init__(db_path)
+    def __init__(self, db_path: str | os.PathLike | None = None) -> None:
+        super().__init__(db_path if db_path is not None else get_heatmap_db_path())
 
     # -- Heatmap Snapshots --------------------------------------------------
 
@@ -239,7 +240,7 @@ class HeatmapRepository(BaseRepository):
 
     def get_snapshot(self, snapshot_id: int) -> dict[str, Any] | None:
         """Retrieve a heatmap snapshot by ID."""
-        with _connect() as conn:
+        with self.connection() as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(
                 "SELECT * FROM heatmap_snapshots WHERE snapshot_id = ?",
@@ -251,7 +252,7 @@ class HeatmapRepository(BaseRepository):
         self, *, limit: int = 20, offset: int = 0
     ) -> list[dict[str, Any]]:
         """List heatmap snapshots ordered by most recent."""
-        with _connect() as conn:
+        with self.connection() as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 """
@@ -264,7 +265,7 @@ class HeatmapRepository(BaseRepository):
             return [self._hydrate_snapshot(r) for r in rows]
 
     def count_snapshots(self) -> int:
-        with _connect() as conn:
+        with self.connection() as conn:
             row = conn.execute("SELECT COUNT(1) FROM heatmap_snapshots").fetchone()
             return int(row[0]) if row else 0
 
@@ -312,7 +313,7 @@ class HeatmapRepository(BaseRepository):
             return cursor.lastrowid  # type: ignore[return-value]
 
     def get_clustering(self, result_id: int) -> dict[str, Any] | None:
-        with _connect() as conn:
+        with self.connection() as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(
                 "SELECT * FROM clustering_results WHERE result_id = ?",
@@ -323,7 +324,7 @@ class HeatmapRepository(BaseRepository):
     def list_clusterings(
         self, *, limit: int = 20, offset: int = 0
     ) -> list[dict[str, Any]]:
-        with _connect() as conn:
+        with self.connection() as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 """
@@ -411,7 +412,7 @@ class HeatmapRepository(BaseRepository):
         query += " ORDER BY similarity DESC LIMIT ?"
         params.append(limit)
 
-        with _connect() as conn:
+        with self.connection() as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, params).fetchall()
             return [dict(row) for row in rows]
@@ -425,7 +426,7 @@ class HeatmapRepository(BaseRepository):
             return cursor.rowcount > 0
 
     def get_unresolved_hotspot_count(self) -> int:
-        with _connect() as conn:
+        with self.connection() as conn:
             row = conn.execute(
                 "SELECT COUNT(1) FROM similarity_hotspots WHERE is_resolved = 0"
             ).fetchone()
@@ -434,7 +435,7 @@ class HeatmapRepository(BaseRepository):
     # -- Analytics ----------------------------------------------------------
 
     def get_hotspot_summary(self) -> dict[str, Any]:
-        with _connect() as conn:
+        with self.connection() as conn:
             total = conn.execute(
                 "SELECT COUNT(1) FROM similarity_hotspots"
             ).fetchone()[0]

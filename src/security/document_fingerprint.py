@@ -176,7 +176,7 @@ class MinHash:
             Tuple of min-hash values, one per permutation.
         """
         prime = (1 << 61) - 1
-        signature = [float("inf")] * self.num_perm
+        signature = [prime] * self.num_perm
 
         shingles = set(tokens) if len(tokens) <= 10000 else set(tokens[:10000])
 
@@ -532,14 +532,14 @@ class DocumentFingerprintEngine:
         simhash_val = None
         trigram_s = None
 
-        if FingerprintMethod.MINHASH in methods or FingerprintMethod.SHA256 not in methods:
+        if FingerprintMethod.MINHASH in methods:
             shingles = _shingle_tokens(tokens, self.shingle_size)
             minhash_sig = self._minhash.compute(shingles)
 
-        if FingerprintMethod.SIMHASH in methods or FingerprintMethod.SHA256 not in methods:
+        if FingerprintMethod.SIMHASH in methods:
             simhash_val = self._simhash.compute(tokens)
 
-        if FingerprintMethod.TRIGRAM in methods or FingerprintMethod.SHA256 not in methods:
+        if FingerprintMethod.TRIGRAM in methods:
             trigram_s = compute_trigram_fingerprint(text)
 
         fingerprint = DocumentFingerprint(

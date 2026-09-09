@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - Added `search_index()` function with score threshold filtering support in `src/core/faiss_index.py` and comprehensive test coverage (`tests/core/test_faiss_threshold_filtering_issue_4036.py`).
 - Added `docker-compose.override.yml` mounting `./src` and `./app` into container for live hot-reloading during local development (`docker-compose.override.yml`).
 - Automated fault tolerance test for mid-session Redis connection drop and graceful in-memory failover (`tests/core/test_fault_tolerance.py`, `tests/utils/test_redis_fallback_failover.py`).
@@ -22,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Accessible High Contrast theme (`HIGH_CONTRAST_THEME`) with sidebar theme selector (`app/theme.py`).
 
 ### Fixed
+
 - Restore the Streamlit login, comparison tabs, model pipeline, and atomic corpus ingestion; remove duplicated widgets and competing FastAPI application definitions.
 - Restore runtime dependencies and missing public model/service contracts; defer heavyweight imports and optional model warmup until needed.
 - Fix FAISS concurrent operations/autosave, empty embeddings and low-memory fallback, short-tail and Markdown chunking, lexical metrics, PDF highlights, SSO verified email checks, cleanup, and release-check caching.
@@ -46,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rewrote the ten demonstration strings in `_generate_sample_ai_texts` and `_generate_sample_human_texts` as implicit concatenation; they were single-quoted literals wrapped across physical lines, which left the whole module uncompilable (`AI_ADVANCED_Text_Gen.py`).
 
 ### Security
+
 - Require real credentials for API login and 2FA enrollment, reject secret re-disclosure, honor refresh-token revocation, and prevent 2FA helpers from creating accounts.
 - Require an explicit administrator bootstrap password for new installations; preserve existing account passwords.
 - Centralize spreadsheet formula sanitization in `export_sanitizer` and apply it across excel, bulk, and batch exports (`src/utils/export_sanitizer.py`).
@@ -54,18 +57,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Explicitly excluded `.env`, `.git/`, `.venv/`, `*.sqlite`, and bytecode caches in `.dockerignore` to prevent leaking secrets and development artifacts into production containers (`.dockerignore`).
 
 ### Changed
+
 - Optimized `count_unique_words` to populate the word set directly using `re.finditer` generator expressions, eliminating intermediate list allocations on large documents (`src/utils/text_stats.py`).
 - Optimized `clear_session` and `clear_pattern` with Redis pipelining to batch deletions into a single network round-trip (`src/utils/redis_cache.py`).
 - Warning list pagination no longer writes `st.session_state` directly; page updates are applied via a view-layer callback (`src/utils/warning_list.py`).
 - Diff highlighter default match length is configurable via `DEFAULT_DIFF_MIN_MATCH_LENGTH` (`src/core/config.py`, `src/utils/diff_highlighter.py`).
 - Build originality badge SVGs with `xml.etree.ElementTree` instead of f-string interpolation (`src/utils/badge_generator.py`).
 
-### Added
+### Document warnings
+
 - Detection and UI warning for high stop-word density in documents. Flags `WARNING_HIGH_STOPWORD_DENSITY` when stop-words exceed 70% of a document's token count and displays a warning in the warning list (`src/utils/warning_list.py`).
 
 ## [1.0.0] - 2026-07-21
 
 ### Added
+
 - Cross-lingual preprocessing pipeline supporting language detection and automatic English alignment (`src/core/cross_lingual.py`, `src/core/translator.py`).
 - SQLite-backed corpus database and chunk vector persistence (`src/db/corpus_db.py`).
 - Plagiarism incident tracking and review status management (`src/db/incidents.py`).
@@ -78,10 +84,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Standard open-source governance documents (`CODE_OF_CONDUCT.md`, `SECURITY.md`, `SUPPORT.md`, `CHANGELOG.md`, GitHub issue templates).
 
 ### Changed
+
 - Reorganized `tests/` directory structure into modular `tests/app/`, `tests/core/`, `tests/db/`, `tests/utils/`, and `tests/visualization/`.
 - Moved `warning_list.py` into `src/utils/` to maintain strict `src/` modular encapsulation.
 - Updated `requirements.txt` to remove duplicate dependency entries.
 
 ### Fixed
+
 - Handled missing `redis` dependency in `src/utils/redis_cache.py` to prevent import crashes during test collection.
 - Removed legacy duplicate `utils/pdf_report.py` file to ensure tests validate the production PDF report module.

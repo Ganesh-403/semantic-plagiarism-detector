@@ -47,7 +47,9 @@ class TestCrossModalAligner:
         ]
         result = compute_cross_modal_similarity(text_blocks, code_blocks)
         assert result["structural_similarity"] == 1.0
-        assert result["is_translation"] is True
+        # Shared block types alone do not establish a translation.
+        assert result["overall_score"] == pytest.approx(2 / 3, abs=0.0001)
+        assert result["is_translation"] is False
 
     def test_compute_cross_modal_similarity_different_flow(self):
         text_blocks = [LogicalBlock("loop", "for each", ["for", "each"])]

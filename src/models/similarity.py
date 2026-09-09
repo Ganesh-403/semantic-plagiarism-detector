@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field, asdict
 from enum import Enum
+from datetime import datetime, timezone
 from uuid import uuid4
 from src.models.document import DocumentStatus
 
@@ -72,6 +73,7 @@ class AnalysisResult:
     status: DocumentStatus = DocumentStatus.PENDING
     processing_time_ms: float = 0.0
     error_message: str = ""
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def add_match(self, match):
         self.matches.append(match)

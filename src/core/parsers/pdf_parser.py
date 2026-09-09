@@ -427,7 +427,7 @@ def extract_texts_parallel(
 def count_pdf_images(pdf_bytes: bytes) -> int:
     """Count embedded images in a PDF by inspecting page image lists."""
     try:
-        import fitz
+        from src.utils import pdf_backend as fitz
 
         with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
             return sum(len(page.get_images()) for page in doc)
@@ -441,7 +441,7 @@ def extract_pdf_metadata(file: PDFInput) -> dict[str, str]:
     metadata = {"author": None, "creation_date": None, "title": None}
 
     try:
-        import fitz
+        from src.utils import pdf_backend as fitz
 
         with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
             doc_metadata = doc.metadata

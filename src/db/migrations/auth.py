@@ -6,7 +6,7 @@ import sys
 
 from .common import column_exists, run_migrations
 
-AUTH_SCHEMA_VERSION = 18
+AUTH_SCHEMA_VERSION = 20
 
 
 def migration_001_create_users(
@@ -236,6 +236,23 @@ def migration_018_add_password_expiration(connection: sqlite3.Connection) -> Non
         connection.execute("ALTER TABLE users ADD COLUMN password_expires_at TEXT")
 
 
+def migration_019_add_sso_identity(connection: sqlite3.Connection) -> None:
+    """Add fields used by the SSO account repository to upgraded installations."""
+    for name in ("sso_provider", "sso_provider_user_id", "created_at", "updated_at"):
+        if not column_exists(connection, "users", name):
+            connection.execute(f'ALTER TABLE users ADD COLUMN "{name}" TEXT')
+
+
+def migration_020_add_password_reset_tokens(connection: sqlite3.Connection) -> None:
+    """Store only digests of short-lived recovery tokens."""
+    connection.execute("""CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        token_hash TEXT PRIMARY KEY,
+        username TEXT NOT NULL UNIQUE REFERENCES users(username) ON DELETE CASCADE,
+        created_at REAL NOT NULL,
+        expires_at REAL NOT NULL
+    )""")
+
+
 def _discover_migrations() -> dict[int, callable]:
     """Dynamically discover migration functions starting with 'migration_' sorted numerically."""
     current_module = sys.modules[__name__]
@@ -346,7 +363,17 @@ def down_018_add_password_expiration(connection: sqlite3.Connection) -> None:
     _drop_column_if_exists(connection, "users", "password_expires_at")
 
 
+def down_019_add_sso_identity(connection: sqlite3.Connection) -> None:
+    for name in ("sso_provider", "sso_provider_user_id", "created_at", "updated_at"):
+        _drop_column_if_exists(connection, "users", name)
+
+
+def down_020_add_password_reset_tokens(connection: sqlite3.Connection) -> None:
+    connection.execute("DROP TABLE IF EXISTS password_reset_tokens")
+
+
 AUTH_DOWN_MIGRATIONS = {
+    20: down_020_add_password_reset_tokens,
     1: down_001_create_users,
     2: down_002_add_onboarding_state,
     3: down_003_add_two_factor_fields,
@@ -365,6 +392,7 @@ AUTH_DOWN_MIGRATIONS = {
     16: down_016_add_audit_log_indexes,
     17: down_017_drop_is_active,
     18: down_018_add_password_expiration,
+    19: down_019_add_sso_identity,
 }
 
 

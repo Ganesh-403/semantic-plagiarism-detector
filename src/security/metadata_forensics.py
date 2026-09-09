@@ -30,6 +30,7 @@ suspicious document provenance, such as purchased essays or copied templates.
 Analyzes core properties, revision histories, and creation timestamps.
 """
 
+import io
 import logging
 import re
 import struct
@@ -75,7 +76,7 @@ def extract_docx_metadata(file_bytes: bytes) -> Dict[str, Any]:
     }
 
     try:
-        with zipfile.ZipFile(file_bytes) as zf:
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as zf:
             # Extract core properties
             if "docProps/core.xml" in zf.namelist():
                 core_xml = zf.read("docProps/core.xml")

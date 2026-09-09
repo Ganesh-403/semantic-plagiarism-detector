@@ -20,7 +20,7 @@ def main():
     add_user("smoke_teacher", "Smoke-Test-Password!984", role="admin")
     at = AppTest.from_file(str(ROOT / "app/streamlit_app.py"), default_timeout=90).run()
     assert not at.exception, [e.message for e in at.exception]
-    assert [w.label for w in at.text_input] == ["Username", "Password"]
+    assert [w.label for w in at.text_input[:2]] == ["Username", "Password"]
     at.text_input[0].set_value("smoke_teacher")
     at.text_input[1].set_value("Smoke-Test-Password!984")
     next(b for b in at.button if b.label == "Login").click().run()

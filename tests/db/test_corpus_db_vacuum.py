@@ -46,6 +46,7 @@ class TestVacuumCorpusDatabase(unittest.TestCase):
             def connect(*args, **kwargs):
                 conn = real_connect(*args, **kwargs)
                 connections.append(conn)
+                self.assertIsNone(conn.isolation_level)
                 return conn
 
             with patch("src.db.corpus_db.get_corpus_db_path", return_value=db_path), patch(
@@ -54,7 +55,6 @@ class TestVacuumCorpusDatabase(unittest.TestCase):
                 vacuum_corpus_database()
 
             self.assertEqual(len(connections), 1)
-            self.assertIsNone(connections[0].isolation_level)
             with self.assertRaises(sqlite3.ProgrammingError):
                 connections[0].execute("SELECT 1")
 

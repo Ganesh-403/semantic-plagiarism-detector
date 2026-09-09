@@ -45,6 +45,38 @@ def health_check():
     }
 
 
+@router.get("/health/live", tags=["Health"])
+@router.get("/api/v1/health/live", tags=["Health"])
+def health_live():
+    return {"status": "alive", "service": "Semantic Plagiarism Detector API", "version": APP_VERSION}
+
+
+@router.get("/health/ready", tags=["Health"])
+@router.get("/api/v1/health/ready", tags=["Health"])
+def health_ready():
+    """Check durable storage and Redis only when the operator configured it."""
+    database = "connected"
+    try:
+        with _connect() as conn:
+            conn.execute("SELECT 1")
+    except Exception:
+        database = "disconnected"
+    redis_status = "disabled"
+    if os.getenv("REDIS_URL") or os.getenv("REDIS_HOST"):
+        from src.utils.redis_cache import get_cache
+        try:
+            reachable, _ = get_cache().ping()
+            redis_status = "connected" if reachable else "disconnected"
+        except Exception:
+            redis_status = "disconnected"
+    ready = database == "connected" and redis_status != "disconnected"
+    return JSONResponse(status_code=200 if ready else 503, content={
+        "status": "ready" if ready else "not_ready",
+        "db": database, "redis": redis_status,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+
 @router.get(
     "/api/v1/status",
     tags=["Health"],
@@ -132,8 +164,18 @@ def healthz():
 
         memory = psutil.virtual_memory()
 
-        if memory.available <= 0:
-            raise RuntimeError("Low memory")
+        try:
+            max_memory = float(os.getenv("HEALTHZ_MAX_MEMORY_PERCENT", "95"))
+            if not 0 < max_memory <= 100:
+                max_memory = 95.0
+        except ValueError:
+            max_memory = 95.0
+        if memory.available <= 0 or memory.percent >= max_memory:
+            return JSONResponse(status_code=503, content={
+                "status": "degraded", "db": "connected", "memory": "unavailable",
+                "db_size_bytes": 0, "db_size_mb": 0.0,
+                "warning": f"Memory usage {memory.percent:.1f}% exceeds threshold {max_memory:.1f}%",
+            })
 
         from src.core.app_config import CORPUS_DB_PATH
 
@@ -173,13 +215,11 @@ def healthz():
     summary="Get current API rate limit status",
     status_code=status.HTTP_200_OK,
 )
-def get_rate_limit(_user: dict = Security(get_current_user, scopes=["read"])):
-    """Return the current API rate limit information."""
-    return {
-        "limit": 100,
-        "remaining": 85,
-        "reset_in_seconds": 45,
-    }
+def get_rate_limit(request: Request, _user: dict = Security(get_current_user, scopes=["read"])):
+    """Return the authenticated token's actual bucket, including this request."""
+    from src.security.rate_limiter import get_token_bucket_limiter
+    token = request.headers.get("authorization", "").partition(" ")[2].strip()
+    return get_token_bucket_limiter().get_status(token)
 
 
 @router.get(

@@ -141,7 +141,7 @@ def test_detect_language_high_confidence():
 
     with patch("src.core.cross_lingual.detect_langs") as mock_detect_langs:
         mock_detect_langs.return_value = [Language("fr", 0.9)]
-        lang, confident = detect_language("some text in french")
+        lang, confident = detect_language("Some sufficiently long text in French")
 
         assert lang == "fr"
         assert confident is True
@@ -376,37 +376,74 @@ class TestDetectChunkLanguage:
 class TestBackTranslateChunk:
     """Tests for the back-translation and caching logic."""
 
-    def test_english_text_unchanged(self):
+    @pytest.fixture(autouse=True)
+    def translation_http(self, monkeypatch):
+        """Keep provider parsing real; supply only the external HTTP response."""
+        import requests
+        from unittest.mock import Mock
+        from src.utils import translation_providers
+
+        for key in ("DEEPL_API_KEY", "GOOGLE_TRANSLATE_API_KEY", "OFFLINE_TRANSLATION_ENABLED"):
+            monkeypatch.delenv(key, raising=False)
+        response = requests.Response()
+        response.status_code = 200
+        response._content = b'{"responseStatus": 200, "responseData": {"translatedText": "The brown fox."}}'
+        response._content_consumed = True
+        http_get = Mock(return_value=response)
+        monkeypatch.setattr(translation_providers.requests, "get", http_get)
+        return http_get
+
+    def test_english_text_unchanged(self, translation_http):
         text = "This is already in English."
         result = back_translate_chunk(text, source_lang="en")
         assert result == text
+        translation_http.assert_not_called()
 
     @patch("src.core.cross_lingual.save_translation")
     @patch("src.core.cross_lingual.get_cached_translation", return_value=None)
-    def test_cache_miss_triggers_translation(self, mock_get, mock_save):
+    def test_cache_miss_triggers_translation(self, mock_get, mock_save, translation_http):
         text = "El zorro marrón."
         result = back_translate_chunk(text, source_lang="es", use_cache=True)
 
         # Should call save_translation after mock translation
-        mock_save.assert_called_once()
-        assert "[Translated from es]" in result
+        mock_save.assert_called_once_with(text, "es", "en", "The brown fox.")
+        assert result == "The brown fox."
+        translation_http.assert_called_once()
+        assert translation_http.call_args.kwargs["params"]["langpair"] == "es|en"
+        assert translation_http.call_args.kwargs["timeout"] > 0
 
     @patch("src.core.cross_lingual.save_translation")
     @patch(
         "src.core.cross_lingual.get_cached_translation", return_value="The brown fox."
     )
-    def test_cache_hit_returns_cached_value(self, mock_get, mock_save):
+    def test_cache_hit_returns_cached_value(self, mock_get, mock_save, translation_http):
         text = "El zorro marrón."
         result = back_translate_chunk(text, source_lang="es", use_cache=True)
 
         assert result == "The brown fox."
         mock_save.assert_not_called()
+        translation_http.assert_not_called()
 
-    def test_cache_disabled_skips_lookup(self):
+    @patch("src.core.cross_lingual.save_translation")
+    @patch("src.core.cross_lingual.get_cached_translation")
+    def test_cache_disabled_skips_lookup(self, mock_get, mock_save, translation_http):
         text = "El zorro marrón."
         # With use_cache=False, it should bypass cache and translate directly
         result = back_translate_chunk(text, source_lang="es", use_cache=False)
-        assert "[Translated from es]" in result
+        assert result == "The brown fox."
+        mock_get.assert_not_called()
+        mock_save.assert_not_called()
+        translation_http.assert_called_once()
+
+    @patch("src.core.cross_lingual.save_translation")
+    @patch("src.core.cross_lingual.get_cached_translation", return_value=None)
+    def test_provider_rate_limit_preserves_source_without_caching_error(self, mock_get, mock_save, translation_http, caplog):
+        translation_http.return_value.status_code = 429
+        text = "El zorro marrón."
+        assert back_translate_chunk(text, source_lang="es") == text
+        assert translation_http.call_count == 3
+        mock_save.assert_not_called()
+        assert "HTTP 429" in caplog.text
 
 
 # ── Issue #2222: Add Italian and Portuguese language detection heuristics ─────

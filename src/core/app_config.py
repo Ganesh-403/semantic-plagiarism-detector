@@ -77,10 +77,20 @@ JWT_SECRET_KEY: Final[str] = os.getenv("JWT_SECRET_KEY", "").strip()
 REDIS_PASSWORD: Final[str] = os.getenv("REDIS_PASSWORD", "").strip()
 
 if APP_ENV == "production":
-    # If secrets are unset ("") or using obvious default placeholders, halt startup.
+    from urllib.parse import unquote, urlsplit
+
     _default_secrets = {"", "default", "changeme", "secret", "password"}
-    if JWT_SECRET_KEY in _default_secrets or REDIS_PASSWORD in _default_secrets:
-        raise SystemExit("Fatal: Default secrets detected in production environment.")
+    if JWT_SECRET_KEY.lower() in _default_secrets or len(JWT_SECRET_KEY) < 32:
+        raise SystemExit("Fatal: Set a strong JWT_SECRET_KEY of at least 32 characters in production.")
+    # Redis is optional. Validate credentials when an endpoint is configured,
+    # including managed services that put their password in REDIS_URL.
+    if os.getenv("REDIS_URL") or os.getenv("REDIS_HOST"):
+        try:
+            _redis_url_password = unquote(urlsplit(os.getenv("REDIS_URL", "")).password or "")
+        except ValueError:
+            raise SystemExit("Fatal: Invalid production Redis configuration.") from None
+        if (_redis_url_password or REDIS_PASSWORD).lower() in _default_secrets:
+            raise SystemExit("Fatal: Set non-default credentials for the configured production Redis service.")
 
 
 # ─── Logging level configuration (issue #3745) ─────────────────────────────

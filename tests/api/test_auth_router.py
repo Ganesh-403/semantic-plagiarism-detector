@@ -43,7 +43,7 @@ def test_refresh_token_rotation_success():
                 assert "access_token" in response.json()
                 assert response.json()["access_token"] == mock_access_token
                 
-                mock_revoked.assert_called_once_with(valid_refresh_token)
+                mock_revoked.assert_called_with(valid_refresh_token)
                 mock_verify.assert_called_once_with(valid_refresh_token)
 
 

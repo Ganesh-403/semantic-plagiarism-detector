@@ -99,8 +99,14 @@ def test_chunk_document_by_tokens_with_dummy_hf_tokenizer():
         assert "token_" in chunk
 
 
-def test_chunk_document_by_tokens_fallback_without_tokenizer():
+def test_chunk_document_by_tokens_fallback_without_tokenizer(monkeypatch):
     """Verify graceful fallback when tokenizer is None and EmbeddingModelManager is mocked/unavailable."""
+    from src.core.embedding_model import EmbeddingModelManager
+
+    def unavailable():
+        raise RuntimeError("Model unavailable")
+
+    monkeypatch.setattr(EmbeddingModelManager, "get_instance", unavailable)
     words = [f"item_{i}" for i in range(50)]
     text = " ".join(words)
 

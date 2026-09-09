@@ -40,7 +40,7 @@ CREATE TABLE chunks (
 
 ### 1. Indexing Flow
 
-```
+```text
 Documents (PDF/DOCX/TXT)
         │
         ▼
@@ -117,17 +117,17 @@ save_index(new_index, _INDEX_PATH)
 
 ## Consistency Guarantees
 
-| Check | Location | What it verifies |
-|---|---|---|
-| Matrix rows == registry length | `load_or_rebuild_index()` | `matrix.shape[0] == len(registry)` |
-| ORDER BY vector_id ASC | `get_all_embeddings()` and `get_chunk_registry()` | Both use the same ordering |
-| Vector ID compaction | `_compact_vector_ids()` | Removes gaps after deletion |
-| Index rebuild after delete | `streamlit_app.py` | `build_index_from_matrix()` + `save_index()` |
+| Check                          | Location                                          | What it verifies                             |
+| ------------------------------ | ------------------------------------------------- | -------------------------------------------- |
+| Matrix rows == registry length | `load_or_rebuild_index()`                         | `matrix.shape[0] == len(registry)`           |
+| ORDER BY vector_id ASC         | `get_all_embeddings()` and `get_chunk_registry()` | Both use the same ordering                   |
+| Vector ID compaction           | `_compact_vector_ids()`                           | Removes gaps after deletion                  |
+| Index rebuild after delete     | `streamlit_app.py`                                | `build_index_from_matrix()` + `save_index()` |
 
 ## File Reference
 
-| File | Key Functions |
-|---|---|
+| File                      | Key Functions                                                                                                     |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `src/core/faiss_index.py` | `ChunkRecord`, `build_index()`, `search_similar_chunks()`, `load_or_rebuild_index()`, `build_index_from_matrix()` |
-| `src/db/corpus_db.py` | `add_chunks()`, `get_chunk_registry()`, `get_all_embeddings()`, `_compact_vector_ids()`, `delete_document()` |
-| `app/streamlit_app.py` | Document management UI, FAISS search UI |
+| `src/db/corpus_db.py`     | `add_chunks()`, `get_chunk_registry()`, `get_all_embeddings()`, `_compact_vector_ids()`, `delete_document()`      |
+| `app/streamlit_app.py`    | Document management UI, FAISS search UI                                                                           |

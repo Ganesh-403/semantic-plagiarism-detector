@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import html
 import logging
+import math
 from typing import Any, Dict, List
 
 import pandas as pd
@@ -108,8 +109,9 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
     if value is None:
         return default
     try:
-        return float(value)
-    except (ValueError, TypeError):
+        result = float(value)
+        return result if math.isfinite(result) else default
+    except (ValueError, TypeError, OverflowError):
         return default
 
 
@@ -119,7 +121,7 @@ def _safe_int(value: Any, default: int = 0) -> int:
         return default
     try:
         return int(value)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, OverflowError):
         return default
 
 
@@ -140,7 +142,7 @@ def _normalise_review_status(value: Any) -> str:
     if not value:
         return "Pending"
     val_str = str(value).strip().lower()
-    if "resolved" in val_str or "resolve" in val_str:
+    if val_str in {"resolved", "resolve", "✅ resolved"}:
         return "Resolved"
     return "Pending"
 
@@ -175,7 +177,8 @@ def _incidents_to_dataframe(incidents: list[Any]) -> pd.DataFrame:
         inc_id = _get_val("incident_id")
         doc_a = _get_val("document_a") or _get_val("doc_a") or "Unknown"
         doc_b = _get_val("document_b") or _get_val("doc_b") or "Unknown"
-        similarity = _safe_float(_get_val("similarity_score") or _get_val("similarity"))
+        raw_similarity = _get_val("similarity_score")
+        similarity = _safe_float(raw_similarity if raw_similarity is not None else _get_val("similarity"))
         severity = _normalise_severity(
             _get_val("severity_rank") or _get_val("severity")
         )
@@ -420,12 +423,12 @@ def _apply_plotly_theme(
         xaxis=dict(
             gridcolor=theme_colors.get("border", "#E2E8F0"),
             tickfont=dict(color=theme_colors.get("muted", "#64748B")),
-            titlefont=dict(color=theme_colors.get("ink", "#0F172A")),
+            title=dict(font=dict(color=theme_colors.get("ink", "#0F172A"))),
         ),
         yaxis=dict(
             gridcolor=theme_colors.get("border", "#E2E8F0"),
             tickfont=dict(color=theme_colors.get("muted", "#64748B")),
-            titlefont=dict(color=theme_colors.get("ink", "#0F172A")),
+            title=dict(font=dict(color=theme_colors.get("ink", "#0F172A"))),
         ),
     )
 

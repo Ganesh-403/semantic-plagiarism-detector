@@ -1,6 +1,8 @@
 """src/api/routers/analysis.py - Plagiarism analysis and scan job management router."""
 
 import logging
+import io
+from contextlib import contextmanager
 import os
 import uuid
 from datetime import datetime, timezone
@@ -19,6 +21,7 @@ from fastapi import (
     status,
 )
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field, field_validator
 from sklearn.metrics.pairwise import cosine_similarity
 
 from src.api.dependencies import (
@@ -34,7 +37,8 @@ from src.api.schemas import (
     SimilarityCheckResponse,
 )
 from src.core.document_parser import extract_text
-from src.core.embedding_model import embed_chunks, get_document_embedding
+from src.errors import EmptyDocumentError
+from src.core.embedding_model import embed_chunks, get_document_embedding, release_large_batch_memory, LARGE_BATCH_GC_THRESHOLD
 from src.core.similarity import (
     PLAGIARISM_THRESHOLD,
     chunk_max_similarity,
@@ -54,6 +58,19 @@ total_scans = 0
 scan_jobs: Dict[str, Dict[str, Any]] = {}
 
 
+@contextmanager
+def _scan_stage(stage: str, job_id: str | None = None):
+    from src.core.metrics import spd_scan_duration_seconds
+    with spd_scan_duration_seconds.labels(stage=stage).time():
+        yield
+    if job_id and job_id in scan_jobs and scan_jobs[job_id]["status"] != "cancelled":
+        percent, label = {
+            "parsing": (20, "text extraction"), "chunking": (40, "chunking"),
+            "embedding": (70, "embedding"), "matrix comparison": (90, "comparison"),
+        }[stage]
+        scan_jobs[job_id].update(progress_percent=percent, stage=label)
+
+
 def _process_scan_job(
     job_id: str,
     file_input: Any,
@@ -61,7 +78,7 @@ def _process_scan_job(
     threshold: float,
     top_k: int,
 ) -> None:
-    if job_id not in scan_jobs:
+    if job_id not in scan_jobs or scan_jobs[job_id]["status"] == "cancelled":
         if isinstance(file_input, (str, os.PathLike)) and os.path.exists(file_input):
             try:
                 os.unlink(file_input)
@@ -71,8 +88,10 @@ def _process_scan_job(
 
     scan_jobs[job_id]["status"] = "processing"
 
+    chunks = []
     try:
-        extracted_text = extract_text(file_input, filename)
+        with _scan_stage("parsing", job_id):
+            extracted_text = extract_text(file_input, filename)
         if not extracted_text.strip():
             scan_jobs[job_id]["status"] = "failed"
             scan_jobs[job_id]["error"] = (
@@ -83,12 +102,39 @@ def _process_scan_job(
         words = extracted_text.split()
         word_count = len(words)
 
-        chunks = chunk_document(extracted_text)
+        with _scan_stage("chunking", job_id):
+            chunks = chunk_document(extracted_text)
         if not chunks:
             chunks = [extracted_text[:1000]]
 
-        uploaded_embeddings = embed_chunks(chunks)
-        doc_embedding = get_document_embedding(uploaded_embeddings)
+        exact_match = None
+        if isinstance(file_input, (str, os.PathLike)):
+            exact_match = get_document_by_hash(calculate_file_sha256(file_input))
+        if scan_jobs.get(job_id, {}).get("status") == "cancelled":
+            return
+        if exact_match and exact_match != filename:
+            scan_jobs[job_id].update(
+                status="completed", progress_percent=100, stage="done",
+                completed_at=datetime.now(timezone.utc).isoformat(),
+                result={
+                    "filename": filename, "word_count": word_count,
+                    "chunk_count": len(chunks), "plagiarism_flagged": True,
+                    "threshold_used": threshold, "plagiarism_density": 100,
+                    "overall_document_similarity": 1.0, "max_chunk_similarity": 1.0,
+                    "matched_documents_count": 1,
+                    "matched_documents": [{
+                        "filename": exact_match, "document_similarity_score": 1.0,
+                        "max_chunk_similarity_score": 1.0, "severity": "🔴 High",
+                        "exact_file_match": True,
+                        "flagged_chunks": [{"uploaded_chunk": chunk, "matched_chunk": chunk, "similarity_score": 1.0} for chunk in chunks[:top_k]],
+                    }],
+                },
+            )
+            return
+
+        with _scan_stage("embedding", job_id):
+            uploaded_embeddings = embed_chunks(chunks)
+            doc_embedding = get_document_embedding(uploaded_embeddings)
         corpus_docs = get_corpus_documents_with_embeddings()
 
         matched_documents = []
@@ -96,70 +142,71 @@ def _process_scan_job(
         max_chunk_overall_score = 0.0
         uploaded_chunks_flagged = np.zeros(len(chunks), dtype=bool)
 
-        for corpus_filename, corpus_data in corpus_docs.items():
-            if scan_jobs.get(job_id, {}).get("status") == "cancelled":
-                logger.info(f"Scan job {job_id} aborted by client termination check.")
-                return
+        with _scan_stage("matrix comparison", job_id):
+            for corpus_filename, corpus_data in corpus_docs.items():
+                if scan_jobs.get(job_id, {}).get("status") == "cancelled":
+                    logger.info(f"Scan job {job_id} aborted by client termination check.")
+                    return
 
-            if corpus_filename == filename:
-                continue
+                if corpus_filename == filename:
+                    continue
 
-            c_embeddings = corpus_data["embeddings"]
-            c_chunks = corpus_data["chunks"]
+                c_embeddings = corpus_data["embeddings"]
+                c_chunks = corpus_data["chunks"]
 
-            if c_embeddings.size == 0:
-                continue
+                if c_embeddings.size == 0:
+                    continue
 
-            c_doc_embedding = get_document_embedding(c_embeddings)
-            sim_doc = float(
-                np.clip(
-                    cosine_similarity(
-                        doc_embedding.reshape(1, -1), c_doc_embedding.reshape(1, -1)
-                    )[0, 0],
-                    0.0,
-                    1.0,
+                c_doc_embedding = get_document_embedding(c_embeddings)
+                sim_doc = float(
+                    np.clip(
+                        cosine_similarity(
+                            doc_embedding.reshape(1, -1), c_doc_embedding.reshape(1, -1)
+                        )[0, 0],
+                        0.0,
+                        1.0,
+                    )
                 )
-            )
-            sim_matrix = cosine_similarity(uploaded_embeddings, c_embeddings)
-            sim_chunk = float(np.max(sim_matrix))
+                sim_matrix = cosine_similarity(uploaded_embeddings, c_embeddings)
+                sim_chunk = float(np.max(sim_matrix))
 
-            chunk_maxes = np.max(sim_matrix, axis=1)
-            uploaded_chunks_flagged |= chunk_maxes >= threshold
+                chunk_maxes = np.max(sim_matrix, axis=1)
+                uploaded_chunks_flagged |= chunk_maxes >= threshold
 
-            combined_score = max(sim_doc, sim_chunk)
-            max_overall_score = max(max_overall_score, sim_doc)
-            max_chunk_overall_score = max(max_chunk_overall_score, sim_chunk)
+                combined_score = max(sim_doc, sim_chunk)
+                max_overall_score = max(max_overall_score, sim_doc)
+                max_chunk_overall_score = max(max_chunk_overall_score, sim_chunk)
 
-            if combined_score >= threshold:
-                severity = "🔴 High" if combined_score >= 0.90 else "🟡 Medium"
+                if combined_score >= threshold:
+                    severity = "🔴 High" if combined_score >= 0.90 else "🟡 Medium"
 
-                similar_chunks = find_most_similar_chunks(
-                    chunks_a=chunks,
-                    chunks_b=c_chunks,
-                    emb_a=uploaded_embeddings,
-                    emb_b=c_embeddings,
-                    top_k=top_k,
-                    threshold=threshold,
-                )
+                    similar_chunks = find_most_similar_chunks(
+                        chunks_a=chunks,
+                        chunks_b=c_chunks,
+                        emb_a=uploaded_embeddings,
+                        emb_b=c_embeddings,
+                        top_k=top_k,
+                        threshold=threshold,
+                    )
 
-                flagged_chunks = [
-                    {
-                        "uploaded_chunk": pair[0],
-                        "matched_chunk": pair[1],
-                        "similarity_score": round(float(pair[2]), 4),
-                    }
-                    for pair in similar_chunks
-                ]
+                    flagged_chunks = [
+                        {
+                            "uploaded_chunk": pair[0],
+                            "matched_chunk": pair[1],
+                            "similarity_score": round(float(pair[2]), 4),
+                        }
+                        for pair in similar_chunks
+                    ]
 
-                matched_documents.append(
-                    {
-                        "filename": corpus_filename,
-                        "document_similarity_score": round(sim_doc, 4),
-                        "max_chunk_similarity_score": round(sim_chunk, 4),
-                        "severity": severity,
-                        "flagged_chunks": flagged_chunks,
-                    }
-                )
+                    matched_documents.append(
+                        {
+                            "filename": corpus_filename,
+                            "document_similarity_score": round(sim_doc, 4),
+                            "max_chunk_similarity_score": round(sim_chunk, 4),
+                            "severity": severity,
+                            "flagged_chunks": flagged_chunks,
+                        }
+                    )
 
         matched_documents.sort(
             key=lambda x: x["max_chunk_similarity_score"], reverse=True
@@ -171,7 +218,9 @@ def _process_scan_job(
             int(round((total_flagged / len(chunks)) * 100)) if len(chunks) > 0 else 0
         )
 
-        scan_jobs[job_id]["status"] = "completed"
+        if scan_jobs.get(job_id, {}).get("status") == "cancelled":
+            return
+        scan_jobs[job_id].update(status="completed", progress_percent=100, stage="done")
         scan_jobs[job_id]["completed_at"] = datetime.now(timezone.utc).isoformat()
         scan_jobs[job_id]["result"] = {
             "filename": filename,
@@ -189,6 +238,9 @@ def _process_scan_job(
         scan_jobs[job_id]["status"] = "failed"
         scan_jobs[job_id]["error"] = str(exc)
     finally:
+        uploaded_embeddings = doc_embedding = corpus_docs = None
+        if len(chunks) > LARGE_BATCH_GC_THRESHOLD:
+            release_large_batch_memory(len(chunks))
         if isinstance(file_input, (str, os.PathLike)) and os.path.exists(file_input):
             try:
                 os.unlink(file_input)
@@ -310,7 +362,14 @@ async def scan_document(
                     },
                 )
 
-        extracted_text = extract_text(temp_path, filename)
+        try:
+            with _scan_stage("parsing"):
+                extracted_text = extract_text(temp_path, filename)
+        except EmptyDocumentError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Failed to extract readable text from the uploaded file.",
+            ) from exc
         if not extracted_text.strip():
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -320,12 +379,14 @@ async def scan_document(
         words = extracted_text.split()
         word_count = len(words)
 
-        chunks = chunk_document(extracted_text)
+        with _scan_stage("chunking"):
+            chunks = chunk_document(extracted_text)
         if not chunks:
             chunks = [extracted_text[:1000]]
 
-        uploaded_embeddings = embed_chunks(chunks)
-        doc_embedding = get_document_embedding(uploaded_embeddings)
+        with _scan_stage("embedding"):
+            uploaded_embeddings = embed_chunks(chunks)
+            doc_embedding = get_document_embedding(uploaded_embeddings)
         corpus_docs = get_corpus_documents_with_embeddings()
 
         matched_documents = []
@@ -333,67 +394,68 @@ async def scan_document(
         max_chunk_overall_score = 0.0
         uploaded_chunks_flagged = np.zeros(len(chunks), dtype=bool)
 
-        for corpus_filename, corpus_data in corpus_docs.items():
-            if corpus_filename == filename:
-                continue
+        with _scan_stage("matrix comparison"):
+            for corpus_filename, corpus_data in corpus_docs.items():
+                if corpus_filename == filename:
+                    continue
 
-            c_embeddings = corpus_data["embeddings"]
-            c_chunks = corpus_data["chunks"]
+                c_embeddings = corpus_data["embeddings"]
+                c_chunks = corpus_data["chunks"]
 
-            if c_embeddings.size == 0:
-                continue
+                if c_embeddings.size == 0:
+                    continue
 
-            c_doc_embedding = get_document_embedding(c_embeddings)
-            sim_doc = float(
-                np.clip(
-                    cosine_similarity(
-                        doc_embedding.reshape(1, -1), c_doc_embedding.reshape(1, -1)
-                    )[0, 0],
-                    0.0,
-                    1.0,
-                )
-            )
-
-            sim_matrix = cosine_similarity(uploaded_embeddings, c_embeddings)
-            sim_chunk = float(np.max(sim_matrix))
-
-            chunk_maxes = np.max(sim_matrix, axis=1)
-            uploaded_chunks_flagged |= chunk_maxes >= threshold
-
-            combined_score = max(sim_doc, sim_chunk)
-            max_overall_score = max(max_overall_score, sim_doc)
-            max_chunk_overall_score = max(max_chunk_overall_score, sim_chunk)
-
-            if combined_score >= threshold:
-                severity = "🔴 High" if combined_score >= 0.90 else "🟡 Medium"
-
-                similar_chunks = find_most_similar_chunks(
-                    chunks_a=chunks,
-                    chunks_b=c_chunks,
-                    emb_a=uploaded_embeddings,
-                    emb_b=c_embeddings,
-                    top_k=top_k,
-                    threshold=threshold,
+                c_doc_embedding = get_document_embedding(c_embeddings)
+                sim_doc = float(
+                    np.clip(
+                        cosine_similarity(
+                            doc_embedding.reshape(1, -1), c_doc_embedding.reshape(1, -1)
+                        )[0, 0],
+                        0.0,
+                        1.0,
+                    )
                 )
 
-                flagged_chunks = [
-                    {
-                        "uploaded_chunk": pair[0],
-                        "matched_chunk": pair[1],
-                        "similarity_score": round(float(pair[2]), 4),
-                    }
-                    for pair in similar_chunks
-                ]
+                sim_matrix = cosine_similarity(uploaded_embeddings, c_embeddings)
+                sim_chunk = float(np.max(sim_matrix))
 
-                matched_documents.append(
-                    {
-                        "filename": corpus_filename,
-                        "document_similarity_score": round(sim_doc, 4),
-                        "max_chunk_similarity_score": round(sim_chunk, 4),
-                        "severity": severity,
-                        "flagged_chunks": flagged_chunks,
-                    }
-                )
+                chunk_maxes = np.max(sim_matrix, axis=1)
+                uploaded_chunks_flagged |= chunk_maxes >= threshold
+
+                combined_score = max(sim_doc, sim_chunk)
+                max_overall_score = max(max_overall_score, sim_doc)
+                max_chunk_overall_score = max(max_chunk_overall_score, sim_chunk)
+
+                if combined_score >= threshold:
+                    severity = "🔴 High" if combined_score >= 0.90 else "🟡 Medium"
+
+                    similar_chunks = find_most_similar_chunks(
+                        chunks_a=chunks,
+                        chunks_b=c_chunks,
+                        emb_a=uploaded_embeddings,
+                        emb_b=c_embeddings,
+                        top_k=top_k,
+                        threshold=threshold,
+                    )
+
+                    flagged_chunks = [
+                        {
+                            "uploaded_chunk": pair[0],
+                            "matched_chunk": pair[1],
+                            "similarity_score": round(float(pair[2]), 4),
+                        }
+                        for pair in similar_chunks
+                    ]
+
+                    matched_documents.append(
+                        {
+                            "filename": corpus_filename,
+                            "document_similarity_score": round(sim_doc, 4),
+                            "max_chunk_similarity_score": round(sim_chunk, 4),
+                            "severity": severity,
+                            "flagged_chunks": flagged_chunks,
+                        }
+                    )
 
         matched_documents.sort(
             key=lambda x: x["max_chunk_similarity_score"], reverse=True
@@ -423,6 +485,41 @@ async def scan_document(
                 os.unlink(temp_path)
             except Exception:
                 pass
+
+
+
+class TextScanRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=1_000_000)
+    filename: str = Field(default="submission.txt", max_length=255)
+    threshold: float = Field(default=PLAGIARISM_THRESHOLD, ge=0, le=1)
+    top_k: int = Field(default=3, ge=1, le=100)
+    reprocess: bool = False
+
+    @field_validator("text")
+    @classmethod
+    def require_readable_text(cls, value):
+        if not value.strip():
+            raise ValueError("Text must not be empty or whitespace.")
+        return value
+
+    @field_validator("filename")
+    @classmethod
+    def require_text_filename(cls, value):
+        from src.utils.filename import sanitize_filename
+        value = sanitize_filename(value)
+        if not value.lower().endswith(".txt"):
+            raise ValueError("Raw text submissions require a .txt filename.")
+        return value
+
+
+@router.post("/api/v1/scan/text", response_model=SimilarityCheckResponse)
+async def scan_text(payload: TextScanRequest, _user: dict = Security(get_current_user, scopes=["write"])):
+    file = UploadFile(filename=payload.filename, file=io.BytesIO(payload.text.encode("utf-8")))
+    try:
+        return await scan_document(file=file, threshold=payload.threshold,
+            top_k=payload.top_k, reprocess=payload.reprocess, _user=_user, _content_type=None)
+    finally:
+        await file.close()
 
 
 @router.post(
@@ -547,6 +644,8 @@ def get_async_scan_status(
         "completed_at": job.get("completed_at"),
         "result": job.get("result"),
         "error": job.get("error"),
+        "progress_percent": job.get("progress_percent", 0),
+        "stage": job.get("stage", ""),
     }
 
 @router.delete(
@@ -571,12 +670,12 @@ def cancel_async_scan(
     
     current_status = scan_jobs[job_id]["status"]
     if current_status in ["completed", "failed", "cancelled"]:
-        return {"status": "ignored", "message": f"Job {job_id} is already {current_status}."}
+        return {"job_id": job_id, "status": current_status, "message": f"Job {job_id} is already {current_status}."}
         
     scan_jobs[job_id]["status"] = "cancelled"
-    scan_jobs[job_id]["error"] = "Job forcibly aborted by the client."
+    scan_jobs[job_id]["error"] = "Job cancelled by the client."
     
-    return {"status": "success", "message": f"Job {job_id} has been marked for cancellation."}
+    return {"job_id": job_id, "status": "cancelled", "message": f"Job {job_id} has been marked for cancellation."}
 
 # ==============================================================================
 # Padding Implementation Base

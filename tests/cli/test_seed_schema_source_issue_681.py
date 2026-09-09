@@ -9,8 +9,8 @@ def test_seed_generator_supports_isolated_output_directory():
 
     assert '"--seed-dir"' in source
     assert "seed_dir=config.seed_dir" not in source
-    assert "seed_dir = config.seed_dir" in source
-    assert "_clean_seed_files(seed_dir)" in source
+    assert "seed_dir=args.seed_dir" in source
+    assert "if args.state_dir and not args.dry_run:" in source
 
 
 def test_cli_test_compares_generated_and_reference_schema():

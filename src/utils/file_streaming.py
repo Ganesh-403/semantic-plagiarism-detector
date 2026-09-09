@@ -46,7 +46,13 @@ async def stream_upload_file_to_disk(
         else int(os.getenv("MAX_UPLOAD_SIZE_BYTES", DEFAULT_MAX_UPLOAD_BYTES))
     )
 
-    temp_file = tempfile.NamedTemporaryFile(delete=False)
+    try:
+        temp_file = tempfile.NamedTemporaryFile(delete=False)
+    except OSError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to create temporary upload storage.",
+        ) from exc
     temp_path = temp_file.name
     total_bytes = 0
 

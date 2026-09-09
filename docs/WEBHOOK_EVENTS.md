@@ -7,8 +7,8 @@ event is a schema-versioned JSON object with a stable set of top-level
 fields, defined in [`src/core/events.py`](../src/core/events.py).
 
 > **Relationship to `docs/WEBHOOKS.md`:** that document covers webhook
-> *transport* concerns — configuration, HMAC signing, SSRF protection, retry
-> behavior. This document covers the *event schema and catalog* — what gets
+> _transport_ concerns — configuration, HMAC signing, SSRF protection, retry
+> behavior. This document covers the _event schema and catalog_ — what gets
 > sent, and how to parse it reliably. Read both if you're building an
 > integration.
 
@@ -24,18 +24,18 @@ these six top-level keys, always in this order:
   "event_id": "6b1f7f2e-6c8b-4f7b-9a2e-1a2b3c4d5e6f",
   "occurred_at": "2026-01-15T09:30:00+00:00",
   "workspace_id": "default",
-  "payload": { }
+  "payload": {}
 }
 ```
 
-| Field             | Type   | Description                                                                                          |
-|--------------------|--------|--------------------------------------------------------------------------------------------------------|
-| `schema_version`  | string | Semantic version of this envelope's shape. See [Versioning Policy](#versioning-policy).               |
-| `event_type`      | string | One of the [event types](#event-types) below. Unknown values must be rejected by strict consumers.    |
-| `event_id`        | string | UUID4 identifying this specific event occurrence. Use it to de-duplicate on the consumer side.         |
-| `occurred_at`     | string | ISO-8601 UTC timestamp of when the event occurred.                                                     |
-| `workspace_id`    | string | Identifier of the workspace/tenant the event belongs to. Defaults to `"default"` for single-tenant deployments. |
-| `payload`         | object | Event-type-specific data. Shape documented per event type below.                                       |
+| Field            | Type   | Description                                                                                                     |
+| ---------------- | ------ | --------------------------------------------------------------------------------------------------------------- |
+| `schema_version` | string | Semantic version of this envelope's shape. See [Versioning Policy](#versioning-policy).                         |
+| `event_type`     | string | One of the [event types](#event-types) below. Unknown values must be rejected by strict consumers.              |
+| `event_id`       | string | UUID4 identifying this specific event occurrence. Use it to de-duplicate on the consumer side.                  |
+| `occurred_at`    | string | ISO-8601 UTC timestamp of when the event occurred.                                                              |
+| `workspace_id`   | string | Identifier of the workspace/tenant the event belongs to. Defaults to `"default"` for single-tenant deployments. |
+| `payload`        | object | Event-type-specific data. Shape documented per event type below.                                                |
 
 For backward compatibility with Slack- and Discord-style incoming webhooks
 (which read a bare `text` or `content` field and ignore everything else),
@@ -89,12 +89,12 @@ Emitted when a pair of documents is flagged as a semantic plagiarism match.
 }
 ```
 
-| Payload field       | Type   | Description                                              |
-|----------------------|--------|------------------------------------------------------------|
-| `document_a`         | string | Filename of the first document in the matched pair.        |
-| `document_b`         | string | Filename of the second document in the matched pair.       |
-| `similarity_score`   | number | Cosine similarity between `0.0` and `1.0`.                  |
-| `review_url`         | string | Link to the dashboard instance for reviewing the match.     |
+| Payload field      | Type   | Description                                             |
+| ------------------ | ------ | ------------------------------------------------------- |
+| `document_a`       | string | Filename of the first document in the matched pair.     |
+| `document_b`       | string | Filename of the second document in the matched pair.    |
+| `similarity_score` | number | Cosine similarity between `0.0` and `1.0`.              |
+| `review_url`       | string | Link to the dashboard instance for reviewing the match. |
 
 Emitted by `src.core.webhook.dispatch_plagiarism_alert()` /
 `send_plagiarism_alert()`.
@@ -119,11 +119,11 @@ plagiarism incident (e.g. marking it `Resolved`).
 }
 ```
 
-| Payload field    | Type   | Description                                                    |
-|-------------------|--------|--------------------------------------------------------------------|
-| `incident_id`     | string | Identifier of the incident that was reviewed.                      |
-| `review_status`   | string | New status — currently `"Pending"` or `"Resolved"`.                |
-| `reviewed_by`     | string | *(optional)* Username of the reviewer, when known.                  |
+| Payload field   | Type   | Description                                         |
+| --------------- | ------ | --------------------------------------------------- |
+| `incident_id`   | string | Identifier of the incident that was reviewed.       |
+| `review_status` | string | New status — currently `"Pending"` or `"Resolved"`. |
+| `reviewed_by`   | string | _(optional)_ Username of the reviewer, when known.  |
 
 Emitted by `src.core.webhook.dispatch_incident_reviewed_event()` /
 `send_incident_reviewed_alert()`, wired into the incident review panel in
@@ -133,25 +133,25 @@ Emitted by `src.core.webhook.dispatch_incident_reviewed_event()` /
 
 Reserved for a document successfully entering the corpus (upload, parse, and
 indexing complete). Payload will include the document filename, hash, and
-upload timestamp. *Not yet wired to a dispatch call site — defined here so
-the contract is stable ahead of that integration.*
+upload timestamp. _Not yet wired to a dispatch call site — defined here so
+the contract is stable ahead of that integration._
 
 ### `document_deleted`
 
 Reserved for a document being removed from the corpus. Payload will include
-the document filename and hash. *Not yet wired to a dispatch call site.*
+the document filename and hash. _Not yet wired to a dispatch call site._
 
 ### `scan_failed`
 
 Reserved for a plagiarism scan that failed to complete (e.g. parsing error,
 pipeline exception). Payload will include the failing document(s) and an
-error summary. *Not yet wired to a dispatch call site.*
+error summary. _Not yet wired to a dispatch call site._
 
 ### `system_health_warning`
 
 Reserved for operational warnings (e.g. storage nearing capacity, repeated
 webhook delivery failures). Payload will include a warning code and message.
-*Not yet wired to a dispatch call site.*
+_Not yet wired to a dispatch call site._
 
 ---
 

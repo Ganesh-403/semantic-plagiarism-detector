@@ -23,8 +23,8 @@ def setup_test_db(mock_db):
     yield
 
 
-@patch("src.utils.sso.requests.get")
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.get")
+@patch("src.utils.sso.requests.Session.post")
 def test_full_google_oauth_login_cycle(mock_post, mock_get, monkeypatch):
     """Simulate a full OAuth cycle: auth URL -> state -> token exchange -> session."""
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "dummy_client_id")
@@ -59,7 +59,7 @@ def test_full_google_oauth_login_cycle(mock_post, mock_get, monkeypatch):
         json=lambda: {
             "email": "student@example.com",
             "name": "Test Student",
-            "picture": "https://example.com/avatar.png",
+            "verified_email": True, "id": "google-user-123", "picture": "https://example.com/avatar.png",
         },
     )
 
@@ -86,8 +86,8 @@ def test_full_google_oauth_login_cycle(mock_post, mock_get, monkeypatch):
     assert role is not None
 
 
-@patch("src.utils.sso.requests.get")
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.get")
+@patch("src.utils.sso.requests.Session.post")
 def test_oauth_cycle_rejects_invalid_state(mock_post, mock_get, monkeypatch):
     """A callback with an unknown/forged state must be rejected before any network call."""
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "dummy_client_id")

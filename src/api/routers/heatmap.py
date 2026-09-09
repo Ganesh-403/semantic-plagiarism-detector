@@ -26,6 +26,27 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Similarity Heatmap & Clustering"])
 
 
+def _document_embeddings():
+    """Return one mean vector per document with stored chunks, in label order."""
+    import numpy as np
+    from src.db.corpus_db import get_all_documents, get_chunks_for_documents
+
+    documents = get_all_documents()
+    grouped = get_chunks_for_documents([doc.filename for doc in documents])
+    labels, vectors = [], []
+    for doc in documents:
+        entry = grouped.get(doc.filename)
+        if entry is None or entry[1].shape[0] == 0:
+            continue
+        labels.append(doc.filename)
+        vectors.append(entry[1].mean(axis=0))
+    if len(labels) < 2:
+        raise HTTPException(
+            status_code=400, detail="Need at least 2 documents with embeddings",
+        )
+    return labels, np.stack(vectors)
+
+
 # ---------------------------------------------------------------------------
 # Compute Heatmap
 # ---------------------------------------------------------------------------
@@ -49,24 +70,9 @@ async def compute_heatmap(
     and persist a snapshot.
     """
     try:
-        from src.db.corpus_db import get_all_documents, get_all_embeddings
         from src.core.similarity_heatmap import compute_heatmap, detect_similarity_hotspots
 
-        docs = get_all_documents()
-        if len(docs) < 2:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Need at least 2 documents to compute a heatmap",
-            )
-
-        filenames = [d.filename for d in docs]
-        embeddings = get_all_embeddings()
-
-        if embeddings.shape[0] < 2:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Not enough embeddings to compute similarity",
-            )
+        filenames, embeddings = _document_embeddings()
 
         heatmap = compute_heatmap(filenames, embeddings)
 
@@ -222,24 +228,9 @@ async def compute_clustering(
 ):
     """Compute document clustering from corpus embeddings."""
     try:
-        from src.db.corpus_db import get_all_documents, get_all_embeddings
         from src.core.similarity_heatmap import cluster_documents
 
-        docs = get_all_documents()
-        if len(docs) < 2:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Need at least 2 documents to cluster",
-            )
-
-        filenames = [d.filename for d in docs]
-        embeddings = get_all_embeddings()
-
-        if embeddings.shape[0] < 2:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Not enough embeddings for clustering",
-            )
+        filenames, embeddings = _document_embeddings()
 
         result = cluster_documents(
             filenames=filenames,

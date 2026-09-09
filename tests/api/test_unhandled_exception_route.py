@@ -38,7 +38,7 @@ def _raise_runtime_error_for_testing():
     raise RuntimeError("Boom")
 
 
-client = TestClient(app)
+client = TestClient(app, raise_server_exceptions=False)
 
 
 @pytest.fixture(autouse=True)

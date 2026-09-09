@@ -18,6 +18,8 @@ def filter_stop_words(tokens, remove_stop_words=False):
     Filters out stop words from a list of tokens.
     If remove_stop_words is False, returns the original list unchanged.
     """
+    if not isinstance(remove_stop_words, bool):
+        raise TypeError("remove_stop_words must be a boolean")
     if not remove_stop_words:
         return tokens
     

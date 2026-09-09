@@ -395,6 +395,8 @@ class ReportGenerator:
             recs.append("🔴 Immediate review required for high-severity matches.")
         if summary["plagiarism_rate"] > 30:
             recs.append("🟠 Consider implementing stricter plagiarism policies.")
+        if summary["total_matches"] == 0:
+            recs.append("✅ No matches detected. Continue regular monitoring.")
         if summary["total_documents"] < 5:
             recs.append("📊 Upload more documents for more reliable analysis.")
         if not recs:

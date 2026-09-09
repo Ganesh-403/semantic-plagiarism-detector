@@ -1,4 +1,5 @@
 import os
+from contextlib import closing
 import sqlite3
 import stat
 from pathlib import Path
@@ -14,7 +15,7 @@ from src.db.database_backup import (
 
 
 def create_database(path: Path, value: str) -> None:
-    with sqlite3.connect(path) as connection:
+    with closing(sqlite3.connect(path)) as connection:
         connection.execute("CREATE TABLE records (value TEXT NOT NULL)")
         connection.execute(
             "INSERT INTO records (value) VALUES (?)",
@@ -24,7 +25,7 @@ def create_database(path: Path, value: str) -> None:
 
 
 def read_value(path: Path) -> str:
-    with sqlite3.connect(path) as connection:
+    with closing(sqlite3.connect(path)) as connection:
         row = connection.execute("SELECT value FROM records").fetchone()
     assert row is not None
     return row[0]
@@ -125,21 +126,15 @@ def test_rejects_world_writable_backup(tmp_path):
     current_mode = source.stat().st_mode
     os.chmod(source, current_mode | stat.S_IWOTH)
 
-    with patch(
-        "src.db.database_backup.os.stat",
-        wraps=os.stat,
-    ) as mocked_stat:
-        with pytest.raises(
-            BackupRestoreSecurityError,
-            match="world-writable",
-        ):
-            restore(
-                source,
-                backup_dir=backup_dir,
-                destination=tmp_path / "corpus.db",
-            )
-
-    mocked_stat.assert_called()
+    if os.name == "nt":
+        # Windows chmod has no group/other write bits. Verify restoration with
+        # native Windows permissions; the POSIX branch is exercised on Linux CI.
+        destination = tmp_path / "corpus.db"
+        restore(source, backup_dir=backup_dir, destination=destination)
+        assert read_value(destination) == "unsafe"
+    else:
+        with pytest.raises(BackupRestoreSecurityError, match="world-writable"):
+            restore(source, backup_dir=backup_dir, destination=tmp_path / "corpus.db")
 
 
 def test_rejects_directory_source(tmp_path):

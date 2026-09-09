@@ -28,7 +28,8 @@ import logging
 
 import pyotp
 import qrcode
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, SecretStr
 
 from src.api.dependencies import limiter
 from src.api.schemas import (
@@ -50,6 +51,44 @@ from src.api.schemas import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Authentication"])
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: SecretStr
+    new_password: SecretStr
+
+
+from src.api.dependencies import verify_bearer_token
+
+
+@router.post("/api/v1/auth/change-password")
+@router.post("/auth/change-password")
+@limiter.limit("5/minute")
+def change_password(
+    request: Request,
+    payload: ChangePasswordRequest,
+    token: str = Depends(verify_bearer_token),
+):
+    """Change only the signed-in account after verifying its current password."""
+    from src.db.auth import update_password
+    from src.security.jwt_utils import verify_access_token
+
+    if not token:
+        raise HTTPException(status_code=401, detail="A user access token is required.")
+    claims = verify_access_token(token)
+    username = claims.get("sub") if claims else None
+    if not username:
+        raise HTTPException(status_code=401, detail="A user access token is required.")
+    try:
+        update_password(
+            username,
+            payload.new_password.get_secret_value(),
+            current_user=username,
+            old_password=payload.old_password.get_secret_value(),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"message": "Password changed successfully. Sign in again."}
 
 
 def generate_totp_qr_code_data_uri(otpauth_url: str) -> str:
@@ -761,3 +800,36 @@ def verify_reset_token(token: str) -> str:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Reset token has expired or is cryptographically invalid.",
         )
+
+
+from fastapi import BackgroundTasks
+from pydantic import EmailStr, Field
+from src.security import password_recovery
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: SecretStr
+    new_password: SecretStr
+
+
+@router.post("/api/v1/auth/forgot-password")
+@limiter.limit("5/minute")
+def forgot_password(request: Request, payload: ForgotPasswordRequest, background_tasks: BackgroundTasks):
+    if not password_recovery.mail_is_configured():
+        raise HTTPException(status_code=503, detail="Email recovery is unavailable. Contact your administrator.")
+    background_tasks.add_task(password_recovery.request_password_reset, str(payload.email))
+    return {"message": password_recovery.RESET_MESSAGE}
+
+
+@router.post("/api/v1/auth/reset-password")
+@limiter.limit("5/minute")
+def reset_password_endpoint(request: Request, payload: ResetPasswordRequest):
+    try:
+        password_recovery.reset_password(payload.token.get_secret_value(), payload.new_password.get_secret_value())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"message": "Password updated successfully. Sign in again."}

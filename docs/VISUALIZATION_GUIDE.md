@@ -4,11 +4,11 @@
 
 All chart-drawing code lives in `src/visualization/`:
 
-| File | Library | What it draws |
-|---|---|---|
-| `heatmap.py` | Matplotlib/Seaborn + Plotly | Similarity matrix heatmaps (static PNG and interactive), chunk-level comparison heatmap |
-| `network_graph.py` | NetworkX + Plotly | Document plagiarism network graph |
-| `analytics.py` | Plotly Express/Graph Objects | Dashboard charts (trend lines, bar charts, histograms) |
+| File               | Library                      | What it draws                                                                           |
+| ------------------ | ---------------------------- | --------------------------------------------------------------------------------------- |
+| `heatmap.py`       | Matplotlib/Seaborn + Plotly  | Similarity matrix heatmaps (static PNG and interactive), chunk-level comparison heatmap |
+| `network_graph.py` | NetworkX + Plotly            | Document plagiarism network graph                                                       |
+| `analytics.py`     | Plotly Express/Graph Objects | Dashboard charts (trend lines, bar charts, histograms)                                  |
 
 These functions are pure: they take data in and return a `Figure` object out. They don't read Streamlit session state directly — the app layer (`app/streamlit_app.py`) calls them and passes in whatever theme/config values are needed.
 
@@ -49,7 +49,6 @@ mapped to the appropriate Matplotlib or Plotly colormap using the mappings
 defined in `app/theme.py`. Supported options include those listed in
 `UI_COLORMAP_OPTIONS`, such as `"Viridis"`, `"Plasma"`, `"Coolwarm"`, and
 `"YlOrRd"`.
-
 
 Internally, `colormap_name` is translated through `MATPLOTLIB_CMAP_MAPPING` or `PLOTLY_CMAP_MAPPING`, allowing the same UI selection to work consistently across both static and interactive heatmaps.
 
@@ -198,6 +197,7 @@ THEMES["HighContrast"] = {
 Once added, `set_theme("HighContrast")` makes it available through `get_colors()`, and every chart that accepts `theme_colors=get_colors()` will pick it up automatically.
 
 ## Known Gaps (useful context for future work)
+
 - `plot_similarity_heatmap(...)`, `plot_similarity_heatmap_plotly(...)`, and `plot_chunk_similarity_comparison(...)` now support a `colormap_name` parameter. If additional heatmap visualizations are added in the future, they should follow the same `colormap_name` + mapping approach so the UI exposes a consistent set of colormap options.
 - **`plot_similarity_distribution` and `plot_document_sizes` are not exported** from `src/visualization/__init__.py`. They're defined in `analytics.py` but must currently be imported as `from src.visualization.analytics import plot_similarity_distribution` rather than `from src.visualization import plot_similarity_distribution`.
 - **`analytics.py` charts don't take `theme_colors`.** Their colors are hardcoded hex strings, so they won't shift with the Light/Dark toggle the way `heatmap.py` and `network_graph.py` do.

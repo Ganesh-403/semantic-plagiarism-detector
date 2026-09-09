@@ -25,11 +25,12 @@ Endpoints:
 from __future__ import annotations
 
 import base64
+import json
 import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.db import task_db
 from src.workers.task_queue import get_default_queue
@@ -79,6 +80,12 @@ class JobStatusResponse(BaseModel):
     updated_at: str
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
+
+
+    @field_validator("payload", "result", mode="before")
+    @classmethod
+    def decode_database_json(cls, value):
+        return json.loads(value) if isinstance(value, str) else value
 
 
 class JobListResponse(BaseModel):

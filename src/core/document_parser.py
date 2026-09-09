@@ -1,3 +1,5 @@
+"""Document text extraction with OCR fallback for scanned PDF pages."""
+
 # MIT License
 #
 # Copyright (c) 2026 Ganesh Kambli
@@ -42,7 +44,6 @@ from __future__ import annotations
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-"""Document text extraction with OCR fallback for scanned PDF pages."""
 
 
 import functools
@@ -131,122 +132,7 @@ ALLOWED_EXTENSIONS = {
 ZERO_WIDTH_CHARS_PATTERN = re.compile(r"[\u200B\u200C\u200D\uFEFF\u2060\u200E\u200F]")
 
 # Standard English stopwords for lexical analysis noise reduction
-ENGLISH_STOPWORDS = frozenset(
-    {
-        "a",
-        "an",
-        "the",
-        "and",
-        "or",
-        "but",
-        "in",
-        "on",
-        "at",
-        "to",
-        "for",
-        "of",
-        "with",
-        "by",
-        "is",
-        "are",
-        "was",
-        "were",
-        "be",
-        "been",
-        "being",
-        "over",
-        "have",
-        "has",
-        "had",
-        "do",
-        "does",
-        "did",
-        "will",
-        "would",
-        "shall",
-        "should",
-        "can",
-        "could",
-        "may",
-        "might",
-        "must",
-        "i",
-        "me",
-        "my",
-        "myself",
-        "we",
-        "our",
-        "ours",
-        "ourselves",
-        "you",
-        "your",
-        "yours",
-        "yourself",
-        "yourselves",
-        "he",
-        "him",
-        "his",
-        "himself",
-        "she",
-        "her",
-        "hers",
-        "herself",
-        "it",
-        "its",
-        "itself",
-        "they",
-        "them",
-        "their",
-        "theirs",
-        "themselves",
-        "what",
-        "which",
-        "who",
-        "whom",
-        "this",
-        "that",
-        "these",
-        "those",
-        "am",
-        "as",
-        "if",
-        "then",
-        "than",
-        "too",
-        "very",
-        "s",
-        "t",
-        "just",
-        "don",
-        "now",
-        "d",
-        "ll",
-        "m",
-        "o",
-        "re",
-        "ve",
-        "y",
-        "ain",
-        "aren",
-        "couldn",
-        "didn",
-        "doesn",
-        "hadn",
-        "hasn",
-        "haven",
-        "isn",
-        "ma",
-        "mightn",
-        "mustn",
-        "needn",
-        "shan",
-        "shouldn",
-        "wasn",
-        "weren",
-        "won",
-        "wouldn",
-    }
-)
+from src.core.stopwords import ENGLISH_STOPWORDS
 
 
 @functools.lru_cache(maxsize=1)
@@ -287,7 +173,7 @@ def load_custom_stopwords(file_path: str | None = None) -> frozenset:
 
 def get_stopwords() -> frozenset:
     """Return the combined set of standard and custom (domain-specific) stopwords."""
-    return ENGLISH_STOPWORDS | load_custom_stopwords()
+    return ENGLISH_STOPWORDS | load_custom_stopwords(os.environ.get("STOPWORDS_FILE"))
 
 
 def reject_zero_width_characters(text: str, filename: Optional[str] = None) -> str:
@@ -588,8 +474,8 @@ def clean_text(raw_text: str, remove_stopwords: bool = False) -> str:
     )
 
     text = re.sub(r"\n\s*\n\s*\n", "\n\n", text)
-    text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"[\u00a0\u200b]", " ", text)
+    text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r"[ \t]+\n", "\n", text)
     text = re.sub(r"\n[ \t]+", "\n", text)
@@ -868,7 +754,7 @@ def check_ocr_dependencies() -> None:
             or Tesseract binary are missing/unavailable.
     """
     try:
-        import fitz  # noqa: F401 # PyMuPDF
+        from src.utils import pdf_backend as fitz
         import pytesseract
         from PIL import Image  # noqa: F401
     except ImportError as exc:
@@ -895,7 +781,7 @@ def _is_blank_scanned_page(
 ) -> bool:
     """Return True if a rendered page looks blank (very low pixel variance)."""
     try:
-        import fitz  # PyMuPDF
+        from src.utils import pdf_backend as fitz
         from PIL import Image
     except ImportError:
         return False
@@ -940,7 +826,7 @@ def _ocr_pdf_page(
     """Render one PDF page and extract text with Tesseract."""
     check_ocr_dependencies()
 
-    import fitz  # PyMuPDF
+    from src.utils import pdf_backend as fitz
     import pytesseract
     from PIL import Image
 
@@ -1028,58 +914,34 @@ def _format_table_as_text(table: list[list[str | None]]) -> str:
     return "\n".join(lines)
 
 
-def _parse_pdf_page(
-    pdf_bytes: bytes,
-    page_index: int,
-    ocr_dpi: int,
-    ocr_language: str,
-) -> list[str]:
-    """Helper running in a subprocess to extract text from a single PDF page."""
-    import io
+def _extract_loaded_pdf_page(pdf_bytes, page_index, page, ocr_dpi, ocr_language):
+    """Extract a page while its shared PDF reader remains open."""
+    tables = page.find_tables()
+    text_page = page
+    for table in tables:
+        text_page = text_page.outside_bbox(table.bbox)
+    native_text = (text_page.extract_text() or "").strip()
+    if not _has_meaningful_text(native_text, page=page):
+        if _is_blank_scanned_page(pdf_bytes, page_index, dpi=ocr_dpi):
+            return []
+    table_texts = []
+    for table in tables:
+        extracted_rows = table.extract()
+        if extracted_rows:
+            formatted = _format_table_as_text(extracted_rows)
+            if formatted:
+                table_texts.append(formatted)
+    selected_text = "\n\n".join([native_text, *table_texts]).strip()
+    if not _has_meaningful_text(selected_text, page=page):
+        selected_text = _ocr_pdf_page(pdf_bytes, page_index, dpi=ocr_dpi, language=ocr_language)
+    return _clean_page_text(selected_text)
 
-    import pdfplumber
 
+def _parse_pdf_page(pdf_bytes: bytes, page_index: int, ocr_dpi: int, ocr_language: str) -> list[str]:
+    """Extract one explicitly requested page using the shared page implementation."""
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            page = pdf.pages[page_index]
-
-            tables = page.find_tables()
-
-            # Pull normal text, but exclude the regions covered by tables
-            # so table cells don't also show up mashed together in the
-            # regular text (which is what caused the chaotic strings).
-            text_page = page
-            for table in tables:
-                text_page = text_page.outside_bbox(table.bbox)
-            native_text = (text_page.extract_text() or "").strip()
-
-            if not _has_meaningful_text(native_text, page=page):
-                if _is_blank_scanned_page(pdf_bytes, page_index, dpi=ocr_dpi):
-                    return []
-
-            table_texts = []
-            for table in tables:
-                extracted_rows = table.extract()
-                if extracted_rows:
-                    formatted = _format_table_as_text(extracted_rows)
-                    if formatted:
-                        table_texts.append(formatted)
-
-            combined_text = native_text
-            if table_texts:
-                combined_text = "\n\n".join([combined_text, *table_texts]).strip()
-
-            selected_text = combined_text
-
-            if not _has_meaningful_text(selected_text, page=page):
-                selected_text = _ocr_pdf_page(
-                    pdf_bytes,
-                    page_index,
-                    dpi=ocr_dpi,
-                    language=ocr_language,
-                )
-
-            return _clean_page_text(selected_text)
+            return _extract_loaded_pdf_page(pdf_bytes, page_index, pdf.pages[page_index], ocr_dpi, ocr_language)
     except OCRDependencyError:
         raise
     except Exception as exc:
@@ -1261,7 +1123,7 @@ def count_pdf_images(pdf_bytes: bytes) -> int:
         Total number of image objects embedded in the PDF.
     """
     try:
-        import fitz  # PyMuPDF
+        from src.utils import pdf_backend as fitz
 
         with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
             return sum(len(page.get_images()) for page in doc)
@@ -1280,7 +1142,7 @@ def extract_pdf_metadata(file: PDFInput) -> dict[str, str]:
     metadata = {"author": None, "creation_date": None, "title": None}
 
     try:
-        import fitz  # PyMuPDF
+        from src.utils import pdf_backend as fitz
 
         with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
             doc_metadata = doc.metadata
@@ -1342,57 +1204,13 @@ def extract_text_from_pdf(
             if num_pages == 0:
                 return ""
 
-            if _should_use_parallel() and num_pages > 1:
-                from concurrent.futures import ProcessPoolExecutor
-
-                page_lines = [[] for _ in range(num_pages)]
-                try:
-                    with ProcessPoolExecutor() as executor:
-                        futures = [
-                            executor.submit(
-                                _parse_pdf_page,
-                                pdf_bytes,
-                                page_index,
-                                ocr_dpi,
-                                ocr_language,
-                            )
-                            for page_index in range(num_pages)
-                        ]
-                        for page_index, future in enumerate(futures):
-                            page_lines[page_index] = future.result()
-                except OCRDependencyError:
-                    raise
-                except (RuntimeError, OSError) as exc:
-                    logger.warning(
-                        f"[document_parser] ProcessPoolExecutor failed ({exc}), falling back to sequential page parsing..."
-                    )
-                    page_lines = []
-                    for page_index in range(num_pages):
-                        page = pdf.pages[page_index]
-                        native_text = (page.extract_text() or "").strip()
-                        selected_text = native_text
-                        if not _has_meaningful_text(native_text, page=page):
-                            selected_text = _ocr_pdf_page(
-                                pdf_bytes,
-                                page_index,
-                                dpi=ocr_dpi,
-                                language=ocr_language,
-                            )
-                        page_lines.append(_clean_page_text(selected_text))
-            else:
-                page_lines = []
-                for page_index in range(num_pages):
-                    page = pdf.pages[page_index]
-                    native_text = (page.extract_text() or "").strip()
-                    selected_text = native_text
-                    if not _has_meaningful_text(native_text, page=page):
-                        selected_text = _ocr_pdf_page(
-                            pdf_bytes,
-                            page_index,
-                            dpi=ocr_dpi,
-                            language=ocr_language,
-                        )
-                    page_lines.append(_clean_page_text(selected_text))
+            # Reuse one reader for every page. Reopening the complete PDF in a
+            # worker for each page repeats document parsing and makes text-only
+            # PDFs much slower; batch-level parallelism remains in extract_texts.
+            page_lines = [
+                _extract_loaded_pdf_page(pdf_bytes, page_index, page, ocr_dpi, ocr_language)
+                for page_index, page in enumerate(pdf.pages)
+            ]
     except OCRDependencyError:
         raise
     except Exception as exc:
@@ -1492,6 +1310,8 @@ def extract_text_from_rtf(file: PDFInput) -> str:
     RTF inputs are capped at 10 MB to prevent oversized documents from being
     handed to striprtf and causing avoidable memory spikes.
     """
+    from src.exceptions import UnsupportedFormatError
+
     text = ""
     try:
         if not _rtf_content_within_limit(file):
@@ -1516,6 +1336,8 @@ def extract_text_from_rtf(file: PDFInput) -> str:
                 else data
             )
         text = rtf_to_text(content)
+    except UnsupportedFormatError:
+        raise
     except Exception as exc:
         print(f"[document_parser] Error reading RTF: {exc}")
     return text.strip()
@@ -1732,26 +1554,8 @@ def strip_markdown_syntax(raw_text: str) -> str:
 def extract_text_from_epub(file: PDFInput) -> str:
     """Extract plain text from an EPUB file."""
     try:
-        from bs4 import BeautifulSoup
-        from ebooklib import ITEM_DOCUMENT, epub  # type: ignore
-
-        epub_file = io.BytesIO(file) if isinstance(file, bytes) else file
-
-        book = epub.read_epub(epub_file)
-
-        text_parts = []
-
-        for item in book.get_items():
-            if item.get_type() == ITEM_DOCUMENT or item.get_type() == 9:
-                soup = BeautifulSoup(
-                    item.get_content(),
-                    "html.parser",
-                )
-                text = soup.get_text(" ", strip=True)
-                if text:
-                    text_parts.append(text)
-
-        return "\n\n".join(text_parts).strip()
+        from src.utils.epub_reader import extract_epub_text
+        return extract_epub_text(file)
 
     except (ValueError, TypeError, OSError, KeyError) as exc:
         logger.error(f"[document_parser] Error reading EPUB: {exc}")
@@ -2093,75 +1897,6 @@ class EnterpriseTimeoutCircuitBreaker:
             executor.shutdown(wait=False)
 
 
-# Padding for enterprise architecture density
-class AbstractCircuitBreakerMetric(abc.ABC):
-    pass
-
-
-class DummyMetric1(AbstractCircuitBreakerMetric):
-    pass
-
-
-class DummyMetric2(AbstractCircuitBreakerMetric):
-    pass
-
-
-class DummyMetric3(AbstractCircuitBreakerMetric):
-    pass
-
-
-class DummyMetric4(AbstractCircuitBreakerMetric):
-    pass
-
-
-class DummyMetric5(AbstractCircuitBreakerMetric):
-    pass
-
-
-class DummyMetric6(AbstractCircuitBreakerMetric):
-    pass
-
-
-class DummyMetric7(AbstractCircuitBreakerMetric):
-    pass
-
-
-class DummyMetric8(AbstractCircuitBreakerMetric):
-    pass
-
-
-class DummyMetric9(AbstractCircuitBreakerMetric):
-    pass
-
-
-class DummyMetric10(AbstractCircuitBreakerMetric):
-    pass
-
-
-
-import abc
-import concurrent.futures
-import threading
-
-class ExtractionTimeoutError(TimeoutError):
-    pass
-
-class EnterpriseTimeoutCircuitBreaker:
-    def __init__(self, timeout_seconds: float = 10.0):
-        self.timeout_seconds = timeout_seconds
-
-    def execute(self, func, *args, **kwargs):
-        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        future = executor.submit(func, *args, **kwargs)
-        try:
-            return future.result(timeout=self.timeout_seconds)
-        except concurrent.futures.TimeoutError as e:
-            future.cancel()
-            executor.shutdown(wait=False)
-            raise ExtractionTimeoutError(f"Extraction aborted after {self.timeout_seconds}s limit.") from e
-        finally:
-            executor.shutdown(wait=False)
-
 def _extract_text_internal(
     file: PDFInput,
     filename: str,
@@ -2193,6 +1928,8 @@ def _extract_text_internal(
         raw = extract_text_from_epub(file)
     elif extension in ("png", "jpg", "jpeg"):
         raw = extract_text_from_image(file, ocr_language=ocr_language)
+    elif extension == "pptx":
+        raw = _extract_pptx_text(io.BytesIO(file))
     elif extension == "odt":
         raw = extract_text_from_odt(file)
     else:
@@ -2423,7 +2160,11 @@ try:
 except ImportError:
     Presentation = None
 
-ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt", ".pptx", ".png", ".jpg", ".jpeg"}
+ALLOWED_EXTENSIONS.update({".doc", ".odt", ".pptx", ".zip"})
+
+
+def _allowed_file(filename: str) -> bool:
+    return Path(filename).suffix.lower() in ALLOWED_EXTENSIONS
 
 
 def _extract_pptx_text(file_obj) -> str:
@@ -2471,28 +2212,3 @@ def _validate_ooxml_archive(file_bytes: bytes) -> bool:
         return True
     except (zipfile.BadZipFile, Exception):
         return False
-def extract_text(
-    file: PDFInput,
-    filename: str,
-    *,
-    ocr_language: str = DEFAULT_OCR_LANGUAGE,
-    ocr_dpi: int = DEFAULT_OCR_DPI,
-    clean_whitespace: bool = True,
-    mask_named_entities: bool = False,
-    timeout_seconds: float = 10.0,
-) -> str:
-    breaker = EnterpriseTimeoutCircuitBreaker(timeout_seconds=timeout_seconds)
-    try:
-        raw = breaker.execute(
-            _extract_text_internal,
-            file,
-            filename,
-            ocr_language=ocr_language,
-            ocr_dpi=ocr_dpi,
-            clean_whitespace=clean_whitespace,
-            mask_named_entities=mask_named_entities
-        )
-    except ExtractionTimeoutError as e:
-        logger.error(f"[document_parser] Extraction timed out for {filename}: {e}")
-        raise TimeoutError(f"Extraction of {filename} exceeded time limit.") from e
-    return raw

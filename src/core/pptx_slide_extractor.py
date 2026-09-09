@@ -139,7 +139,9 @@ def extract_presentation_deck(pptx_bytes: bytes) -> PresentationDeck:
     slides = []
 
     try:
-        with zipfile.ZipFile(pptx_bytes) as zf:
+        from io import BytesIO
+
+        with zipfile.ZipFile(BytesIO(pptx_bytes)) as zf:
             # Find all slide files (e.g., ppt/slides/slide1.xml)
             slide_files = sorted(
                 [f for f in zf.namelist() if re.match(r"ppt/slides/slide\d+\.xml", f)],

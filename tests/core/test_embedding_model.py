@@ -30,6 +30,13 @@ from src.core.embedding_model import (
 from src.exceptions import ModelInitializationError
 
 
+@pytest.fixture(autouse=True)
+def predictable_available_memory(monkeypatch):
+    # Model selection tests must not depend on RAM left by other workers.
+    from types import SimpleNamespace
+    monkeypatch.setattr(embedding_model.psutil, "virtual_memory", lambda: SimpleNamespace(available=8 * 1024**3))
+
+
 def _mock_encode(
     texts, batch_size=64, show_progress_bar=False, normalize_embeddings=True
 ):

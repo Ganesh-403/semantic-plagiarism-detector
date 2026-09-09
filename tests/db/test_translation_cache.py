@@ -7,6 +7,7 @@ Tests for translation caching system and TTL expiration helpers.
 import os
 import sqlite3
 import tempfile
+from contextlib import ExitStack, closing
 from unittest.mock import patch
 
 import pytest
@@ -47,10 +48,10 @@ def test_translation_cache_index_exists():
     conn = sqlite3.connect(DB_PATH)
     try:
         cursor = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='translation_cache'"
+            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='legacy_translation_cache'"
         )
         indexes = [row[0] for row in cursor.fetchall()]
-        assert "idx_translation_cache_created_at" in indexes
+        assert "idx_legacy_translation_cache_created_at" in indexes
     finally:
         conn.close()
 
@@ -59,33 +60,30 @@ class TestTranslationCacheTTL:
     """Test suite for TTL expiration and purge helpers."""
 
     @pytest.fixture
-    def temp_db_path(self):
-        """Provide a temporary database path for isolated testing."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            yield tmp.name
-        if os.path.exists(tmp.name):
-            os.remove(tmp.name)
+    def temp_db_path(self, tmp_path):
+        return str(tmp_path / "translations.db")
 
     @pytest.fixture(autouse=True)
-    def override_db_path(self, temp_db_path):
-        """Override the module-level DB_PATH for the duration of the test."""
-        original_path = translation_cache.DB_PATH
-        translation_cache.DB_PATH = temp_db_path
-        yield
-        translation_cache.DB_PATH = original_path
+    def override_db_path(self, temp_db_path, monkeypatch):
+        monkeypatch.setattr(translation_cache, "DB_PATH", temp_db_path)
+        # SQLite's transaction context does not close its connection.
+        connect = sqlite3.connect
+        with ExitStack() as handles:
+            monkeypatch.setattr(sqlite3, "connect", lambda *a, **kw: handles.enter_context(closing(connect(*a, **kw))))
+            yield
 
     def _seed_cache_with_dates(self, conn, days_ago_list):
         """Helper to insert cache entries with specific historical dates."""
         cursor = conn.cursor()
-        for days_ago in days_ago_list:
+        for index, days_ago in enumerate(days_ago_list):
             cursor.execute(
                 """
-                INSERT INTO translation_cache
+                INSERT INTO legacy_translation_cache
                 (text_hash, foreign_text, translated_text, source_lang, target_lang, created_at)
                 VALUES (?, ?, ?, ?, ?, datetime('now', '-' || ? || ' days'))
                 """,
                 (
-                    f"hash_{days_ago}",
+                    f"hash_{index}_{days_ago}",
                     f"foreign_{days_ago}",
                     f"translated_{days_ago}",
                     "auto",
@@ -106,8 +104,8 @@ class TestTranslationCacheTTL:
         deleted_count = translation_cache.purge_expired_translation_cache()
 
         assert deleted_count == 2
-        conn.execute("SELECT COUNT(*) FROM translation_cache")
-        assert conn.fetchone()[0] == 2
+        cursor = conn.execute("SELECT COUNT(*) FROM legacy_translation_cache")
+        assert cursor.fetchone()[0] == 2
 
     def test_purge_expired_translation_cache_custom_days(self, temp_db_path):
         """Test purging with a custom days_old threshold."""
@@ -119,15 +117,15 @@ class TestTranslationCacheTTL:
         deleted_count = translation_cache.purge_expired_translation_cache(days_old=15)
 
         assert deleted_count == 2  # 20 and 30 days old are purged
-        conn.execute("SELECT COUNT(*) FROM translation_cache")
-        assert conn.fetchone()[0] == 1  # Only the 10-day-old entry remains
+        cursor = conn.execute("SELECT COUNT(*) FROM legacy_translation_cache")
+        assert cursor.fetchone()[0] == 1  # Only the 10-day-old entry remains
 
     def test_purge_expired_translation_cache_zero_days(self, temp_db_path):
         """Test purging with 0 days (should purge nothing inserted 'now')."""
         conn = sqlite3.connect(temp_db_path)
         translation_cache.get_cached_translation("init")
         conn.execute("""
-            INSERT INTO translation_cache
+            INSERT INTO legacy_translation_cache
             (text_hash, foreign_text, translated_text, source_lang, target_lang)
             VALUES ('hash_now', 'foreign', 'translated', 'auto', 'en')
             """)
@@ -146,7 +144,7 @@ class TestTranslationCacheTTL:
     def test_purge_expired_translation_cache_handles_db_error(self, temp_db_path):
         """Test that database errors during purge are logged and return 0."""
         with patch("sqlite3.connect") as mock_connect:
-            mock_conn = mock_connect.return_value.__enter__.return_value
+            mock_conn = mock_connect.return_value
             mock_conn.cursor.return_value.execute.side_effect = sqlite3.Error(
                 "DB locked"
             )
@@ -166,8 +164,8 @@ class TestTranslationCacheTTL:
         deleted_count = translation_cache.purge_translation_cache_older_than()
 
         assert deleted_count == 2
-        conn.execute("SELECT COUNT(*) FROM translation_cache")
-        assert conn.fetchone()[0] == 2
+        cursor = conn.execute("SELECT COUNT(*) FROM legacy_translation_cache")
+        assert cursor.fetchone()[0] == 2
 
     def test_purge_translation_cache_older_than_custom_days(self, temp_db_path):
         """Test purging with a custom days threshold."""
@@ -179,8 +177,8 @@ class TestTranslationCacheTTL:
         deleted_count = translation_cache.purge_translation_cache_older_than(days=15)
 
         assert deleted_count == 2  # 20 and 30 days old are purged
-        conn.execute("SELECT COUNT(*) FROM translation_cache")
-        assert conn.fetchone()[0] == 1  # Only the 10-day-old entry remains
+        cursor = conn.execute("SELECT COUNT(*) FROM legacy_translation_cache")
+        assert cursor.fetchone()[0] == 1  # Only the 10-day-old entry remains
 
     def test_purge_translation_cache_older_than_negative_days_raises_error(self):
         """Test that negative days raises a ValueError."""
@@ -190,7 +188,7 @@ class TestTranslationCacheTTL:
     def test_purge_translation_cache_older_than_handles_db_error(self, temp_db_path):
         """Test that database errors during purge are logged and return 0."""
         with patch("sqlite3.connect") as mock_connect:
-            mock_conn = mock_connect.return_value.__enter__.return_value
+            mock_conn = mock_connect.return_value
             mock_conn.cursor.return_value.execute.side_effect = sqlite3.Error(
                 "DB locked"
             )
@@ -305,27 +303,10 @@ def test_get_cache_performance_summary():
     assert abs(summary["hit_ratio_percentage"] - 66.6666666) < 0.1
 
 
-def test_get_translation_cache_stats(self, temp_db_path):
-    """Test retrieving accurate cache statistics."""
-    conn = sqlite3.connect(temp_db_path)
-    translation_cache.get_cached_translation("init")
-    self._seed_cache_with_dates(conn, [10, 50, 100])
-
-    stats = translation_cache.get_translation_cache_stats()
-
-    assert stats == {"total_entries": 3}
-
-
-def test_get_translation_cache_stats_empty(self, temp_db_path):
-    """Test stats retrieval on an empty cache."""
-    stats = translation_cache.get_translation_cache_stats()
-    assert stats == {"total_entries": 0}
-
-
 def test_get_cached_translation_recovers_from_malformed_database(tmp_path, caplog):
     """A malformed SQLite cache is replaced and its schema is recreated."""
     cache_path = tmp_path / "translation_cache.db"
-    with sqlite3.connect(cache_path) as conn:
+    with closing(sqlite3.connect(cache_path)) as conn, conn:
         conn.execute("CREATE TABLE marker (value TEXT)")
         conn.execute("INSERT INTO marker VALUES ('keep schema test')")
 
@@ -341,7 +322,7 @@ def test_get_cached_translation_recovers_from_malformed_database(tmp_path, caplo
         assert "corrupted" in caplog.text.lower()
         assert "deleting it and recreating the schema" in caplog.text
 
-        with sqlite3.connect(cache_path) as conn:
+        with closing(sqlite3.connect(cache_path)) as conn, conn:
             table = conn.execute(
                 "SELECT name FROM sqlite_master "
                 "WHERE type='table' AND name='translation_cache'"

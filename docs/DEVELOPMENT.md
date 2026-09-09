@@ -9,6 +9,7 @@ Welcome! This guide will walk you through setting up your local environment for 
 It is recommended to use a Python virtual environment to manage dependencies.
 
 ### Windows (PowerShell)
+
 ```powershell
 # Create the virtual environment
 python -m venv venv
@@ -18,6 +19,7 @@ python -m venv venv
 ```
 
 ### macOS / Linux (Terminal)
+
 ```bash
 # Create the virtual environment
 python3 -m venv venv
@@ -39,6 +41,7 @@ pip install -r requirements-dev.txt
 pip install pytest-cov
 python -m nltk.downloader punkt_tab
 ```
+
 ---
 
 ## ⚙️ Step 3: Install Native C Dependencies
@@ -46,11 +49,14 @@ python -m nltk.downloader punkt_tab
 The application relies on `Tesseract` (for OCR parsing of images/scanned PDFs) and `Poppler` (for PDF rendering/highlighting). Follow the setup instructions for your operating system:
 
 ### 🪟 Windows
+
 1. **Tesseract OCR**:
    - Install via Winget in PowerShell:
+
      ```powershell
      winget install UB.TesseractOCR
      ```
+
    - Alternatively, download and run the installer from [UB Mannheim Tesseract Wiki](https://github.com/UB-Mannheim/tesseract/wiki).
    - Ensure the installation directory (usually `C:\Program Files\Tesseract-OCR`) is added to your system's `PATH` environment variable.
 2. **Poppler**:
@@ -59,13 +65,17 @@ The application relies on `Tesseract` (for OCR parsing of images/scanned PDFs) a
    - Add the `bin/` subdirectory (e.g., `C:\Program Files\poppler\Library\bin`) to your system's `PATH` environment variable.
 
 ### 🍎 macOS
+
 Install both dependencies easily using [Homebrew](https://brew.sh/):
+
 ```bash
 brew install tesseract poppler
 ```
 
 ### 🐧 Linux (Ubuntu / Debian)
+
 Install dependencies using `apt`:
+
 ```bash
 sudo apt update
 sudo apt install -y tesseract-ocr poppler-utils libtesseract-dev
@@ -74,38 +84,47 @@ sudo apt install -y tesseract-ocr poppler-utils libtesseract-dev
 ---
 
 ## 🧪 Step 4: Running Tests
- 
+
 The test suite uses `pytest` and `pytest-xdist` for fast, parallel unit and integration testing across CPU cores.
- 
+
 ### Run All Tests (Parallel)
+
 ```bash
 pytest
 # or explicitly:
 pytest -n auto
 ```
- 
+
 ### Run Tests in a Specific File
+
 ```bash
 pytest tests/db/test_database_backup.py
 ```
- 
+
 ### Run Specific Marker in Parallel
+
 ```bash
 pytest -m unit -n auto
 ```
- 
+
 ### Run Tests Bypassing Default Options (Local Quick Run)
+
 If you have config options causing coverage failures locally or want single-process debugging:
+
 ```bash
 pytest -n 0 -o addopts="" tests/db/test_database_backup.py
 ```
 
 ### Generate and View the HTML Coverage Report
+
 Run the test suite with HTML coverage and open `htmlcov/index.html` automatically in your default browser:
+
 ```bash
 python scripts/coverage_report.py
 ```
+
 To generate the report without opening the browser, add `--no-open`:
+
 ```bash
 python scripts/coverage_report.py --no-open
 ```
@@ -117,18 +136,22 @@ python scripts/coverage_report.py --no-open
 This project uses `pre-commit` to automatically check formatting, linting, and validation rules before commits are finalized.
 
 ### Install and Register Git Hooks
+
 ```bash
 pip install -r requirements-dev.txt
 pre-commit install
 ```
 
 ### Run Checks Manually
+
 To run checks on all files:
+
 ```bash
 pre-commit run --all-files
 ```
 
 To run checks only on staged files:
+
 ```bash
 pre-commit run
 ```
@@ -144,7 +167,6 @@ python scripts/generate_seed_data.py --reset-db --include-plagiarism
 ```
 
 For more details on optional parameters, refer to the seed generation guide in `scripts/generate_seed_data.py`.
-
 
 ---
 
@@ -180,11 +202,11 @@ streamlit run app/streamlit_app.py
 Gunicorn workers are separate operating-system processes. Each process has its
 own Python interpreter and its own `EmbeddingModelManager` instance.
 
-| Gunicorn configuration | Model-owning processes | Expected model-memory impact |
-|---|---:|---|
-| `--workers 1 --threads 4` | 1 | One model copy |
-| `--workers 2 --threads 4` | 2 | Approximately two model copies |
-| `--workers 4 --threads 4` | 4 | Approximately four model copies |
+| Gunicorn configuration    | Model-owning processes | Expected model-memory impact    |
+| ------------------------- | ---------------------: | ------------------------------- |
+| `--workers 1 --threads 4` |                      1 | One model copy                  |
+| `--workers 2 --threads 4` |                      2 | Approximately two model copies  |
+| `--workers 4 --threads 4` |                      4 | Approximately four model copies |
 
 Actual memory usage depends on the model, PyTorch runtime, allocator
 behaviour, and CPU/GPU execution, so these figures are deployment guidance.

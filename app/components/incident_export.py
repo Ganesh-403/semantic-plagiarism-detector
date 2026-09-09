@@ -28,7 +28,12 @@ def render_incident_export_panel(
         "The first flagged date and review status are retained."
     )
 
-    pdf_buffer = generate_batch_plagiarism_report(get_all_incidents(db_path))
+    incidents = sync_flagged_incidents(flags, db_path)
+    if not incidents:
+        st.info("No plagiarism incidents are currently available for export.")
+        return
+
+    pdf_buffer = generate_batch_plagiarism_report(incidents)
 
     pdf_filename = (
         "plagiarism_batch_report_"
@@ -42,11 +47,6 @@ def render_incident_export_panel(
         mime="application/pdf",
         use_container_width=True,
     )
-
-    incidents = sync_flagged_incidents(flags, db_path)
-    if not incidents:
-        st.info("No plagiarism incidents are currently available for export.")
-        return
 
     total = len(incidents)
     pending = sum(i["review_status"] == "Pending" for i in incidents)
@@ -116,8 +116,23 @@ def render_incident_export_panel(
     )
     st.download_button(
         "⬇️ Download All Flagged Incidents CSV",
-        data=incidents_to_csv(get_all_incidents(db_path)),
+        data=incidents_to_csv(incidents),
         file_name=filename,
         mime="text/csv",
         use_container_width=True,
+    )
+
+
+from src.core.export_engine import LMSExportEngine
+
+
+def render_incident_txt_export(incidents):
+    text = LMSExportEngine.generate_incident_txt(incidents) if incidents else None
+    st.download_button(
+        label="📝 Export TXT",
+        data=text or "",
+        file_name="plagiarism_incident_summary.txt",
+        mime="text/plain; charset=utf-8",
+        key="export_incidents_txt",
+        disabled=text is None,
     )

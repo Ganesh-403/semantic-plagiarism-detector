@@ -10,11 +10,11 @@ backup / cleanup mechanisms available.
 
 The application persists data in three primary artifacts:
 
-| Artifact | Default location | Contents |
-|----------|------------------|----------|
-| `corpus.db` | `<repo>/data/corpus.db` | Documents, text chunks, embeddings, plagiarism incidents |
-| `users.db`  | `<repo>/users.db` | User authentication, roles, permissions, SSO state |
-| `corpus.index` | `<repo>/corpus.index` | FAISS ANN index for similarity search |
+| Artifact       | Default location        | Contents                                                 |
+| -------------- | ----------------------- | -------------------------------------------------------- |
+| `corpus.db`    | `<repo>/data/corpus.db` | Documents, text chunks, embeddings, plagiarism incidents |
+| `users.db`     | `<repo>/users.db`       | User authentication, roles, permissions, SSO state       |
+| `corpus.index` | `<repo>/corpus.index`   | FAISS ANN index for similarity search                    |
 
 Both SQLite databases and the FAISS index are discovered dynamically; a
 `storage_metrics` module reports their combined disk usage.
@@ -95,15 +95,15 @@ endpoint (via `HEALTHZ_DB_PATHS`).
 `src/db/database_backup.py` provides snapshot, backup, restore, and cleanup
 operations:
 
-| Function | Purpose |
-|----------|---------|
-| `create_sqlite_snapshot(path)` | Transactionally consistent snapshot of a SQLite DB as bytes |
-| `create_database_backup(path)` | Writes a timestamped, gzip-compressed `.db.gz` backup into `backups/` (or a custom `backup_dir`) |
-| `create_password_protected_backup(path)` | AES-256 encrypted backup (requires `pyzipper`) |
-| `restore_database_backup(...)` / `restore(...)` | Restores a backup with strict path & content validation |
-| `cleanup_old_backups(...)` | Removes backups older than a retention window |
-| `optimize_database(path)` | Runs `VACUUM` to reclaim space |
-| `checkpoint_wal_log(path)` | Checkpoints the SQLite WAL |
+| Function                                        | Purpose                                                                                          |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `create_sqlite_snapshot(path)`                  | Transactionally consistent snapshot of a SQLite DB as bytes                                      |
+| `create_database_backup(path)`                  | Writes a timestamped, gzip-compressed `.db.gz` backup into `backups/` (or a custom `backup_dir`) |
+| `create_password_protected_backup(path)`        | AES-256 encrypted backup (requires `pyzipper`)                                                   |
+| `restore_database_backup(...)` / `restore(...)` | Restores a backup with strict path & content validation                                          |
+| `cleanup_old_backups(...)`                      | Removes backups older than a retention window                                                    |
+| `optimize_database(path)`                       | Runs `VACUUM` to reclaim space                                                                   |
+| `checkpoint_wal_log(path)`                      | Checkpoints the SQLite WAL                                                                       |
 
 Backups are written as `<source>.db.<timestamp>.db.gz` (or `.db` when
 `compress_backup=False`) into `DEFAULT_BACKUP_DIRECTORY` (the `backups/`

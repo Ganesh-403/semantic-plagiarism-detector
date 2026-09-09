@@ -32,8 +32,8 @@ class TestCohensKappa:
 
     def test_disagreement(self):
         """Verify Kappa is negative for systematic disagreement."""
-        r1 = [1, 1, 1, 1]
-        r2 = [2, 2, 2, 2]
+        r1 = [1, 1, 2, 2]
+        r2 = [2, 2, 1, 1]
         kappa = compute_cohens_kappa(r1, r2)
         assert kappa < 0.0
 

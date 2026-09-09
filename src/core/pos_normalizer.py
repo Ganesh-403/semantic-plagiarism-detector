@@ -70,6 +70,8 @@ def _mock_pos_tagger(text: str) -> list[tuple[str, str]]:
             tagged.append((word, 'PRP'))
         elif w_lower in conjunctions:
             tagged.append((word, 'CC'))
+        elif w_lower in {'am', 'is', 'are', 'was', 'were', 'be', 'been', 'sat', 'ran', 'went', 'wrote', 'read', 'made', 'did', 'had', 'said', 'saw', 'took', 'gave', 'got'}:
+            tagged.append((word, 'VB'))
         elif w_lower.endswith('ing'):
             tagged.append((word, 'VBG'))
         elif w_lower.endswith('ed'):
@@ -104,9 +106,6 @@ def extract_pos_sequence(text: str, use_nltk: bool = False) -> list[str]:
     if use_nltk:
         try:
             import nltk
-            # Ensure punkt and averaged_perceptron_tagger are downloaded
-            nltk.download('punkt', quiet=True)
-            nltk.download('averaged_perceptron_tagger', quiet=True)
             from nltk import word_tokenize, pos_tag
             
             tokens = word_tokenize(text)
@@ -148,19 +147,6 @@ def compute_pos_ngrams(pos_sequence: list[str], n: int = 3) -> list[tuple[str, .
     return [tuple(pos_sequence[i:i+n]) for i in range(len(pos_sequence) - n + 1)]
 
 
-# semantic-plagiarism-detector/src/core/pos_normalizer.py
-
-import nltk
-from typing import List
-
-# Ensure required NLTK corpuses/taggers are available
-try:
-    nltk.data.find('tokenizers/punkt')
-    nltk.data.find('taggers/averaged_perceptron_tagger')
-except LookupError:
-    nltk.download('punkt', quiet=True)
-    nltk.download('averaged_perceptron_tagger', quiet=True)
-
 class POSNormalizer:
     """
     Normalizes text into Part-of-Speech (POS) tag sequences to detect 
@@ -176,8 +162,13 @@ class POSNormalizer:
         if not text or not text.strip():
             return []
             
-        tokens = nltk.word_tokenize(text)
-        tagged_tokens = nltk.pos_tag(tokens)
+        try:
+            import nltk
+            tokens = nltk.word_tokenize(text)
+            tagged_tokens = nltk.pos_tag(tokens)
+        except (ImportError, LookupError):
+            logger.warning("POS language data unavailable; using approximate heuristic tags.")
+            tagged_tokens = _mock_pos_tagger(text)
         
         # Extract just the POS tags and standardize/simplify if needed
         pos_tags = [tag for word, tag in tagged_tokens]

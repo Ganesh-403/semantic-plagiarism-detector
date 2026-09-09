@@ -1,16 +1,15 @@
-from pathlib import Path
+from streamlit.testing.v1 import AppTest
+from src.db.corpus_db import add_document
 
-APP_PATH = Path("app/streamlit_app.py")
 
-
-def test_document_management_filter_ui():
-    source = APP_PATH.read_text(encoding="utf-8")
-    assert (
-        'doc_filter = st.text_input("Filter documents by filename", key="doc_mgmt_filter")'
-        in source
-    )
-    assert (
-        'if not doc_filter or doc_filter.lower() in str(d["filename"]).lower()'
-        in source
-    )
-    assert "filtered_docs = [" in source
+def test_document_management_filter_ui(mock_db):
+    add_document("Alpha.txt", "a")
+    add_document("Beta.txt", "b")
+    at = AppTest.from_string("from app.views.corpus_view import render_document_management_sidebar; render_document_management_sidebar('admin', '/missing/index', 'filter-test', 0)").run()
+    assert not at.exception
+    at.text_input(key="doc_mgmt_filter").set_value("ALPHA").run()
+    assert not at.exception
+    assert list(at.dataframe[0].value["Filename"]) == ["Alpha.txt"]
+    at.text_input(key="doc_mgmt_filter").set_value("unknown").run()
+    assert not at.exception
+    assert not at.dataframe

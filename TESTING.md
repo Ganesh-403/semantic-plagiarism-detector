@@ -3,14 +3,20 @@
 This document outlines the testing strategy, architecture, and developer workflows for the Semantic Plagiarism Detector platform.
 
 ## Architecture & Mocking Strategy
-To ensure hermetic, deterministic test execution without side-effects, the repository utilizes robust dependency injection and global fixtures via `conftest.py`.
 
-### Database Fixtures (`mock_db` & `mock_auth_db`)
-The core database layers (`src.db.corpus_db`, `src.db.auth`, `src.db.incidents`) are built on SQLite databases stored in the root directory. To prevent tests from corrupting the production or local seed databases, we globally patch the internal `_DB_PATH` constants across the entire `src.db` namespace.
-- **In-Memory Speed:** The fixtures route all test I/O to transient, file-backed SQLite instances in a temporary directory.
-- **State Reset:** Databases are fully rebuilt and seeded at the start of each test phase, ensuring isolated execution and avoiding cross-test contamination.
+Tests use dependency injection, temporary directories and scoped fixtures to keep
+application data separate from test data. Fixtures are defined in `tests/conftest.py`
+and in the test subdirectories.
+
+### Database fixtures
+
+The opt-in `mock_db` fixture creates separate temporary SQLite files for corpus and
+authentication data and patches the corresponding database paths for that test.
+Other suites provide their own scoped fixtures. These are file-backed databases,
+not in-memory databases. New database tests must explicitly use an isolated fixture.
 
 ### FAISS & Redis Infrastructure
+
 - **Redis Mocking:** The system uses `fakeredis` to mock the Redis backend for the `TelemetryService` and caching layers, simulating connection failures, TTL expiry, and cache misses.
 - **FAISS Isolation:** FAISS vectors are generated dynamically and saved to temporary file descriptors to test desync recovery paths (`synchronization.py`) without modifying the disk index.
 
@@ -19,28 +25,32 @@ The core database layers (`src.db.corpus_db`, `src.db.auth`, `src.db.incidents`)
 We provide a robust testing framework designed to enforce code coverage and execute targeted subsets across multiple CPU cores.
 
 ### Parallel Test Execution (`pytest-xdist`)
-The test suite is pre-configured in `pytest.ini` to run in parallel using `pytest-xdist`:
-- **`-n auto`**: Automatically detects the number of available CPU cores and spawns worker processes accordingly.
-- **`--dist=loadscope`**: Groups test functions by module and test methods by class, sending each group to the same worker process. This guarantees that tests sharing database fixtures (`mock_db`, `mock_auth_db`), mock states, or temporary resources run sequentially on one worker, preventing concurrency issues and race conditions.
+
+Parallel execution is opt-in. The CI runner uses two workers and `--dist=loadfile`
+to keep each test file on one worker. Fixtures must still isolate database paths,
+model singletons and cached state; the scheduler does not prevent shared-state bugs.
 
 ```bash
-# Run all tests in parallel (auto-detects CPU cores via pytest.ini)
-pytest
+# Serial default
+python -m pytest
 
-# Explicitly specify parallel workers
-pytest -n auto
-pytest -n 4
+# Same worker scheduling as CI, including application coverage
+python -m pytest -n 2 --dist=loadfile --cov=src --cov=app
 
-# Run a specific test marker in parallel
-pytest -m unit -n auto
-pytest -m integration -n auto
+# Focused test without a repository-wide coverage report
+python -m pytest --no-cov tests/app/test_app_clear.py
 
-# Disable parallel execution for debugging/serial tracing
-pytest -n 0
+# Explicitly selected integration tests
+python -m pytest -m integration
 ```
 
+`pytest.ini` still contains legacy test exclusions. Passing the discovered suite
+does not validate those excluded files. See [recovery validation](docs/recovery-validation.md)
+for the current measured results and remaining coverage gap.
+
 ### Automated Test Runner
-Instead of calling `pytest` directly, you can also use the provided `scripts/run_tests.py` automation script. It handles configuration parsing, coverage aggregation, and Docker container provisioning.
+
+Instead of calling `pytest` directly, you can also use the provided `scripts/run_tests.py` automation script. It selects pytest markers, worker scheduling and coverage options; external services must be configured separately.
 
 ```bash
 # Run the entire test suite and generate an HTML coverage report
@@ -60,7 +70,9 @@ python scripts/run_tests.py --all --enforce-coverage 85
 ```
 
 ### Makefile Targets
+
 For convenience, `Makefile` encapsulates these commands:
+
 ```bash
 make test         # Runs standard test suite
 make test-unit    # Runs only unit tests
@@ -68,9 +80,11 @@ make test-cov     # Runs tests with coverage enforcement
 ```
 
 ## Generating Mock Data
+
 To quickly populate the dashboard with realistic dummy essays, use the built-in mock data generator available from the Streamlit application.
 
 ### Prerequisites
+
 The mock data generator requires the `faker` package. If it is not already installed, run:
 
 ```bash
@@ -78,6 +92,7 @@ pip install faker
 ```
 
 ### Steps
+
 1. Launch the Streamlit application.
 2. Log in as an administrator.
 3. Open the **🧪 Developer Tools** section in the sidebar.
@@ -93,6 +108,7 @@ The generator will:
 - Automatically refresh the application so the demo essays are immediately available in the dashboard.
 
 ## Adding New Tests
+
 1. **File Location:** Place new tests in `tests/` mirroring the `src/` directory structure.
 2. **Naming Convention:** Prefix test files with `test_` and functions with `test_`.
 3. **Markers:** Always decorate tests with `@pytest.mark.unit` or `@pytest.mark.integration`.

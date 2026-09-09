@@ -76,7 +76,7 @@ class SecurityHeadersMiddleware:
         # 'unsafe-inline' is needed for Swagger UI inline scripts
         self.csp_policy = os.getenv(
             "CSP_POLICY",
-            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'",
+            "frame-ancestors 'none'; default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'",
         )
 
     async def __call__(self, scope, receive, send):

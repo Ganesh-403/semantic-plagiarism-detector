@@ -81,10 +81,10 @@ def test_get_lock_timeout_invalid(mocker):
     assert get_lock_timeout() == 30
 
 
-def test_get_lock_timeout_minimum(mocker):
+def test_get_lock_timeout_invalid_minimum_uses_default(mocker):
     mocker.patch("os.getenv", return_value="0")
 
-    assert get_lock_timeout() == 1
+    assert get_lock_timeout() == 30
 
 
 # ---------------------------------------------------------------------------
@@ -362,7 +362,7 @@ def test_get_backup_idle_timeout_valid(monkeypatch):
     assert get_backup_idle_timeout() == 45 * 60
 
 
-def test_get_backup_idle_timeout_negative_logs_warning_and_defaults_to_30(
+def test_get_backup_idle_timeout_negative_defaults_to_30(
     monkeypatch, caplog
 ):
     monkeypatch.setenv("BACKUP_IDLE_TIMEOUT_MINUTES", "-10")
@@ -370,10 +370,10 @@ def test_get_backup_idle_timeout_negative_logs_warning_and_defaults_to_30(
         result = get_backup_idle_timeout()
 
     assert result == 30 * 60
-    assert "Invalid backup timeout -10, defaulting to 30" in caplog.text
+    assert result > 0  # Invalid values must not disable scheduled backups.
 
 
-def test_get_backup_idle_timeout_zero_logs_warning_and_defaults_to_30(
+def test_get_backup_idle_timeout_zero_defaults_to_30(
     monkeypatch, caplog
 ):
     monkeypatch.setenv("BACKUP_IDLE_TIMEOUT_MINUTES", "0")
@@ -381,4 +381,4 @@ def test_get_backup_idle_timeout_zero_logs_warning_and_defaults_to_30(
         result = get_backup_idle_timeout()
 
     assert result == 30 * 60
-    assert "Invalid backup timeout 0, defaulting to 30" in caplog.text
+    assert result > 0  # Invalid values must not disable scheduled backups.

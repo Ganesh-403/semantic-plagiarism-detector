@@ -62,7 +62,10 @@ def is_valid_email(email: Optional[str]) -> bool:
     """
     if not email or not isinstance(email, str):
         return False
-    return bool(re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email.strip()))
+    return bool(re.fullmatch(
+        r"[a-zA-Z0-9._%+-]+@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}",
+        email,
+    ))
 
 
 def get_admin_emails() -> list[str]:

@@ -47,7 +47,7 @@ def test_github_auth_url_default_scope(monkeypatch):
     parsed = urlparse(url)
     params = parse_qs(parsed.query)
     
-    assert params["scope"] == ["user:email"]
+    assert params["scope"] == ["read:user user:email"]
 
 
 def test_github_auth_url_custom_scope(monkeypatch):

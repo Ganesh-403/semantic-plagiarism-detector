@@ -8,7 +8,7 @@ to prevent misaligned highlight boxes on rotated scanned/standard pages.
 from __future__ import annotations
 
 import os
-import fitz
+from src.utils import pdf_backend as fitz
 import pytest
 
 from src.utils.pdf_highlighter import (

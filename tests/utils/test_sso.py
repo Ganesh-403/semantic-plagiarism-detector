@@ -52,8 +52,8 @@ def test_exchange_google_code_missing_client_secret(monkeypatch):
         exchange_google_code("dummy_code")
 
 
-@patch("src.utils.sso.requests.get")
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.get")
+@patch("src.utils.sso.requests.Session.post")
 def test_exchange_google_code_success(mock_post, mock_get, monkeypatch):
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "dummy_client_id")
     monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "dummy_secret")
@@ -67,7 +67,7 @@ def test_exchange_google_code_success(mock_post, mock_get, monkeypatch):
     mock_get.return_value.json.return_value = {
         "email": "user@example.com",
         "name": "Test User",
-        "picture": "https://example.com/avatar.png",
+        "verified_email": True, "id": "google-user-123", "picture": "https://example.com/avatar.png",
     }
 
     user_data, error_msg = exchange_google_code("valid_code")
@@ -77,8 +77,8 @@ def test_exchange_google_code_success(mock_post, mock_get, monkeypatch):
     mock_get.assert_called_once()
 
 
-@patch("src.utils.sso.requests.get")
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.get")
+@patch("src.utils.sso.requests.Session.post")
 def test_exchange_google_code_sanitizes_username(mock_post, mock_get, monkeypatch):
     """Test that email with special characters (dots, pluses) produces a sanitized username."""
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "dummy_client_id")
@@ -93,7 +93,7 @@ def test_exchange_google_code_sanitizes_username(mock_post, mock_get, monkeypatc
     mock_get.return_value.json.return_value = {
         "email": "john.doe+class@school.edu",
         "name": "John Doe",
-        "picture": "https://example.com/avatar.png",
+        "verified_email": True, "id": "google-user-123", "picture": "https://example.com/avatar.png",
     }
 
     user_data, error_msg = exchange_google_code("valid_code")
@@ -106,7 +106,7 @@ def test_exchange_google_code_sanitizes_username(mock_post, mock_get, monkeypatc
     assert error_msg is None
 
 
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.post")
 def test_exchange_google_code_unauthorized(mock_post, monkeypatch):
     """Test Google OAuth returns 4xx error message when authorization code is rejected."""
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "dummy_client_id")
@@ -155,8 +155,8 @@ def test_exchange_github_code_missing_client_secret(monkeypatch):
         exchange_github_code("dummy_code")
 
 
-@patch("src.utils.sso.requests.get")
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.get")
+@patch("src.utils.sso.requests.Session.post")
 def test_exchange_github_code_success(mock_post, mock_get, monkeypatch):
     monkeypatch.setenv("GITHUB_CLIENT_ID", "dummy_client_id")
     monkeypatch.setenv("GITHUB_CLIENT_SECRET", "dummy_secret")
@@ -174,14 +174,15 @@ def test_exchange_github_code_success(mock_post, mock_get, monkeypatch):
         "avatar_url": "https://example.com/octocat.png",
     }
 
+    mock_get.return_value.json.side_effect = [mock_get.return_value.json.return_value, [{"email": "octocat@github.com", "primary": True, "verified": True}]]
     user_data, error_msg = exchange_github_code("valid_code")
     assert user_data == SSOUserProfile(email="octocat@github.com", username="octocat", name="The Octocat", avatar="https://example.com/octocat.png")
     assert error_msg is None
     mock_post.assert_called_once()
-    mock_get.assert_called_once()
+    assert mock_get.call_count == 2
 
 
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.post")
 def test_exchange_github_code_4xx_unauthorized(mock_post, monkeypatch):
     """Test GitHub OAuth returns 4xx error message when authorization code is rejected."""
     monkeypatch.setenv("GITHUB_CLIENT_ID", "dummy_client_id")
@@ -197,7 +198,7 @@ def test_exchange_github_code_4xx_unauthorized(mock_post, monkeypatch):
     mock_post.assert_called_once()
 
 
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.post")
 def test_exchange_github_code_json_error_response(mock_post, monkeypatch):
     """Test GitHub OAuth returning 200 OK with error payload."""
     monkeypatch.setenv("GITHUB_CLIENT_ID", "dummy_client_id")
@@ -216,7 +217,7 @@ def test_exchange_github_code_json_error_response(mock_post, monkeypatch):
     assert error_msg == "Invalid or expired SSO authorization code"
 
 
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.post")
 def test_oauth_token_exchange_timeout(mock_post, monkeypatch):
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "dummy_client_id")
     monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "dummy_secret")
@@ -232,7 +233,7 @@ def test_oauth_token_exchange_timeout(mock_post, monkeypatch):
     assert kwargs.get("timeout") == 10
 
 
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.post")
 def test_github_oauth_token_exchange_timeout(mock_post, monkeypatch):
     monkeypatch.setenv("GITHUB_CLIENT_ID", "dummy_client_id")
     monkeypatch.setenv("GITHUB_CLIENT_SECRET", "dummy_secret")
@@ -248,8 +249,8 @@ def test_github_oauth_token_exchange_timeout(mock_post, monkeypatch):
     assert kwargs.get("timeout") == 10
 
 
-@patch("src.utils.sso.requests.get")
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.get")
+@patch("src.utils.sso.requests.Session.post")
 def test_oauth_user_request_timeout(mock_post, mock_get, monkeypatch):
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "dummy_client_id")
     monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "dummy_secret")
@@ -268,8 +269,8 @@ def test_oauth_user_request_timeout(mock_post, mock_get, monkeypatch):
     assert kwargs.get("timeout") == 10
 
 
-@patch("src.utils.sso.requests.get")
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.get")
+@patch("src.utils.sso.requests.Session.post")
 def test_github_oauth_user_request_timeout(mock_post, mock_get, monkeypatch):
     monkeypatch.setenv("GITHUB_CLIENT_ID", "dummy_client_id")
     monkeypatch.setenv("GITHUB_CLIENT_SECRET", "dummy_secret")
@@ -288,8 +289,8 @@ def test_github_oauth_user_request_timeout(mock_post, mock_get, monkeypatch):
     assert kwargs.get("timeout") == 10
 
 
-@patch("src.utils.sso.requests.get")
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.get")
+@patch("src.utils.sso.requests.Session.post")
 def test_exchange_github_code_email_fallback_success(mock_post, mock_get, monkeypatch):
     """Test GitHub email fallback when user profile does not contain email."""
     monkeypatch.setenv("GITHUB_CLIENT_ID", "dummy_client_id")
@@ -322,8 +323,8 @@ def test_exchange_github_code_email_fallback_success(mock_post, mock_get, monkey
     assert mock_get.call_count == 2
 
 
-@patch("src.utils.sso.requests.get")
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.get")
+@patch("src.utils.sso.requests.Session.post")
 def test_exchange_github_code_email_fallback_timeout(mock_post, mock_get, monkeypatch):
     """Test GitHub email fallback when /user/emails request times out."""
     monkeypatch.setenv("GITHUB_CLIENT_ID", "dummy_client_id")
@@ -346,8 +347,8 @@ def test_exchange_github_code_email_fallback_timeout(mock_post, mock_get, monkey
     assert mock_get.call_count == 2
 
 
-@patch("src.utils.sso.requests.get")
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.get")
+@patch("src.utils.sso.requests.Session.post")
 def test_exchange_github_code_filters_noreply_profile_email(
     mock_post, mock_get, monkeypatch
 ):
@@ -366,6 +367,8 @@ def test_exchange_github_code_filters_noreply_profile_email(
     user_response.json.return_value = {
         "login": "octocat",
         "email": "12345+octocat@users.noreply.github.com",
+        "name": "The Octocat",
+        "avatar_url": "https://example.com/octocat.png",
     }
 
     # /user/emails returns list with real verified email
@@ -378,7 +381,7 @@ def test_exchange_github_code_filters_noreply_profile_email(
             "primary": True,
             "verified": True,
         },
-        {"email": "octocat@github.com", "primary": False, "verified": True},
+        {"email": "octocat@github.com", "primary": True, "verified": True},
     ]
 
     mock_get.side_effect = [user_response, emails_response]
@@ -388,8 +391,8 @@ def test_exchange_github_code_filters_noreply_profile_email(
     assert error_msg is None
 
 
-@patch("src.utils.sso.requests.get")
-@patch("src.utils.sso.requests.post")
+@patch("src.utils.sso.requests.Session.get")
+@patch("src.utils.sso.requests.Session.post")
 def test_exchange_github_code_rejects_login_with_no_public_email(
     mock_post, mock_get, monkeypatch
 ):

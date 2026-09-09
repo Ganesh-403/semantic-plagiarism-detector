@@ -36,6 +36,14 @@ jobs:
         run: |
           echo "Auditing open-source dependency licenses..."
           pip-licenses --format=markdown
+          pip-licenses --format=json --output-file=license-report.json
 
           # Fail if any GPL / AGPL / LGPL copyleft licenses are detected
-          pip-licenses --fail-on "GPL;GPLv2;GPLv3;AGPL;AGPLv3;LGPL;LGPLv2;LGPLv3;GNU General Public License;GNU Affero General Public License;GNU Lesser General Public License"
+          pip-licenses --partial-match --fail-on "GPL;GPLv2;GPLv3;AGPL;AGPLv3;LGPL;LGPLv2;LGPLv3;GNU General Public License;GNU Affero General Public License;GNU Lesser General Public License"
+
+      - name: Upload license inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-licenses
+          path: license-report.json

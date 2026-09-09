@@ -12,7 +12,7 @@ This JSON endpoint provides compatibility for all standard Prometheus metric typ
 
 The response is a JSON dictionary where the keys are the metric family names (e.g. `documents`, `pipeline_duration_seconds`) and the values adhere to the `MetricFamily` schema:
 
-```json
+````json
 {
   "metric_family_name": {
     "name": "metric_family_name",
@@ -80,25 +80,30 @@ The response is a JSON dictionary where the keys are the metric family names (e.
     ]
   }
 }
-````
+````text
+
 ## Metric Types and Representation
 
 ### Counters
+
 Counters track monotonically non-decreasing values (e.g. total requests, total ingested documents).
 The `metrics` array typically contains:
-+ `{name}_total`: The accumulated value of the counter.
-+ `{name}_created`: A UNIX timestamp reflecting when the counter was initialized.
 
+- `{name}_total`: The accumulated value of the counter.
+- `{name}_created`: A UNIX timestamp reflecting when the counter was initialized.
 
 ### Gauges
+
 Gauges track a value that can go up or down (e.g. active users, index sizes on disk).
 The `metrics` array typically contains a single entry per label permutation with the base name (e.g. `active_users`).
 
 ### Histograms
+
 Histograms record observations (usually durations or sizes) and count them into configurable buckets.
 The `metrics` array includes:
-+ `{name}_bucket`: The cumulative count of observations falling into the bucket. Each bucket includes an `le` label indicating the upper inclusive bound.
-+ `{name}_count`: The total number of observations.
-+ `{name}_sum`: The total sum of all observed values.
+
+- `{name}_bucket`: The cumulative count of observations falling into the bucket. Each bucket includes an `le` label indicating the upper inclusive bound.
+- `{name}_count`: The total number of observations.
+- `{name}_sum`: The total sum of all observed values.
 
 This structure allows web dashboard components to reliably parse labels without conflating buckets with the sum or count.

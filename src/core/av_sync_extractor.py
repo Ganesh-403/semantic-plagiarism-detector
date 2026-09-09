@@ -43,11 +43,13 @@ def extract_pitch_contour(audio_bytes: bytes, window_size: int = 1024) -> List[f
     pitch frequency over time windows. This is a lightweight proxy for
     actual FFT-based pitch extraction.
     """
+    if window_size <= 0:
+        raise ValueError("window_size must be positive")
     if not audio_bytes or len(audio_bytes) < window_size:
         return []
 
     contour = []
-    for i in range(0, len(audio_bytes) - window_size, window_size):
+    for i in range(0, len(audio_bytes) - window_size + 1, window_size):
         window = audio_bytes[i : i + window_size]
 
         # Zero-crossing rate proxy: count sign changes (assuming 8-bit signed PCM proxy)

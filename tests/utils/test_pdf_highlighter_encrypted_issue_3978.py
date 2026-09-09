@@ -7,7 +7,7 @@ in pdf_highlighter.py and raising PDFEncryptedError when authentication fails.
 
 from __future__ import annotations
 
-import fitz
+from src.utils import pdf_backend as fitz
 import pytest
 
 from src.errors import PDFEncryptedError
@@ -59,7 +59,7 @@ def test_encrypted_pdf_wrong_password_raises_pdf_encrypted_error(encrypted_pdf_b
         highlight_pdf_matches(
             pdf_bytes=encrypted_pdf_bytes,
             matching_phrases=["confidential sample document"],
-            password="WrongPassword999",
+            password="WrongPassword999",  # pragma: allowlist secret
         )
 
     assert "PDF is encrypted and password was not provided or invalid." in str(exc_info.value)
@@ -70,7 +70,7 @@ def test_encrypted_pdf_correct_password_succeeds(encrypted_pdf_bytes: bytes):
     result = highlight_pdf_matches(
         pdf_bytes=encrypted_pdf_bytes,
         matching_phrases=["confidential sample document"],
-        password="UserSecret123",
+        password="UserSecret123",  # pragma: allowlist secret
     )
 
     assert result != b""
@@ -83,7 +83,7 @@ def test_encrypted_pdf_correct_owner_password_succeeds(encrypted_pdf_bytes: byte
     result = highlight_pdf_matches(
         pdf_bytes=encrypted_pdf_bytes,
         matching_phrases=["confidential sample document"],
-        password="OwnerSecret123",
+        password="OwnerSecret123",  # pragma: allowlist secret
     )
 
     assert result != b""

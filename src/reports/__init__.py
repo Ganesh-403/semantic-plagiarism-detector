@@ -9,9 +9,9 @@ from .csv_exporter import CSVExporter
 from .visualizations import ReportVisualizer
 
 __all__ = [
-    'ReportGenerator',
-    'PDFGenerator',
-    'HTMLGenerator',
-    'CSVExporter',
-    'ReportVisualizer'
+    "ReportGenerator",
+    "PDFGenerator",
+    "HTMLGenerator",
+    "CSVExporter",
+    "ReportVisualizer",
 ]

@@ -5,10 +5,11 @@ Creates beautiful, interactive HTML reports with embedded visualizations.
 
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+from html import escape
 import json
 import base64
 
-from src.models.report import Report, ReportConfig, ReportSection
+from src.models.report import Report
 from .visualizations import ReportVisualizer
 
 
@@ -16,15 +17,15 @@ class HTMLGenerator:
     """
     Generates HTML reports with embedded visualizations and interactive elements.
     """
-    
+
     def __init__(self):
         self.visualizer = ReportVisualizer()
         self._templates = self._load_templates()
-    
+
     def _load_templates(self) -> Dict[str, str]:
         """Load HTML templates."""
         return {
-            'header': """
+            "header": """
             <!DOCTYPE html>
             <html lang="en">
             <head>
@@ -218,86 +219,90 @@ class HTMLGenerator:
                 <div class="container">
             """
         }
-    
+
     def generate(self, report: Report, content: Dict[str, Any]) -> str:
         """
         Generate an HTML report.
-        
+
         Args:
             report: Report object
             content: Report content data
-        
+
         Returns:
             HTML string
         """
-        html = []
-        
+        html = [self._templates["header"].format(title=escape(report.title))]
+
         # Header
         html.append(self._generate_header(report))
-        
+
         # Executive Summary
         if report.statistics:
             html.append(self._generate_summary(report))
-        
+
         # Heatmap
         if report.similarity_matrix and report.document_names:
-            html.append(self._generate_heatmap(report))
-        
+            html.append(
+                self._generate_heatmap(
+                    report, content.get("visualizations", {}).get("heatmap")
+                )
+            )
+
         # Matches
         if report.matches:
             html.append(self._generate_matches(report))
-        
+
         # Detailed Statistics
         if report.statistics:
             html.append(self._generate_statistics(report))
-        
+
         # Footer
         html.append(self._generate_footer(report))
-        
+
         return "\n".join(html)
-    
+
     def _generate_header(self, report: Report) -> str:
         """Generate report header section."""
         status_badge = {
-            'pending': '🟡 Pending',
-            'generating': '🔄 Generating',
-            'completed': '✅ Completed',
-            'failed': '❌ Failed'
+            "pending": "🟡 Pending",
+            "generating": "🔄 Generating",
+            "completed": "✅ Completed",
+            "failed": "❌ Failed",
         }.get(report.status.value, report.status.value)
-        
+
         return f"""
         <div class="header">
-            <h1>📊 {report.title}</h1>
+            <h1>📊 {escape(report.title)}</h1>
             <div class="header-meta">
                 <span>📋 Report ID: {report.id[:8]}</span>
-                <span>📅 Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</span>
-                <span>📁 Type: {report.report_type.value.replace('_', ' ').title()}</span>
+                <span>📅 Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</span>
+                <span>📁 Type: {report.report_type.value.replace("_", " ").title()}</span>
                 <span>📄 Format: {report.format.value.upper()}</span>
                 <span>🔖 Status: {status_badge}</span>
             </div>
-            {f'<p style="margin-top:12px;color:#475569;">{report.description}</p>' if report.description else ''}
+            {f'<p style="margin-top:12px;color:#475569;">{escape(report.description)}</p>' if report.description else ""}
         </div>
         """
-    
+
     def _generate_summary(self, report: Report) -> str:
         """Generate executive summary section."""
         stats = report.statistics
-        
+
         html = """
         <div class="section">
             <h2>📊 Executive Summary</h2>
             <div class="stats-grid">
         """
-        
+
         summary_items = [
-            ('📄 Documents', stats.get('total_documents', 0)),
-            ('🔄 Comparisons', stats.get('total_comparisons', 0)),
-            ('🎯 Matches', stats.get('total_matches', 0)),
-            ('📈 Avg Similarity', f"{stats.get('avg_similarity', 0):.1%}"),
-            ('📈 Max Similarity', f"{stats.get('max_similarity', 0):.1%}"),
-            ('🔴 High Severity', stats.get('high_severity_count', 0))
+            ("📄 Documents", stats.get("total_documents", 0)),
+            ("🔄 Comparisons", stats.get("total_comparisons", 0)),
+            ("🎯 Matches", stats.get("total_matches", 0)),
+            ("📈 Avg Similarity", f"{stats.get('average_similarity', 0):.1%}"),
+            ("📈 Max Similarity", f"{stats.get('max_similarity', 0):.1%}"),
+            ("🔴 High Severity", stats.get("high_severity_count", 0)),
         ]
-        
+
         for label, value in summary_items:
             html += f"""
                 <div class="stat-card">
@@ -305,25 +310,25 @@ class HTMLGenerator:
                     <div class="stat-label">{label}</div>
                 </div>
             """
-        
+
         html += """
             </div>
         </div>
         """
-        
+
         return html
-    
-    def _generate_heatmap(self, report: Report) -> str:
+
+    def _generate_heatmap(self, report: Report, image: str | None = None) -> str:
         """Generate heatmap section."""
         if not report.similarity_matrix or not report.document_names:
             return ""
-        
-        img_data = self.visualizer.create_heatmap(
+
+        img_data = image or self.visualizer.create_heatmap(
             report.similarity_matrix,
             report.document_names,
-            title="Document Similarity Matrix"
+            title="Document Similarity Matrix",
         )
-        
+
         return f"""
         <div class="section">
             <h2>📈 Similarity Heatmap</h2>
@@ -336,13 +341,13 @@ class HTMLGenerator:
             </div>
         </div>
         """
-    
+
     def _generate_matches(self, report: Report) -> str:
         """Generate matches section."""
-        matches = report.matches[:100]
+        matches = report.matches
         if not matches:
             return ""
-        
+
         html = """
         <div class="section">
             <h2>🔍 Detected Matches</h2>
@@ -361,62 +366,62 @@ class HTMLGenerator:
                 </thead>
                 <tbody>
         """.format(total=len(matches))
-        
+
         for i, match in enumerate(matches, 1):
-            score = match.get('hybrid_score', match.get('score', 0))
-            
+            score = match.get("hybrid_score", match.get("score", 0))
+
             if score >= 0.8:
-                severity, badge_class = 'High', 'badge-high'
-            elif score >= 0.6:
-                severity, badge_class = 'Medium', 'badge-medium'
-            elif score >= 0.4:
-                severity, badge_class = 'Low', 'badge-low'
+                severity, badge_class = "High", "badge-high"
+            elif score >= 0.5:
+                severity, badge_class = "Medium", "badge-medium"
+            elif score >= 0.3:
+                severity, badge_class = "Low", "badge-low"
             else:
-                severity, badge_class = 'None', 'badge-none'
-            
+                severity, badge_class = "None", "badge-none"
+
             html += f"""
                 <tr>
                     <td>{i}</td>
-                    <td>{match.get('source_document', 'Unknown')}</td>
-                    <td>{match.get('target_document', 'Unknown')}</td>
+                    <td>{escape(str(match.get("source_document", "Unknown")))}</td>
+                    <td>{escape(str(match.get("target_document", "Unknown")))}</td>
                     <td>{score:.2%}</td>
                     <td><span class="badge {badge_class}">{severity}</span></td>
                 </tr>
             """
-        
+
         html += """
                 </tbody>
             </table>
         </div>
         """
-        
+
         return html
-    
+
     def _generate_statistics(self, report: Report) -> str:
         """Generate detailed statistics section."""
         stats = report.statistics
-        
+
         html = """
         <div class="section">
             <h2>📊 Detailed Statistics</h2>
             <div class="stats-grid">
         """
-        
+
         stat_items = [
-            ('📄 Total Documents', stats.get('total_documents', 0)),
-            ('🔄 Total Comparisons', stats.get('total_comparisons', 0)),
-            ('🎯 Total Matches', stats.get('total_matches', 0)),
-            ('📈 Average Similarity', f"{stats.get('avg_similarity', 0):.2%}"),
-            ('📈 Median Similarity', f"{stats.get('median_similarity', 0):.2%}"),
-            ('📈 Max Similarity', f"{stats.get('max_similarity', 0):.2%}"),
-            ('📉 Min Similarity', f"{stats.get('min_similarity', 0):.2%}"),
-            ('📊 Std Deviation', f"{stats.get('std_similarity', 0):.2%}"),
-            ('🔴 High Severity (≥80%)', stats.get('high_severity_count', 0)),
-            ('🟡 Medium Severity (50-80%)', stats.get('medium_severity_count', 0)),
-            ('🟢 Low Severity (30-50%)', stats.get('low_severity_count', 0)),
-            ('⚪ Very Low (<30%)', stats.get('none_severity_count', 0))
+            ("📄 Total Documents", stats.get("total_documents", 0)),
+            ("🔄 Total Comparisons", stats.get("total_comparisons", 0)),
+            ("🎯 Total Matches", stats.get("total_matches", 0)),
+            ("📈 Average Similarity", f"{stats.get('average_similarity', 0):.2%}"),
+            ("📈 Median Similarity", f"{stats.get('median_similarity', 0):.2%}"),
+            ("📈 Max Similarity", f"{stats.get('max_similarity', 0):.2%}"),
+            ("📉 Min Similarity", f"{stats.get('min_similarity', 0):.2%}"),
+            ("📊 Std Deviation", f"{stats.get('std_similarity', 0):.2%}"),
+            ("🔴 High Severity (≥80%)", stats.get("high_severity_count", 0)),
+            ("🟡 Medium Severity (50-80%)", stats.get("medium_severity_count", 0)),
+            ("🟢 Low Severity (30-50%)", stats.get("low_severity_count", 0)),
+            ("⚪ Very Low (<30%)", stats.get("none_severity_count", 0)),
         ]
-        
+
         for label, value in stat_items:
             html += f"""
                 <div class="stat-card">
@@ -424,14 +429,14 @@ class HTMLGenerator:
                     <div class="stat-label">{label}</div>
                 </div>
             """
-        
+
         html += """
             </div>
         </div>
         """
-        
+
         return html
-    
+
     def _generate_footer(self, report: Report) -> str:
         """Generate report footer."""
         return f"""
@@ -439,12 +444,13 @@ class HTMLGenerator:
                 <p>🔍 Report generated by <strong>Semantic Plagiarism Detector</strong></p>
                 <p style="margin-top:4px;">
                     Report ID: {report.id} | 
-                    Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} |
+                    Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")} |
                     Version: 1.0.0
                 </p>
                 <p style="margin-top:8px;font-size:11px;color:#cbd5e1;">
                     This report is for internal use only. Contains confidential analysis results.
                 </p>
+            </div>
             </div>
         </body>
         </html>

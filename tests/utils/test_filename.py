@@ -1,3 +1,6 @@
+import os
+import ntpath
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -151,8 +154,7 @@ def test_invalid_max_length_type_is_rejected(value):
 # ---------------------------------------------------------------------------
 
 
-@patch("src.utils.filename.os.name", "nt")
-@patch("src.utils.filename.os.path.sep", "\\")
+@patch("src.utils.filename.os", SimpleNamespace(name="nt", path=ntpath, getenv=os.getenv))
 def test_sanitize_filename_windows_style_path_under_nt_mock():
     """Windows absolute path stripped to a bare filename with no separators."""
     result = sanitize_filename(r"C:\Users\attacker\..\secret.pdf")
@@ -162,8 +164,7 @@ def test_sanitize_filename_windows_style_path_under_nt_mock():
     assert result == "secret.pdf"
 
 
-@patch("src.utils.filename.os.name", "nt")
-@patch("src.utils.filename.os.path.sep", "\\")
+@patch("src.utils.filename.os", SimpleNamespace(name="nt", path=ntpath, getenv=os.getenv))
 def test_sanitize_filename_deep_windows_traversal_under_nt_mock():
     """Deep Windows traversal collapsed to the leaf filename."""
     result = sanitize_filename(r"D:\work\projects\..\..\sensitive\report.docx")
@@ -184,8 +185,7 @@ def test_sanitize_filename_posix_absolute_path_under_posix_mock():
     assert result == "passwd"
 
 
-@patch("src.utils.filename.os.name", "nt")
-@patch("src.utils.filename.os.path.sep", "\\")
+@patch("src.utils.filename.os", SimpleNamespace(name="nt", path=ntpath, getenv=os.getenv))
 def test_sanitize_filename_mixed_separators_under_nt_mock():
     """Input mixing forward and back slashes resolved to a flat filename."""
     result = sanitize_filename("uploads/2024\\report.pdf")
@@ -195,8 +195,7 @@ def test_sanitize_filename_mixed_separators_under_nt_mock():
     assert result == "report.pdf"
 
 
-@patch("src.utils.filename.os.name", "nt")
-@patch("src.utils.filename.os.path.sep", "\\")
+@patch("src.utils.filename.os", SimpleNamespace(name="nt", path=ntpath, getenv=os.getenv))
 def test_unique_filename_no_separator_in_output_under_nt_mock():
     """unique_filename() returns a separator-free name even under mocked Windows."""
     existing = {"report.pdf", "report_1.pdf"}

@@ -66,3 +66,11 @@ class TestChangepointDetection:
 
         # Should detect at least one major shift around the splice point
         assert len(changepoints) > 0
+
+
+@pytest.mark.parametrize("value", [0.16, 0.1, 1 / 3, 200.1234])
+def test_constant_feature_has_no_floating_point_changepoints(value):
+    from src.core.changepoint_analysis import compute_baseline
+    features = [{"ttr": value} for _ in range(71)]
+    assert compute_baseline(features, "ttr")[1] == 0.0
+    assert detect_cusum_changepoints(features, feature_keys=["ttr"]) == []

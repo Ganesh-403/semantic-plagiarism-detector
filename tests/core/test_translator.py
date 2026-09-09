@@ -19,12 +19,13 @@ def test_invalid_language_raises_value_error():
 
 
 def test_get_language_display_name():
-    assert get_language_display_name("es") == "Spanish (Español)"
+    assert get_language_display_name("es") == "Spanish"
     assert get_language_display_name("en") == "English"
     assert get_language_display_name("INVALID") == "INVALID"
 
 
-def test_translate_text_basic():
+@patch("src.core.translator.GoogleTranslator.translate", return_value="Hello everyone")
+def test_translate_text_basic(mock_translate):
     # Translate a simple French sentence to English
     result = translate_text("Bonjour tout le monde", target_lang="en")
     assert "hello" in result.lower() or "everyone" in result.lower()

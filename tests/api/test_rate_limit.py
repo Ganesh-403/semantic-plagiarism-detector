@@ -1,3 +1,5 @@
+import json
+import pytest
 from fastapi.testclient import TestClient
 
 from src.api.app import app
@@ -5,10 +7,11 @@ from src.api.app import app
 client = TestClient(app)
 
 
-def test_rate_limit_endpoint():
+def test_rate_limit_endpoint(monkeypatch):
+    monkeypatch.setattr("src.security.rate_limiter.time.time", lambda: 1000.0)
     response = client.get(
         "/api/v1/rate_limit",
-        headers={"Authorization": "Bearer dummy-token"},
+        headers={"Authorization": "Bearer validation-test-token"},
     )
 
     assert response.status_code == 200
@@ -25,14 +28,23 @@ def test_rate_limit_endpoint():
     # Consume one token
     from src.security.rate_limiter import get_token_bucket_limiter
     lim = get_token_bucket_limiter()
-    lim.consume("dummy-token")
+    lim.consume("validation-test-token")
 
     # Fetch rate limit status again
     response = client.get(
         "/api/v1/rate_limit",
-        headers={"Authorization": "Bearer dummy-token"},
+        headers={"Authorization": "Bearer validation-test-token"},
     )
     assert response.status_code == 200
     data2 = response.json()
-    assert data2["remaining"] == initial_remaining - 1
+    assert data2["remaining"] == initial_remaining - 2
 
+
+
+@pytest.fixture(autouse=True)
+def scoped_token(monkeypatch, mock_db):
+    from src.api.middleware import get_valid_tokens
+    monkeypatch.setenv("API_BEARER_TOKENS_MAPPING", json.dumps({"validation-test-token": ["read", "write", "scan"]}))
+    get_valid_tokens.cache_clear()
+    yield
+    get_valid_tokens.cache_clear()

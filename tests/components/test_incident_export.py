@@ -25,6 +25,7 @@ def test_render_incident_export_panel_empty(mock_sync, mock_st):
 def test_render_incident_export_panel_with_copy_details(mock_sync, mock_st):
     """Test panel rendering and copy details code box generation."""
     # Return 3 mock columns for st.columns(3)
+    mock_st.button.return_value = False
     mock_st.columns.return_value = (MagicMock(), MagicMock(), MagicMock())
 
     sample_incidents = [

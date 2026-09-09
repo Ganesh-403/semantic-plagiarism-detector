@@ -2,8 +2,6 @@ from unittest.mock import MagicMock, call, patch
 
 import streamlit as st
 
-# Keep imports deterministic when Streamlit is not running an app.
-st.dialog = lambda *args, **kwargs: lambda function: function
 
 from app.components.faiss_results import render_faiss_results_ui
 

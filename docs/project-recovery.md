@@ -1,8 +1,11 @@
 # Project recovery and deployment
 
 This change restores the main Streamlit analysis flow and addresses the open issue
-backlog. It is not a claim that the entire legacy test suite is green. Validation
-results and remaining blockers are recorded below so reviewers can assess the PR.
+backlog. The full configured Linux test suite passes on Python 3.11–3.13, but
+overall coverage remains below the required gate. Validation results and remaining
+blockers are recorded below so reviewers can assess the PR.
+
+For the hosted app, follow the [redeployment checklist](streamlit-redeploy.md).
 
 ## Run the application
 
@@ -46,23 +49,23 @@ Back up these volumes before upgrading. Do not delete volumes to apply code chan
 
 The regression module is `tests/test_remaining_issues.py`.
 
-| Issues | Implementation or verified behavior |
-| --- | --- |
-| #4192, #4191 | Restored clone detector and four component class entry points |
-| #4190 | MetricSample/MetricFamily response schema and metrics documentation |
-| #4057 | Document deletion cascades across ten stored chunks |
-| #4028, #4027 | Shared reentrant FAISS lock and default autosave on incremental additions |
-| #4026, #4023, #4021 | Jaccard symmetry, overlap coefficient and normalized Levenshtein |
-| #4016, #4013 | Empty embedding dimensions and 1.5 GiB model fallback |
-| #4003, #4001, #4000 | Compiled boundaries, short-tail merging and Markdown section boundaries |
-| #3994, #3695, #3692 | Translation errors, fidelity warnings and configurable detection length |
-| #3981, #3976, #3972 | Encrypted/rotated PDFs and score-based annotation colors |
-| #3963, #3962 | Failed release lookup caching and prerelease filtering |
-| #3777 | Twenty-request rate-limit burst with Retry-After |
-| #3763, #3757 | Unique session keys and authentication failure counters |
-| #3746, #3732, #3705, #3702 | Docker detection, stopword warning and academic text statistics |
-| #3245, #3181 | Disk-full upload cleanup and accurate cleanup logging |
-| #3168 | Require a verified primary GitHub email |
+| Issues                     | Implementation or verified behavior                                       |
+| -------------------------- | ------------------------------------------------------------------------- |
+| #4192, #4191               | Restored clone detector and four component class entry points             |
+| #4190                      | MetricSample/MetricFamily response schema and metrics documentation       |
+| #4057                      | Document deletion cascades across ten stored chunks                       |
+| #4028, #4027               | Shared reentrant FAISS lock and default autosave on incremental additions |
+| #4026, #4023, #4021        | Jaccard symmetry, overlap coefficient and normalized Levenshtein          |
+| #4016, #4013               | Empty embedding dimensions and 1.5 GiB model fallback                     |
+| #4003, #4001, #4000        | Compiled boundaries, short-tail merging and Markdown section boundaries   |
+| #3994, #3695, #3692        | Translation errors, fidelity warnings and configurable detection length   |
+| #3981, #3976, #3972        | Encrypted/rotated PDFs and score-based annotation colors                  |
+| #3963, #3962               | Failed release lookup caching and prerelease filtering                    |
+| #3777                      | Twenty-request rate-limit burst with Retry-After                          |
+| #3763, #3757               | Unique session keys and authentication failure counters                   |
+| #3746, #3732, #3705, #3702 | Docker detection, stopword warning and academic text statistics           |
+| #3245, #3181               | Disk-full upload cleanup and accurate cleanup logging                     |
+| #3168                      | Require a verified primary GitHub email                                   |
 
 Further recovery fixes include duplicate Streamlit controls/OAuth paths, competing
 FastAPI app instances, deferred package imports, missing public model records,
@@ -83,23 +86,43 @@ The parser, embeddings, similarity, FAISS and application views run normally.
 password login, signed-token access to corpus statistics and unauthenticated
 access rejection. Both smoke scripts use isolated temporary state.
 
-The full suite uses `python -m pytest -n 2 --dist=loadscope`. Existing coverage
+The full suite uses `python -m pytest -n 2 --dist=loadfile`. Existing coverage
 thresholds (85% overall, 90% changed lines) and existing legacy exclusions remain
 visible. No new exclusions or expected failures were added to hide failures.
 See [the validation report](recovery-validation.md) for run counts and failing test
-modules. Docker execution, Linux installation,
-and the maintained Streamlit Community Cloud deployment require their respective
-runners; local success does not deploy the upstream site.
+modules. Linux installation and tests have passed in CI. Docker execution and the
+maintained Streamlit Community Cloud deployment still need verification; local
+success does not deploy the upstream site.
 
 ## Remaining blockers
 
-- The legacy full test suite still has failures, including stale mocked interfaces,
-  report/CLI contracts and feature-specific paths. The PR should remain a draft
-  while these are unresolved; this recovery is not a clean-CI certification.
-- Dependency audit reports `deep-translator` PYSEC-2022-252 and NLTK
-  PYSEC-2026-3740. The advisory database lists no fixed version for either result.
-  Findings remain unsuppressed. Sources: [deep-translator advisory](https://osv.dev/vulnerability/PYSEC-2022-252)
-  and [NLTK advisory](https://github.com/advisories/GHSA-8mgp-746c-j5xp).
-- The existing blanket copyleft policy conflicts with the runtime's PyMuPDF and
-  EbookLib dependencies. Their license findings are preserved for maintainer
-  resolution; no license exception is silently granted here.
+- Overall coverage remains below 85%; the 90% changed-line gate passes. The latest
+  complete-suite result and subsequent targeted repairs are recorded in the
+  validation report. Keep the PR in draft until the full suite and CI gates pass.
+- `deep-translator`, PyMuPDF and EbookLib have been removed from runtime dependencies.
+  Translation uses first-party HTTP clients; PDF operations use pypdf/PDFium/ReportLab;
+  EPUB parsing uses bounded archive reads and hardened XML parsing.
+- NLTK 3.10.3 still has an unpatched advisory. The complete pip-audit report retains
+  it. `security/dependency-assessments.json` records why the application is not
+  affected: it never exposes the affected model-artifact import/export operations.
+  The assessment is version-specific, expires on 2026-10-09, and stops applying if
+  NLTK call sites change or an upstream fix becomes available. See the
+  [upstream advisory](https://github.com/advisories/GHSA-8mgp-746c-j5xp).
+- The resolved local runtime dependency closure passes the strengthened copyleft
+  license gate. The Linux workflow uploads the full license inventory. Development
+  tools such as yamllint/pygit2 are not runtime packages.
+
+## Translation providers and demo data
+
+`GOOGLE_TRANSLATE_API_KEY` enables the official Google Cloud Translation API.
+Without that key, the default online translator uses MyMemory's public endpoint;
+its quota failures are reported explicitly. DeepL uses its authenticated API and
+splits requests at 50 texts. Timeouts are scoped to each translation call.
+
+The seed generator writes sample text files to `--seed-dir` and populates the
+configured application databases. `--state-dir PATH` creates an isolated demo
+state directory containing `users.db`, `corpus.db` and `corpus.index`.
+It uses the real embedding model; `--skip-index` explicitly creates metadata only.
+`--dry-run` performs no database writes or model calls. Account passwords come
+from `ADMIN_BOOTSTRAP_PASSWORD` and optional `SEED_TEACHER_PASSWORD`; there are no
+built-in demo passwords. Never point demonstration seeding at production data.

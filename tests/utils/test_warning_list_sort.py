@@ -33,14 +33,14 @@ class TestSortWarningsPrimary:
         assert result[2]["similarity"] == 0.50
 
     def test_sort_by_similarity_asc(self):
-        """Verify primary_desc=False sorts similarity ascending."""
+        """Verify primary_descending=False sorts similarity ascending."""
         warnings = [
             {"doc_a": "a.pdf", "similarity": 0.90},
             {"doc_a": "b.pdf", "similarity": 0.40},
             {"doc_a": "c.pdf", "similarity": 0.60},
         ]
 
-        result = sort_warnings(warnings, primary_desc=False)
+        result = sort_warnings(warnings, primary_descending=False)
 
         assert result[0]["similarity"] == 0.40
         assert result[1]["similarity"] == 0.60
@@ -54,7 +54,7 @@ class TestSortWarningsPrimary:
             {"doc_a": "bob.pdf", "similarity": 0.5},
         ]
 
-        result = sort_warnings(warnings, primary_field="doc_a", primary_desc=False)
+        result = sort_warnings(warnings, primary_field="doc_a", primary_descending=False)
 
         assert result[0]["doc_a"] == "alice.pdf"
         assert result[1]["doc_a"] == "bob.pdf"
@@ -68,7 +68,7 @@ class TestSortWarningsPrimary:
             {"doc_a": "bob.pdf", "similarity": 0.5},
         ]
 
-        result = sort_warnings(warnings, primary_field="doc_a", primary_desc=True)
+        result = sort_warnings(warnings, primary_field="doc_a", primary_descending=True)
 
         assert result[0]["doc_a"] == "charlie.pdf"
         assert result[1]["doc_a"] == "bob.pdf"
@@ -92,8 +92,8 @@ class TestSortWarningsMultiColumn:
             warnings,
             primary_field="similarity",
             secondary_field="doc_a",
-            primary_desc=True,
-            secondary_desc=False,
+            primary_descending=True,
+            secondary_descending=False,
         )
 
         # 0.95 should be first
@@ -121,7 +121,7 @@ class TestSortWarningsMultiColumn:
         assert result[2]["doc_b"] == "third.pdf"
 
     def test_secondary_sort_descending(self):
-        """Verify secondary_desc=True reverses the secondary sort order."""
+        """Verify secondary_descending=True reverses the secondary sort order."""
         warnings = [
             {"doc_a": "a.pdf", "similarity": 0.90},
             {"doc_a": "c.pdf", "similarity": 0.90},
@@ -132,8 +132,8 @@ class TestSortWarningsMultiColumn:
             warnings,
             primary_field="similarity",
             secondary_field="doc_a",
-            primary_desc=True,
-            secondary_desc=True,  # Reverse alphabetical
+            primary_descending=True,
+            secondary_descending=True,  # Reverse alphabetical
         )
 
         assert result[0]["doc_a"] == "c.pdf"
@@ -217,7 +217,7 @@ class TestSortWarningsEdgeCases:
             {"doc_a": "c.pdf", "similarity": 0.50},
         ]
 
-        result = sort_warnings(warnings, primary_field="similarity", primary_desc=True)
+        result = sort_warnings(warnings, primary_field="similarity", primary_descending=True)
 
         # Missing similarity (0.0) should be last when descending
         assert result[0]["similarity"] == 0.90
@@ -236,7 +236,7 @@ class TestSortWarningsEdgeCases:
             warnings,
             primary_field="similarity",
             secondary_field="doc_a",
-            secondary_desc=False,
+            secondary_descending=False,
         )
 
         # Empty string should come before "a.pdf" and "b.pdf" in ascending order
@@ -252,7 +252,7 @@ class TestSortWarningsEdgeCases:
             {"doc_a": "c.pdf", "similarity": None},
         ]
 
-        result = sort_warnings(warnings, primary_field="similarity", primary_desc=True)
+        result = sort_warnings(warnings, primary_field="similarity", primary_descending=True)
 
         # 0.80 should be first, the invalid/None ones should be tied at 0.0
         assert result[0]["similarity"] == 0.80
@@ -269,7 +269,7 @@ class TestSortWarningsEdgeCases:
 
         assert warnings == original_copy
 
-    @pytest.mark.parametrize("field", list(VALID_SORT_FIELDS))
+    @pytest.mark.parametrize("field", sorted(VALID_SORT_FIELDS))
     def test_all_valid_fields_accepted_without_warning(self, field, caplog):
         """Verify all fields in VALID_SORT_FIELDS do not trigger fallback warnings."""
         warnings = [

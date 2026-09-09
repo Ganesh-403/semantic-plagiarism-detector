@@ -4,8 +4,6 @@ bcrypt>=4.0.0
 beautifulsoup4>=4.15.0
 celery>=5.4.0
 cryptography>=44.0.0
-deep-translator>=1.11.4
-EbookLib>=0.18
 faiss-cpu>=1.8.0
 faker>=20.0.0
 fastapi>=0.109.0
@@ -16,7 +14,7 @@ httpx>=0.26.0
 langdetect>=1.0.9
 matplotlib>=3.8.0
 networkx>=3.0
-nltk>=3.8.0
+nltk==3.10.3  # Reassess security/dependency-assessments.json on upgrade.
 numpy>=2.0.0
 openpyxl>=3.1.5
 opentelemetry-api>=1.29.0
@@ -29,7 +27,7 @@ plotly>=5.20.0
 prometheus-client>=0.26.0
 psutil>=5.9.0
 PyJWT>=2.10.1
-pymupdf>=1.24.0
+pypdfium2>=4.30.0
 pyotp>=2.10.0
 pypdf>=5.0.0
 pytesseract>=0.3.13
@@ -45,6 +43,7 @@ reportlab>=5.0.0
 requests>=2.31.0
 rq>=2.10.0
 scikit-learn>=1.4.0
+setuptools>=83.0.0
 seaborn>=0.13.0
 slowapi
 streamlit>=1.61.1
@@ -58,3 +57,5 @@ uvicorn>=0.27.0
 zxcvbn>=4.4.28
 
 defusedxml>=0.7.1
+
+email-validator>=2.2

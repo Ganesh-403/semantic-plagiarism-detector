@@ -1234,7 +1234,7 @@ def inject_css() -> None:
     }}
     """
 
-    css = main_css + base_css + file_uploader_css + sidebar_active_tab_css
+    css = spd_root_css + main_css + base_css + file_uploader_css + sidebar_active_tab_css
 
     try:
         from app.css_constants import MOBILE_LAYOUT_CSS
@@ -1398,7 +1398,8 @@ def badge_html(tier: str, label: str = None) -> str:
         bg_color = colors["success_soft"]
         default_label = "🟢 Low"
 
-    display_label = label if label is not None else default_label
+    from html import escape
+    display_label = escape(str(label if label is not None else default_label))
 
     tooltip_map = {
         "high": "Similarity >= 80%",
@@ -1691,7 +1692,7 @@ def get_theme_accent_color(theme_name: str | None = None) -> str:
         return THEMES[theme_name].get("accent", "#4f46e5")
     try:
         if hasattr(st, "session_state") and "accent_color" in st.session_state:
-            acc = st.session_state.accent_color
+            acc = st.session_state["accent_color"]
             if acc in THEME_ACCENT_PALETTES:
                 return THEME_ACCENT_PALETTES[acc]["primary"]
     except Exception:

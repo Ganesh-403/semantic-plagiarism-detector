@@ -8,15 +8,15 @@ from src.utils.badge_generator import (
     has_reportlab,
     validate_hex_color,
 )
-from src.utils.redis_cache import CacheNamespace, RedisCache
+from src.utils import redis_cache
 
 
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
         ("#4f46e5", "#4f46e5"),
-        ("#abc", "#abc"),
-        ("#fff", "#fff"),
+        ("#abc", "#aabbcc"),
+        ("#fff", "#ffffff"),
         ("#1e3a8a", "#1e3a8a"),
         ("#12345g", DEFAULT_BADGE_COLOR),
         ("rgb(255, 0, 0)", DEFAULT_BADGE_COLOR),
@@ -77,10 +77,10 @@ def test_generate_badge_pdf_raises_when_reportlab_missing(monkeypatch):
 
 def test_generate_badge_png_and_caching():
     """Test generating PNG badge and caching in Redis."""
-    cache = RedisCache.get_instance()
+    cache = redis_cache.RedisCache.get_instance()
     student_id = "test_student_123"
     date_str = "2026-08-20"
-    cache_key = CacheNamespace.BADGES.build_key("png", student_id, date_str)
+    cache_key = redis_cache.CacheNamespace.BADGES.build_key("png", student_id, date_str)
 
     # Invalidate cache if present
     cache.delete(cache_key)
@@ -109,10 +109,10 @@ def test_generate_badge_png_and_caching():
 
 def test_generate_badge_pdf_and_caching():
     """Test generating PDF certificate and caching in Redis."""
-    cache = RedisCache.get_instance()
+    cache = redis_cache.RedisCache.get_instance()
     student_id = "test_student_456"
     date_str = "2026-08-20"
-    cache_key = CacheNamespace.BADGES.build_key("pdf", student_id, date_str)
+    cache_key = redis_cache.CacheNamespace.BADGES.build_key("pdf", student_id, date_str)
 
     # Invalidate cache if present
     cache.delete(cache_key)

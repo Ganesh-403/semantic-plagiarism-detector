@@ -10,6 +10,7 @@ import pytest
 
 from scripts.migrate_redis_keys import map_legacy_key, migrate_redis_keys
 from src.utils.redis_cache import CacheNamespace
+from src.version import APP_VERSION
 
 
 class TestCacheNamespaceEnum:
@@ -38,14 +39,14 @@ class TestMapLegacyKey:
     @pytest.mark.parametrize(
         "legacy_key, expected_key",
         [
-            ("login_attempts:user123", "spd:v1:login_attempts:user123"),
-            ("upload_count:alice", "spd:v1:uploads:alice"),
-            ("similarity:abc123hash", "spd:v1:analysis:abc123hash"),
-            ("analysis:def456hash", "spd:v1:analysis:def456hash"),
-            ("doc:1042", "spd:v1:analysis:doc:1042"),
-            ("faiss_index", "spd:v1:faiss:index:corpus_index"),
-            ("faiss_index:custom_index", "spd:v1:faiss:index:custom_index"),
-            ("session:sess_abc:user", "spd:v1:session:sess_abc:user"),
+            ("login_attempts:user123", f"spd:v1:login_attempts:{APP_VERSION}:user123"),
+            ("upload_count:alice", f"spd:v1:uploads:{APP_VERSION}:alice"),
+            ("similarity:abc123hash", f"spd:v1:analysis:{APP_VERSION}:abc123hash"),
+            ("analysis:def456hash", f"spd:v1:analysis:{APP_VERSION}:def456hash"),
+            ("doc:1042", f"spd:v1:analysis:{APP_VERSION}:doc:1042"),
+            ("faiss_index", f"spd:v1:faiss:{APP_VERSION}:index:corpus_index"),
+            ("faiss_index:custom_index", f"spd:v1:faiss:{APP_VERSION}:index:custom_index"),
+            ("session:sess_abc:user", f"spd:v1:session:{APP_VERSION}:sess_abc:user"),
         ],
     )
     def test_map_legacy_keys(self, legacy_key: str, expected_key: str):
@@ -108,11 +109,11 @@ class TestMigrateRedisKeys:
         assert stats["errors"] == 0
         assert mock_client.rename.call_count == 3
         mock_client.rename.assert_any_call(
-            b"similarity:query123", b"spd:v1:analysis:query123"
+            b"similarity:query123", f"spd:v1:analysis:{APP_VERSION}:query123".encode()
         )
-        mock_client.rename.assert_any_call(b"doc:99", b"spd:v1:analysis:doc:99")
+        mock_client.rename.assert_any_call(b"doc:99", f"spd:v1:analysis:{APP_VERSION}:doc:99".encode())
         mock_client.rename.assert_any_call(
-            b"analysis:result1", b"spd:v1:analysis:result1"
+            b"analysis:result1", f"spd:v1:analysis:{APP_VERSION}:result1".encode()
         )
 
     def test_migrate_handles_rename_error(self):

@@ -7,6 +7,7 @@ All protected endpoints within the scanning engine require authentication via JS
 Send a `POST` request with your user credentials to the `/api/v1/auth/login` route. A successful request returns a Bearer access token.
 
 ### Using cURL
+
 ```bash
 curl -X POST "https://openprep.ai" \
      -H "Content-Type: application/json" \
@@ -17,6 +18,7 @@ curl -X POST "https://openprep.ai" \
 ```
 
 ### Using Python (`requests`)
+
 ```python
 import requests
 
@@ -41,9 +43,10 @@ print("Access token retrieved successfully.")
 
 ## 2. Access Protected Scan Endpoints
 
-Include your access token in the `Authorization` header prefixed with `Bearer ` for any subsequent requests to secured endpoints like `/api/v1/scans/start`.
+Include your access token in the `Authorization` header prefixed with `Bearer` for any subsequent requests to secured endpoints like `/api/v1/scans/start`.
 
 ### Using cURL
+
 ```bash
 curl -X POST "https://openprep.ai" \
      -H "Authorization: Bearer YOUR_ACCESS_TOKEN_HERE" \
@@ -55,6 +58,7 @@ curl -X POST "https://openprep.ai" \
 ```
 
 ### Using Python (`requests`)
+
 ```python
 import requests
 
@@ -90,17 +94,17 @@ Secured endpoints require a valid JSON Web Token (JWT) Bearer token to authorize
 
 1. **Open the Documentation Core**: Navigate to [http://localhost:8000/docs](http://localhost:8000/docs) in your browser.
 2. **Locate the Security Action Hook**: Click the lock icon button labeled **"Authorize"** positioned at the top right header section of the page.
-3. **Inject the Authorization Token**: 
-   * In the modal popup window, locate the text input field labeled **Value**.
-   * Enter your token using the exact format: `Bearer <your_jwt_token_here>`
-   * *Example*: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+3. **Inject the Authorization Token**:
+   - In the modal popup window, locate the text input field labeled **Value**.
+   - Enter your token using the exact format: `Bearer <your_jwt_token_here>`
+   - _Example_: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
 4. **Lock the Session Configuration**: Click the **Authorize** button within the modal window, then click **Close**.
 
 Now, all subsequent interactive endpoint requests dispatched via the UI will automatically append the correct tracking header (`Authorization: Bearer <token>`) to your API request parameters.
 
 ### 🧪 Triggering an Interactive Request
 
-* Expand any locked API route container (indicated by a closed lock icon).
-* Click the **"Try it out"** button in the top right of the route container.
-* Populate any required query parameters or JSON body payloads.
-* Press the blue **"Execute"** button to fire the network request and review the server's response.
+- Expand any locked API route container (indicated by a closed lock icon).
+- Click the **"Try it out"** button in the top right of the route container.
+- Populate any required query parameters or JSON body payloads.
+- Press the blue **"Execute"** button to fire the network request and review the server's response.

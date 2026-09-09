@@ -21,7 +21,9 @@ from src.db.incidents import (
 
 
 @pytest.fixture(autouse=True)
-def setup_test_db(mock_db):
+def setup_test_db(mock_db, monkeypatch):
+    # These synthetic vectors represent one explicitly configured test model.
+    monkeypatch.setenv("SEMANTIC_PLAGIARISM_MODEL", "all-MiniLM-L6-v2")
     yield
 
 
@@ -198,3 +200,13 @@ def test_incidents_filter_soft_deleted(mock_db):
     # Both incidents involve doc2, so they should be filtered out!
     assert len(get_all_incidents(db_path=mock_db)) == 0
     assert len(get_all_incidents_above_threshold_for_export(0.80, db_path=mock_db)) == 0
+
+
+def test_hash_lookup_excludes_trashed_documents():
+    from src.db.corpus_db import get_document_by_hash
+    add_document("original.txt", "identical-content")
+    assert get_document_by_hash("identical-content") == "original.txt"
+    soft_delete_document("original.txt")
+    assert get_document_by_hash("identical-content") is None
+    restore_document("original.txt")
+    assert get_document_by_hash("identical-content") == "original.txt"

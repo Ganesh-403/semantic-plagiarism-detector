@@ -130,8 +130,7 @@ def _split_into_sentences(text: str) -> list[str]:
             try:
                 if not _nltk_punkt_checked:
                     _nltk_punkt_checked = True
-                    import nltk as nltk_runtime
-                    nltk_runtime.download("punkt_tab", quiet=True)
+                    nltk.download("punkt_tab", quiet=True)
                 from nltk.tokenize import sent_tokenize  # type: ignore
 
                 sentences = sent_tokenize(text)
@@ -359,28 +358,23 @@ def _find_sentence_boundary(
     if not text or index < 0 or index >= len(text):
         return index
 
-    if direction == "backward":
-        start_idx = max(0, index - max_search)
-        search_space = text[start_idx:index]
-
-        # Find the last occurrence of a sentence boundary in the search space
-        matches = list(_SENTENCE_BOUNDARY_PATTERN.finditer(search_space))
-        if matches:
-            last_match = matches[-1]
-            # Return the index immediately after the punctuation
-            return start_idx + (last_match.end(1) if last_match.group(1) else last_match.end())
-
-    elif direction == "forward":
-        end_idx = min(len(text), index + max_search)
-        search_space = text[index:end_idx]
-
-        matches = list(_SENTENCE_BOUNDARY_PATTERN.finditer(search_space))
-        if matches:
-            first_match = matches[0]
-            # Return the index immediately after the punctuation
-            return index + (first_match.end(1) if first_match.group(1) else first_match.end())
-
-    # Fallback to original index if no boundary found
+    low, high = (
+        (max(0, index - max_search), index)
+        if direction == "backward"
+        else (index, min(len(text), index + max_search))
+    )
+    boundaries = []
+    for match in re.finditer(r"[.!?。！？]", text[low:high]):
+        end = low + match.end()
+        tail = end
+        while tail < len(text) and text[tail].isspace():
+            tail += 1
+        if text[end - 1] in "。！？" or tail == len(text) or (
+            tail > end and text[tail].isupper()
+        ):
+            boundaries.append(end)
+    if boundaries:
+        return boundaries[-1] if direction == "backward" else boundaries[0]
     return index
 
 
@@ -504,6 +498,22 @@ def chunk_text(
             logger.warning("Text length (%d chars) exceeded chunk capacity limit; text was truncated", len(text))
         return _character_fallback_chunking(unmask_citation_initials(text), chunk_size, chunk_overlap, count_bytes)[:max_chunks]
 
+    heading_offsets = []
+    if structured_headings:
+        from bisect import bisect_right
+        heading_offsets = [match.start() for match in re.finditer(r"\S+", text)]
+
+    section_starts = [0]
+    for index, offset in enumerate(heading_offsets):
+        if index and index < len(structured_headings) and structured_headings[index] != structured_headings[index - 1]:
+            section_starts.append(offset)
+
+    def heading_at(offset):
+        if not heading_offsets:
+            return None
+        index = max(0, bisect_right(heading_offsets, offset) - 1)
+        return structured_headings[index] if index < len(structured_headings) else None
+
     # Enforce minimum chunk size to prevent infinite loops
     if chunk_size < MIN_CHUNK_SIZE:
         logger.warning(
@@ -528,6 +538,9 @@ def chunk_text(
 
     while start < text_len:
         end = _find_length_capped_end(text, start, chunk_size, count_bytes)
+        next_section = bisect_right(section_starts, start) if heading_offsets else len(section_starts)
+        section_end = section_starts[next_section] if next_section < len(section_starts) else text_len
+        end = min(end, section_end)
 
         # Extract the raw character window
         raw_chunk = text[start:end]
@@ -546,7 +559,7 @@ def chunk_text(
 
             # Otherwise, advance the window and try again.
             step = max(1, chunk_size - chunk_overlap)
-            start += step
+            start = min(start + step, section_end)
             continue
 
         # The chunk meets the minimum word count. Now apply sentence boundary
@@ -574,8 +587,13 @@ def chunk_text(
 
                 # Hard cap to prevent chunks from growing too large for embedding models
                 if end > max_allowed_end:
-                    end = max_allowed_end
+                    previous = _find_sentence_boundary(
+                        text, max_allowed_end, direction="backward",
+                        max_search=max_allowed_end - start,
+                    )
+                    end = previous if previous > start else max_allowed_end
 
+            end = min(end, section_end)
             chunk = text[start:end].strip()
             chunk = unmask_citation_initials(chunk)
 
@@ -587,22 +605,18 @@ def chunk_text(
                         text=chunk,
                         char_start=start,
                         char_end=end,
-                        section_title=None,
+                        section_title=heading_at(start),
                     )
                 )
         else:
             # Original word-boundary path (sentence_padding=False)
-            word_headings = structured_headings
             words = raw_chunk.split()
 
             if len(words) >= min_words:
                 chunk_str = separator.join(words)
                 chunk_str = unmask_citation_initials(chunk_str)
                 metadata = {}
-                section_title = None
-                if word_headings:
-                    # Approximate heading lookup based on start index
-                    metadata["section_title"] = None
+                section_title = heading_at(start)
 
                 chunks.append(
                     Chunk(
@@ -624,6 +638,10 @@ def chunk_text(
 
         if end >= text_len:
             break
+
+        if end == section_end:
+            start = end
+            continue
 
         # Calculate next start position with overlap
         next_start = end - chunk_overlap
@@ -654,7 +672,7 @@ def chunk_text(
         )
         chunks = [
             ChunkString(text=unmask_citation_initials(c.text), metadata=c.metadata)
-            for c in fallback_chunks
+            for c in fallback_chunks if count_words(c.text) >= min_words
         ]
 
     logger.info(
@@ -911,7 +929,7 @@ def chunk_by_sentences(
                 count_words(chunk_text_val) >= min_words
                 and len(chunk_text_val) >= min_chunk_length
             ):
-                chunks.append(chunk_text_val)
+                chunks.append(ChunkString(chunk_text_val))
 
                 # Safety limit check (Issue #2054)
                 if len(chunks) >= max_chunks:
@@ -937,7 +955,7 @@ def chunk_by_sentences(
             count_words(chunk_text_val) >= min_words
             and len(chunk_text_val) >= min_chunk_length
         ):
-            chunks.append(chunk_text_val)
+            chunks.append(ChunkString(chunk_text_val))
 
     return chunks
 

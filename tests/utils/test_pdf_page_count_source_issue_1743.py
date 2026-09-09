@@ -24,6 +24,7 @@ def test_unit_test_and_extraction_integration_exist():
     source = SOURCE.read_text(encoding="utf-8")
     tests = TESTS.read_text(encoding="utf-8")
 
-    assert "validate_pdf_page_count(file_bytes)" in source
+    # Extraction validates the already-open document without parsing it twice.
+    assert "if doc.page_count > 500:" in source
     assert "class TestPDFPageCountValidation:" in tests
     assert "test_validate_pdf_page_count_rejects_over_default_limit" in tests

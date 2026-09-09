@@ -248,12 +248,10 @@ class CrossLingualDetector:
 
     def _get_model(self):
         if self._model is None:
-            try:
-                from sentence_transformers import SentenceTransformer
+            from sentence_transformers import SentenceTransformer
 
-                self._model = SentenceTransformer(self.config.embedding_model)
-            except Exception:
-                self._model = "mock"
+            # Loading failure must never produce random plagiarism scores.
+            self._model = SentenceTransformer(self.config.embedding_model)
         return self._model
 
     def detect_language(self, text: str) -> str:
@@ -276,19 +274,30 @@ class CrossLingualDetector:
         return best if scores[best] > 0 else "en"
 
     def embed_text(self, text: str, lang: str = "en") -> np.ndarray:
-        cache_key = f"{lang}:{hash(text)}"
+        cache_key = f"{lang}:{hashlib.sha256(text.encode('utf-8')).hexdigest()}"
         if self.config.enable_cache and cache_key in self._cache:
             return self._cache[cache_key]
 
         model = self._get_model()
-        if model == "mock":
-            embedding = np.random.rand(384).astype(np.float32)
-        else:
-            embedding = model.encode(text, normalize_embeddings=True)
+        embedding = np.asarray(
+            model.encode(text, normalize_embeddings=True), dtype=np.float32
+        )
+        if embedding.ndim != 1 or not embedding.size or not np.all(np.isfinite(embedding)):
+            raise ValueError("Embedding model returned an invalid vector")
 
         if self.config.enable_cache:
             self._cache[cache_key] = embedding
         return embedding
+
+    def clear_cache(self) -> None:
+        """Discard cached embeddings and translations."""
+        self._cache.clear()
+        if self.cache is not None:
+            self.cache._cache.clear()
+            self.cache._timestamps.clear()
+
+    def get_supported_languages(self) -> List[Dict[str, str]]:
+        return [{"code": code, "name": name} for code, name in LANGUAGE_NAMES.items()]
 
     def compare_across_languages(
         self, source_embeddings: List[np.ndarray], target_embeddings: List[np.ndarray]
@@ -311,7 +320,7 @@ class CrossLingualDetector:
         threshold: Optional[float] = None,
     ) -> CrossLingualResult:
         start_time = datetime.now()
-        threshold = threshold or self.config.similarity_threshold
+        threshold = self.config.similarity_threshold if threshold is None else threshold
 
         doc_chunks = {name: chunks for name, (_, chunks) in documents.items()}
         embeddings = {
@@ -336,7 +345,6 @@ class CrossLingualDetector:
             for j in range(i + 1, len(doc_names)):
                 name_a, name_b = doc_names[i], doc_names[j]
                 lang_a, lang_b = doc_langs[name_a], doc_langs[name_b]
-                is_cross_lingual = lang_a != lang_b
 
                 emb_a = embeddings.get(name_a, [])
                 emb_b = embeddings.get(name_b, [])
@@ -367,8 +375,7 @@ class CrossLingualDetector:
                                     else "",
                                     similarity=score,
                                     method="multilingual_embedding",
-                                    translation_used=is_cross_lingual
-                                    and self.config.use_translation_bridge,
+                                    translation_used=False,
                                     confidence=min(score * 1.1, 1.0),
                                 )
                             )

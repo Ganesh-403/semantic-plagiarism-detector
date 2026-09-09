@@ -326,7 +326,7 @@ def test_compress_pdf_buffer_reduces_size(monkeypatch):
 
 
 def test_compress_pdf_buffer_fallback(monkeypatch):
-    import fitz
+    from src.utils import pdf_backend as fitz
 
     def mock_fitz_open(*args, **kwargs):
         raise Exception("Mock PyMuPDF error")
@@ -353,7 +353,7 @@ def test_compress_pdf_buffer_fallback(monkeypatch):
 
 def test_compress_pdf_buffer_all_fail(monkeypatch):
     import sys
-    import fitz
+    from src.utils import pdf_backend as fitz
 
     def mock_fitz_open(*args, **kwargs):
         raise Exception("Mock PyMuPDF error")
@@ -657,9 +657,9 @@ def test_pdf_report_headers_french():
         language="fr",
     )
     text = _read_text(pdf_buffer.getvalue())
-    assert "Nom du Document" in text
-    assert "Score de Similarit" in text
-    assert "Seuil de D" in text
+    assert "Nom du document" in text
+    assert "Score de similitude" in text
+    assert "Seuil de détection" in text
 
 
 def test_break_long_urls():

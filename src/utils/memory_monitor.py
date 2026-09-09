@@ -1,12 +1,32 @@
 """Memory monitoring utility for detecting leaks."""
 
 import logging
+import math
 import os
 from typing import Any, Callable, Dict, Optional
 
 import psutil
 
 logger = logging.getLogger(__name__)
+
+
+def check_memory_threshold(
+    threshold_percent: float = 85.0,
+    on_exceeded: Optional[Callable[[], None]] = None,
+) -> bool:
+    """Report process memory above a percentage and optionally run a callback."""
+    if not math.isfinite(threshold_percent) or not 0 <= threshold_percent <= 100:
+        raise ValueError("threshold_percent must be finite and between 0 and 100")
+    usage = get_memory_usage()
+    exceeded = usage["percent"] > threshold_percent
+    if exceeded:
+        logger.warning("Process memory %.1f%% exceeds %.1f%%", usage["percent"], threshold_percent)
+        if on_exceeded is not None:
+            try:
+                on_exceeded()
+            except Exception:
+                logger.exception("Memory threshold callback failed")
+    return exceeded
 
 
 def get_memory_usage() -> dict[str, Any]:

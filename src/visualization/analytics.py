@@ -627,6 +627,7 @@ def plot_similarity_percentiles(
     similarity_scores: list[float],
     show_grid: bool = True,
     theme_colors: dict[str, str] | None = None,
+    theme_override: str | None = None,
 ) -> go.Figure:
     """Create a horizontal bar chart of the similarity score percentile breakdown."""
     scores: list[float] = []
@@ -637,7 +638,7 @@ def plot_similarity_percentiles(
             continue
 
     if not scores:
-        return _empty_chart(
+        fig = _empty_chart(
             title="Similarity Score Percentile Breakdown",
             message="No similarity scores available to compute percentiles",
             theme_colors=theme_colors,
@@ -645,6 +646,8 @@ def plot_similarity_percentiles(
             xaxis_title="Similarity Score",
             yaxis_title="Percentile",
         )
+        _apply_theme_colors(fig, theme_colors, theme_override)
+        return fig
     percentile_values = np.percentile(scores, [25, 50, 75, 90])
     percentile_labels = ["25th", "50th (Median)", "75th", "90th"]
 
@@ -676,7 +679,9 @@ def plot_similarity_percentiles(
         marker_line_width=1,
         hovertemplate="<b>%{y}</b><br>Similarity Score: %{x:.2f}<extra></extra>",
     )
-    return apply_plotly_theme(fig, theme_colors, show_grid=show_grid)
+    apply_plotly_theme(fig, theme_colors, show_grid=show_grid)
+    _apply_theme_colors(fig, theme_colors, theme_override)
+    return fig
 
 
 def plot_hierarchical_dendrogram(

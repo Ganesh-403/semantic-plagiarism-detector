@@ -105,60 +105,16 @@ class TestGetActiveSessionsCount:
 class TestBackupDaemonSafety:
     """Tests for backup daemon skipping execution when active sessions count is negative."""
 
-    def test_backup_daemon_skips_when_active_sessions_negative(self):
-        """Verify backup is not executed when get_active_sessions_count returns -1."""
-        from app.state_manager import _run_backup_daemon
+    def test_active_session_lookup_failure_logs_and_prevents_backup(self, monkeypatch, tmp_path):
+        from tests.app.test_backup_daemon_race_condition import daemon
+        # Exercise the same deterministic loop harness with the real failure sentinel.
+        runner = daemon.__wrapped__(monkeypatch, tmp_path)
+        result = runner([(12000, {}, -1)])
+        result.active.assert_called_once()
+        result.snapshot.assert_not_called()
 
-        mock_cache = Mock()
-        mock_cache.get.side_effect = lambda k: {
-            "spd:v1:global:last_backup_time": "0.0",
-            "spd:v1:global:last_activity": time.time() - 3600,
-        }.get(k, None)
-
-        with (
-            patch("app.state_manager.get_cache", return_value=mock_cache),
-            patch("app.state_manager.get_active_sessions_count", return_value=-1),
-            patch("src.core.app_config.get_backup_idle_timeout", return_value=1800),
-            patch(
-                "src.db.database_backup.create_corpus_database_snapshot"
-            ) as mock_snapshot,
-            patch("time.sleep", side_effect=InterruptedError("Stop loop")),
-        ):
-            try:
-                _run_backup_daemon()
-            except InterruptedError:
-                pass
-
-            # Snapshot must NOT be called because active_sessions was -1
-            mock_snapshot.assert_not_called()
-
-    def test_backup_daemon_triggers_when_zero_sessions_and_idle(self, tmp_path):
-        """Verify backup daemon triggers snapshot when active sessions count is 0 and idle."""
-        from app.state_manager import _run_backup_daemon
-
-        mock_cache = Mock()
-        mock_cache.get.side_effect = lambda k: {
-            "spd:v1:global:last_backup_time": 0.0,
-            "spd:v1:global:last_activity": time.time() - 3600,
-        }.get(k, None)
-
-        fake_db = tmp_path / "corpus.db"
-        fake_db.write_bytes(b"mock_db")
-
-        with (
-            patch("app.state_manager.get_cache", return_value=mock_cache),
-            patch("app.state_manager.get_active_sessions_count", return_value=0),
-            patch("src.core.app_config.get_backup_idle_timeout", return_value=1800),
-            patch("src.db.corpus_db.get_corpus_db_path", return_value=fake_db),
-            patch(
-                "src.db.database_backup.create_corpus_database_snapshot",
-                return_value=b"snapshot_data",
-            ) as mock_snapshot,
-            patch("time.sleep", side_effect=[None, InterruptedError("Stop loop")]),
-        ):
-            try:
-                _run_backup_daemon()
-            except InterruptedError:
-                pass
-
-            mock_snapshot.assert_called_once()
+    def test_backup_daemon_triggers_when_zero_sessions_and_idle(self, monkeypatch, tmp_path):
+        from tests.app.test_backup_daemon_race_condition import daemon
+        runner = daemon.__wrapped__(monkeypatch, tmp_path)
+        result = runner([(12000, {}, 0)])
+        result.snapshot.assert_called_once()

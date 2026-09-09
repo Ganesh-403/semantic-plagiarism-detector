@@ -3,7 +3,6 @@ import argparse
 import os
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -21,7 +20,7 @@ def check_dependencies():
         importlib.util.find_spec("coverage") and importlib.util.find_spec("pytest")
     ):
         print("Error: Missing dependency.")
-        print("Please install requirements: pip install -r requirements.txt")
+        print("Please install requirements: pip install -r requirements.txt -r requirements-dev.txt")
         sys.exit(1)
 
 
@@ -30,7 +29,7 @@ def run_tests(args):
     Executes the pytest test suite dynamically based on parsed arguments.
     Enforces coverage thresholds and builds JUnit XML reports.
     """
-    cmd = [sys.executable, "-m", "pytest"]
+    cmd = [sys.executable, "-m", "pytest", "--junitxml=test-reports/junit.xml"]
 
     # 1. Scope selection
     if args.unit:
@@ -40,7 +39,7 @@ def run_tests(args):
 
     # 2. Parallel execution
     if getattr(args, "parallel", False):
-        cmd.extend(["-n", "2", "--dist=loadscope"])
+        cmd.extend(["-n", "2", "--dist=loadfile"])
 
     # 3. Coverage flags
     if getattr(args, "coverage", False) or args.enforce_coverage:
@@ -54,7 +53,6 @@ def run_tests(args):
             cov_cmd.extend(
                 [
                     f"--cov-fail-under={args.enforce_coverage}",
-                    f"--junitxml=test-reports/junit-{datetime.now().strftime('%Y%m%d%H%M%S')}.xml",
                 ]
             )
         cmd.extend(cov_cmd)

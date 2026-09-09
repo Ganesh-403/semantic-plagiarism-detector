@@ -27,18 +27,18 @@ class TestValidateHexColorStandard:
         assert validate_hex_color("#123abc") == "#123abc"
 
     def test_valid_3_digit_hex(self):
-        """Verify 3-digit hex codes are accepted as-is."""
-        assert validate_hex_color("#f00") == "#f00"
-        assert validate_hex_color("#0F0") == "#0f0"
-        assert validate_hex_color("#123") == "#123"
+        """Verify 3-digit hex codes are expanded to canonical hex."""
+        assert validate_hex_color("#f00") == "#ff0000"
+        assert validate_hex_color("#0F0") == "#00ff00"
+        assert validate_hex_color("#123") == "#112233"
 
     def test_valid_8_digit_hex_with_alpha(self):
         """Verify 8-digit hex codes (with alpha channel) are accepted."""
         assert validate_hex_color("#ff000080") == "#ff000080"
 
     def test_valid_4_digit_hex_with_alpha(self):
-        """Verify 4-digit hex codes are accepted as-is."""
-        assert validate_hex_color("#f008") == "#f008"
+        """Verify 4-digit hex codes are expanded to canonical hex."""
+        assert validate_hex_color("#f008") == "#ff000088"
 
     def test_whitespace_stripped(self):
         """Verify leading/trailing whitespace is stripped before validation."""

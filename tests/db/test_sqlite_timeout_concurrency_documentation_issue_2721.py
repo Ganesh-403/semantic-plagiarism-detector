@@ -214,7 +214,10 @@ def test_simulated_bulk_faiss_sync_write_lock_contention():
             f1.result()
             inserted_count = f2.result()
 
-        assert inserted_count == 50
+        # A WAL reader sees a consistent snapshot while the writer is uncommitted.
+        assert inserted_count == 0
+        with get_connection(db_path, timeout=15.0) as conn:
+            assert conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0] == 50
     finally:
         Path(db_path).unlink(missing_ok=True)
 

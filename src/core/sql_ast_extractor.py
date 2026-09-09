@@ -139,7 +139,7 @@ def extract_sql_ast(sql_query: str) -> SQLAST:
                 # Check if it's a known table or alias
                 if token_lower in table_map or token_lower in ast.aliases:
                     norm_tokens.append(
-                        table_map.get(token_lower, ast.aliases[token_lower])
+                        table_map[token_lower] if token_lower in table_map else ast.aliases[token_lower]
                     )
                 else:
                     # Assume it's a column

@@ -7,6 +7,28 @@ supports adding synthetic vectors and querying nearest neighbors.
 """
 
 import numpy as np
+import faiss
+import pytest
+
+
+@pytest.fixture
+def mock_faiss_index():
+    """An isolated in-memory FAISS index; no embedding model or files."""
+    class TestIndex:
+        def __init__(self):
+            self.index = faiss.IndexFlatL2(384)
+
+        def add_vectors(self, vectors):
+            self.index.add(np.ascontiguousarray(vectors, dtype=np.float32))
+
+        def search_vectors(self, vectors, k):
+            return self.index.search(np.ascontiguousarray(vectors, dtype=np.float32), k)
+
+        def get_nearest_neighbors(self, vector, k):
+            return self.search_vectors(np.asarray(vector).reshape(1, -1), k)
+
+    return TestIndex()
+
 
 
 def test_mock_faiss_index_add_and_search_vectors(mock_faiss_index):

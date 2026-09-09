@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
+from starlette.requests import Request
 
 from src.api.middleware import verify_bearer_token
 from src.security.rate_limiter import (
@@ -61,9 +62,7 @@ def test_token_bucket_independent_identities():
 @pytest.mark.asyncio
 async def test_verify_bearer_token_rate_limiting_exceeded():
     """Verify verify_bearer_token middleware raises HTTP 429 when per-token bucket is exhausted."""
-    mock_request = MagicMock()
-    mock_request.method = "GET"
-    mock_request.url.path = "/api/v1/analysis"
+    mock_request = Request({"type": "http", "method": "GET", "path": "/api/v1/analysis", "headers": []})
 
     test_token = "unique-test-bearer-token-429"
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=test_token)
@@ -81,7 +80,11 @@ async def test_verify_bearer_token_rate_limiting_exceeded():
         result = await verify_bearer_token(mock_request, credentials)
         assert result == test_token
 
-        # Second request exceeds token capacity and raises 429
+        # Resolving another dependency in the same request must not charge twice.
+        assert await verify_bearer_token(mock_request, credentials) == test_token
+
+        # A distinct HTTP request consumes its own allowance.
+        mock_request = Request({"type": "http", "method": "GET", "path": "/api/v1/analysis", "headers": []})
         with pytest.raises(HTTPException) as exc_info:
             await verify_bearer_token(mock_request, credentials)
 

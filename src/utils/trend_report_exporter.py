@@ -140,7 +140,7 @@ def _render_markdown(
         lines.append(f"- **Mean:** {tm.mean_value:.4f}")
         lines.append(f"- **Range:** [{tm.min_value:.4f}, {tm.max_value:.4f}]")
         lines.append(f"- **Change rate:** {tm.change_rate:+.2%}")
-        lines.append(f"- **Data points:** {tm.data_points}")
+        lines.append(f"- **Data points:** {len(tm.values)}")
         lines.append("")
 
     return "\n".join(lines)

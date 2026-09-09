@@ -35,7 +35,7 @@ def test_request_timeout_injects_default_when_absent(monkeypatch):
 
     with pytest.raises(RuntimeError):
         with translator._request_timeout(7.25):
-            requests.get("http://translation.invalid")
+            translator.GoogleTranslator(source="es", target="en").translate("Hola mundo")
 
     assert captured["timeout"] == 7.25
 
@@ -68,7 +68,7 @@ def test_request_timeout_uses_module_constant_by_default(monkeypatch):
 
     with pytest.raises(RuntimeError):
         with translator._request_timeout():
-            requests.get("http://translation.invalid")
+            translator.GoogleTranslator(source="es", target="en").translate("Hola mundo")
 
     assert captured["timeout"] == 4.0
 
@@ -76,7 +76,8 @@ def test_request_timeout_uses_module_constant_by_default(monkeypatch):
 def test_request_timeout_restores_original_on_exit():
     original = requests.sessions.Session.request
     with translator._request_timeout(5):
-        assert requests.sessions.Session.request is not original
+        assert requests.sessions.Session.request is original
+        assert translator.request_timeout.get() == 5
     assert requests.sessions.Session.request is original
 
 

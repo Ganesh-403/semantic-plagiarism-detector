@@ -1,3 +1,22 @@
+import json
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def scoped_api_tokens(monkeypatch, mock_db):
+    from src.api.middleware import get_valid_tokens
+    monkeypatch.setenv("API_BEARER_TOKENS_MAPPING", json.dumps({
+        "test-admin-token": ["admin", "read", "write", "scan"],
+        "test-write-token": ["write", "scan"],
+        "test-read-token": ["read"],
+        "test-scan-token": ["scan"],
+        "test-no-scope-token": [],
+    }))
+    get_valid_tokens.cache_clear()
+    yield
+    get_valid_tokens.cache_clear()
+
+
 from fastapi.testclient import TestClient
 
 from src.api.app import app
@@ -10,11 +29,11 @@ def test_http_404_not_found():
     """Verify that a nonexistent route returns a standardized JSON 404 response payload."""
     response = client.get("/api/v1/nonexistent-endpoint-xyz")
     assert response.status_code == 404
-    assert response.json() == {
-        "error": True,
-        "code": 404,
-        "message": "API endpoint or resource not found",
-    }
+    body = response.json()
+    assert body["status"] == body["code"] == 404
+    assert body["error"] is True
+    assert body["detail"] == body["message"] == "API endpoint or resource not found"
+    assert response.headers["content-type"].startswith("application/problem+json")
 
 
 # JSONContentTypeMiddleware unit coverage for Issue #1394.
@@ -332,7 +351,7 @@ def test_scope_enforcement_clear_endpoint(tmp_path):
     configure_db_path(db_file)
     init_db()
     try:
-        add_user("admin", "password123", role="admin")
+        add_user("admin", "StrongAdmin123!", role="admin")
     except ValueError:
         pass
 
@@ -364,7 +383,7 @@ def test_clear_corpus_audit_logging(tmp_path):
     init_db()
     
     try:
-        add_user("admin_user", "password123", role="admin")
+        add_user("admin_user", "StrongAdmin123!", role="admin")
     except ValueError:
         pass
 
@@ -464,7 +483,9 @@ def test_async_scan_empty_file_returns_400():
     assert "empty" in response.json()["detail"].lower()
 
 
-def test_cancel_async_scan_job_success():
+def test_cancel_async_scan_job_success(monkeypatch):
+    # Keep the job queued: TestClient normally completes BackgroundTasks before returning.
+    monkeypatch.setattr("src.api.routers.analysis._process_scan_job", lambda *a, **k: None)
     """Verify DELETE /api/v1/scan/jobs/{job_id} cancels an async scan job."""
     client = TestClient(app)
 
@@ -514,7 +535,7 @@ from src.api.app import global_exception_handler
 def test_global_exception_handler_returns_standard_payload(monkeypatch):
     """Verify Issue #1500: unhandled exceptions return the standardized JSON payload."""
     monkeypatch.setenv("APP_ENVIRONMENT", "development")
-    mock_request = Mock()
+    mock_request = Request({"type": "http", "method": "GET", "path": "/test", "headers": []})
 
     response = asyncio.run(global_exception_handler(mock_request, ValueError("boom")))
     body = json.loads(response.body)
@@ -529,7 +550,7 @@ def test_global_exception_handler_returns_standard_payload(monkeypatch):
 def test_global_exception_handler_masks_details_in_production(monkeypatch):
     """Verify Issue #1500: internal exception details are masked in production."""
     monkeypatch.setenv("APP_ENVIRONMENT", "production")
-    mock_request = Mock()
+    mock_request = Request({"type": "http", "method": "GET", "path": "/test", "headers": []})
 
     response = asyncio.run(
         global_exception_handler(mock_request, ValueError("sensitive internal detail"))
@@ -1128,9 +1149,7 @@ def test_custom_http_exception_handler_dictionary_detail():
 
     from src.api.app import custom_http_exception_handler
 
-    mock_request = Mock()
-    mock_request.method = "GET"
-    mock_request.url.path = "/test"
+    mock_request = Request({"type": "http", "method": "GET", "path": "/test", "headers": []})
 
     dict_detail = {"key": "value", "reason": "invalid request"}
     exc = StarletteHTTPException(status_code=400, detail=dict_detail)
@@ -1157,9 +1176,7 @@ def test_custom_http_exception_handler_string_detail():
 
     from src.api.app import custom_http_exception_handler
 
-    mock_request = Mock()
-    mock_request.method = "GET"
-    mock_request.url.path = "/test"
+    mock_request = Request({"type": "http", "method": "GET", "path": "/test", "headers": []})
 
     exc = StarletteHTTPException(status_code=400, detail="string error")
 

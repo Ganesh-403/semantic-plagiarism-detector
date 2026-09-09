@@ -8,7 +8,7 @@ This document describes how document data moves through the Semantic Plagiarism 
 
 The processing pipeline begins when one or more documents are uploaded through the Streamlit application or API. Uploaded files are received as raw byte streams and stored in a dictionary mapping filenames to their corresponding byte content.
 
-**Input Format**
+#### Input Format
 
 ```text
 Dict[str, bytes]
@@ -20,7 +20,7 @@ Example:
 {"report.pdf": b"...", "assignment.docx": b"..."}
 ```
 
-**Output Format**
+#### Output Format
 
 ```text
 bytes
@@ -34,7 +34,7 @@ Each uploaded file is passed to the document parser, which extracts readable tex
 
 The extracted text is stored using the document filename as the key.
 
-**Transformation**
+#### Transformation
 
 ```text
 bytes
@@ -44,7 +44,7 @@ extract_text()
 str
 ```
 
-**Output Format**
+#### Output Format
 
 ```python
 {"report.pdf": "Extracted document text..."}
@@ -66,7 +66,7 @@ Characteristics:
 - Filters very small chunks
 - Uses character-based fallback chunking for languages without whitespace (for example CJK languages)
 
-**Transformation**
+#### Transformation
 
 ```text
 str
@@ -88,9 +88,9 @@ Example:
 
 Each text chunk is converted into a semantic vector using the SentenceTransformer model.
 
-**Embedding Model**
+#### Embedding Model
 
-```
+```text
 paraphrase-multilingual-MiniLM-L12-v2
 ```
 
@@ -103,7 +103,7 @@ Features:
 
 The embedding stage produces one vector for every text chunk.
 
-**Transformation**
+#### Transformation
 
 ```text
 list[str]
@@ -134,14 +134,14 @@ Each vector is associated with metadata using a `ChunkRecord`, which stores:
 
 The system automatically selects the index type based on the number of vectors.
 
-| Number of Vectors | FAISS Index |
-|------------------:|------------|
-| Less than 5000 | IndexFlatIP |
-| 5000 or more | IndexIVFFlat |
+| Number of Vectors | FAISS Index  |
+| ----------------: | ------------ |
+|    Less than 5000 | IndexFlatIP  |
+|      5000 or more | IndexIVFFlat |
 
 Since embeddings are L2-normalized, the project uses inner-product search, which is equivalent to cosine similarity.
 
-**Transformation**
+#### Transformation
 
 ```text
 np.ndarray
@@ -188,13 +188,13 @@ K --> L
 
 ## Data Format Summary
 
-| Processing Stage | Input Format | Output Format |
-|------------------|--------------|---------------|
-| File Upload | File | `bytes` |
-| Text Extraction | `bytes` | `str` |
-| Text Chunking | `str` | `list[str]` |
-| Embedding Generation | `list[str]` | `np.ndarray (N × 384)` |
-| FAISS Indexing | `np.ndarray` | `FAISS Index` |
+| Processing Stage     | Input Format | Output Format          |
+| -------------------- | ------------ | ---------------------- |
+| File Upload          | File         | `bytes`                |
+| Text Extraction      | `bytes`      | `str`                  |
+| Text Chunking        | `str`        | `list[str]`            |
+| Embedding Generation | `list[str]`  | `np.ndarray (N × 384)` |
+| FAISS Indexing       | `np.ndarray` | `FAISS Index`          |
 
 ---
 

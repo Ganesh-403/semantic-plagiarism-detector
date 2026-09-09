@@ -816,7 +816,7 @@ def test_plot_plagiarism_network_graph_max_nodes_caption():
     assert isinstance(fig, go.Figure)
     assert len(fig.data[1].customdata) == 3
     caption_texts = [ann.text for ann in (fig.layout.annotations or [])]
-    assert "3 nodes hidden" in caption_texts
+    assert any("3 nodes hidden" in text for text in caption_texts)
 
 
 # ─── Tests for get_cluster_count (Issue #1793) ────────────────────────────────
@@ -976,7 +976,7 @@ class TestNetworkExport:
 
         assert isinstance(csv_bytes, bytes)
         csv_str = csv_bytes.decode("utf-8")
-        lines = csv_str.strip().split("\n")
+        lines = csv_str.strip().splitlines()
 
         assert lines[0] == "Source,Target,Similarity"
         assert "doc1" in lines[1]

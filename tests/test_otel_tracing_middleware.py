@@ -33,7 +33,7 @@ async def get_document_mock(document_id: str):
 # ----------------------------------------------------------------------
 # 2. Pytest Suite containing TestClient validation assertions
 # ----------------------------------------------------------------------
-@patch("src.api.app.get_tracer")
+@patch("src.utils.tracing.get_tracer")
 def test_otel_tracing_middleware_intercepts_and_records_attributes(mock_get_tracer):
     """
     Verifies that the OpenTelemetry tracing middleware captures incoming request vectors,
@@ -41,6 +41,7 @@ def test_otel_tracing_middleware_intercepts_and_records_attributes(mock_get_trac
     """
     # Create mock handles mimicking OpenTelemetry Span life cycle structures
     mock_span = MagicMock()
+    mock_span.get_span_context.return_value.trace_id = 123
     mock_tracer = MagicMock()
 
     # Configure the mock context manager to return our mock span handle safely

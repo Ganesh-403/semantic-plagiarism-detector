@@ -172,7 +172,7 @@ def _generate_test_runner(
 ) -> str:
     """Generate a Python script that imports the submitted code and runs test cases."""
     # Normalize path for Windows/Unix
-    safe_path = code_file_path.replace("\\", "\\\\")
+    safe_path = repr(code_file_path)
 
     runner_script = f"""
 import sys
@@ -181,16 +181,17 @@ import traceback
 import importlib.util
 
 # Load the submitted code as a module
-spec = importlib.util.spec_from_file_location("submitted_code", "{safe_path}")
+spec = importlib.util.spec_from_file_location("submitted_code", {safe_path})
 module = importlib.util.module_from_spec(spec)
 
 test_results = []
+exit_code = 0
 
 try:
     spec.loader.exec_module(module)
 
     # If test cases are provided, run them
-    test_cases = {json.dumps(test_cases) if test_cases else "[]"}
+    test_cases = json.loads({json.dumps(test_cases or [])!r})
 
     for i, tc in enumerate(test_cases):
         test_input = tc.get("input")
@@ -230,10 +231,12 @@ try:
             }})
 
 except Exception as e:
+    exit_code = 1
     print(f"Error loading submitted code: {{e}}", file=sys.stderr)
     print(traceback.format_exc(), file=sys.stderr)
 
 # Output the test results as JSON for the sandbox to parse
 print("TEST_RESULTS:" + json.dumps(test_results))
+sys.exit(exit_code)
 """
     return runner_script

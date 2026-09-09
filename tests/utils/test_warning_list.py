@@ -478,14 +478,15 @@ def test_document_warning_creation_with_missing_optional_parameters():
     from src.utils.warning_list import DocumentWarning
 
     # Instantiate with only required/code & message fields
-    warning = DocumentWarning(code="TEST", message="Test message")
+    warning = DocumentWarning(warning_type="TEST", message="Test message")
 
-    assert warning.code == "TEST"
+    assert warning.warning_type == "TEST"
     assert warning.message == "Test message"
-    assert warning.severity == "Medium"
-    assert warning.details is None
-    assert warning.page_number is None
+    assert warning.severity == "Low"
+    assert warning.details == {}
+    assert warning.doc_a == warning.doc_b == ""
 
+    from src.utils.warning_list import _truncate_search_query
     assert _truncate_search_query(12345) == "12345"
     assert _truncate_search_query(98.6) == "98.6"
     assert _truncate_search_query(None) == ""

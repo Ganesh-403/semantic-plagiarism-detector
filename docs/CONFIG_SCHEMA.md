@@ -12,9 +12,9 @@ default values where applicable.
 
 ## Configuration Variables
 
-| Config Key | Environment Variable | Type | Default | Required | Description |
-|------------|----------------------|------|---------|----------|-------------|
-| APP_TITLE | APP_TITLE | string | Semantic Plagiarism Detection System | No | Application title |
+| Config Key | Environment Variable | Type   | Default                              | Required | Description       |
+| ---------- | -------------------- | ------ | ------------------------------------ | -------- | ----------------- |
+| APP_TITLE  | APP_TITLE            | string | Semantic Plagiarism Detection System | No       | Application title |
 
 ## Environment Variables
 

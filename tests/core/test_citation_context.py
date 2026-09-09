@@ -47,7 +47,7 @@ class TestSemanticCitationAligner:
         """Verify identical texts have similarity 1.0."""
         text = "The cat sat on the mat."
         sim = compute_tf_idf_cosine_similarity(text, text)
-        assert sim == 1.0
+        assert sim == pytest.approx(1.0)
 
     def test_cosine_similarity_disjoint(self):
         """Verify disjoint texts have low similarity."""

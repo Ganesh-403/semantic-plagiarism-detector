@@ -56,7 +56,7 @@ class TestChunkTextDynamicMinWords:
 
         # The "Short." chunk (1 word) should be discarded
         assert all(count_words(c.text) >= 5 for c in chunks)
-        assert all("Short." not in c.text for c in chunks)
+        assert all(c.text.strip() != "Short." for c in chunks)
 
     def test_keeps_chunks_meeting_threshold(self):
         """Verify chunks meeting the min_words threshold are retained."""
@@ -74,7 +74,8 @@ class TestChunkTextDynamicMinWords:
         chunks = chunk_text(text, chunk_size=2, chunk_overlap=0, min_words=0)
 
         # Should keep even 1-word chunks
-        assert len(chunks) >= 5
+        assert chunks
+        assert " ".join(chunks) == text
 
     def test_page_numbers_discarded(self):
         """Verify isolated page numbers (common in PDFs) are discarded."""
@@ -88,8 +89,8 @@ class TestChunkTextDynamicMinWords:
         chunks = chunk_text(text, chunk_size=100, chunk_overlap=0, min_words=5)
 
         # Page numbers "1" and "2" should not appear as standalone chunks
-        assert all("1" not in c.text for c in chunks)
-        assert all("2" not in c.text for c in chunks)
+        assert all(c.text.strip() != "1" for c in chunks)
+        assert all(c.text.strip() != "2" for c in chunks)
 
     def test_headers_discarded_if_too_short(self):
         """Verify short headers are discarded if they fall below min_words."""
@@ -98,7 +99,7 @@ class TestChunkTextDynamicMinWords:
         chunks = chunk_text(text, chunk_size=50, chunk_overlap=0, min_words=5)
 
         # "Chapter 1" is only 2 words, should be discarded
-        assert all("Chapter 1" not in c.text for c in chunks)
+        assert all(c.text.strip() != "Chapter 1" for c in chunks)
 
     def test_overlap_does_not_create_invalid_chunks(self):
         """Verify overlapping windows don't generate invalid small chunks."""

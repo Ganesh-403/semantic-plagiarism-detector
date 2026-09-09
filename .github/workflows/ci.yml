@@ -61,18 +61,8 @@ jobs:
         with:
           fetch-depth: 1
 
-      # Issue #3485: Catch inconsistent heading levels, trailing whitespace,
-      # and other Markdown formatting problems across docs/ and README.md.
-      #
-      # continue-on-error is intentional for now: a repo-wide scan found
-      # existing heading-level violations (H1 -> H3/H4 skips) in 13 files,
-      # including README.md itself. Flipping this to a hard failure should
-      # happen in a follow-up PR once those pre-existing violations are
-      # cleaned up — otherwise this step would block every unrelated PR
-      # from merging on day one.
       - name: Run markdownlint-cli2
         uses: DavidAnson/markdownlint-cli2-action@v18
-        continue-on-error: true
         with:
           globs: |
             **/*.md
@@ -129,6 +119,7 @@ jobs:
           python scripts/run_tests.py --parallel --coverage
 
       - name: Enforce Coverage Threshold (≥85%)
+        if: always() && hashFiles('.coverage') != ''
         # Resolves #1616 – fail the build if total coverage drops below 85 %.
         run: |
           coverage report --fail-under=85
@@ -137,7 +128,7 @@ jobs:
       - name: Enforce Diff Coverage Threshold (≥90%) for New Code
         # Resolves #3492 - Diff coverage enforcement for new code
         # Runs only on Pull Requests and dynamically compares against the base branch.
-        if: github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request' && hashFiles('coverage.xml') != ''
         run: |
           git fetch origin ${{ github.base_ref }}
           diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=90
@@ -147,7 +138,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report-${{ matrix.python-version }}
-          path: htmlcov/
+          path: |
+            htmlcov/
+            coverage.xml
+            test-reports/
 
   security:
     name: Dependency vulnerability audit
@@ -163,7 +157,7 @@ jobs:
           python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
           python -m pip install -r requirements.txt
       - name: Audit installed runtime dependencies
-        run: pip-audit --desc on -f json -o security-report.json
+        run: python scripts/audit_dependencies.py --output security-report.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -1086,6 +1086,7 @@ from app.views.drilldown_view import render_drilldown_view
 from app.views.history_view import render_history_view
 from app.views.matrix_view import render_matrix_view
 from app.views.settings_view import render_settings_view
+from app.views.health_view import render_health_view
 from app.views.upload_view import render_upload_section
 from app.views.users_view import render_users_view
 from src.core.ai_detector import detect_documents_ai_probability
@@ -1372,19 +1373,14 @@ def configure_page_meta(title: str, icon: str) -> None:
         initial_sidebar_state="auto",
     )
 # Initialize page metadata with dynamic branding
-configure_page_meta(title="Semantic Plagiarism Processor - Dashboard", icon="🔍")
+from src.core.app_config import get_app_title
+APP_TITLE = get_app_title()
+configure_page_meta(title=APP_TITLE, icon="🔍")
 def update_page_title(tab_name: str):
-    """Update browser title based on active tab."""
-    st.markdown(
-        f"""
-        <script>
-        window.parent.document.title = '{tab_name} | Semantic Plagiarism Detector';
-        </script>
-        """,
-        unsafe_allow_html=True,
-    )
-# Configure Page Setup
-configure_page_meta(title="Semantic Plagiarism Detector - Dashboard", icon="🔍")
+    """Keep branding consistent; Streamlit tabs are all evaluated on every rerun."""
+    # A browser title set once avoids the last-rendered hidden tab winning.
+    return APP_TITLE
+
 SESSION_ID = init_session_state()
 st.markdown(back_to_top_html(), unsafe_allow_html=True)
 inject_css()
@@ -1517,49 +1513,13 @@ def get_date_range_preset(preset: str) -> tuple:
         return today - timedelta(days=29), today
     else:  # "All Time"
         return date(2020, 1, 1), today
-# ── SESSION TIMEOUT & ROUTE PROTECTION ────────────────────────────────────────
-TIMEOUT_LIMIT = 15 * 60  # 15 minutes in seconds
-cached_last_interaction = get_session_state(SESSION_ID, SessionKeys.LAST_INTERACTION)
-if cached_last_interaction is not None:
-    last_interaction = cached_last_interaction
-elif SessionKeys.LAST_INTERACTION in st.session_state:
-    last_interaction = st.session_state[SessionKeys.LAST_INTERACTION]
-else:
-    last_interaction = None
-if last_interaction and st.session_state.get(SessionKeys.AUTHENTICATED, False):
-    elapsed_time = time.time() - last_interaction
-    if elapsed_time > TIMEOUT_LIMIT:
-        for key in [
-            SessionKeys.AUTHENTICATED,
-            SessionKeys.USERNAME,
-            SessionKeys.ROLE,
-            SessionKeys.LAST_INTERACTION,
-        ]:
-            if key in st.session_state:
-                del st.session_state[key]
-        clear_session(SESSION_ID)
-        from src.errors import UI_SESSION_EXPIRED
-        st.warning(UI_SESSION_EXPIRED)
-        st.stop()
-    else:
-        st.session_state[SessionKeys.LAST_INTERACTION] = time.time()
-        cache_session_state(SESSION_ID, SessionKeys.LAST_INTERACTION, time.time())
 # Render Login UI if not authenticated
 if not st.session_state.get(SessionKeys.AUTHENTICATED, False):
     render_login_view(SESSION_ID)
-def file_uploader_callback():
-    uploaded = st.session_state.get("file_uploader")
-    if uploaded:
-        st.session_state["staged_files_count"] = len(uploaded)
-        total_size = sum(getattr(f, "size", 0) for f in uploaded)
-        st.session_state["staged_files_size"] = total_size
-    else:
-        st.session_state["staged_files_count"] = 0
-        st.session_state["staged_files_size"] = 0
-if "staged_files_count" not in st.session_state:
-    st.session_state["staged_files_count"] = 0
-if "staged_files_size" not in st.session_state:
-    st.session_state["staged_files_size"] = 0
+
+from app.components.password_management import enforce_password_rotation
+enforce_password_rotation()
+
 user_role = st.session_state.get(SessionKeys.ROLE, "user")
 # Top-right Theme Toggle
 current_theme = get_theme_name()
@@ -1646,55 +1606,8 @@ with st.sidebar:
             if user_role == "admin":
                 initialize_enhanced_dashboard()
                 initialize_report_generator()
-    # ── Threshold Presets (Issue #1674) ───────────────────────────────────────
-    st.markdown("### 🎯 Threshold Presets")
-    # Define preset options with descriptions
-    preset_options = {
-        "Strict (0.80)": 0.80,
-        "Balanced (0.59)": 0.59,
-        "Lenient (0.45)": 0.45,
-        "Custom": None,
-    }
-    # Determine current preset based on session state threshold
-    current_threshold = st.session_state.get("threshold_slider", PLAGIARISM_THRESHOLD)
-    current_preset = "Custom"
-    for label, value in preset_options.items():
-        if value is not None and abs(current_threshold - value) < 0.001:
-            current_preset = label
-            break
-    selected_preset = st.radio(
-        "Select Evaluation Standard:",
-        options=list(preset_options.keys()),
-        index=list(preset_options.keys()).index(current_preset),
-        key="threshold_preset_radio",
-        horizontal=True,
-        help="Choose a predefined threshold standard or use the custom slider below.",
-    )
-    # Sync preset selection with slider value
-    if selected_preset != "Custom" and preset_options[selected_preset] is not None:
-        st.session_state["threshold_slider"] = preset_options[selected_preset]
-    # Force rerun to update the slider widget if it changed via radio
-    if current_preset != selected_preset:
-        st.rerun()
-    threshold = st.slider(
-        "Plagiarism Threshold (Hybrid)",
-        0.10,
-        0.99,
-        value=st.session_state.get("threshold_slider", PLAGIARISM_THRESHOLD),
-        step=0.01,
-        help=(
-            "Combined Hybrid score threshold for flagging pair plagiarism. "
-            "Calculated from Lexical (exact phrase overlap) and Semantic (meaning alignment) scores. "
-            "Recommended Default: 0.59 (59%)."
-        ),
-        key="threshold_slider",
-        on_change=save_preferences_callback,
-    )
-    # If user manually changes slider, reset preset to "Custom"
-    if selected_preset != "Custom" and abs(threshold - preset_options[selected_preset]) > 0.001:
-        if st.session_state.get("threshold_preset_radio") != "Custom":
-            st.session_state["threshold_preset_radio"] = "Custom"
-            st.rerun()
+    from app.components.threshold_control import render_threshold_control
+    threshold = render_threshold_control(PLAGIARISM_THRESHOLD, save_preferences_callback)
     lexical_threshold = st.slider(
         "Lexical Sensitivity Threshold",
         0.10,
@@ -2029,7 +1942,8 @@ with st.sidebar:
     st.divider()
     render_timezone_footer()
 # ── Main UI ───────────────────────────────────────────────────────────────────
-st.title("🔍 Semantic Plagiarism Detection System")
+st.title(f"🔍 {APP_TITLE}")
+st.caption(f"🎓 {APP_TITLE} · Streamlit")
 # Live Scan Statistics Metrics Header (#1508)
 try:
     total_scans = get_upload_count()
@@ -2068,7 +1982,7 @@ with st.expander("ℹ️ How Semantic Plagiarism Detection Works"):
     - **2. AI vector embeddings generated** — The documents are converted into vector embeddings for semantic comparison.
     - **3. View similarity heatmap & incident logs** — Review detected similarities through the heatmap and incident logs.
     """)
-st.title(get_text("title", lang=lang_code))
+
 st.markdown(get_text("subtitle", lang=lang_code))
 st.divider()
 if user_role == "admin":
@@ -2133,6 +2047,7 @@ if user_role == "admin":
     registry = get_chunk_registry()
 else:
     faiss_index = load_index(_INDEX_PATH) if os.path.exists(_INDEX_PATH) else None
+    registry = get_chunk_registry()
 file_bytes_dict = render_upload_section(user_role, lang_code, _INDEX_PATH)
 has_enough_files = len(file_bytes_dict) >= 2
 @st.cache_data(show_spinner=False)
@@ -2312,6 +2227,9 @@ else:
 st.subheader(get_text("analysis_summary", lang=lang_code))
 doc_names = list(raw_texts.keys()) if raw_texts else []
 n_docs = len(doc_names)
+from app.components.analysis_exports import render_analysis_exports
+if user_role == "admin":
+    render_analysis_exports(flags, doc_names, threshold)
 total_pairs = n_docs * (n_docs - 1) // 2 if n_docs > 1 else 0
 n_flagged = len(flags)
 total_doc_count = max(n_docs, get_total_document_count())
@@ -2344,6 +2262,7 @@ if _parse_durations and raw_texts:
     tab_analytics,
     tab_patterns,
     tab_users,
+    tab_health,
     tab_settings,
     tab_history,
     tab_audit,
@@ -2358,6 +2277,7 @@ if _parse_durations and raw_texts:
         get_text("tab_analytics", lang=lang_code),
         "🧠 Patterns",
         get_text("tab_users", lang=lang_code),
+        get_text("tab_health", lang=lang_code),
         get_text("tab_settings", lang=lang_code),
         "📊 History",
         get_text("tab_audit_logs", lang=lang_code),
@@ -2476,6 +2396,8 @@ with tab_warnings:
                 filtered_flags.append(flag)
 
     st.caption(f"Total matching incidents: **{len(filtered_flags)}**")
+    from app.components.incident_export import render_incident_txt_export
+    render_incident_txt_export(filtered_flags)
 
     if not filtered_flags:
         st.info("No plagiarism incidents detected matching the selected filters.")
@@ -2532,74 +2454,15 @@ with tab_warnings:
 # ══ TAB 2: FAISS ══════════════════════════════════════════════════════════
 with tab_faiss:
     update_page_title("FAISS")
-    st.subheader("⚡ FAISS Vector Search")
-    if faiss_index is not None:
-        st.info(f"Index total: {faiss_index.ntotal} vectors.")
-    faiss_query = st.text_input("Query FAISS Index:", key="faiss_query_input_tab2")
-    if st.button("Run Search", key="run_search_tab2") and faiss_query.strip():
-        q_vec = embed_chunks([faiss_query.strip()])[0]
-        results = search_similar_chunks(
-            q_vec, faiss_index, registry, top_k=faiss_top_k, threshold=threshold
-        )
-        from app.components.faiss_results import render_faiss_results_ui
+    from app.views.faiss_view import render_faiss_view
+    render_faiss_view(faiss_index, registry, faiss_top_k, threshold, file_bytes_dict)
 with tab_matrix:
     update_page_title("Matrix")
     render_matrix_view(active_sim_df)
 with tab_heatmap:
     update_page_title("Heatmap")
-    st.subheader("🗺️ Heatmap & Network")
-    heatmap_fig = None
-    if active_sim_df is not None:
-        heatmap_fig = ui_exception_handler("Similarity Heatmap")(
-            plot_similarity_heatmap
-        )(active_sim_df, threshold=threshold, theme_colors=get_chart_colors())
-    if heatmap_fig is not None:
-        st.pyplot(heatmap_fig, use_container_width=True)
-    doc_select_options = (
-        ["None"] + list(active_sim_df.columns)
-        if active_sim_df is not None
-        else ["None"]
-    )
-    selected_highlight_doc = st.selectbox(
-        "Highlight Document Node",
-        options=doc_select_options,
-        index=0,
-        key="highlight_doc_node_selector",
-    )
-    highlighted_doc = (
-        selected_highlight_doc if selected_highlight_doc != "None" else None
-    )
-    network_fig = None
-    if active_sim_df is not None:
-        network_fig = ui_exception_handler("Plagiarism Network")(
-            plot_similarity_network
-        )(
-            similarity_df=active_sim_df,
-            threshold=threshold,
-            highlighted_doc=highlighted_doc,
-            title="Interactive Document Plagiarism Network",
-        )
-    if network_fig is not None:
-        st.plotly_chart(network_fig, use_container_width=True)
-    # ── Plagiarism Cluster Detection Summary (Issue #1675) ───────────────────
-    if active_sim_df is not None and len(doc_names) >= 2:
-        from src.core.similarity import detect_plagiarism_clusters
-        cluster_data = detect_plagiarism_clusters(active_sim_df, threshold=threshold)
-        suspicious_groups = cluster_data["suspicious_groups"]
-        if suspicious_groups:
-            with st.expander(
-                f"🚨 Suspicious Collusion Rings Detected ({len(suspicious_groups)})",
-                expanded=True,
-            ):
-                st.warning(
-                    f"Found {len(suspicious_groups)} group(s) of 3+ highly similar documents. "
-                    "These may indicate collusion or shared source material."
-                )
-                for group in suspicious_groups:
-                    st.markdown(f"**Cluster #{group['cluster_id']}** ({group['size']} documents):")
-                    for doc in group["documents"]:
-                        st.markdown(f"- 📄 `{doc}`")
-                    st.divider()
+    from app.views.heatmap_view import render_heatmap_view
+    render_heatmap_view(active_sim_df, threshold, doc_names)
 # ══ TAB 5: PAIR DRILL-DOWN ════════════════════════════════════════════════
 with tab_drill:
     update_page_title("Drill Down")
@@ -2877,6 +2740,9 @@ with tab_users:
 # Issue #2810: Settings UI has been moved to app/pages/2_Settings.py
 # Streamlit's native multi-page feature will automatically render this
 # in the sidebar navigation.
+with tab_health:
+    render_health_view(user_role)
+
 with tab_settings:
     update_page_title("Settings")
     st.subheader("⚙️ System Configuration")

@@ -28,7 +28,9 @@ from src.db.corpus_db import (
 
 
 @pytest.fixture(autouse=True)
-def setup_test_db(mock_db):
+def setup_test_db(mock_db, monkeypatch):
+    # These synthetic vectors represent one explicitly configured test model.
+    monkeypatch.setenv("SEMANTIC_PLAGIARISM_MODEL", "all-MiniLM-L6-v2")
     """Uses the global mock_db fixture from conftest.py for complete DB isolation."""
     yield
 

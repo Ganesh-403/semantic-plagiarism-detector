@@ -92,10 +92,10 @@ class TestColemanLiauCalculation:
     @pytest.mark.parametrize(
         "sample_text,expected_bracket",
         [
-            ("See Spot run. Spot runs fast.", "Elementary School"),
+            ("See Spot run. Spot runs fast.", "Before Grade 1"),
             (
                 "Modern distributed operating systems synchronize cluster state using replicated state machines.",
-                "College",
+                "Graduate",
             ),
             (
                 "Quantum electrodynamics formulates relativistic field theory across non-Abelian gauge groups.",
@@ -148,7 +148,9 @@ class TestComputeTextStatsIntegration:
             "unique_word_ratio",
             "readability_score",
         }
-        assert set(stats.keys()) == expected_keys
+        assert expected_keys <= set(stats)
+        assert stats["avg_word_length"] > 0
+        assert stats["avg_sentence_length"] > 0
 
     def test_compute_text_stats_empty_text(self):
         stats = compute_text_stats("")

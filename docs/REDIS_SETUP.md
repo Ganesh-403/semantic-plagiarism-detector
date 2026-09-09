@@ -8,7 +8,7 @@ This guide explains how to run Redis locally using Docker, configure the require
 
 ---
 
-# Prerequisites
+## Prerequisites
 
 Before setting up Redis, ensure the following are installed:
 
@@ -23,7 +23,7 @@ docker --version
 
 ---
 
-# Running Redis Locally with Docker
+## Running Redis Locally with Docker
 
 Pull the official Redis image:
 
@@ -39,11 +39,11 @@ docker run -d --name redis -p 6379:6379 redis
 
 ### Command Explanation
 
-| Option | Description |
-|---------|-------------|
-| `-d` | Run the container in detached mode |
-| `--name redis` | Name the container `redis` |
-| `-p 6379:6379` | Expose Redis on the default port |
+| Option         | Description                        |
+| -------------- | ---------------------------------- |
+| `-d`           | Run the container in detached mode |
+| `--name redis` | Name the container `redis`         |
+| `-p 6379:6379` | Expose Redis on the default port   |
 
 Verify that Redis is running:
 
@@ -55,7 +55,7 @@ You should see a container named **redis** with port **6379** exposed.
 
 ---
 
-# Running with Docker Compose
+## Running with Docker Compose
 
 The project also provides Docker Compose support. Running the following command starts the Streamlit application together with the optional Redis service.
 
@@ -77,17 +77,17 @@ docker compose down -v
 
 ---
 
-# Redis Configuration
+## Redis Configuration
 
 Redis configuration is provided through environment variables in `.env`.
 
-| Variable | Description |
-|----------|-------------|
-| `REDIS_URL` | Complete Redis connection URL. If set, it overrides the individual Redis settings. |
-| `REDIS_HOST` | Redis server hostname. |
-| `REDIS_PORT` | Redis server port. |
-| `REDIS_DB` | Redis database number. |
-| `REDIS_PASSWORD` | Password used when Redis authentication is enabled. |
+| Variable         | Description                                                                        |
+| ---------------- | ---------------------------------------------------------------------------------- |
+| `REDIS_URL`      | Complete Redis connection URL. If set, it overrides the individual Redis settings. |
+| `REDIS_HOST`     | Redis server hostname.                                                             |
+| `REDIS_PORT`     | Redis server port.                                                                 |
+| `REDIS_DB`       | Redis database number.                                                             |
+| `REDIS_PASSWORD` | Password used when Redis authentication is enabled.                                |
 
 Example configuration:
 
@@ -113,7 +113,7 @@ If `REDIS_URL` is provided, the remaining Redis settings are ignored.
 
 ---
 
-# Authentication
+## Authentication
 
 Redis does not require authentication by default.
 
@@ -140,7 +140,7 @@ redis-cli -a yourpassword
 
 ---
 
-# Verifying the Connection
+## Verifying the Connection
 
 Open the Redis CLI:
 
@@ -168,7 +168,7 @@ PONG
 
 ---
 
-# Useful Docker Commands
+## Useful Docker Commands
 
 Start Redis:
 
@@ -202,7 +202,7 @@ docker rm redis
 
 ---
 
-# Troubleshooting
+## Troubleshooting
 
 ## Redis container is not running
 
@@ -279,7 +279,7 @@ Review the logs for startup or configuration errors.
 
 ---
 
-# Connection Debugging Checklist
+## Connection Debugging Checklist
 
 Before reporting a Redis issue, verify the following:
 
@@ -293,6 +293,6 @@ Before reporting a Redis issue, verify the following:
 
 ---
 
-# Summary
+## Summary
 
 Redis is an optional service for this project that enhances session caching and rate limiting. Contributors can run Redis locally with Docker or Docker Compose, configure the required environment variables through `.env`, and use the troubleshooting steps above to diagnose connection issues. If Redis is unavailable, the application continues to operate using its built-in in-memory fallback.

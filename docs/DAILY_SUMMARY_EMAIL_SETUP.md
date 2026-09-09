@@ -28,15 +28,18 @@ ADMIN_EMAIL=admin@example.com
 ### SMTP Configuration Examples
 
 **Gmail:**
+
 - Server: `smtp.gmail.com`
 - Port: `587` (TLS)
 - Password: Use an [App Password](http://web.archive.org/web/20260713122540/https://support.google.com/accounts/answer/185833)
 
 **Outlook/Office 365:**
+
 - Server: `smtp.office365.com`
 - Port: `587` (TLS)
 
 **SendGrid:**
+
 - Server: `smtp.sendgrid.net`
 - Port: `587` (TLS)
 
@@ -106,18 +109,21 @@ python src/utils/daily_summary_email.py
 
 ## Troubleshooting
 
-### Email not sending:
+### Email not sending
+
 - Verify SMTP credentials are correct
 - Check firewall settings allow SMTP traffic
 - Review logs for error messages
 - Ensure your SMTP provider allows sending from your IP
 
-### No incidents in email:
+### No incidents in email
+
 - Verify incidents are being created in the database
 - Check the `date_flagged` timestamps are within the last 24 hours
 - Run the script with `--verbose` flag if available
 
-### Task not running:
+### Task not running
+
 - Check Task Scheduler history for errors
 - Verify the Python path is correct
 - Ensure the working directory path is absolute
@@ -126,6 +132,7 @@ python src/utils/daily_summary_email.py
 ## Email Format
 
 The daily summary email includes:
+
 - Total count of new incidents
 - Breakdown by severity (High, Medium, Low)
 - Detailed table for High and Medium severity incidents

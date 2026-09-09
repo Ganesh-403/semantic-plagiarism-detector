@@ -75,7 +75,7 @@ def test_migration_adds_nullable_text_column(tmp_path):
     column = columns["password_changed_at"]
     assert column[2].upper() == "TEXT"
     assert column[3] == 0
-    assert column[4] is None
+    assert column[4] == "NULL"
 
 
 def test_migration_is_idempotent(tmp_path):

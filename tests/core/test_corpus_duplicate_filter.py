@@ -1,5 +1,6 @@
-from __future__ import annotations
 """Tests for corpus-level exact and near-duplicate detection."""
+
+from __future__ import annotations
 
 
 

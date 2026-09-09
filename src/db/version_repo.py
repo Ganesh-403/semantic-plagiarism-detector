@@ -176,11 +176,26 @@ class DocumentSnapshotRepository:
         similarity_to_parent: float | None = None,
     ) -> dict[str, Any]:
         """Register a new document version and return the snapshot record."""
-        content_hash = hashlib.sha256(content_text.encode("utf-8")).hexdigest()
+        identity = json.dumps([user_id, assignment_id, content_text], ensure_ascii=False)
+        content_hash = hashlib.sha256(identity.encode("utf-8")).hexdigest()
         word_count = len(content_text.split())
         now = datetime.now(timezone.utc).isoformat()
 
         with self._conn() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            existing = conn.execute(
+                "SELECT * FROM document_snapshots WHERE document_hash = ?",
+                (content_hash,),
+            ).fetchone()
+            if existing:
+                return dict(existing)
+            if parent_hash:
+                parent = conn.execute(
+                    "SELECT user_id, assignment_id FROM document_snapshots WHERE document_hash = ?",
+                    (parent_hash,),
+                ).fetchone()
+                if not parent or tuple(parent) != (user_id, assignment_id):
+                    raise ValueError("Parent version must belong to the same user and assignment")
             # Determine version number
             cursor = conn.execute(
                 """SELECT MAX(version_number) FROM document_snapshots
@@ -494,103 +509,64 @@ class DocumentSnapshotRepository:
     # -- Delete ----------------------------------------------------------------
 
     def delete_version(self, doc_hash: str) -> bool:
-        """Delete a specific version snapshot."""
+        """Delete a snapshot and its diffs, retaining the remaining lineage."""
         with self._conn() as conn:
-            cursor = conn.execute(
-                "DELETE FROM document_snapshots WHERE document_hash = ?",
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT user_id, assignment_id FROM document_snapshots WHERE document_hash = ?",
                 (doc_hash,),
-            )
-            return cursor.rowcount > 0
+            ).fetchone()
+            if not row:
+                return False
+            user_id, assignment_id = row
+            conn.execute("DELETE FROM version_diffs WHERE parent_hash = ? OR child_hash = ?",
+                         (doc_hash, doc_hash))
+            conn.execute("UPDATE document_snapshots SET parent_hash = NULL, similarity_to_parent = NULL "
+                         "WHERE parent_hash = ?", (doc_hash,))
+            conn.execute("DELETE FROM version_lineage WHERE user_id = ? AND assignment_id = ?",
+                         (user_id, assignment_id))
+            conn.execute("DELETE FROM document_snapshots WHERE document_hash = ?", (doc_hash,))
+            self._upsert_lineage(conn, assignment_id, user_id)
+            return True
 
     def delete_lineage(self, user_id: str, assignment_id: str) -> bool:
-        """Delete an entire lineage (all versions for a user + assignment)."""
+        """Delete all versions and references in one transaction."""
         with self._conn() as conn:
-            conn.execute(
-                """DELETE FROM version_diffs WHERE parent_hash IN
-                   (SELECT document_hash FROM document_snapshots
-                    WHERE user_id = ? AND assignment_id = ?)""",
-                (user_id, assignment_id),
-            )
-            conn.execute(
-                """DELETE FROM version_diffs WHERE child_hash IN
-                   (SELECT document_hash FROM document_snapshots
-                    WHERE user_id = ? AND assignment_id = ?)""",
-                (user_id, assignment_id),
-            )
-            cursor = conn.execute(
-                """DELETE FROM document_snapshots
-                   WHERE user_id = ? AND assignment_id = ?""",
-                (user_id, assignment_id),
-            )
-            conn.execute(
-                """DELETE FROM version_lineage
-                   WHERE user_id = ? AND assignment_id = ?""",
-                (user_id, assignment_id),
-            )
+            conn.execute("BEGIN IMMEDIATE")
+            hashes = "SELECT document_hash FROM document_snapshots WHERE user_id = ? AND assignment_id = ?"
+            conn.execute(f"DELETE FROM version_diffs WHERE parent_hash IN ({hashes}) OR child_hash IN ({hashes})",
+                         (user_id, assignment_id, user_id, assignment_id))
+            conn.execute(f"UPDATE document_snapshots SET parent_hash = NULL, similarity_to_parent = NULL "
+                         f"WHERE parent_hash IN ({hashes})", (user_id, assignment_id))
+            conn.execute("DELETE FROM version_lineage WHERE user_id = ? AND assignment_id = ?",
+                         (user_id, assignment_id))
+            cursor = conn.execute("DELETE FROM document_snapshots WHERE user_id = ? AND assignment_id = ?",
+                                  (user_id, assignment_id))
             return cursor.rowcount > 0
 
     # -- Internal helpers -----------------------------------------------------
 
     @staticmethod
-    def _upsert_lineage(
-        conn: sqlite3.Connection,
-        assignment_id: str,
-        user_id: str,
-        head_hash: str,
-        now: str,
-        similarity: float | None,
-    ) -> None:
-        """Insert or update the lineage record for a user + assignment."""
-        existing = conn.execute(
-            """SELECT * FROM version_lineage
-               WHERE user_id = ? AND assignment_id = ?""",
-            (user_id, assignment_id),
-        ).fetchone()
-
-        if existing:
-            total = existing["total_versions"] + 1
-            sims = [existing["avg_similarity"]]
-            if similarity is not None:
-                sims.append(similarity)
-            avg_sim = sum(sims) / len(sims) if sims else 0.0
-            min_sim = min(existing["min_similarity"], similarity or 1.0)
-            max_sim = max(existing["max_similarity"], similarity or 0.0)
-
-            conn.execute(
-                """UPDATE version_lineage
-                   SET head_hash = ?, total_versions = ?,
-                       avg_similarity = ?, min_similarity = ?,
-                       max_similarity = ?, last_created = ?
-                   WHERE user_id = ? AND assignment_id = ?""",
-                (
-                    head_hash,
-                    total,
-                    avg_sim,
-                    min_sim,
-                    max_sim,
-                    now,
-                    user_id,
-                    assignment_id,
-                ),
-            )
-        else:
-            conn.execute(
-                """INSERT INTO version_lineage
-                   (assignment_id, user_id, head_hash, total_versions,
-                    avg_similarity, min_similarity, max_similarity,
-                    first_created, last_created)
-                   VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)""",
-                (
-                    assignment_id,
-                    user_id,
-                    head_hash,
-                    similarity or 0.0,
-                    similarity or 1.0,
-                    similarity or 0.0,
-                    now,
-                    now,
-                ),
-            )
+    def _upsert_lineage(conn, assignment_id, user_id, *unused) -> None:
+        """Recompute lineage aggregates from surviving snapshots."""
+        rows = conn.execute(
+            "SELECT * FROM document_snapshots WHERE user_id = ? AND assignment_id = ? "
+            "ORDER BY version_number", (user_id, assignment_id),
+        ).fetchall()
+        if not rows:
+            return
+        similarities = [r["similarity_to_parent"] for r in rows if r["similarity_to_parent"] is not None]
+        conn.execute("DELETE FROM version_lineage WHERE user_id = ? AND assignment_id = ?",
+                     (user_id, assignment_id))
+        conn.execute(
+            "INSERT INTO version_lineage (assignment_id, user_id, head_hash, total_versions, "
+            "avg_similarity, min_similarity, max_similarity, first_created, last_created) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (assignment_id, user_id, rows[-1]["document_hash"], len(rows),
+             sum(similarities) / len(similarities) if similarities else 0.,
+             min(similarities, default=1.), max(similarities, default=0.),
+             rows[0]["created_at"], rows[-1]["created_at"]),
+        )
 
 
 # ---------------------------------------------------------------------------

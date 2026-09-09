@@ -804,7 +804,8 @@ def test_severity_tier_boundary_just_below_high():
 
 def test_severity_tier_boundary_at_high():
     """A score of 0.80 is classified as high."""
-    assert severity_tier(0.80, 0.50) == "high"
+    from src.core.config import DEFAULT_THRESHOLDS
+    assert severity_tier(DEFAULT_THRESHOLDS.high, 0.50) == "high"
 
 
 # sanitize_hex_color edge-case tests (Issue #2352)

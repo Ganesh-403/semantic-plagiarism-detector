@@ -147,8 +147,7 @@ def plot_citation_network(
     fig = go.Figure(
         data=[edge_trace, node_trace],
         layout=go.Layout(
-            title=f"Shared Bibliography Network ({len(shared_citations)} citations)",
-            titlefont=dict(size=16, color=ink_color),
+            title=dict(text=f"Shared Bibliography Network ({len(shared_citations)} citations)", font=dict(size=16, color=ink_color)),
             showlegend=False,
             hovermode="closest",
             margin=dict(b=20, l=5, r=5, t=40),

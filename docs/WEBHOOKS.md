@@ -7,7 +7,7 @@ not yet part of the codebase.
 > **Scope note:** This webhook is **outbound only**. The application sends a
 > POST request to a URL you configure (`PLAGIARISM_WEBHOOK_URL`) — there is no
 > inbound webhook receiver/endpoint in this project. Any future signature
-> support described below refers to *signing the outgoing request* so the
+> support described below refers to _signing the outgoing request_ so the
 > receiving service can verify it originated from this application.
 
 ## Overview
@@ -22,9 +22,9 @@ Streamlit UI is never blocked waiting on the network request.
 
 ## Configuration
 
-| Environment Variable     | Required | Description                                                        |
-|---------------------------|----------|----------------------------------------------------------------------|
-| `PLAGIARISM_WEBHOOK_URL` | Yes      | The destination webhook URL (must be `https://`).                   |
+| Environment Variable     | Required | Description                                                                                                 |
+| ------------------------ | -------- | ----------------------------------------------------------------------------------------------------------- |
+| `PLAGIARISM_WEBHOOK_URL` | Yes      | The destination webhook URL (must be `https://`).                                                           |
 | `APP_BASE_URL`           | No       | Base URL used to build the "review details" link in the alert message. Defaults to `http://localhost:8501`. |
 
 If `PLAGIARISM_WEBHOOK_URL` is not set, webhook dispatch is silently skipped
@@ -103,7 +103,7 @@ happens once against the cached/resolved IP.
   catches any unexpected exception from the send routine so a webhook
   failure can never crash the background thread.
 
-## What Is *Not* Currently Implemented
+## What Is _Not_ Currently Implemented
 
 The following are **not** present in the codebase today. They are listed
 here so this document doesn't imply protections that don't exist:

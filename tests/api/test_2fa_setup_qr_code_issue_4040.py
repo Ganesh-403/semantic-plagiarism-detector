@@ -7,14 +7,21 @@ Unit tests for Issue #4040: Generating TOTP QR code data URI in 2FA setup endpoi
 from __future__ import annotations
 
 import base64
+import pytest
 from fastapi.testclient import TestClient
 
 from src.api.app import app
 from src.api.routers.auth import generate_totp_qr_code_data_uri
 from src.db.auth import get_2fa_status, init_db
 
-init_db()
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def enrolled_accounts(mock_db):
+    from src.db.auth import add_user
+    for name in ("admin_test_4040_cb4dffb6", "admin_legacy_4040_cb4dffb6"):
+        add_user(name, "StrongPassword9!")
 
 
 def test_generate_totp_qr_code_data_uri():
@@ -33,7 +40,7 @@ def test_2fa_setup_endpoint_returns_qr_code_data_uri():
     """Verify POST /api/v1/auth/2fa/setup returns secret, otpauth URL, and base64 PNG QR code data URI."""
     response = client.post(
         "/api/v1/auth/2fa/setup",
-        json={"username": "admin_test_4040_cb4dffb6", "issuer": "TestIssuer"},
+        json={"username": "admin_test_4040_cb4dffb6", "issuer": "TestIssuer", "password": "StrongPassword9!"},  # pragma: allowlist secret
     )
     assert response.status_code == 200
     data = response.json()
@@ -58,7 +65,7 @@ def test_2fa_setup_endpoint_legacy_path():
     """Verify POST /auth/2fa/setup endpoint path also works."""
     response = client.post(
         "/auth/2fa/setup",
-        json={"username": "admin_legacy_4040_cb4dffb6"},
+        json={"username": "admin_legacy_4040_cb4dffb6", "password": "StrongPassword9!"},  # pragma: allowlist secret
     )
     assert response.status_code == 200
     data = response.json()

@@ -30,7 +30,7 @@ import re
 import secrets
 import time
 import urllib.parse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Tuple
 
 import requests
@@ -71,6 +71,7 @@ class SSOUserProfile:
     username: str
     name: str
     avatar: str
+    provider_user_id: str = field(default="", compare=False)
 
 
 def _load_env() -> None:
@@ -83,61 +84,6 @@ def _get_redirect_uri() -> str:
     return os.getenv("APP_BASE_URL", "http://localhost:8501")
 
 
-def verify_sso_state(
-    state: str, stored_state: Dict[str, Any]
-) -> Tuple[bool, Optional[str]]:
-    """
-    Verify that the state token is valid and not expired.
-
-    Args:
-        state: The state parameter received from the OAuth callback
-        stored_state: The stored state data containing token and timestamp
-
-    Returns:
-        tuple[bool, Optional[str]]: (is_valid, error_message)
-    """
-    if not stored_state:
-        return False, "Invalid state parameter"
-
-    # Check if stored_state has the expected structure
-    if not isinstance(stored_state, dict):
-        return False, "Invalid state data format"
-
-    # Get the state token and timestamp
-    stored_token = stored_state.get("token")
-    if not stored_token:
-        return False, "Invalid state data: missing token"
-
-    # Verify the state token matches
-    if state != stored_token:
-        return False, "Invalid state token"
-
-    # Check expiration
-    created_at = stored_state.get("created_at")
-    if not created_at:
-        # If no timestamp, treat as invalid for security
-        return False, "Invalid state data: missing timestamp"
-
-    # Handle both string and integer timestamps
-    if isinstance(created_at, str):
-        try:
-            created_at = float(created_at)
-        except ValueError:
-            return False, "Invalid state timestamp format"
-    elif not isinstance(created_at, (int, float)):
-        return False, "Invalid state timestamp type"
-
-    # Check if state has expired
-    current_time = time.time()
-    elapsed_seconds = current_time - created_at
-
-    if elapsed_seconds > STATE_EXPIRATION_SECONDS:
-        return (
-            False,
-            f"State token expired (elapsed: {elapsed_seconds:.0f}s, max: {STATE_EXPIRATION_SECONDS}s)",
-        )
-
-    return True, None
 
 
 def generate_pkce_pair() -> Tuple[str, str]:
@@ -166,7 +112,7 @@ def get_google_auth_url() -> Tuple[str, str, Dict[str, Any]]:
     _load_env()
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     if not client_id:
-        raise ValueError("GOOGLE_CLIENT_ID environment variable is not configured")
+        raise SSOConfigurationError("GOOGLE_CLIENT_ID environment variable is not configured")
 
     redirect_uri = _get_redirect_uri()
     state = f"google_{secrets.token_urlsafe(16)}"
@@ -284,6 +230,8 @@ def exchange_google_code(code: str, state: str | None = None, code_verifier: str
 
     user_data = user_info_resp.json()
     email = user_data.get("email", "")
+    if not email or user_data.get("verified_email") is not True:
+        return None, "A verified Google email is required."
     raw_username = email.split("@")[0] if email else ""
     username = re.sub(r"[^a-zA-Z0-9_-]", "_", raw_username)
 
@@ -297,7 +245,8 @@ def exchange_google_code(code: str, state: str | None = None, code_verifier: str
         email=email,
         username=username,
         name=user_data.get("name", ""),
-        avatar=avatar_url
+        avatar=avatar_url,
+        provider_user_id=str(user_data.get("id", "")),
     )
     return profile, None
 
@@ -378,7 +327,7 @@ def get_github_auth_url() -> Tuple[str, str, Dict[str, Any]]:
     _load_env()
     client_id = os.getenv("GITHUB_CLIENT_ID")
     if not client_id:
-        raise ValueError("GITHUB_CLIENT_ID environment variable is not configured")
+        raise SSOConfigurationError("GITHUB_CLIENT_ID environment variable is not configured")
 
     redirect_uri = _get_redirect_uri()
     state = f"github_{secrets.token_urlsafe(16)}"
@@ -536,7 +485,8 @@ def exchange_github_code(code: str, state: str | None = None) -> tuple[SSOUserPr
         email=user_data["email"],
         username=user_data.get("login", ""),
         name=user_data.get("name", ""),
-        avatar=avatar_url
+        avatar=avatar_url,
+        provider_user_id=str(user_data.get("id", "")),
     )
     return profile, None
 
@@ -590,7 +540,7 @@ def get_azure_auth_url() -> tuple[str, str]:
     _load_env()
     client_id = os.getenv("AZURE_CLIENT_ID")
     if not client_id:
-        raise ValueError("AZURE_CLIENT_ID environment variable is not configured")
+        raise SSOConfigurationError("AZURE_CLIENT_ID environment variable is not configured")
     tenant_id = os.getenv("AZURE_TENANT_ID", "common")
     redirect_uri = _get_redirect_uri()
     state = f"azure_{secrets.token_urlsafe(16)}"
@@ -627,10 +577,10 @@ def exchange_azure_code(code: str, state: str | None = None) -> tuple[SSOUserPro
     _load_env()
     client_id = os.getenv("AZURE_CLIENT_ID")
     if not client_id:
-        raise ValueError("AZURE_CLIENT_ID environment variable is not configured")
+        raise SSOConfigurationError("AZURE_CLIENT_ID environment variable is not configured")
     client_secret = os.getenv("AZURE_CLIENT_SECRET")
     if not client_secret:
-        raise ValueError("AZURE_CLIENT_SECRET environment variable is not configured")
+        raise SSOConfigurationError("AZURE_CLIENT_SECRET environment variable is not configured")
     tenant_id = os.getenv("AZURE_TENANT_ID", "common")
     redirect_uri = _get_redirect_uri()
 

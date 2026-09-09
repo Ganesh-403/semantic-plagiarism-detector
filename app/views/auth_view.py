@@ -44,17 +44,27 @@ def handle_oauth_callbacks(session_id: str):
             except (SSOConfigurationError, ValueError) as _exc:
                 _user_info, _error_msg = None, f"Configuration Error: {_exc}"
 
-            if _user_info and _user_info.get("email"):
-                _email = _user_info["email"]
+            if _user_info and _user_info.email:
+                _email = _user_info.email
                 if not is_user_active(_email):
                     st.error("🚨 Account suspended. Please contact your administrator.")
                     st.query_params.clear()
                 else:
-                    _role = get_or_create_sso_user(_email)
+                    _role = get_or_create_sso_user(
+                        _email, provider=_state.split("_", 1)[0],
+                        provider_user_id=_user_info.provider_user_id,
+                    )
+                    if get_2fa_status(_email)[0]:
+                        st.session_state[SessionKeys.PENDING_2FA] = True
+                        st.session_state[SessionKeys.PENDING_USERNAME] = _email
+                        st.session_state[SessionKeys.PENDING_ROLE] = _role
+                        st.query_params.clear()
+                        st.rerun()
                     st.session_state[SessionKeys.AUTHENTICATED] = True
                     st.session_state[SessionKeys.USERNAME] = _email
                     st.session_state[SessionKeys.ROLE] = _role
                     st.session_state[SessionKeys.LAST_INTERACTION] = time.time()
+                    st.session_state["authenticated_at"] = time.time()
                     cache_session_state(session_id, SessionKeys.AUTHENTICATED, True)
                     cache_session_state(session_id, SessionKeys.USERNAME, _email)
                     cache_session_state(session_id, SessionKeys.ROLE, _role)
@@ -99,6 +109,7 @@ def render_login_view(session_id: str):
                         st.session_state[SessionKeys.USERNAME] = username
                         st.session_state[SessionKeys.ROLE] = role
                         st.session_state[SessionKeys.LAST_INTERACTION] = time.time()
+                        st.session_state["authenticated_at"] = time.time()
 
                         cache_session_state(session_id, SessionKeys.AUTHENTICATED, True)
                         cache_session_state(session_id, SessionKeys.USERNAME, username)
@@ -131,6 +142,8 @@ def render_login_view(session_id: str):
                 st.rerun()
             st.stop()
 
+    if st.session_state.pop("password_changed_notice", False):
+        st.success("Password changed. Sign in again.")
     st.header("🔑 Login")
     username_input = st.text_input("Username")
     password_input = st.text_input("Password", type="password")
@@ -149,6 +162,7 @@ def render_login_view(session_id: str):
                 st.session_state[SessionKeys.USERNAME] = username_input
                 st.session_state[SessionKeys.ROLE] = role
                 st.session_state[SessionKeys.LAST_INTERACTION] = time.time()
+                st.session_state["authenticated_at"] = time.time()
                 cache_session_state(session_id, SessionKeys.AUTHENTICATED, True)
                 cache_session_state(session_id, SessionKeys.USERNAME, username_input)
                 cache_session_state(session_id, SessionKeys.ROLE, role)
@@ -158,4 +172,6 @@ def render_login_view(session_id: str):
                 st.rerun()
         else:
             st.error("Invalid username or password.")
+    from app.components.password_management import render_password_recovery
+    render_password_recovery()
     st.stop()

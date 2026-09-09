@@ -8,6 +8,7 @@ payloads) to detect concealed cheating or AI prompt injections.
 """
 
 import re
+import io
 import zipfile
 import xml.etree.ElementTree as ET
 import logging
@@ -68,7 +69,7 @@ def extract_hidden_docx_text(file_bytes: bytes) -> List[str]:
     """
     hidden_texts = []
     try:
-        with zipfile.ZipFile(file_bytes) as zf:
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as zf:
             if "word/document.xml" not in zf.namelist():
                 return []
 

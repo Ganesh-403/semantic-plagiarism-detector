@@ -40,8 +40,9 @@ def detect_evasion_patterns(code: str) -> List[str]:
 
     matches = []
     for pattern in EVASION_PATTERNS:
-        if re.search(pattern, code, re.IGNORECASE):
-            matches.append(pattern)
+        match = re.search(pattern, code, re.IGNORECASE)
+        if match:
+            matches.append(match.group(0))
 
     return matches
 

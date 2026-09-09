@@ -14,7 +14,7 @@ def test_translate_text_uses_deepl_when_key_present(monkeypatch):
         res = translate_text("Text translated by DeepL", target_lang="es")
         assert res == "Texto traducido por DeepL"
         mock_deepl.assert_called_once_with(
-            api_key="fake-deepl-key-123",
+            api_key="fake-deepl-key-123",  # pragma: allowlist secret
             source="auto",
             target="es",
         )
@@ -48,7 +48,7 @@ def test_translate_text_batch_uses_deepl_when_key_present(monkeypatch):
         res = translate_text_batch(["One", "Two"], target_lang="es")
         assert res == ["Uno", "Dos"]
         mock_deepl.assert_called_once_with(
-            api_key="fake-deepl-key-123",
+            api_key="fake-deepl-key-123",  # pragma: allowlist secret
             source="auto",
             target="es",
         )

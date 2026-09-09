@@ -1,4 +1,4 @@
-﻿"""tests/api/test_scan_stage_metrics.py
+"""tests/api/test_scan_stage_metrics.py
 --------------------------------------
 Tests for Prometheus histogram tracking scan pipeline stages (parsing, chunking, embedding, matrix comparison).
 Issue #3478.
@@ -53,7 +53,7 @@ def test_process_scan_job_records_all_stages():
     ):
         _process_scan_job(
             job_id=job_id,
-            file_input="fake_file_path",
+            file_input=io.BytesIO(sample_text.encode()),
             filename="sample.txt",
             threshold=0.59,
             top_k=3,

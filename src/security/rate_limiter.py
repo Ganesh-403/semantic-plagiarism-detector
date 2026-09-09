@@ -257,6 +257,19 @@ class TokenBucketRateLimiter:
                 return True
             return False
 
+    def get_status(self, identifier: str) -> dict:
+        """Read a bucket after time-based refill without spending another token."""
+        import math
+        now = time.time()
+        with self._lock:
+            bucket = self._buckets.get(identifier)
+            available = self.capacity if bucket is None else min(self.capacity, bucket["tokens"] + max(0.0, now - bucket["last_refill"]) * self.refill_rate)
+            return {
+                "limit": int(self.capacity),
+                "remaining": max(0, int(available)),
+                "reset_in_seconds": math.ceil((self.capacity - available) / self.refill_rate) if self.refill_rate > 0 else None,
+            }
+
     def reset(self, identifier: Optional[str] = None) -> None:
         """Reset rate limit buckets (or single bucket if identifier is provided)."""
         with self._lock:

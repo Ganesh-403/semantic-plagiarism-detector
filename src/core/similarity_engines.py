@@ -67,9 +67,9 @@ class SemanticSimilarityEngine(BaseSimilarityEngine):
                     return self.embedding_model.encode(doc)
 
             # Lazy load fallback model to avoid circular import issues
-            from src.core.embedding_model import get_document_embedding
+            from src.core.embedding_model import embed_chunks
 
-            return get_document_embedding(doc)
+            return embed_chunks([doc])
 
         raise TypeError("Document must be a string or a numpy array of embeddings.")
 

@@ -1,4 +1,7 @@
 from pathlib import Path
+import pytest
+import json
+from src.errors import EmptyDocumentError
 
 from fastapi.testclient import TestClient
 
@@ -8,7 +11,18 @@ from src.core.document_parser import extract_text
 
 client = TestClient(app)
 
-FIXTURES_DIR = Path(__file__).parent / "fixtures"
+FIXTURES_DIR = Path(__file__).parents[1] / "fixtures"
+
+
+@pytest.fixture(autouse=True)
+def isolated_api(monkeypatch, mock_db, mock_embed_chunks):
+    from src.api.middleware import get_valid_tokens
+    monkeypatch.setenv("API_BEARER_TOKENS_MAPPING", json.dumps({"pdf-fixture-token": ["write", "scan"]}))
+    get_valid_tokens.cache_clear()
+    monkeypatch.setattr("src.api.routers.analysis.embed_chunks", mock_embed_chunks)
+    monkeypatch.setattr("src.api.routers.analysis.get_corpus_documents_with_embeddings", lambda: {})
+    yield
+    get_valid_tokens.cache_clear()
 
 
 def test_clean_pdf_extraction():
@@ -26,9 +40,8 @@ def test_encrypted_pdf_extraction():
     encrypted_pdf_path = FIXTURES_DIR / "encrypted.pdf"
     assert encrypted_pdf_path.exists(), "encrypted.pdf fixture is missing"
 
-    text = extract_text(encrypted_pdf_path.read_bytes(), "encrypted.pdf")
-    # Current behavior catches PyMuPDF errors and returns empty string
-    assert text == ""
+    with pytest.raises(EmptyDocumentError):
+        extract_text(encrypted_pdf_path.read_bytes(), "encrypted.pdf")
 
 
 def test_scanned_pdf_extraction():
@@ -55,7 +68,7 @@ def test_scanned_pdf_extraction():
 def test_api_upload_clean_pdf():
     """Verify that the API processes the clean PDF correctly."""
     clean_pdf_path = FIXTURES_DIR / "clean.pdf"
-    expected_token = get_expected_bearer_token()
+    expected_token = "pdf-fixture-token"
 
     with open(clean_pdf_path, "rb") as f:
         response = client.post(
@@ -74,7 +87,7 @@ def test_api_upload_clean_pdf():
 def test_api_upload_encrypted_pdf():
     """Verify that the API handles encrypted PDFs properly."""
     encrypted_pdf_path = FIXTURES_DIR / "encrypted.pdf"
-    expected_token = get_expected_bearer_token()
+    expected_token = "pdf-fixture-token"
 
     with open(encrypted_pdf_path, "rb") as f:
         response = client.post(

@@ -42,10 +42,10 @@ def test_ocr_pdf_page_cleans_up_temp_dir_on_success():
     )
     mock_pytesseract.image_to_string = mock_image_to_string
 
-    with patch.dict(
+    with patch("src.utils.pdf_backend", mock_fitz), patch.dict(
         "sys.modules",
         {
-            "fitz": mock_fitz,
+            "src.utils.pdf_backend": mock_fitz,
             "pytesseract": mock_pytesseract,
             "PIL": MagicMock(),
             "PIL.Image": MagicMock(),
@@ -95,10 +95,10 @@ def test_ocr_pdf_page_cleans_up_temp_dir_on_tesseract_crash():
     )
     mock_pytesseract.image_to_string = crashing_image_to_string
 
-    with patch.dict(
+    with patch("src.utils.pdf_backend", mock_fitz), patch.dict(
         "sys.modules",
         {
-            "fitz": mock_fitz,
+            "src.utils.pdf_backend": mock_fitz,
             "pytesseract": mock_pytesseract,
             "PIL": MagicMock(),
             "PIL.Image": MagicMock(),

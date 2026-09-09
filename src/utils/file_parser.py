@@ -16,7 +16,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from typing import Any, List, Optional, Tuple, Union
 
-import fitz
+from src.utils import pdf_backend as fitz
 logger = logging.getLogger(__name__)
 
 
@@ -348,8 +348,6 @@ def extract_text_from_pdf(
         EncryptedPDFError: If the PDF is encrypted and no password (or an incorrect password) is provided.
         ValueError: If the PDF exceeds the configured page limit.
     """
-    validate_pdf_page_count(file_bytes)
-
     doc = fitz.open(stream=file_bytes, filetype="pdf")
 
     try:
@@ -363,6 +361,9 @@ def extract_text_from_pdf(
             auth_success = doc.authenticate(password)
             if not auth_success:
                 raise EncryptedPDFError("Incorrect password for PDF.")
+
+        if doc.page_count > 500:
+            raise ValueError("PDF exceeds maximum allowed page limit (500 pages)")
 
         text_content = []
         for page in doc:

@@ -4,6 +4,7 @@ Unit tests for the Similarity Heatmap & Clustering API endpoints.
 Tests cover snapshot CRUD, clustering, hotspot management, and analytics.
 """
 
+import numpy as np
 import pytest
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
@@ -28,14 +29,18 @@ def _mock_auth(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _fresh_db(tmp_path, monkeypatch):
+def _fresh_db(tmp_path, monkeypatch, mock_db):
     """Point the DB at a fresh temp file for each test."""
     db_path = str(tmp_path / "heatmap_test.db")
     monkeypatch.setattr(
         "src.db.heatmap_db.get_heatmap_db_path",
         lambda: db_path,
     )
+    monkeypatch.setattr("src.db.heatmap_db.heatmap_repo._db_path", tmp_path / "heatmap_test.db")
     init_heatmap_db()
+    yield
+    from src.db.heatmap_db import close_connections
+    close_connections(all_threads=True)
 
 
 # ---------------------------------------------------------------------------
@@ -53,13 +58,13 @@ class TestSnapshotCRUD:
     """Tests for heatmap snapshot creation, listing, and retrieval."""
 
     def test_create_snapshot_empty_corpus(self):
-        """Creating a snapshot with no documents should still succeed."""
+        """Creating a snapshot requires two documents with embeddings."""
         resp = client.post(
-            "/api/v1/heatmap/snapshots",
+            "/api/v1/heatmap/compute",
             headers=HEADERS,
             json={"notes": "Empty corpus test"},
         )
-        assert resp.status_code in (200, 201, 404)
+        assert resp.status_code == 400
 
     def test_list_snapshots_empty(self):
         """Listing snapshots on a fresh DB should return empty list."""
@@ -85,7 +90,7 @@ class TestSnapshotCRUD:
             "/api/v1/heatmap/snapshots/999999",
             headers=HEADERS,
         )
-        assert resp.status_code in (404, 422)
+        assert resp.status_code == 404
 
     def test_delete_snapshot_not_found(self):
         """Deleting a non-existent snapshot should return 404."""
@@ -93,7 +98,7 @@ class TestSnapshotCRUD:
             "/api/v1/heatmap/snapshots/999999",
             headers=HEADERS,
         )
-        assert resp.status_code in (404, 422)
+        assert resp.status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +115,7 @@ class TestClustering:
             headers=HEADERS,
             json={"linkage_method": "average", "distance_threshold": 0.5},
         )
-        assert resp.status_code in (200, 404)
+        assert resp.status_code == 400
 
     def test_cluster_default_params(self):
         """Clustering with default parameters should be accepted."""
@@ -119,12 +124,12 @@ class TestClustering:
             headers=HEADERS,
             json={},
         )
-        assert resp.status_code in (200, 404)
+        assert resp.status_code == 400
 
     def test_list_clustering_results(self):
         """Listing clustering results on empty DB should return empty."""
         resp = client.get(
-            "/api/v1/heatmap/cluster",
+            "/api/v1/heatmap/clusters",
             headers=HEADERS,
         )
         assert resp.status_code == 200
@@ -135,7 +140,7 @@ class TestClustering:
             "/api/v1/heatmap/cluster/999999",
             headers=HEADERS,
         )
-        assert resp.status_code in (404, 422)
+        assert resp.status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -167,7 +172,7 @@ class TestHotspots:
             "/api/v1/heatmap/hotspots/999999/resolve",
             headers=HEADERS,
         )
-        assert resp.status_code in (404, 422)
+        assert resp.status_code == 404
 
     def test_list_hotspots_with_filter(self):
         """Filtering hotspots by severity should be accepted."""
@@ -183,31 +188,30 @@ class TestHotspots:
 # ---------------------------------------------------------------------------
 
 class TestAnalytics:
-    """Tests for heatmap analytics endpoints."""
+    """Stored hotspots expose summary counts and filtered document pairs."""
 
     def test_analytics_summary(self):
-        """Analytics summary on empty DB should return zeroed stats."""
-        resp = client.get(
-            "/api/v1/heatmap/analytics/summary",
-            headers=HEADERS,
-        )
+        resp = client.get("/api/v1/heatmap/hotspots/summary", headers=HEADERS)
         assert resp.status_code == 200
+        assert resp.json()["total_hotspots"] == 0
 
     def test_analytics_similarity_distribution(self):
-        """Similarity distribution should be accepted."""
-        resp = client.get(
-            "/api/v1/heatmap/analytics/distribution",
-            headers=HEADERS,
-        )
+        repo = HeatmapRepository()
+        repo.save_hotspot(None, "a.txt", "b.txt", 0.95, "critical")
+        repo.save_hotspot(None, "a.txt", "c.txt", 0.72, "warning")
+        resp = client.get("/api/v1/heatmap/hotspots?min_similarity=0.9", headers=HEADERS)
         assert resp.status_code == 200
+        assert resp.json()["total"] == 1
+        assert resp.json()["hotspots"][0]["similarity"] == 0.95
 
     def test_analytics_top_pairs(self):
-        """Top pairs endpoint should be accepted."""
-        resp = client.get(
-            "/api/v1/heatmap/analytics/top-pairs?limit=5",
-            headers=HEADERS,
-        )
+        repo = HeatmapRepository()
+        repo.save_hotspot(None, "a.txt", "b.txt", 0.95, "critical")
+        repo.save_hotspot(None, "a.txt", "c.txt", 0.72, "warning")
+        resp = client.get("/api/v1/heatmap/hotspots?limit=1", headers=HEADERS)
         assert resp.status_code == 200
+        assert resp.json()["total"] == 1
+        assert resp.json()["hotspots"][0]["similarity"] == 0.95
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +237,7 @@ class TestAuth:
     def test_create_snapshot_no_auth(self):
         """POST without auth should be rejected."""
         resp = client.post(
-            "/api/v1/heatmap/snapshots",
+            "/api/v1/heatmap/compute",
             json={},
         )
         assert resp.status_code in (401, 403)
@@ -248,8 +252,8 @@ class TestSimilarityEngine:
 
     def test_import(self):
         """Module should be importable."""
-        from src.core.similarity_heatmap import SimilarityEngine
-        assert SimilarityEngine is not None
+        from src.core import similarity_heatmap as engine
+        assert callable(engine.compute_heatmap)
 
     def test_heatmap_matrix_dataclass(self):
         """HeatmapMatrix dataclass should instantiate correctly."""
@@ -261,6 +265,7 @@ class TestSimilarityEngine:
             max_similarity=1.0,
             mean_similarity=0.75,
             document_count=2,
+            computed_at="2026-09-09T00:00:00+00:00",
         )
         assert m.document_count == 2
         assert m.min_similarity == 0.5
@@ -278,9 +283,9 @@ class TestSimilarityEngine:
         assert c.similarity == 0.85
 
     def test_cluster_info_dataclass(self):
-        """ClusterInfo dataclass should instantiate correctly."""
-        from src.core.similarity_heatmap import ClusterInfo
-        ci = ClusterInfo(
+        """Cluster dataclass should instantiate correctly."""
+        from src.core.similarity_heatmap import Cluster
+        ci = Cluster(
             cluster_id=1,
             documents=["a.pdf", "b.pdf"],
             centroid_score=0.9,
@@ -290,78 +295,70 @@ class TestSimilarityEngine:
 
     def test_empty_similarity_matrix(self):
         """Engine should handle empty document lists."""
-        from src.core.similarity_heatmap import SimilarityEngine
-        engine = SimilarityEngine()
-        result = engine.compute_similarity_matrix([])
+        from src.core import similarity_heatmap as engine
+        result = engine.compute_heatmap([], np.eye(len([])))
         assert result.document_count == 0
 
     def test_single_document_matrix(self):
         """Engine should handle single-document input."""
-        from src.core.similarity_heatmap import SimilarityEngine
-        engine = SimilarityEngine()
-        result = engine.compute_similarity_matrix(["doc1"])
+        from src.core import similarity_heatmap as engine
+        result = engine.compute_heatmap(["doc1"], np.eye(len(["doc1"])))
         assert result.document_count == 1
         assert result.max_similarity == 1.0  # self-similarity
 
     def test_two_document_matrix(self):
         """Engine should produce a 2x2 matrix for two documents."""
-        from src.core.similarity_heatmap import SimilarityEngine
-        engine = SimilarityEngine()
-        result = engine.compute_similarity_matrix(["doc1", "doc2"])
+        from src.core import similarity_heatmap as engine
+        result = engine.compute_heatmap(["doc1", "doc2"], np.eye(len(["doc1", "doc2"])))
         assert result.document_count == 2
         assert len(result.matrix) == 2
         assert len(result.matrix[0]) == 2
 
     def test_cluster_empty(self):
         """Clustering empty input should return zero clusters."""
-        from src.core.similarity_heatmap import SimilarityEngine
-        engine = SimilarityEngine()
-        result = engine.cluster_documents([])
+        from src.core import similarity_heatmap as engine
+        result = engine.cluster_documents([], np.eye(len([])))
         assert result.num_clusters == 0
 
     def test_cluster_single_doc(self):
         """Clustering one document should produce one cluster."""
-        from src.core.similarity_heatmap import SimilarityEngine
-        engine = SimilarityEngine()
-        result = engine.cluster_documents(["doc1"])
+        from src.core import similarity_heatmap as engine
+        result = engine.cluster_documents(["doc1"], np.eye(len(["doc1"])))
         assert result.num_clusters == 1
 
     def test_hotspot_detection_empty(self):
         """Hotspot detection on empty matrix should return empty list."""
-        from src.core.similarity_heatmap import SimilarityEngine
-        engine = SimilarityEngine()
-        hotspots = engine.detect_hotspots([], threshold=0.8)
+        from src.core import similarity_heatmap as engine
+        hotspots = engine.detect_similarity_hotspots([], np.empty((0, 0)), threshold=0.8)
         assert hotspots == []
 
     def test_hotspot_detection_below_threshold(self):
         """Pairs below threshold should not be flagged as hotspots."""
-        from src.core.similarity_heatmap import SimilarityEngine
-        engine = SimilarityEngine()
+        from src.core import similarity_heatmap as engine
         matrix = [[1.0, 0.3], [0.3, 1.0]]
         labels = ["a", "b"]
-        hotspots = engine.detect_hotspots(
-            labels, matrix=matrix, threshold=0.8
+        hotspots = engine.detect_similarity_hotspots(
+            labels, np.array(matrix), threshold=0.8
         )
         assert len(hotspots) == 0
 
     def test_hotspot_detection_above_threshold(self):
         """Pairs above threshold should be flagged as hotspots."""
-        from src.core.similarity_heatmap import SimilarityEngine
-        engine = SimilarityEngine()
+        from src.core import similarity_heatmap as engine
         matrix = [[1.0, 0.95], [0.95, 1.0]]
         labels = ["a", "b"]
-        hotspots = engine.detect_hotspots(
-            labels, matrix=matrix, threshold=0.8
+        hotspots = engine.detect_similarity_hotspots(
+            labels, np.array(matrix), threshold=0.8
         )
         assert len(hotspots) == 1
 
     def test_silhouette_score_range(self):
         """Silhouette score should be between -1 and 1."""
-        from src.core.similarity_heatmap import SimilarityEngine
-        engine = SimilarityEngine()
+        from src.core import similarity_heatmap as engine
         result = engine.cluster_documents(
             ["doc1", "doc2", "doc3", "doc4"],
-            num_clusters=2,
+            np.array([[1., 0.], [0.99, 0.1], [0., 1.], [0.1, 0.99]]),
+            distance_threshold=0.5,
         )
         assert -1.0 <= result.silhouette_score <= 1.0
 
@@ -376,13 +373,12 @@ class TestHeatmapDB:
     def test_create_snapshot(self):
         """Should create and return a snapshot record."""
         repo = HeatmapRepository()
-        snap_id = repo.create_snapshot(
+        snap_id = repo.save_snapshot(
             labels=["a", "b"],
             matrix=[[1.0, 0.5], [0.5, 1.0]],
-            document_count=2,
-            min_sim=0.5,
-            max_sim=1.0,
-            mean_sim=0.75,
+            min_similarity=0.5,
+            max_similarity=1.0,
+            mean_similarity=0.75,
         )
         assert snap_id is not None
         assert snap_id > 0
@@ -390,24 +386,24 @@ class TestHeatmapDB:
     def test_list_snapshots(self):
         """Should list snapshots in reverse chronological order."""
         repo = HeatmapRepository()
-        repo.create_snapshot(
-            labels=["a"], matrix=[[1.0]], document_count=1,
-            min_sim=1.0, max_sim=1.0, mean_sim=1.0,
+        repo.save_snapshot(
+            labels=["a"], matrix=[[1.0]],
+            min_similarity=1.0, max_similarity=1.0, mean_similarity=1.0,
         )
-        repo.create_snapshot(
-            labels=["b"], matrix=[[1.0]], document_count=1,
-            min_sim=1.0, max_sim=1.0, mean_sim=1.0,
+        repo.save_snapshot(
+            labels=["b"], matrix=[[1.0]],
+            min_similarity=1.0, max_similarity=1.0, mean_similarity=1.0,
         )
-        snaps = repo.list_snapshots(page=1, per_page=10)
-        assert len(snaps["items"]) == 2
-        assert snaps["total"] == 2
+        snaps = repo.list_snapshots(limit=10, offset=0)
+        assert len(snaps) == 2
+        assert repo.count_snapshots() == 2
 
     def test_get_snapshot(self):
         """Should retrieve a snapshot by ID."""
         repo = HeatmapRepository()
-        snap_id = repo.create_snapshot(
-            labels=["x"], matrix=[[1.0]], document_count=1,
-            min_sim=1.0, max_sim=1.0, mean_sim=1.0,
+        snap_id = repo.save_snapshot(
+            labels=["x"], matrix=[[1.0]],
+            min_similarity=1.0, max_similarity=1.0, mean_similarity=1.0,
         )
         snap = repo.get_snapshot(snap_id)
         assert snap is not None
@@ -416,9 +412,9 @@ class TestHeatmapDB:
     def test_delete_snapshot(self):
         """Should delete a snapshot by ID."""
         repo = HeatmapRepository()
-        snap_id = repo.create_snapshot(
-            labels=["y"], matrix=[[1.0]], document_count=1,
-            min_sim=1.0, max_sim=1.0, mean_sim=1.0,
+        snap_id = repo.save_snapshot(
+            labels=["y"], matrix=[[1.0]],
+            min_similarity=1.0, max_similarity=1.0, mean_similarity=1.0,
         )
         deleted = repo.delete_snapshot(snap_id)
         assert deleted is True
@@ -427,7 +423,7 @@ class TestHeatmapDB:
     def test_create_hotspot(self):
         """Should create a hotspot record."""
         repo = HeatmapRepository()
-        h_id = repo.create_hotspot(
+        h_id = repo.save_hotspot(None,
             doc_a="file1.pdf",
             doc_b="file2.pdf",
             similarity=0.92,
@@ -439,33 +435,33 @@ class TestHeatmapDB:
     def test_list_hotspots(self):
         """Should list hotspots with optional severity filter."""
         repo = HeatmapRepository()
-        repo.create_hotspot("a.pdf", "b.pdf", 0.9, "critical")
-        repo.create_hotspot("c.pdf", "d.pdf", 0.7, "warning")
-        all_hotspots = repo.list_hotspots()
-        assert len(all_hotspots["items"]) >= 2
-        critical = repo.list_hotspots(severity="critical")
-        assert all(h["severity"] == "critical" for h in critical["items"])
+        repo.save_hotspot(None, "a.pdf", "b.pdf", 0.9, "critical")
+        repo.save_hotspot(None, "c.pdf", "d.pdf", 0.7, "warning")
+        all_hotspots = repo.get_hotspots()
+        assert len(all_hotspots) >= 2
+        critical = repo.get_hotspots(min_similarity=0.9)
+        assert all(h["severity"] == "critical" for h in critical)
 
     def test_resolve_hotspot(self):
         """Should mark a hotspot as resolved."""
         repo = HeatmapRepository()
-        h_id = repo.create_hotspot("a.pdf", "b.pdf", 0.85, "warning")
+        h_id = repo.save_hotspot(None, "a.pdf", "b.pdf", 0.85, "warning")
         resolved = repo.resolve_hotspot(h_id)
         assert resolved is True
 
     def test_hotspot_summary(self):
         """Should return correct hotspot summary counts."""
         repo = HeatmapRepository()
-        repo.create_hotspot("a.pdf", "b.pdf", 0.95, "critical")
-        repo.create_hotspot("c.pdf", "d.pdf", 0.7, "warning")
-        summary = repo.hotspot_summary()
+        repo.save_hotspot(None, "a.pdf", "b.pdf", 0.95, "critical")
+        repo.save_hotspot(None, "c.pdf", "d.pdf", 0.7, "warning")
+        summary = repo.get_hotspot_summary()
         assert summary["total_hotspots"] >= 2
         assert summary["unresolved"] >= 2
 
     def test_create_clustering_result(self):
         """Should create and store clustering results."""
         repo = HeatmapRepository()
-        r_id = repo.create_clustering_result(
+        r_id = repo.save_clustering(snapshot_id=None,
             num_clusters=3,
             silhouette_score=0.45,
             linkage_method="average",
@@ -479,36 +475,56 @@ class TestHeatmapDB:
     def test_list_clustering_results(self):
         """Should list clustering results."""
         repo = HeatmapRepository()
-        repo.create_clustering_result(
+        repo.save_clustering(snapshot_id=None,
             num_clusters=2, silhouette_score=0.3,
             linkage_method="complete", distance_threshold=0.6,
             clusters=[], assignments={},
         )
-        results = repo.list_clustering_results(page=1, per_page=10)
-        assert results["total"] >= 1
+        results = repo.list_clusterings(limit=10, offset=0)
+        assert len(results) >= 1
 
     def test_get_clustering_result(self):
         """Should retrieve clustering result by ID."""
         repo = HeatmapRepository()
-        r_id = repo.create_clustering_result(
+        r_id = repo.save_clustering(snapshot_id=None,
             num_clusters=2, silhouette_score=0.5,
             linkage_method="average", distance_threshold=0.4,
             clusters=[{"id": 0, "docs": ["a.pdf"], "score": 0.9, "size": 1}],
             assignments={"a.pdf": 0},
         )
-        result = repo.get_clustering_result(r_id)
+        result = repo.get_clustering(r_id)
         assert result is not None
         assert result["num_clusters"] == 2
 
     def test_analytics_summary(self):
         """Should return analytics summary from stored data."""
         repo = HeatmapRepository()
-        repo.create_snapshot(
+        repo.save_snapshot(
             labels=["a", "b"],
             matrix=[[1.0, 0.6], [0.6, 1.0]],
-            document_count=2,
-            min_sim=0.6, max_sim=1.0, mean_sim=0.8,
+            min_similarity=0.6, max_similarity=1.0, mean_similarity=0.8,
         )
-        summary = repo.analytics_summary()
-        assert "total_snapshots" in summary
-        assert summary["total_snapshots"] >= 1
+        assert repo.count_snapshots() == 1
+
+
+def test_document_heatmap_averages_chunks_and_preserves_labels(monkeypatch):
+    from types import SimpleNamespace
+    monkeypatch.setattr("src.db.corpus_db.get_all_documents", lambda: [
+        SimpleNamespace(filename=name) for name in ["b", "empty", "a"]
+    ])
+    monkeypatch.setattr("src.db.corpus_db.get_chunks_for_documents", lambda names: {
+        "a": (["a1"], np.array([[0., 1.]])),
+        "b": (["b1", "b2"], np.array([[1., 0.], [0., 1.]])),
+    })
+    resp = client.post("/api/v1/heatmap/compute", headers=HEADERS)
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["document_count"] == 2
+    snapshot = client.get(
+        f"/api/v1/heatmap/snapshots/{resp.json()['snapshot_id']}", headers=HEADERS,
+    )
+    assert snapshot.status_code == 200, snapshot.text
+    assert snapshot.json()["labels"] == ["b", "a"]
+    assert snapshot.json()["matrix"][0][1] == pytest.approx(2 ** -0.5, abs=0.00005)
+    clustered = client.post("/api/v1/heatmap/cluster", headers=HEADERS)
+    assert clustered.status_code == 201, clustered.text
+    assert set(clustered.json()["document_assignments"]) == {"a", "b"}

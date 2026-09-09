@@ -442,7 +442,7 @@ def sync_flagged_incidents(
 
 def get_all_incidents(
     db_path: str | Path | None = None,
-    limit: int = 100,
+    limit: int = 50,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
     if db_path is None:

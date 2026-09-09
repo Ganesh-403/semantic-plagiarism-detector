@@ -22,8 +22,8 @@ def test_query_generator_basic():
     
     assert len(queries) == 2
     # Ensure they are sorted by length (descending)
-    assert "Another very long" in queries[0].query_text
-    assert "Artificial intelligence" in queries[1].query_text
+    assert "another very long" in queries[0].query_text
+    assert "artificial intelligence" in queries[1].query_text
     
 def test_query_generator_empty():
     generator = QueryGenerator()
@@ -76,7 +76,7 @@ async def test_async_fetcher_success():
         mock_response.status = 200
         mock_response.text.return_value = "<html><body>Useful text content</body></html>"
         
-        mock_session = AsyncMock()
+        mock_session = MagicMock()
         # Ensure session.get returns an async context manager
         mock_session.get.return_value.__aenter__.return_value = mock_response
         
@@ -92,7 +92,7 @@ async def test_async_fetcher_blocked_by_robots():
     with patch.object(fetcher, '_can_fetch', new_callable=AsyncMock) as mock_can_fetch:
         mock_can_fetch.return_value = False
         
-        mock_session = AsyncMock()
+        mock_session = MagicMock()
         result = await fetcher.fetch_url(mock_session, "http://example.com/blocked")
         
         assert result.is_valid is False
@@ -117,7 +117,7 @@ def test_transient_index_build(mock_faiss, mock_embed):
     index = TransientInternetIndex(config)
     
     sources = [
-        FetchedSource(url="http://example.com", title="Test", content="Some valid long text content.", fetch_duration_ms=10.0, is_valid=True)
+        FetchedSource(url="http://example.com", title="Test", content="Some valid long text content. " * 15, fetch_duration_ms=10.0, is_valid=True)
     ]
     
     index.build_index(sources)

@@ -449,15 +449,18 @@ def render_enhanced_analytics_tab(
     tab1, tab2, tab3 = st.tabs(["📈 Trends", "🔥 Activity", "🔍 Patterns"])
 
     with tab1:
-        render_similarity_trend_chart(history_data)
+        if st.checkbox("Show trends", key="load_analytics_trends"):
+            render_similarity_trend_chart(history_data)
 
     with tab2:
-        render_document_activity_heatmap(history_data)
+        if st.checkbox("Show activity", key="load_analytics_activity"):
+            render_document_activity_heatmap(history_data)
 
     with tab3:
         col1, col2 = st.columns(2)
         with col1:
-            render_collusion_ring_dashboard(sim_matrix)
+            if st.checkbox("Show collusion patterns", key="load_analytics_patterns"):
+                render_collusion_ring_dashboard(sim_matrix)
         with col2:
             render_processing_time_breakdown(timings)
 

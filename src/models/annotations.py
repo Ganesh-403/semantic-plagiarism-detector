@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime
 from enum import Enum
 from typing import Optional, List, Any
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class AnnotationType(str, Enum):
@@ -83,16 +83,14 @@ class AnnotationCreate(BaseModel):
     highlight: Optional[HighlightData] = None
     comment: Optional[CommentData] = None
 
-    @field_validator("highlight", "comment", mode="before")
-    @classmethod
-    def validate_payload_presence(cls, v: Any, info: Any) -> Any:
-        """Ensure the appropriate payload is present for the annotation type."""
-        ann_type = info.data.get("type")
-        if ann_type == AnnotationType.HIGHLIGHT and not info.data.get("highlight"):
+    @model_validator(mode="after")
+    def validate_payload_presence(self):
+        """Validate the completed payload, including omitted optional fields."""
+        if self.type == AnnotationType.HIGHLIGHT and self.highlight is None:
             raise ValueError("Highlight data is required for HIGHLIGHT annotations.")
-        if ann_type == AnnotationType.COMMENT and not info.data.get("comment"):
+        if self.type == AnnotationType.COMMENT and self.comment is None:
             raise ValueError("Comment data is required for COMMENT annotations.")
-        return v
+        return self
 
 
 class AnnotationRecord(AnnotationCreate):

@@ -24,9 +24,9 @@ class TestWalModeHelpers:
     """Test suite for WAL mode optimization helpers."""
 
     @pytest.fixture
-    def in_memory_db(self):
-        """Provide a clean in-memory SQLite database for each test."""
-        conn = sqlite3.connect(":memory:")
+    def in_memory_db(self, tmp_path):
+        """Use a file-backed database: SQLite cannot enable WAL in memory."""
+        conn = sqlite3.connect(tmp_path / "wal.db")
         yield conn
         conn.close()
 
@@ -50,10 +50,9 @@ class TestWalModeHelpers:
 
     def test_enable_wal_mode_handles_error(self, in_memory_db):
         """Test that enable_wal_mode raises sqlite3.Error on failure."""
-        with patch.object(in_memory_db, "cursor") as mock_cursor:
-            mock_cursor.return_value.execute.side_effect = sqlite3.Error("DB locked")
-            with pytest.raises(sqlite3.Error):
-                enable_wal_mode(in_memory_db)
+        in_memory_db.close()
+        with pytest.raises(sqlite3.Error):
+            enable_wal_mode(in_memory_db)
 
     def test_get_journal_mode_returns_current_mode(self, in_memory_db):
         """Test that get_journal_mode returns the correct current mode."""
@@ -63,9 +62,8 @@ class TestWalModeHelpers:
 
     def test_get_journal_mode_handles_error(self, in_memory_db):
         """Test that get_journal_mode returns 'unknown' on error."""
-        with patch.object(in_memory_db, "cursor") as mock_cursor:
-            mock_cursor.return_value.execute.side_effect = sqlite3.Error("DB error")
-            assert get_journal_mode(in_memory_db) == "unknown"
+        in_memory_db.close()
+        assert get_journal_mode(in_memory_db) == "unknown"
 
     @pytest.mark.parametrize("mode", ["PASSIVE", "FULL", "RESTART", "TRUNCATE"])
     def test_perform_wal_checkpoint_valid_modes(self, in_memory_db, mode):

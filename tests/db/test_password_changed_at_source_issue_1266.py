@@ -11,7 +11,8 @@ def test_migration_adds_required_column():
     assert "AUTH_SCHEMA_VERSION =" in source
     assert "def migration_010_add_password_changed_at(" in source
     assert "ADD COLUMN password_changed_at TEXT" in source
-    assert "10: migration_010_add_password_changed_at" in source
+    from src.db.migrations.auth import AUTH_MIGRATIONS, migration_010_add_password_changed_at
+    assert AUTH_MIGRATIONS[10] is migration_010_add_password_changed_at
 
 
 def test_password_update_writes_timestamp_atomically():

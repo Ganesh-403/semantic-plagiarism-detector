@@ -182,7 +182,7 @@ class TestExportWatchlistMarkdown:
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "watchlist.md")
             export_watchlist_markdown([], [], summary, path, title="My Report")
-            with open(result_path if 'result_path' in dir() else path) as f:
+            with open(path, encoding="utf-8") as f:
                 content = f.read()
             assert "My Report" in content
 

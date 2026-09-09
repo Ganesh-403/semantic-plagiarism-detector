@@ -8,35 +8,8 @@ import pytest
 import hashlib
 
 
-# ==============================================================================
-# SECTION 1: Defining the Function Under Test
-# ==============================================================================
+from src.utils.filename import normalize_sha256_hash
 
-def normalize_sha256_hash(hash_value: str) -> str:
-    """
-    Normalizes a SHA256 hash to lowercase.
-    Raises ValueError if the hash is not a valid 64-character hex string.
-    """
-    if not isinstance(hash_value, str):
-        raise ValueError("Hash must be a string")
-    
-    # Must be exactly 64 characters
-    if len(hash_value) != 64:
-        raise ValueError("Hash must be exactly 64 characters")
-    
-    # Must be valid hex characters (0-9, a-f, A-F)
-    try:
-        bytes.fromhex(hash_value)
-    except ValueError:
-        raise ValueError("Hash contains invalid hex characters")
-    
-    # Normalize to lowercase
-    return hash_value.lower()
-
-
-# ==============================================================================
-# SECTION 2: Testing Valid Hashes
-# ==============================================================================
 
 class TestValidHashes:
     def test_lowercase_hash(self):
@@ -51,7 +24,7 @@ class TestValidHashes:
 
     def test_mixed_case_hash(self):
         """Should convert mixed-case to lowercase."""
-        hash_val = "aBcDeF" * 10 + "AbCdEf"  # 64 chars total
+        hash_val = "aBcDeF" * 10 + "AbCd"  # 64 chars total
         expected = hash_val.lower()
         assert normalize_sha256_hash(hash_val) == expected
 

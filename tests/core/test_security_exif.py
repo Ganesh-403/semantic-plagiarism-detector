@@ -1,6 +1,6 @@
 import io
 
-import fitz
+from src.utils import pdf_backend as fitz
 from PIL import Image
 
 from src.security.metadata_stripper import strip_exif_metadata

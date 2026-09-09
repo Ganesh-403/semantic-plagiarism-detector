@@ -60,7 +60,7 @@ def _hash_shingles(shingles: set[str], num_hashes: int, seed: int = 42) -> np.nd
         h = int(hashlib.sha1(shingle.encode("utf-8")).hexdigest()[:8], 16)  # nosec
 
         # Apply all hash functions
-        hashes = (a * h + b) % _MERSENNE_PRIME
+        hashes = ((a * h + b) % _MERSENNE_PRIME) & _MAX_HASH
 
         # Update signature with minimums
         signature = np.minimum(signature, hashes)

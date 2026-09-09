@@ -5,6 +5,10 @@ Comprehensive test suite covering language detection, embedding,
 cross-language comparison, and result generation.
 """
 
+import hashlib
+from unittest.mock import Mock
+
+import pytest
 import numpy as np
 
 from src.core.cross_lingual_detector import (
@@ -14,6 +18,32 @@ from src.core.cross_lingual_detector import (
     CrossLingualResult,
     LanguageMatch,
 )
+
+
+@pytest.fixture(autouse=True)
+def embedding_provider(monkeypatch):
+    def encode(text, **kwargs):
+        vector = np.frombuffer(hashlib.sha256(text.encode()).digest(), dtype=np.uint8).astype(np.float32)
+        return vector / np.linalg.norm(vector)
+    model = Mock()
+    model.encode.side_effect = encode
+    monkeypatch.setattr(CrossLingualDetector, "_get_model", lambda self: model)
+    return model
+
+
+def test_invalid_model_output_is_rejected(embedding_provider):
+    embedding_provider.encode.return_value = [float("nan")]
+    embedding_provider.encode.side_effect = None
+    with pytest.raises(ValueError, match="invalid vector"):
+        CrossLingualDetector().embed_text("A document")
+
+
+def test_model_load_failure_does_not_fabricate_scores(monkeypatch):
+    def fail(self):
+        raise RuntimeError("Model unavailable")
+    monkeypatch.setattr(CrossLingualDetector, "_get_model", fail)
+    with pytest.raises(RuntimeError, match="unavailable"):
+        CrossLingualDetector().embed_text("A document")
 
 
 class TestLanguageDetection:

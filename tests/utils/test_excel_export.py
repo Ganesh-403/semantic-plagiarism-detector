@@ -188,7 +188,7 @@ def test_export_similarity_matrix_to_excel_with_nan():
     # Load back and verify NaN cell is "-"
     wb = openpyxl.load_workbook(io.BytesIO(xlsx_bytes))
     ws = wb.active
-    assert ws.cell(row=2, column=3).value == "-"
+    assert ws.cell(row=3, column=2).value == "-"
 
 
 def test_build_similarity_workbook_flagged_pairs_standard():

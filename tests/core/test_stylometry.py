@@ -43,8 +43,9 @@ class TestStylometryMath:
         """Verify sentence length variance is calculated correctly."""
         sentences = ["One two.", "One two three four.", "One."]
         mean, var = compute_sentence_stats(sentences)
-        assert mean == 2.0  # (2 + 4 + 1) / 3
-        assert var > 0.0
+        assert mean == pytest.approx(7 / 3)
+        # Sample variance uses n - 1.
+        assert var == pytest.approx(7 / 3)
 
     def test_extract_profile_empty_text(self):
         """Verify empty text returns a zeroed profile."""

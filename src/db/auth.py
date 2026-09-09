@@ -192,6 +192,7 @@ class AuthRepository(BaseRepository):
         details: str | None = None,
     ) -> None:
         """Record a security-relevant event in the security_audit_log table."""
+        username = username.lower()
         timestamp = datetime.datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         try:
             with self.connection() as conn:
@@ -368,6 +369,7 @@ def configure_db_path(db_path: str | os.PathLike) -> None:
     global _DB_PATH
     _DB_PATH = os.path.abspath(os.fspath(db_path))
     auth_repo.configure_db_path(_DB_PATH)
+    clear_revocation_cache()
 
 
 from contextlib import contextmanager
@@ -602,6 +604,7 @@ def verify_user(
 
         if not row:
             record_auth_failure("invalid_password")
+            log_security_event("login_failed", username, "Invalid credentials")
             if return_details:
                 return {"authenticated": False, "must_change_password": False}
             return False
@@ -659,6 +662,7 @@ def verify_user(
 
         if not authenticated:
             record_auth_failure("invalid_password")
+            log_security_event("login_failed", username, "Invalid credentials")
 
         # Check password expiration after successful authentication (Issue #2716)
         password_expired = False
@@ -870,7 +874,7 @@ def delete_user(username: str) -> None:
             )
             conn.execute("DELETE FROM password_history WHERE username = ?", (username,))
 
-            for table_name in ("user_sessions", "authorization_tokens"):
+            for table_name in ("user_sessions", "authorization_tokens", "password_reset_tokens"):
                 if table_exists(conn, table_name):
                     conn.execute(
                         f"DELETE FROM {table_name} WHERE username = ?",  # nosec
@@ -884,10 +888,13 @@ def delete_user(username: str) -> None:
 
 @with_sqlite_retry
 def update_password(
-    username: str, new_password: str, current_user: str | None = None, *, old_password: str | None = None
+    username: str, new_password: str, current_user: str | None = None, *, old_password: str | None = None, _reset_token: str | None = None
 ) -> None:
     """Update a user's password with a new Argon2 hash and record password_changed_at timestamp."""
+    active_connection = None
     def audit_failure(reason: str) -> None:
+        if active_connection is not None:
+            active_connection.rollback()
         try:
             log_security_event("password_change_failed", username, json.dumps({"reason": reason}))
         except Exception:
@@ -910,6 +917,19 @@ def update_password(
             raise
 
         with _connect() as conn:
+            active_connection = conn
+            conn.execute("BEGIN IMMEDIATE")
+            if _reset_token is not None:
+                token_hash = hashlib.sha256(_reset_token.encode()).hexdigest()
+                row = conn.execute(
+                    "DELETE FROM password_reset_tokens WHERE token_hash = ? AND username = ? AND expires_at > ? RETURNING username",
+                    (token_hash, username, time.time()),
+                ).fetchone()
+                if row is None:
+                    raise ValueError("Reset token is invalid or expired.")
+                status_row = conn.execute("SELECT status FROM users WHERE username = ?", (username,)).fetchone()
+                if status_row is None or status_row[0] != "active":
+                    raise ValueError("Reset token is invalid or expired.")
             cursor = conn.execute(
                 "SELECT password FROM users WHERE username = ?",
                 (username,),
@@ -932,10 +952,7 @@ def update_password(
                 (username,),
             ).fetchall()
 
-            recent_hashes = [r[0] for r in history_rows]
-            if current_hash and current_hash not in recent_hashes:
-                recent_hashes.append(current_hash)
-            recent_hashes = recent_hashes[:3]
+            recent_hashes = list(dict.fromkeys([current_hash] + [r[0] for r in history_rows]))[:3]
 
             for old_hash in recent_hashes:
                 if _verify_password_hash(new_password, old_hash):
@@ -949,10 +966,10 @@ def update_password(
             cursor = conn.execute(
                 """
                 UPDATE users
-                SET password = ?, password_changed_at = ?
+                SET password = ?, password_changed_at = ?, must_change_password = 0, password_expires_at = ?
                 WHERE username = ?
                 """,
-                (hashed, password_changed_at, username),
+                (hashed, password_changed_at, (dt.now(timezone.utc) + timedelta(days=DEFAULT_PASSWORD_LIFETIME_DAYS)).isoformat(), username),
             )
             if cursor.rowcount != 1:
                 raise ValueError("User not found.")
@@ -964,16 +981,20 @@ def update_password(
                 """,
                 (username, current_hash, password_changed_at),
             )
+            conn.execute("DELETE FROM password_reset_tokens WHERE username = ?", (username,))
             conn.commit()
+            active_connection = None
 
         log_security_event(
             event_type="password_change",
             username=username,
             details="Password updated successfully.",
         )
+        clear_revocation_cache()
     except (ValueError, PermissionError):
         raise
     except sqlite3.Error as e:
+        active_connection = None
         audit_failure("database_error")
         raise sqlite3.Error(f"Failed to update password: {e}") from e
     except Exception as e:
@@ -1179,7 +1200,7 @@ def is_password_expired(username: str, db_path=None) -> bool:
 
 @with_sqlite_retry
 def set_password_expiration(
-    username: str, days_until_expiration: int = DEFAULT_PASSWORD_LIFETIME_DAYS
+    username: str, days_until_expiration: int = DEFAULT_PASSWORD_LIFETIME_DAYS, db_path=None
 ) -> bool:
     """Set or update the password expiration date for a user.
 
@@ -1199,7 +1220,7 @@ def set_password_expiration(
             dt.now(timezone.utc) + timedelta(days=days_until_expiration)
         ).isoformat()
 
-        with _connect() as conn:
+        with (_connect(db_path) if db_path is not None else _connect()) as conn:
             cursor = conn.execute(
                 """
                 UPDATE users
@@ -1331,15 +1352,15 @@ def _generate_secure_password(length: int = 32) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
-def get_or_create_sso_user(email: str, default_role: str = "teacher") -> str:
+def get_or_create_sso_user(email: str, default_role: str = "teacher", *, provider: str = "legacy", provider_user_id: str | None = None) -> str:
     """
     Get or create SSO user with enhanced security.
     Wrapper around get_or_create_sso_user_enhanced for backward compatibility.
     """
     result = get_or_create_sso_user_enhanced(
         email=email,
-        provider="unknown",
-        provider_user_id=email,
+        provider=provider,
+        provider_user_id=provider_user_id or email,
         default_role=default_role,
     )
     return result["role"]
@@ -1671,6 +1692,7 @@ def _cleanup_revoked_tokens() -> int:
                 deleted_count = cur.rowcount
                 conn.commit()
                 if deleted_count > 0:
+                    clear_revocation_cache()
                     logger.info(
                         f"Cleaned up {deleted_count} expired entries from revoked_tokens table."
                     )
@@ -1812,9 +1834,9 @@ def is_token_revoked(token: str) -> bool:
                     if row and row[0]:
                         p_changed_str = row[0].replace("Z", "+00:00")
                         password_changed_dt = dt.fromisoformat(p_changed_str)
-                        password_changed_ts = int(password_changed_dt.timestamp())
+                        password_changed_ts = password_changed_dt.timestamp()
 
-                        if int(iat) < password_changed_ts:
+                        if float(iat) < password_changed_ts:
                             _revoked_token_cache[token] = True
                             _revoked_token_cache[signature] = True
                             return True
@@ -2484,7 +2506,7 @@ def get_or_create_sso_user_enhanced(
     username = _validate_username(email)
     provider = provider.lower()
 
-    if provider not in ["github", "google", "microsoft", "gitlab"]:
+    if provider not in ["github", "google", "microsoft", "gitlab", "legacy"]:
         raise ValueError(f"Unsupported SSO provider: {provider}")
 
     with _connect() as conn:

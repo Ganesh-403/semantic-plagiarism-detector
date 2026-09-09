@@ -20,7 +20,9 @@ logger = logging.getLogger(__name__)
 
 def _tokenize(text: str) -> List[str]:
     """Extract alphanumeric tokens from text."""
-    return re.findall(r"\b\w+\b", text.lower())
+    # Compare identifier words with prose (calculate_sum / calculateSum).
+    separated = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", text).replace("_", " ")
+    return re.findall(r"\b\w+\b", separated.lower())
 
 
 def compute_jaccard_similarity(set_a: set, set_b: set) -> float:

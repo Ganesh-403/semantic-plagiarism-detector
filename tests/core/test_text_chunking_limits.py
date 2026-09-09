@@ -43,7 +43,7 @@ class TestChunkingMemorySafety:
         limit = 3
 
         with caplog.at_level(logging.WARNING):
-            chunk_by_sentences(text, max_chunks=limit, min_chunk_length=1)
+            chunk_by_sentences(text, max_chunks=limit, min_chunk_length=1, max_chunk_size=5)
 
         warning_msgs = [
             r.message for r in caplog.records if r.levelno == logging.WARNING

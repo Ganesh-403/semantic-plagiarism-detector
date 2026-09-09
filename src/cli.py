@@ -158,8 +158,8 @@ def run_scan(
             extracted = extract_text(
                 BytesIO(file_bytes),
                 filename=filename,
-                language=DEFAULT_OCR_LANGUAGE,
-                dpi=DEFAULT_OCR_DPI,
+                ocr_language=DEFAULT_OCR_LANGUAGE,
+                ocr_dpi=DEFAULT_OCR_DPI,
             )
             if extracted.strip():
                 raw_texts[filename] = extracted
@@ -178,7 +178,7 @@ def run_scan(
             sys.stderr.write(f"❌ Error processing {filename}: {e}\n")
             skipped_files.append(filename)
 
-    if not raw_texts:
+    if files and not raw_texts:
         sys.stderr.write("Error: No valid documents found to process.\n")
         return 1
 
@@ -188,7 +188,7 @@ def run_scan(
     # Plagiarism check is only possible with 2 or more valid documents
     if num_processed >= 2:
         try:
-            chunked_docs = chunk_documents(raw_texts)
+            chunked_docs = chunk_documents(raw_texts, min_words=0)
             translated_chunked_docs = {}
 
             for doc_name, chunks in chunked_docs.items():
@@ -239,6 +239,8 @@ def run_scan(
     elif output_format == "json":
         print(json.dumps(report, indent=2))
     elif output_format == "csv":
+        print(f"# Threshold Used: {threshold}")
+        print(f"# Documents Processed: {num_processed}")
         output = io.StringIO()
         writer = csv.DictWriter(
             output, fieldnames=["doc_a", "doc_b", "similarity_score"]

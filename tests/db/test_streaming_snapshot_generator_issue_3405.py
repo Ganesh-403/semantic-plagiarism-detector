@@ -71,7 +71,8 @@ def test_iter_sqlite_snapshot_chunks_directory_raises_is_a_directory(tmp_path):
         list(iter_sqlite_snapshot_chunks(tmp_path))
 
 
-def test_api_download_backup_endpoint_streams_snapshot(tmp_path):
+def test_api_download_backup_endpoint_streams_snapshot(temp_db, monkeypatch):
+    monkeypatch.setattr("src.core.app_config.CORPUS_DB_PATH", temp_db)
     """Verify /api/v1/backup/download streams SQLite database snapshot response."""
     app.dependency_overrides[verify_bearer_token] = lambda: "test-token"
     app.dependency_overrides[get_current_user] = lambda: {"username": "admin", "scopes": ["admin"]}

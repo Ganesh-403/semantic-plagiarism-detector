@@ -143,7 +143,7 @@ class TestReportExport:
         assert os.path.exists(path)
         with open(path) as f:
             data = json.load(f)
-        assert data["report_type"] == "summary"
+        assert data["report_type"] == "detailed"
 
     def test_export_markdown(self):
         """Test Markdown export."""

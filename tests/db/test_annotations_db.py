@@ -109,3 +109,11 @@ class TestAnnotationsDB:
         """Verify retrieving annotations for a non-existent document returns empty list."""
         annotations = get_annotations_for_document("non_existent_doc", db_path=temp_db)
         assert annotations == []
+
+
+@pytest.mark.parametrize("kind,field", [(AnnotationType.HIGHLIGHT, "highlight"), (AnnotationType.COMMENT, "comment")])
+def test_annotation_rejects_missing_payload(kind, field):
+    from pydantic import ValidationError
+    for extra in ({}, {field: None}):
+        with pytest.raises(ValidationError, match="required"):
+            AnnotationRecord(document_id="doc", user_id="user", username="Alice", type=kind, **extra)
