@@ -108,7 +108,7 @@ class AdvancedComparisonEngine:
             score=lexical_score,
             weight=self.metric_weights["lexical"],
             threshold=self.thresholds["lexical"],
-            details={"method": "Jaccard + TF-IDF"},
+            details={"method": "Jaccard + term-frequency cosine"},
         )
         metrics.append(lexical_metric)
 
@@ -119,7 +119,7 @@ class AdvancedComparisonEngine:
             score=semantic_score,
             weight=self.metric_weights["semantic"],
             threshold=self.thresholds["semantic"],
-            details={"method": "Sentence Embeddings"},
+            details={"method": "Word-frequency cosine (lexical proxy)"},
         )
         metrics.append(semantic_metric)
 
@@ -163,7 +163,7 @@ class AdvancedComparisonEngine:
             score=paraphrase_score,
             weight=self.metric_weights["paraphrase"],
             threshold=self.thresholds["paraphrase"],
-            details={"method": "N-gram + Semantic Alignment"},
+            details={"method": "Bounded n-gram overlap"},
         )
         metrics.append(paraphrase_metric)
 
@@ -331,16 +331,18 @@ class AdvancedComparisonEngine:
         ngrams_b = self._extract_ngrams(text_b, n=3)
 
         # Find similar n-grams
-        similar = 0
-        total = min(len(ngrams_a), len(ngrams_b))
+        sample_a, sample_b = ngrams_a[:100], ngrams_b[:100]
+        if not sample_a or not sample_b:
+            return 0.0
 
-        for ngram_a in ngrams_a[: min(len(ngrams_a), 100)]:
-            for ngram_b in ngrams_b[: min(len(ngrams_b), 100)]:
-                if self._ngram_similarity(ngram_a, ngram_b) > 0.7:
-                    similar += 1
-                    break
+        # Average directional coverage so repeated phrases cannot exceed 100%
+        # and swapping the input documents preserves the score.
+        def coverage(source, target):
+            return sum(
+                any(self._ngram_similarity(a, b) > 0.7 for b in target) for a in source
+            ) / len(source)
 
-        return similar / total if total > 0 else 0.0
+        return (coverage(sample_a, sample_b) + coverage(sample_b, sample_a)) / 2
 
     def _tokenize(self, text: str) -> List[str]:
         """Tokenize text into words"""
@@ -486,6 +488,8 @@ class AdvancedComparisonEngine:
 
     def get_comparison_history(self, limit: int = 50) -> List[Dict]:
         """Get comparison history"""
+        if limit <= 0:
+            return []
         return [r.to_dict() for r in self.comparison_history[-limit:]]
 
     def get_comparison_stats(self) -> Dict:
@@ -514,6 +518,9 @@ class AdvancedComparisonEngine:
 def render_comparison_engine_ui(comparison_engine: AdvancedComparisonEngine):
     """Render comparison engine UI"""
     st.subheader("🔬 Advanced Document Comparison")
+    st.caption(
+        "Heuristic text comparison. The semantic metric is a word-frequency proxy; it does not use an embedding model."
+    )
 
     # Document selection
     documents = st.session_state.get("document_names", [])
@@ -539,9 +546,6 @@ def render_comparison_engine_ui(comparison_engine: AdvancedComparisonEngine):
         with st.spinner("Analyzing documents..."):
             result = comparison_engine.compare_documents(text_a, text_b, doc_a, doc_b)
             st.session_state["last_comparison"] = result
-
-            # Display results
-            display_comparison_results(result)
 
     # Display previous results
     if "last_comparison" in st.session_state:
@@ -603,7 +607,9 @@ def display_comparison_results(result: DocumentComparisonResult):
                 "Score": metric.score,
                 "Weight": metric.weight,
                 "Threshold": metric.threshold,
-                "Status": "✅ Passed" if metric.is_passed() else "⚠️ Needs Review",
+                "Status": "⚠️ Above review threshold"
+                if metric.is_passed()
+                else "Below review threshold",
             }
         )
 
@@ -618,7 +624,7 @@ def display_comparison_results(result: DocumentComparisonResult):
             y=[m.score for m in result.metrics],
             name="Score",
             marker_color=[
-                "#4CAF50" if m.is_passed() else "#FF9800" for m in result.metrics
+                "#FF9800" if m.is_passed() else "#4CAF50" for m in result.metrics
             ],
         )
     )

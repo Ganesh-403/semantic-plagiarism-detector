@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from html import escape
 import uuid
 from app.components.collaboration_system import initialize_review_system
 # ───────────────────────────────────────────────────────────────────────────────
@@ -81,25 +82,35 @@ class SearchFilter:
     operator: str  # 'eq', 'ne', 'gt', 'lt', 'gte', 'lte', 'contains', 'in'
     value: Any
 
+    def to_dict(self) -> Dict:
+        return asdict(self)
+
     def matches(self, document: Dict) -> bool:
         """Check if document matches this filter"""
         doc_value = document.get(self.field)
+
+        if doc_value is None:
+            return False
+        if self.operator in {"gt", "lt", "gte", "lte"}:
+            try:
+                return {
+                    "gt": lambda: doc_value > self.value,
+                    "lt": lambda: doc_value < self.value,
+                    "gte": lambda: doc_value >= self.value,
+                    "lte": lambda: doc_value <= self.value,
+                }[self.operator]()
+            except TypeError:
+                return False
 
         if self.operator == "eq":
             return doc_value == self.value
         elif self.operator == "ne":
             return doc_value != self.value
-        elif self.operator == "gt":
-            return doc_value > self.value
-        elif self.operator == "lt":
-            return doc_value < self.value
-        elif self.operator == "gte":
-            return doc_value >= self.value
-        elif self.operator == "lte":
-            return doc_value <= self.value
         elif self.operator == "contains":
-            return self.value.lower() in str(doc_value).lower()
+            return str(self.value).lower() in str(doc_value).lower()
         elif self.operator == "in":
+            if isinstance(doc_value, (list, tuple, set)):
+                return any(item in self.value for item in doc_value)
             return doc_value in self.value
         return False
 
@@ -128,6 +139,13 @@ class SearchEngine:
         tags: List[str] = None,
     ):
         """Index a document for search"""
+        # Replacing a document must remove its old words, tags and vector.
+        for index in (self.full_text_index, self.tag_index):
+            for term in list(index):
+                index[term].discard(doc_name)
+                if not index[term]:
+                    del index[term]
+        self.semantic_embeddings.pop(doc_name, None)
         # Store full text
         self.document_index[doc_name] = content
         self.metadata_index[doc_name] = metadata or {}
@@ -180,6 +198,8 @@ class SearchEngine:
         self, query: str, filters: List[SearchFilter] = None, max_results: int = 50
     ) -> List[SearchResult]:
         """Perform full-text search"""
+        if max_results <= 0:
+            return []
         query_words = self._tokenize(query)
         if not query_words:
             return []
@@ -192,11 +212,11 @@ class SearchEngine:
                     doc_scores[doc] = doc_scores.get(doc, 0) + 1
 
         # Sort by score
-        sorted_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
+        sorted_docs = sorted(doc_scores.items(), key=lambda x: (-x[1], x[0]))
 
         # Apply filters
         results = []
-        for doc_name, score in sorted_docs[:max_results]:
+        for doc_name, score in sorted_docs:
             # Apply filters
             if filters and not self._apply_filters(doc_name, filters):
                 continue
@@ -214,6 +234,8 @@ class SearchEngine:
                 metadata=self.metadata_index.get(doc_name, {}),
             )
             results.append(result)
+            if len(results) >= max_results:
+                break
 
         return results
 
@@ -225,11 +247,26 @@ class SearchEngine:
         max_results: int = 50,
     ) -> List[SearchResult]:
         """Perform semantic search using embeddings"""
-        if not self.semantic_embeddings or query_embedding is None:
+        if max_results <= 0 or not self.semantic_embeddings or query_embedding is None:
+            return []
+
+        query_embedding = np.asarray(query_embedding, dtype=float)
+        if (
+            query_embedding.ndim != 1
+            or not np.isfinite(query_embedding).all()
+            or np.linalg.norm(query_embedding) == 0
+        ):
             return []
 
         results = []
         for doc_name, doc_embedding in self.semantic_embeddings.items():
+            doc_embedding = np.asarray(doc_embedding, dtype=float)
+            if (
+                doc_embedding.shape != query_embedding.shape
+                or not np.isfinite(doc_embedding).all()
+                or np.linalg.norm(doc_embedding) == 0
+            ):
+                continue
             # Calculate similarity
             similarity = np.dot(query_embedding, doc_embedding) / (
                 np.linalg.norm(query_embedding) * np.linalg.norm(doc_embedding)
@@ -263,14 +300,19 @@ class SearchEngine:
         max_results: int = 50,
     ) -> List[SearchResult]:
         """Perform hybrid search combining full-text and semantic"""
+        if not 0 <= semantic_weight <= 1:
+            raise ValueError("semantic_weight must be between zero and one")
+        if max_results <= 0:
+            return []
+        candidate_limit = len(self.document_index)
         # Get full-text results
-        text_results = self.search_full_text(query, filters, max_results)
+        text_results = self.search_full_text(query, filters, candidate_limit)
 
         # Get semantic results if embedding available
         semantic_results = []
         if query_embedding is not None:
             semantic_results = self.search_semantic(
-                query_embedding, filters, max_results
+                query_embedding, filters, max_results=candidate_limit
             )
 
         # Combine results
@@ -435,6 +477,9 @@ class SearchQueryParser:
             if token.startswith('"'):
                 phrase = token
                 i += 1
+                if len(token) > 1 and token.endswith('"'):
+                    result["exact_phrases"].append(token.strip('"'))
+                    continue
                 while i < len(parts) and not parts[i].endswith('"'):
                     phrase += " " + parts[i]
                     i += 1
@@ -510,14 +555,14 @@ def render_search_bar(search_engine: SearchEngine):
     with col1:
         query = st.text_input(
             "Search query:",
-            placeholder="Enter search terms... (use AND, OR, NOT, field:value)",
+            placeholder="Enter words to search; use the filters below for metadata",
             key="search_query_input",
         )
 
     with col2:
         search_type = st.selectbox(
             "Search type:",
-            ["full_text", "semantic", "hybrid"],
+            ["full_text"],
             key="search_type_select",
         )
 
@@ -526,26 +571,14 @@ def render_search_bar(search_engine: SearchEngine):
             st.session_state["active_search"] = True
             st.session_state["search_query"] = query
             st.session_state["search_type"] = search_type
-            st.rerun()
 
     # Search tips
     with st.expander("ℹ️ Search Tips", expanded=False):
         st.markdown("""
-        **Basic Search:**
-        - Use `AND`, `OR`, `NOT` between terms: `plagiarism AND detection`
-        - Use quotes for exact phrases: `"semantic similarity"`
-        - Exclude terms with `-`: `-citations`
-
-        **Field Search:**
-        - `author:"John Doe"` - Search by author
-        - `date:>2024-01-01` - Search by date
-        - `similarity:>0.7` - Search by similarity score
-        - `tags:research` - Search by tags
-
-        **Examples:**
-        - `"machine learning" OR "deep learning"`
-        - `author:Smith AND date:>2024-01-01`
-        - `plagiarism -self NOT draft`
+        Search matches indexed words and ranks documents by the number of query
+        words they contain. Use the metadata controls below to narrow results.
+        Semantic search requires document and query embeddings from the same
+        model and is available through the search engine API.
         """)
 
     return query, search_type
@@ -622,7 +655,7 @@ def render_search_filters(filter_builder: SmartFilterBuilder):
 
     # Reset filters
     if st.button("🔄 Reset Filters", key="reset_filters_button"):
-        st.session_state["search_filters"] = []
+        st.session_state["reset_search_filters"] = True
         st.rerun()
 
     return filters
@@ -642,6 +675,9 @@ def render_search_results(results: List[SearchResult]):
 
     if "search_page" not in st.session_state:
         st.session_state["search_page"] = 0
+    st.session_state["search_page"] = min(
+        max(0, st.session_state["search_page"]), total_pages - 1
+    )
 
     col1, col2, col3 = st.columns([3, 1, 1])
     with col2:
@@ -688,7 +724,7 @@ def render_search_results(results: List[SearchResult]):
             # Snippet
             st.markdown("**Snippet:**")
             st.markdown(
-                f"<div style='background:#f5f5f5;padding:10px;border-radius:5px;'>{result.snippet}</div>",
+                f"<div style='background:#f5f5f5;padding:10px;border-radius:5px;'>{escape(result.snippet)}</div>",
                 unsafe_allow_html=True,
             )
 
@@ -788,40 +824,48 @@ def render_advanced_search_dashboard():
         st.session_state["active_search"] = False
 
     search_engine = st.session_state["search_engine"]
-    filter_builder = st.session_state["filter_builder"]
+    filter_builder = st.session_state.setdefault("filter_builder", SmartFilterBuilder())
+
+    if st.session_state.pop("reset_search_filters", False):
+        for key in (
+            "date_filter_select",
+            "date_op_select",
+            "sim_filter_check",
+            "sim_op_select",
+            "sim_value_slider",
+            "author_filter_input",
+            "author_op_select",
+            "tags_filter_select",
+        ):
+            st.session_state.pop(key, None)
 
     # Search header
     query, search_type = render_search_bar(search_engine)
     filters = render_search_filters(filter_builder)
 
     # Execute search
-    if st.session_state.get("active_search", False) or (
-        query and st.session_state.get("search_query")
-    ):
+    if st.session_state.get("active_search", False):
         search_query = st.session_state.get("search_query", query)
         search_type = st.session_state.get("search_type", search_type)
 
         with st.spinner("Searching..."):
             if search_type == "full_text":
                 results = search_engine.search_full_text(search_query, filters)
-            elif search_type == "semantic":
-                # Use a dummy embedding for demo (should use actual embeddings)
-                query_embedding = np.random.randn(384)
-                results = search_engine.search_semantic(query_embedding, filters)
-            else:  # hybrid
-                query_embedding = np.random.randn(384)  # Dummy embedding
-                results = search_engine.search_hybrid(
-                    search_query, query_embedding, filters
+            else:
+                st.error(
+                    "Use full-text search here; semantic search needs a configured query encoder."
                 )
+                results = []
 
             st.session_state["search_results"] = results
+            st.session_state["search_page"] = 0
 
             # Save to history
             if results:
                 search_query_obj = SearchQuery(
                     id=str(uuid.uuid4()),
                     query_text=search_query,
-                    filters=[f.to_dict() for f in filters],
+                    filters={str(i): f.to_dict() for i, f in enumerate(filters)},
                     search_type=search_type,
                     timestamp=datetime.now(),
                     user_id=st.session_state.get("user_id", "unknown"),

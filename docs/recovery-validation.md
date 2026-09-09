@@ -1,100 +1,96 @@
 # Recovery validation
 
-The follow-up is still in progress in [PR #4328](https://github.com/Ganesh-403/semantic-plagiarism-detector/pull/4328).
-Startup and license checks pass on Linux. Overall coverage remains below the
-required gate; this is not a fully verified release.
+[PR #4328](https://github.com/Ganesh-403/semantic-plagiarism-detector/pull/4328)
+remains in draft because overall coverage is below the required 85% gate.
+The full Linux test matrix passes at `b64e71a8`; changed-line coverage,
+dependency, license, security and startup checks also pass.
 
-## Complete suite at `af5f0b42`
+## Complete Linux suite at `b64e71a8`
 
-Windows, Python 3.13.7, 2026-09-09, application source held unchanged for the run:
+[CI run 34359175413](https://github.com/Ganesh-403/semantic-plagiarism-detector/actions/runs/34359175413),
+2026-09-09, two pytest workers with `--dist=loadfile`, covering both `src` and `app`:
 
-```console
-python -m pytest -n 2 --dist=loadfile --cov=src --cov=app --junitxml=suite.xml --cov-report=xml --cov-report=term tests
-```
+| Python | Passed | Failed | Errors | Skipped | Xfailed | Duration |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 3.11 | 9,869 | 0 | 0 | 24 | 1 | 249.21 s |
+| 3.12 | 9,869 | 0 | 0 | 24 | 1 | 323.28 s |
+| 3.13 | 9,869 | 0 | 0 | 24 | 1 | 300.51 s |
 
-Result: **9,849 passed, 2 failed, 24 skipped, 1 xfailed, 0 errors in 1,242.77 seconds**.
-The failures were parser timing assertions under coverage: DOCX took 2.68 seconds
-against a two-second limit, and PDF took 5.34 seconds against a three-second limit.
-The earlier Streamlit three-second timeouts were resolved and pass in this run.
+All three versions pass Streamlit and API startup smoke checks and the **90%
+changed-line coverage gate**. Each reports approximately **60% combined line and
+branch coverage**, below the unchanged **85% overall gate**. That gate is the only
+failing CI step. Python 3.13 covers 40,401 of 65,209 executable lines (61.96%).
+No source exclusions or reduced thresholds were used to reach these results.
 
-The snapshot measured **61.84% line coverage** (40,350 / 65,246 lines),
-**51.72% branch coverage** (8,981 / 17,366 branches), and **59.71% combined
-coverage**, below the retained **85%** gate. Changed-line coverage was **89.19%**
-(1,848 / 2,072 lines), below the retained **90%** gate. No source modules were
-excluded to raise these numbers.
+The earlier Windows run at `af5f0b42` passed 9,849 tests with two parser timing
+failures under coverage. PDF reader reuse and uninstrumented timing subprocesses
+resolve these failures; correctness assertions still run under coverage and the
+original two-second DOCX / three-second PDF budgets remain. The 200-page PDF
+production benchmark improved from 16.79 to 1.71 seconds locally.
 
-The initial Linux matrix at the same commit reported 14–17 failures depending on
-Python version, with 9,834–9,837 passing tests. The failures concern cross-platform
-cache paths, Windows-only test adapters, global path mocks, directory enumeration,
-and numerical precision in constant-feature change-point detection. All three
-versions passed both Streamlit and API startup smoke checks. Linux syntax/Ruff/YAML,
-Markdown, license, and memory-leak checks passed.
+Linux-only failures were fixed by normalizing Windows path spellings independently
+of the host OS, isolating Windows test adapters, covering both directory iteration
+implementations and stabilizing constant-feature numerical calculations.
 
-## Subsequent repairs being validated
+## Additional search and comparison regressions
 
-- Normalize cache path separators independently of the host OS and use stable
-  summation/constant-feature handling for change-point detection.
-- Isolate simulated Windows adapters in tests and cover both Python directory
-  enumeration implementations.
-- Reuse one PDF reader across all pages. A production-process benchmark fell from
-  16.79 to 1.71 seconds for the same 200-page PDF. Benchmark assertions retain
-  their original two-/three-second limits in an uninstrumented subprocess, while
-  extraction correctness remains covered in the parent test.
-- Preserve table rows without duplicate extraction and verify a reader opens once.
-- Exercise the recovery form with real token creation, password policy validation,
-  atomic consumption and replay rejection; replace only the outbound email boundary.
-- Audit the full pinned installed inventory, preserving CPU-wheel versions while
-  looking up the matching public PyTorch release. Require fixed setuptools 83+.
+Subsequent tests exercise the production document search index and comparison
+engine, including real Streamlit views. They repair stale entries after reindexing,
+filtering before result limits, invalid vectors, hybrid search argument ordering,
+filter serialization, widget reruns, pagination and HTML escaping of snippets.
+The standalone search view offers full-text search; it no longer invents random
+query embeddings. Its API still accepts real, compatible semantic vectors.
 
-The first post-repair group passed 280 checks with four outdated PDF-page fixture
-failures; those fixtures were corrected, and the OCR/recovery UI group then passed
-all 14 checks. New audit-inventory checks also pass. These targeted results do not
-replace a complete run at the updated head.
+Comparison scores are bounded and symmetric for repeated phrases, the results
+view renders once per comparison, and high similarity is labeled for review.
+The view explicitly identifies its word-frequency semantic proxy.
+
+The first 41 checks pass both with and without coverage. The focused coverage run
+measures 92.04% of lines in `Doc_Search_Filtering.py` and 99.66% in
+`advanced_comparison_engine.py`. These are module measurements, not a claim that
+the project-wide gate passes. All **47** checks pass locally after adding date-filter,
+saved-search and missing-encoder views; consult the PR's latest CI results for the head.
 
 ## Runtime, dependency and quality checks
 
-- Fresh Streamlit process: password login and the authenticated dashboard pass.
-- Real embedding model (`all-MiniLM-L6-v2`): two-document analysis, result rendering,
-  corpus persistence and rerun without duplicate documents pass. Upload bytes are
-  injected at the file-upload boundary; parsing, embeddings and FAISS run normally.
+- Fresh Streamlit process: password login and authenticated dashboard pass.
+- Real `all-MiniLM-L6-v2` model: two-document analysis, result rendering, corpus
+  persistence and rerun without duplicate documents pass. Only upload bytes are
+  injected; parsing, embeddings and FAISS run normally.
 - Fresh API process: password login, signed-token corpus read and unauthorized
   access rejection pass.
-- The 160-package installed runtime dependency closure passes the existing
-  GPL/AGPL/LGPL license gate. Runtime PDF, EPUB and translation adapters replace
-  PyMuPDF, EbookLib and deep-translator. See the [dependency review](../security/README.md).
-- The local dependency audit retains one NLTK finding with a reviewed,
-  source-hash-bound not-affected assessment expiring on 2026-10-09. It reports zero
-  blocking findings; NLTK itself has no patched release for this advisory.
-- Ruff, YAML, Markdown, pre-commit (including secret detection), and all 1,267
-  Python files parsed with Python 3.11 grammar pass. The configured Bandit check
-  reports no findings.
-- Markdown lint was repaired across the repository and is now mandatory in CI.
-- The initial Linux audit exposed old setuptools and an unresolved CPU-wheel
-  lookup; the updated audit and dependency floor require a new CI run. The public
-  hosted site was inspected on 2026-09-09 and displays “Error running app.” It has
-  not been redeployed with this follow-up.
+- Linux dependency audit, dependency update, security scan, license, memory leak,
+  syntax/Ruff/YAML and Markdown jobs pass at `b64e71a8`.
+- The complete installed inventory audit preserves CPU-wheel versions while using
+  the matching public PyTorch version for advisory lookup. Setuptools must be 83+.
+- The audit retains one unpatched NLTK finding with a reviewed, source-hash-bound
+  not-affected assessment expiring on 2026-10-09. Zero findings are blocking;
+  this does not mean NLTK has been patched.
+- The 160-package local runtime closure passes the existing GPL/AGPL/LGPL gate;
+  Linux also passes and uploads its inventory. See the
+  [dependency review](../security/README.md).
+- Local `pip check`, pre-commit including secret detection, and Markdown checks pass.
+- The public hosted site displayed “Error running app” when inspected on 2026-09-09.
+  It has not been redeployed with this follow-up.
 
 ## Test integrity and scope
 
 The merged PR #4327 baseline was **677 failed, 8,982 passed, 25 skipped, 1 xfailed
 and 25 errors**, with **52.26% line coverage** across `src` and `app`.
 
-The follow-up replaces several tests of copied local stand-ins with tests of
-production functions and real Streamlit views. The misspelled duplicate
-`test_teext_normalization_properties.py` was consolidated into the production
-normalization suite. Constant-return padding classes were removed from six
-modules; their real scanner, security and runtime implementations remain.
-Five legacy utility exclusions were removed after repairing their production APIs
-and tests; the remaining exclusions are documented in `pytest.ini`. Test counts
-therefore differ from the baseline, and passing counts alone are not a coverage
-claim.
+This follow-up replaces tests of copied stand-ins with production calls and real
+Streamlit views. A duplicate normalization suite was consolidated. Constant-return
+padding classes were removed from six modules; real implementations remain.
+Five legacy utility exclusions were removed after repairing their APIs and tests;
+remaining exclusions are visible in `pytest.ini`. Passing counts alone are not a
+coverage claim.
 
 New regression coverage includes authentication recovery and password rotation,
-account suspension/deletion, file parsing and export payloads, cancellation,
-soft deletion, document revision lifecycle and storage, analytics, and dashboard
-navigation. Five standalone dashboards generate illustrative data; they now label
-that data explicitly and retain it across navigation. These demonstrations do not
-provide analysis of uploaded documents.
+account suspension/deletion, parsing and exports, cancellation, soft deletion,
+document revision lifecycle and storage, analytics, dashboard navigation, search
+and comparison. Five standalone dashboards explicitly label illustrative data and
+retain it across navigation; they do not analyze uploaded documents.
 
-For deployment configuration, backups, SMTP and the Cloud reboot/redeploy
-procedure, use the [Streamlit redeployment guide](streamlit-redeploy.md).
+Container deployment and the updated public hosted app still require verification.
+For configuration, backups, SMTP and Cloud reboot/redeployment, use the
+[Streamlit redeployment guide](streamlit-redeploy.md).

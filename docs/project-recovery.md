@@ -1,8 +1,9 @@
 # Project recovery and deployment
 
 This change restores the main Streamlit analysis flow and addresses the open issue
-backlog. It is not a claim that the entire legacy test suite is green. Validation
-results and remaining blockers are recorded below so reviewers can assess the PR.
+backlog. The full configured Linux test suite passes on Python 3.11–3.13, but
+overall coverage remains below the required gate. Validation results and remaining
+blockers are recorded below so reviewers can assess the PR.
 
 For the hosted app, follow the [redeployment checklist](streamlit-redeploy.md).
 
@@ -89,13 +90,13 @@ The full suite uses `python -m pytest -n 2 --dist=loadfile`. Existing coverage
 thresholds (85% overall, 90% changed lines) and existing legacy exclusions remain
 visible. No new exclusions or expected failures were added to hide failures.
 See [the validation report](recovery-validation.md) for run counts and failing test
-modules. Docker execution, Linux installation,
-and the maintained Streamlit Community Cloud deployment require their respective
-runners; local success does not deploy the upstream site.
+modules. Linux installation and tests have passed in CI. Docker execution and the
+maintained Streamlit Community Cloud deployment still need verification; local
+success does not deploy the upstream site.
 
 ## Remaining blockers
 
-- Overall and changed-line coverage remain below the required gates. The latest
+- Overall coverage remains below 85%; the 90% changed-line gate passes. The latest
   complete-suite result and subsequent targeted repairs are recorded in the
   validation report. Keep the PR in draft until the full suite and CI gates pass.
 - `deep-translator`, PyMuPDF and EbookLib have been removed from runtime dependencies.
