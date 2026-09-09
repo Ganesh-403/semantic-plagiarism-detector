@@ -51,6 +51,15 @@ measures 92.04% of lines in `Doc_Search_Filtering.py` and 99.66% in
 the project-wide gate passes. All **47** checks pass locally after adding date-filter,
 saved-search and missing-encoder views; consult the PR's latest CI results for the head.
 
+At `bd3d9434`, Python 3.12 and 3.13 each pass **9,916 tests** and the changed-line
+gate. Overall coverage rises to approximately **61% combined** (63.07% of lines
+on Python 3.13), still below 85%. Python 3.11 passes 9,914 with two failures caused
+by tests contacting a live translation provider that returned HTTP 429. Those
+tests now supply responses only at the HTTP boundary and assert both cache behavior
+and rate-limit fallback. The 76-test translation module passes locally; its final
+five HTTP/cache checks and pre-commit also pass. The latest-head matrix must verify
+this test isolation change before relying on its final counts.
+
 ## Runtime, dependency and quality checks
 
 - Fresh Streamlit process: password login and authenticated dashboard pass.
