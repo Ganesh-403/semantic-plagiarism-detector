@@ -4,7 +4,7 @@
 
 > **[▶ Live Demo](https://semantic-plagiarism-detector.streamlit.app/)**
 
-A production-ready NLP application that detects **semantic plagiarism** in student
+An NLP application that detects **semantic plagiarism** in student
 assignments—even when text has been paraphrased—using Sentence Transformers, cosine
 similarity, and **FAISS vector search**.
 
@@ -157,6 +157,13 @@ python -m nltk.downloader punkt_tab  # Pre-download NLTK corpus to avoid runtime
 
 ### 4. Launch the Streamlit dashboard
 
+Use Python 3.11–3.13. Set `ADMIN_BOOTSTRAP_PASSWORD` to a unique strong password
+in your environment or `.env` before the first start. This creates the `admin`
+account only when it does not already exist; no default password is installed.
+See [deployment and recovery notes](docs/project-recovery.md) for persistent
+storage, Streamlit Community Cloud configuration, smoke checks, and current
+validation limits.
+
 ```bash
 streamlit run app/streamlit_app.py
 ```
@@ -304,28 +311,27 @@ docker compose up
 docker compose down
 ```
 
-### Default credentials
+### Administrator account
 
-| Username | Password | Role |
-|---|---|---|
-| `admin` | `admin123` | Admin — full access + user management |
-
-Additional users can be created from the **User Management** page (admin only).
+The initial username is `admin`; its password comes from
+`ADMIN_BOOTSTRAP_PASSWORD` at first startup. Existing accounts keep their stored
+passwords. Remove the bootstrap setting after setup and use User Management
+to create additional accounts. Development seed databases are for local testing.
 
 ## ⚠️ Data Persistence & Docker Volumes
 
 The app persists two SQLite databases plus the FAISS index. All three
 live in the container filesystem and are wiped on `docker compose down -v`
-**unless** they are mounted on named volumes. As of issue #3025, the
-`docker-compose.yml` mounts three named volumes by default so the
+**unless** they are mounted on named volumes. The
+`docker-compose.yml` retains its three named volumes so the
 data survives `down` / `up` cycles.
 
 ### What is persisted
 
 | Volume name            | Container path | Holds                                           | Wiped by `down -v`? |
 |------------------------|----------------|-------------------------------------------------|----------------------|
-| `plagiarism_data`      | `/app/data`    | `corpus.db`, `corpus.index`, `backups/`         | ✅ Yes |
-| `plagiarism_users`     | `/app`         | `users.db` (auth, roles, password hashes)        | ✅ Yes |
+| `plagiarism_data`      | `/state/data`    | `corpus.db`, `corpus.index`, `backups/`         | ✅ Yes |
+| `plagiarism_users`     | `/state`       | `users.db` (auth, roles, password hashes)        | ✅ Yes |
 | `redis_data`           | `/data`        | Redis dump (session cache, rate-limit counters)  | ✅ Yes |
 
 ### Safe operations

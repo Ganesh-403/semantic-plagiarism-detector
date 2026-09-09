@@ -1,9 +1,10 @@
+from pathlib import Path
 from streamlit.testing.v1 import AppTest
 
 
 def test_staged_files_counter_badge():
     """Verify that uploading files displays the staged files counter banner and clearing files hides it."""
-    at = AppTest.from_file("app/streamlit_app.py")
+    at = AppTest.from_file(str(Path(__file__).resolve().parents[2] / "app/streamlit_app.py"))
     at.session_state["authenticated"] = True
     at.session_state["username"] = "admin"
     at.session_state["role"] = "admin"

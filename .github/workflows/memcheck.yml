@@ -24,10 +24,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov
-          pip install "numpy>=1.26.0,<2.5.0"
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Run pytest with tracemalloc monitoring
+      - name: Check retained memory after repeated streamed uploads
         run: |
           python scripts/memcheck_runner.py

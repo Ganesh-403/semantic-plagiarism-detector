@@ -6,13 +6,13 @@ branch names that sat beside them:
 
     @app.on_event("startup")
     def startup_event():
-     feature/model-warmup-startup-4009
+     # feature/model-warmup-startup-4009
         from src.core.embedding_model import warmup_embedding_model
         warmup_embedding_model()
 
         print_startup_config_summary()
 
-     main
+     # main
 
 Python reported ``IndentationError: unexpected indent`` at line 61 and the
 whole REST API — every router, ``src/asgi_app.py``, ``tests/api/`` — became
@@ -226,6 +226,7 @@ def test_startup_event_runs_both_steps(app_module, monkeypatch) -> None:
     printing the config summary. They are independent, so the resolution keeps
     both.
     """
+    monkeypatch.setenv("PRELOAD_EMBEDDING_MODEL", "true")
     calls: list[str] = []
     monkeypatch.setattr(
         app_module, "_warmup_embedding_model", lambda: calls.append("warmup") or True
@@ -246,6 +247,7 @@ def test_startup_survives_a_failing_warmup(app_module, monkeypatch) -> None:
     Refusing to boot because the model could not be preloaded trades a latency
     problem for an availability one.
     """
+    monkeypatch.setenv("PRELOAD_EMBEDDING_MODEL", "true")
     printed: list[str] = []
 
     def boom() -> bool:

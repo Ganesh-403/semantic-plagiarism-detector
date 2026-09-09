@@ -1,37 +1,5 @@
-version: "3.9"
-
-# =============================================================================
-# Issue #3025 — Emphasize Docker Volume Persistence in Docs
-#
-# The app persists two SQLite databases:
-#
-#   - /app/data/corpus.db   (corpus DB — uploaded assignments + embeddings)
-#   - /app/users.db         (auth DB — user accounts, roles, password hashes)
-#   - /app/data/backups/    (automated backup snapshots of corpus.db)
-#
-# Without named volumes, `docker compose down` destroys the container's
-# writable layer — and with it, every user account and every uploaded
-# assignment. The fix below mounts THREE named volumes so data survives
-# `down` / `up` cycles. `docker compose down -v` is the only command
-# that wipes them; that's now called out in the README with a loud
-# warning.
-#
-# Volume layout (see the `volumes:` block at the bottom of this file):
-#
-#   plagiarism_data      → /app/data          (corpus.db + backups/ + corpus.index)
-#   plagiarism_users     → /app               (users.db at repo root)
-#   redis_data           → /data              (Redis dump only — unchanged)
-#
-# We mount `plagiarism_users` at `/app` rather than a single-file bind
-# because (a) SQLite creates `-wal` and `-shm` sidecar files that
-# must live next to the main DB, and (b) Docker named volumes can
-# only mount directories, not individual files. The container's
-# `/app` is still populated by the Dockerfile's `COPY . .` on first
-# start; subsequent starts reuse the volume's contents, so source
-# code changes require `docker compose build` to take effect — which
-# is the standard Docker workflow and already documented below.
-# =============================================================================
-
+# Keep application source in the image and state in persistent named volumes.
+# Existing volume names are retained: users/index at /state, corpus at /state/data.
 services:
   nginx:
     image: nginx:alpine
@@ -40,7 +8,8 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     restart: unless-stopped
 
   app:
@@ -48,26 +17,17 @@ services:
     expose:
       - "8501"
     environment:
-      - REDIS_URL=redis://redis:6379/0
-      - REDIS_HOST=redis
-      - APP_BASE_URL=http://localhost:8501
-      # Scheduled plagiarism rescan (disabled unless set > 0). See
-      # src/core/scheduler.py and .env.example for details.
-      - RESCAN_INTERVAL_MINUTES=${RESCAN_INTERVAL_MINUTES:-0}
-      - RESCAN_GRACE_PERIOD_MINUTES=${RESCAN_GRACE_PERIOD_MINUTES:-60}
+      REDIS_URL: redis://redis:6379/0
+      REDIS_HOST: redis
+      APP_BASE_URL: http://localhost:8501
+      SPD_STATE_DIR: /state
+      ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
+      RESCAN_INTERVAL_MINUTES: ${RESCAN_INTERVAL_MINUTES:-0}
+      RESCAN_GRACE_PERIOD_MINUTES: ${RESCAN_GRACE_PERIOD_MINUTES:-60}
     volumes:
-      # Pass through the Streamlit config (theme, server settings).
-      - ./.streamlit:/app/.streamlit
-      # ── Named volumes for the persistent SQLite DBs (Issue #3025) ──
-      # `plagiarism_data` survives `docker compose down`. Only
-      # `docker compose down -v` wipes it. See README →
-      # "⚠️ Data Persistence & Docker Volumes".
-      - plagiarism_data:/app/data
-      # `plagiarism_users` holds `users.db` (auth). Mounted at `/app`
-      # rather than a single file because Docker named volumes can
-      # only target directories, and SQLite's WAL sidecar files must
-      # live next to the main DB.
-      - plagiarism_users:/app
+      - ./.streamlit:/app/.streamlit:ro
+      - plagiarism_data:/state/data
+      - plagiarism_users:/state
     depends_on:
       redis:
         condition: service_healthy
@@ -76,13 +36,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 60s
     restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -92,16 +53,8 @@ services:
       retries: 5
     restart: unless-stopped
 
-# ─── Named volumes (Issue #3025) ──────────────────────────────────
-# These volumes are managed by Docker and survive `docker compose down`.
-# They are only destroyed by `docker compose down -v` or an explicit
-# `docker volume rm <name>`. See the README's "Data Persistence"
-# section for the exact commands and the data-loss warning.
+# Retained across `docker compose down`; removed only with explicit volume deletion.
 volumes:
-  # Corpus DB + FAISS index + automated backups (lives at /app/data/).
   plagiarism_data:
-  # Auth DB (lives at /app/users.db). Mounted at /app so the WAL
-  # sidecar files (-wal, -shm) are co-located with the main DB.
   plagiarism_users:
-  # Redis dump (unchanged — was already a named volume).
   redis_data:

@@ -216,8 +216,8 @@ class TestHealthScoreAPI:
     @patch("src.api.routers.health_score.health_repo")
     def test_list_scores_success(self, mock_repo, auth_headers):
         mock_repo.list_scores.return_value = [
-            {"id": 1, "filename": "a.pdf", "overall_score": 85.0, "grade": "B"},
-            {"id": 2, "filename": "b.pdf", "overall_score": 45.0, "grade": "F"},
+            {"id": 1, "filename": "a.pdf", "overall_score": 85.0, "grade": "B", "checked_at": "2026-01-01T00:00:00Z"},
+            {"id": 2, "filename": "b.pdf", "overall_score": 45.0, "grade": "F", "checked_at": "2026-01-01T00:00:00Z"},
         ]
         mock_repo.count_scores.return_value = 2
 

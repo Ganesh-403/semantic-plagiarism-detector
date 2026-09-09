@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Accessible High Contrast theme (`HIGH_CONTRAST_THEME`) with sidebar theme selector (`app/theme.py`).
 
 ### Fixed
+- Restore the Streamlit login, comparison tabs, model pipeline, and atomic corpus ingestion; remove duplicated widgets and competing FastAPI application definitions.
+- Restore runtime dependencies and missing public model/service contracts; defer heavyweight imports and optional model warmup until needed.
+- Fix FAISS concurrent operations/autosave, empty embeddings and low-memory fallback, short-tail and Markdown chunking, lexical metrics, PDF highlights, SSO verified email checks, cleanup, and release-check caching.
+- Repair SQLite migrations, SQL statements, role alternatives, private health-route authorization, metric schemas, and test state isolation.
+- Align CI/runtime dependencies and preserve audit and coverage failures; correct Docker entry point, persistent volume locations, and release tagging.
 - Split the two `from` imports that had been welded onto one line in `src/core/processing.py`, un-interleaved `PipelineResult`'s docstring from `is_incremental_update()` and moved the method below the annotated fields where a `NamedTuple` requires it, and separated `run_full_pipeline`'s return annotation from its docstring; the module did not parse, so neither the synchronous upload path nor the background worker could import the pipeline (`src/core/processing.py`).
 - Defined the module-level `logger` that `translate_text_batch()` referenced but never imported; the batch error handler raised `NameError` instead of logging, which left the per-text fallback loop unreachable (`src/core/translator.py`).
 - Handled empty file validation cleanly in `is_executable_upload` by explicitly returning `False` on empty byte payloads (`src/security/mime_validator.py`).
@@ -41,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rewrote the ten demonstration strings in `_generate_sample_ai_texts` and `_generate_sample_human_texts` as implicit concatenation; they were single-quoted literals wrapped across physical lines, which left the whole module uncompilable (`AI_ADVANCED_Text_Gen.py`).
 
 ### Security
+- Require real credentials for API login and 2FA enrollment, reject secret re-disclosure, honor refresh-token revocation, and prevent 2FA helpers from creating accounts.
+- Require an explicit administrator bootstrap password for new installations; preserve existing account passwords.
 - Centralize spreadsheet formula sanitization in `export_sanitizer` and apply it across excel, bulk, and batch exports (`src/utils/export_sanitizer.py`).
 - Sanitize bulk export ZIP entry names with `sanitize_filename` so document and incident metadata cannot introduce `..` or absolute paths (`src/utils/bulk_export.py`).
 - Integrated `zxcvbn` password strength evaluation in `_validate_password_complexity` to block common dictionary passwords and weak credentials (`src/db/auth.py`, `requirements.txt`).

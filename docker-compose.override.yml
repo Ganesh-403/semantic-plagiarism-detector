@@ -1,11 +1,11 @@
-version: "3.9"
-
 # Local development override configuration for Docker Compose.
 # Automatically loaded by `docker compose up` to mount source code
 # directly into the container, enabling live hot-reloading on changes (Issue #2944).
 
 services:
   app:
+    environment:
+      STREAMLIT_SERVER_FILE_WATCHER_TYPE: poll
     volumes:
       - ./src:/app/src
       - ./app:/app/app

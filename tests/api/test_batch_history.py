@@ -98,8 +98,8 @@ class TestBatchRunCRUD:
     @patch("src.api.routers.batch_history.batch_repo")
     def test_list_batch_runs_success(self, mock_repo, auth_headers):
         mock_repo.list_batch_runs.return_value = [
-            {"run_id": 1, "status": "completed", "documents_scanned": 100},
-            {"run_id": 2, "status": "failed", "documents_scanned": 50},
+            {"run_id": 1, "status": "completed", "documents_scanned": 100, "started_at": "2026-01-01T00:00:00Z"},
+            {"run_id": 2, "status": "failed", "documents_scanned": 50, "started_at": "2026-01-01T00:00:00Z"},
         ]
         mock_repo.count_batch_runs.return_value = 2
 
@@ -138,9 +138,10 @@ class TestBatchRunCRUD:
             "run_id": 1,
             "status": "completed",
             "documents_scanned": 100,
+            "started_at": "2026-01-01T00:00:00Z",
         }
         mock_repo.get_batch_documents.return_value = [
-            {"id": 1, "document_name": "test.pdf", "similarity_score": 0.85}
+            {"id": 1, "run_id": 1, "document_name": "test.pdf", "similarity_score": 0.85}
         ]
         mock_repo.get_severity_distribution.return_value = {"high": 1, "none": 99}
 
@@ -197,6 +198,7 @@ class TestBatchRunCRUD:
             "/api/v1/batch/runs/1/complete",
             params={
                 "documents_scanned": 100,
+            "started_at": "2026-01-01T00:00:00Z",
                 "documents_flagged": 5,
                 "avg_similarity": 0.5,
                 "max_similarity": 0.95,

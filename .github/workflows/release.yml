@@ -9,6 +9,11 @@ name: Release & Multi-Arch Docker Build
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to release
+        required: true
+        type: string
   push:
     # Trigger on strictly semver compatible tag pushes
     tags:
@@ -34,18 +39,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.tag || github.ref }}
           # Fetch all history so changelog generators can see previous tags
           fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
       - name: Validate Tag Format
         id: validate_tag
+        env:
+          REQUESTED_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          TAG_NAME="$REQUESTED_TAG"
+          [[ "$TAG_NAME" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]] || exit 1
+          git rev-parse --verify "refs/tags/$TAG_NAME"
           echo "Processing release for tag: $TAG_NAME"
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
 
@@ -56,7 +66,7 @@ jobs:
           name: Release ${{ steps.validate_tag.outputs.tag_name }}
           generate_release_notes: true
           draft: true
-          prerelease: ${{ contains(github.ref, '-') }}
+          prerelease: ${{ contains(steps.validate_tag.outputs.tag_name, '-') }}
         env:
           # GitHub token is provided automatically by Actions
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -68,6 +78,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -91,8 +103,8 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=ref,event=tag
-            type=ref,event=release
-            type=raw,value=latest,enable=${{ !github.event.release.prerelease }}
+            type=raw,value=${{ inputs.tag || github.ref_name }}
+            type=raw,value=latest,enable=${{ !contains(inputs.tag || github.ref_name, '-') }}
 
       - name: Build and Push Multi-Arch Docker Image
         uses: docker/build-push-action@v6

@@ -1,7 +1,6 @@
 import sys
 from unittest.mock import MagicMock, patch
 
-sys.modules["streamlit"] = MagicMock()
 from app.components.chunk_alignment_inspector import render_chunk_alignment_inspector
 
 
