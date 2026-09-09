@@ -1,0 +1,3 @@
+libmagic1
+libgomp1
+tesseract-ocr

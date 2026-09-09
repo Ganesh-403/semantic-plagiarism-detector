@@ -9,6 +9,7 @@ plagiarism reports to provide additional context about compared documents.
 """
 
 from __future__ import annotations
+from typing import Any, Iterable
 
 import logging
 import re
@@ -68,6 +69,7 @@ def count_words(text: str, count_hyphenated_as_single: bool = False) -> int:
 # Common abbreviations whose trailing period does not end a sentence. Matched
 # whole-word only — see ``_ABBREVIATION_RE`` for why that matters.
 ABBREVIATIONS = (
+    "al", "ibid", "eg", "ie", "cf", "ed", "eds", "ref",
     "mr",
     "mrs",
     "ms",

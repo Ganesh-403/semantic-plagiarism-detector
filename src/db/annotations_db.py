@@ -19,7 +19,9 @@ from src.models.annotations import AnnotationRecord, AnnotationType
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/annotations.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "annotations.db"
 
 
 @contextmanager
@@ -66,13 +68,13 @@ def initialize_annotations_db(db_path: Optional[Path] = None) -> None:
 
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_annotations_document 
+            CREATE INDEX IF NOT EXISTS idx_annotations_document
             ON annotations(document_id)
         """
         )
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_annotations_user 
+            CREATE INDEX IF NOT EXISTS idx_annotations_user
             ON annotations(user_id)
         """
         )
@@ -91,8 +93,8 @@ def create_annotation(record: AnnotationRecord, db_path: Optional[Path] = None) 
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO annotations 
-                (id, document_id, user_id, username, type, highlight_data, comment_data, 
+                INSERT INTO annotations
+                (id, document_id, user_id, username, type, highlight_data, comment_data,
                  parent_annotation_id, is_resolved, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,

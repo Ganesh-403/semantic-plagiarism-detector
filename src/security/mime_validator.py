@@ -1,6 +1,7 @@
 """Secure MIME validation using magic bytes and container inspection."""
 
 from __future__ import annotations
+from typing import Any
 
 import io
 import logging

@@ -506,15 +506,15 @@ def get_incident_statistics(
         - 'daily_counts': A list of daily incident counts.
     """
     total = get_total_incidents_count(db_path)
-    
+
     # Get distribution by severity
     severity_distribution = {}
     for level in ["High", "Medium", "Low"]:
         severity_distribution[level] = len(get_incidents_by_severity(level, db_path))
-        
+
     # Get daily counts
     daily_counts = get_incidents_count_by_date(db_path)
-    
+
     return {
         "total": total,
         "severity_distribution": severity_distribution,
@@ -1216,7 +1216,7 @@ def query_incidents_paginated(
         # Paginated fetch
         order_sql = f"pi.{sort_by} {sort_order}, pi.incident_id ASC"
         rows = conn.execute(
-            f"""  # nosec
+            f"""
             SELECT pi.incident_id, pi.document_a, pi.document_b,
                    pi.similarity_score, pi.severity_rank,
                    pi.review_status, pi.date_flagged, pi.last_seen,
@@ -1444,3 +1444,117 @@ def log_incident(
         if res.incident_id == target_id:
             return res
     return results[0]
+
+
+def get_last_scheduler_run(
+    job_name: str,
+    db_path: str | Path | None = None,
+) -> dict[str, Any] | None:
+    """Return the last recorded run of a named background job, if any.
+
+    Returns a dict with ``last_run_at``, ``documents_scanned`` and
+    ``new_incidents`` keys, or ``None`` if the job has never completed a
+    run (e.g. on a fresh database, or before the first scheduled tick).
+    """
+    if db_path is None:
+        db_path = DEFAULT_DB_PATH
+    init_incident_db(db_path)
+
+    with closing(_get_connection(db_path)) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """
+            SELECT job_name, last_run_at, documents_scanned, new_incidents
+            FROM scheduler_runs
+            WHERE job_name = ?
+            """,
+            (job_name,),
+        ).fetchone()
+
+    if row is None:
+        return None
+    return {
+        "job_name": row["job_name"],
+        "last_run_at": row["last_run_at"],
+        "documents_scanned": row["documents_scanned"],
+        "new_incidents": row["new_incidents"],
+    }
+
+
+
+def record_scheduler_run(
+    job_name: str,
+    db_path: str | Path | None = None,
+    *,
+    now: str | None = None,
+    documents_scanned: int = 0,
+    new_incidents: int = 0,
+) -> None:
+    """Persist the last-completed run of a named background job.
+
+    Used by :mod:`src.core.scheduler` so the scheduled rescan job is
+    restart-safe: on process restart it can consult
+    :func:`get_last_scheduler_run` instead of assuming no rescan has ever
+    happened.
+    """
+    if db_path is None:
+        db_path = DEFAULT_DB_PATH
+    init_incident_db(db_path)
+    timestamp = now or _utc_now_iso()
+
+    with closing(_get_connection(db_path)) as conn:
+        try:
+            conn.execute(
+                """
+                INSERT INTO scheduler_runs (
+                    job_name, last_run_at, documents_scanned, new_incidents
+                )
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(job_name) DO UPDATE SET
+                    last_run_at = excluded.last_run_at,
+                    documents_scanned = excluded.documents_scanned,
+                    new_incidents = excluded.new_incidents
+                """,
+                (job_name, timestamp, int(documents_scanned), int(new_incidents)),
+            )
+            conn.commit()
+        except sqlite3.Error as exc:
+            conn.rollback()
+            raise sqlite3.Error(f"Failed to record scheduler run: {exc}") from exc
+
+
+
+
+def incident_exists(
+    doc_a: str,
+    doc_b: str,
+    db_path: str | Path | None = None,
+) -> bool:
+    """Return whether an incident already exists for the ``(doc_a, doc_b)`` pair.
+
+    Uses the same pair-normalisation and id derivation as
+    :func:`sync_flagged_incidents`/:func:`build_incident_id`, so this check
+    agrees with what a subsequent sync would (re)write.
+    """
+    if db_path is None:
+        db_path = DEFAULT_DB_PATH
+    init_incident_db(db_path)
+
+    incident_id = build_incident_id(doc_a, doc_b)
+    with closing(_get_connection(db_path)) as conn:
+        row = conn.execute(
+            "SELECT 1 FROM plagiarism_incidents WHERE incident_id = ? LIMIT 1",
+            (incident_id,),
+        ).fetchone()
+    return row is not None
+
+
+
+
+def get_existing_incident_pairs(db_path: str | Path | None = None) -> set[tuple[str, str]]:
+    """Fetch normalized pairs once for deduplication during a batch scan."""
+    path = db_path or DEFAULT_DB_PATH
+    init_incident_db(path)
+    with closing(_get_connection(path)) as conn:
+        rows = conn.execute("SELECT document_a, document_b FROM plagiarism_incidents").fetchall()
+    return {tuple(sorted((row[0], row[1]))) for row in rows}

@@ -444,7 +444,7 @@ def generate_daily_summary_html(stats: dict[str, Any]) -> str:
             <tr>
                 <td align="center" style="padding: 40px 20px;">
                     <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                        
+
                         <!-- Header -->
                         <tr>
                             <td style="background-color: #2563eb; padding: 30px; border-radius: 8px 8px 0 0; text-align: center;">
@@ -456,7 +456,7 @@ def generate_daily_summary_html(stats: dict[str, Any]) -> str:
                                 </p>
                             </td>
                         </tr>
-                        
+
                         <!-- Stats Grid -->
                         <tr>
                             <td style="padding: 30px;">
@@ -478,7 +478,7 @@ def generate_daily_summary_html(stats: dict[str, Any]) -> str:
                                 </table>
                             </td>
                         </tr>
-                        
+
                         <!-- Top Pairs Table -->
                         <tr>
                             <td style="padding: 0 30px 30px 30px;">
@@ -499,7 +499,7 @@ def generate_daily_summary_html(stats: dict[str, Any]) -> str:
                                 </table>
                             </td>
                         </tr>
-                        
+
                         <!-- Footer -->
                         <tr>
                             <td style="padding: 20px 30px; background-color: #f8fafc; border-radius: 0 0 8px 8px; text-align: center;">
@@ -508,7 +508,7 @@ def generate_daily_summary_html(stats: dict[str, Any]) -> str:
                                 </p>
                             </td>
                         </tr>
-                        
+
                     </table>
                 </td>
             </tr>
@@ -581,6 +581,9 @@ def send_email(
     subject: str,
     html_body: str,
     status_callback: Optional[Callable[[bool, str], None]] = None,
+    text_body: str | None = None,
+    attach_csv: bool = True,
+    csv_data: bytes | str | None = None,
     attachment_filename: str = "daily_plagiarism_summary.csv",
     timeout: float = 10.0,
     reply_to: Optional[str] = None,
@@ -622,7 +625,7 @@ def send_email(
         raise ValueError(f"Invalid reply-to email address: {reply_to}")
 
     smtp_server = os.getenv("SMTP_SERVER")
-    
+
     # Issue #3446: Validate SMTP port number range (1 <= port <= 65535) with fallback to default 587
     raw_smtp_port = os.getenv("SMTP_PORT", "587")
     try:

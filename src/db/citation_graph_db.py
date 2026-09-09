@@ -19,7 +19,9 @@ from src.core.citation_extractor import Citation
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/citation_graph.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "citation_graph.db"
 
 
 @contextmanager
@@ -71,7 +73,7 @@ def initialize_citation_db(db_path: Optional[Path] = None) -> None:
 
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_doc_citations_doc 
+            CREATE INDEX IF NOT EXISTS idx_doc_citations_doc
             ON document_citations(document_id)
         """
         )
@@ -92,7 +94,7 @@ def ingest_citations(
                 # Insert node if it doesn't exist
                 conn.execute(
                     """
-                    INSERT OR IGNORE INTO citation_nodes 
+                    INSERT OR IGNORE INTO citation_nodes
                     (node_key, authors, year, title, source)
                     VALUES (?, ?, ?, ?, ?)
                     """,
@@ -102,7 +104,7 @@ def ingest_citations(
                 # Link document to node
                 conn.execute(
                     """
-                    INSERT OR IGNORE INTO document_citations 
+                    INSERT OR IGNORE INTO document_citations
                     (document_id, node_key, cited_at)
                     VALUES (?, ?, ?)
                     """,

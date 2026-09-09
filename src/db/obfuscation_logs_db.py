@@ -17,7 +17,9 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/obfuscation_logs.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "obfuscation_logs.db"
 
 
 @contextmanager
@@ -60,13 +62,13 @@ def initialize_obfuscation_db(db_path: Optional[Path] = None) -> None:
 
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_obfuscation_user 
+            CREATE INDEX IF NOT EXISTS idx_obfuscation_user
             ON obfuscation_logs(user_id)
         """
         )
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_obfuscation_hash 
+            CREATE INDEX IF NOT EXISTS idx_obfuscation_hash
             ON obfuscation_logs(document_hash)
         """
         )
@@ -91,8 +93,8 @@ def log_obfuscation_attempt(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO obfuscation_logs 
-                (document_id, document_hash, user_id, obfuscation_score, 
+                INSERT INTO obfuscation_logs
+                (document_id, document_hash, user_id, obfuscation_score,
                  zero_width_count, homoglyph_count, flagged_indices_count, detected_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
@@ -121,9 +123,9 @@ def get_user_obfuscation_history(
         with get_connection(db_path) as conn:
             cursor = conn.execute(
                 """
-                SELECT * FROM obfuscation_logs 
-                WHERE user_id = ? 
-                ORDER BY detected_at DESC 
+                SELECT * FROM obfuscation_logs
+                WHERE user_id = ?
+                ORDER BY detected_at DESC
                 LIMIT ?
                 """,
                 (user_id, limit),
@@ -139,7 +141,7 @@ from datetime import datetime
 def log_obfuscation_incident(incident_data: dict) -> bool:
     """
     Saves flagged evasion attempts into the 'obfuscation_incidents' schema.
-    
+
     Expected Database Table Structure:
     CREATE TABLE obfuscation_incidents (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

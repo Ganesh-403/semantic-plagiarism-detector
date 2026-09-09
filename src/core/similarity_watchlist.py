@@ -209,6 +209,9 @@ def _connection(db_path: str) -> Generator[sqlite3.Connection, None, None]:
     except Exception:
         conn.rollback()
         raise
+    finally:
+        conn.close()
+        getattr(_connection_pool, "connections", {}).pop(db_path, None)
 
 
 def init_watchlist_db(db_path: str) -> None:
@@ -398,7 +401,7 @@ class SimilarityWatchlistRepository:
                 ):
                     matches.append(entry)
             elif entry.watchlist_type == WatchlistType.DOCUMENT:
-                if document_name in (doc_a, doc_b):
+                if entry.target in (doc_a, doc_b):
                     matches.append(entry)
         return matches
 

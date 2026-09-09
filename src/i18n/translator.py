@@ -214,6 +214,8 @@ def translation_coverage(lang_code: str) -> float:
     if not reference:
         return 1.0
 
+    if not reference:
+        return 0.0
     return 1.0 - len(missing_translation_keys(lang_code)) / len(reference)
 
 

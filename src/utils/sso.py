@@ -170,9 +170,10 @@ def get_google_auth_url() -> Tuple[str, str, Dict[str, Any]]:
 
     redirect_uri = _get_redirect_uri()
     state = f"google_{secrets.token_urlsafe(16)}"
+    code_verifier, code_challenge = generate_pkce_pair()
 
     # Create state data with timestamp for expiration checking
-    state_data = {"token": state, "created_at": time.time(), "provider": "google"}
+    state_data = {"token": state, "created_at": time.time(), "provider": "google", "code_verifier": code_verifier}
 
     try:
         from src.db.auth import store_sso_state
@@ -384,11 +385,13 @@ def get_github_auth_url() -> Tuple[str, str, Dict[str, Any]]:
 
     # Create state data with timestamp for expiration checking
     state_data = {"token": state, "created_at": time.time(), "provider": "github"}
+    from src.db.auth import store_sso_state
+    store_sso_state(state)
 
     query_params = {
         "client_id": client_id,
         "redirect_uri": redirect_uri,
-        "scope": github_scopes,
+        "scope": os.getenv("GITHUB_OAUTH_SCOPES", "read:user user:email"),
         "state": state,
     }
 
@@ -481,6 +484,7 @@ def exchange_github_code(code: str, state: str | None = None) -> tuple[SSOUserPr
         user_data["email"] = None
 
     # GitHub might not return email in /user if it's private, fetch explicitly
+    user_data["email"] = None
     if not user_data.get("email"):
         try:
             emails_resp = session.get(
@@ -513,8 +517,6 @@ def exchange_github_code(code: str, state: str | None = None) -> tuple[SSOUserPr
             )
             if primary_email:
                 user_data["email"] = primary_email
-            elif valid_emails:
-                user_data["email"] = valid_emails[0]["email"]
             else:
                 user_data["email"] = None
 
@@ -581,3 +583,180 @@ def cleanup_expired_states(
         logger.info(f"Cleaned up {expired_count} expired OAuth state tokens")
 
     return valid_states
+
+
+def get_azure_auth_url() -> tuple[str, str]:
+    """Return the Microsoft / Azure AD OAuth authorization URL and state."""
+    _load_env()
+    client_id = os.getenv("AZURE_CLIENT_ID")
+    if not client_id:
+        raise ValueError("AZURE_CLIENT_ID environment variable is not configured")
+    tenant_id = os.getenv("AZURE_TENANT_ID", "common")
+    redirect_uri = _get_redirect_uri()
+    state = f"azure_{secrets.token_urlsafe(16)}"
+
+    try:
+        from src.db.auth import store_sso_state
+        store_sso_state(state)
+    except Exception as e:
+        logger.warning(f"Failed to store Azure SSO state parameter: {e}")
+
+    query_params = {
+        "response_type": "code",
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "scope": "openid profile email User.Read",
+        "state": state,
+        "prompt": "select_account",
+    }
+
+    encoded_args = urllib.parse.urlencode(query_params)
+    url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/authorize?{encoded_args}"
+
+    return url, state
+
+
+
+
+def exchange_azure_code(code: str, state: str | None = None) -> tuple[SSOUserProfile | None, str | None]:
+    """Exchange Azure AD authorization code for access token and fetch user info."""
+    if state is not None:
+        if not verify_sso_state(state):
+            return None, "Invalid or expired SSO state parameter (CSRF protection failed)."
+
+    _load_env()
+    client_id = os.getenv("AZURE_CLIENT_ID")
+    if not client_id:
+        raise ValueError("AZURE_CLIENT_ID environment variable is not configured")
+    client_secret = os.getenv("AZURE_CLIENT_SECRET")
+    if not client_secret:
+        raise ValueError("AZURE_CLIENT_SECRET environment variable is not configured")
+    tenant_id = os.getenv("AZURE_TENANT_ID", "common")
+    redirect_uri = _get_redirect_uri()
+
+    try:
+        token_resp = requests.post(
+            f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
+            data={
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "code": code,
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+                "scope": "openid profile email User.Read",
+            },
+            timeout=10,
+        )
+    except requests.Timeout:
+        logger.error("OAuth token exchange timed out")
+        return None, "SSO provider timed out. Please try again."
+    except Exception as e:
+        logger.error(f"OAuth token exchange unexpected error: {e}")
+        return None, "SSO authentication failed"
+
+    if 400 <= token_resp.status_code < 500:
+        return None, "Invalid or expired SSO authorization code"
+    if not token_resp.ok:
+        return None, "SSO authentication failed"
+
+    token_json = token_resp.json()
+    if token_json.get("error"):
+        logger.error(f"Azure OAuth error response: {token_json.get('error_description') or token_json.get('error')}")
+        return None, "Invalid or expired SSO authorization code"
+
+    access_token = token_json.get("access_token")
+    if not access_token:
+        return None, "Invalid or expired SSO authorization code"
+
+    try:
+        user_info_resp = requests.get(
+            "https://graph.microsoft.com/v1.0/me",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10,
+        )
+    except requests.Timeout:
+        logger.error("OAuth user information request timed out")
+        return None, "SSO provider timed out. Please try again."
+    except Exception as e:
+        logger.error(f"OAuth user information request unexpected error: {e}")
+        return None, "SSO authentication failed"
+
+    if 400 <= user_info_resp.status_code < 500:
+        return None, "Invalid or expired SSO authorization code"
+    if not user_info_resp.ok:
+        return None, "SSO authentication failed"
+
+    user_data = user_info_resp.json()
+    email = user_data.get("mail") or user_data.get("userPrincipalName", "")
+    raw_username = email.split("@")[0] if email else ""
+    username = re.sub(r"[^a-zA-Z0-9_-]", "_", raw_username)
+
+    profile = SSOUserProfile(
+        email=email,
+        username=username,
+        name=user_data.get("displayName", ""),
+        avatar="",
+    )
+    return profile, None
+
+
+
+
+def verify_sso_state_payload(
+    state: str, stored_state: Dict[str, Any]
+) -> Tuple[bool, Optional[str]]:
+    """
+    Verify a state token against the ``state_data`` payload it was issued with.
+
+    This is the stateless counterpart to :func:`verify_sso_state`. That one
+    asks the auth database whether a state row is live and unused; this one
+    checks a token against the dict returned as the third element of
+    :func:`get_google_auth_url` / :func:`get_github_auth_url`, which is useful
+    when the payload is held in the session rather than the database.
+
+    Args:
+        state: The state parameter received from the OAuth callback
+        stored_state: The stored state data containing token and timestamp
+
+    Returns:
+        tuple[bool, Optional[str]]: (is_valid, error_message)
+    """
+    if not stored_state:
+        return False, "Invalid state parameter"
+
+    # Check if stored_state has the expected structure
+    if not isinstance(stored_state, dict):
+        return False, "Invalid state data format"
+
+    # Get the state token and timestamp
+    stored_token = stored_state.get("token")
+    if not stored_token:
+        return False, "Invalid state data: missing token"
+
+    # Verify the state token matches
+    if state != stored_token:
+        return False, "Invalid state token"
+
+    # Check expiration
+    created_at = stored_state.get("created_at")
+    if not created_at:
+        # If no timestamp, treat as invalid for security
+        return False, "Invalid state data: missing timestamp"
+
+    # Handle both string and integer timestamps
+    if isinstance(created_at, str):
+        try:
+            created_at = float(created_at)
+        except ValueError:
+            return False, "Invalid state timestamp format"
+    elif not isinstance(created_at, (int, float)):
+        return False, "Invalid state timestamp type"
+
+    # Check if state has expired
+    current_time = time.time()
+    elapsed_seconds = current_time - created_at
+
+    if elapsed_seconds > STATE_EXPIRATION_SECONDS:
+        return False, f"State token expired (elapsed: {elapsed_seconds:.0f}s, max: {STATE_EXPIRATION_SECONDS}s)"
+
+    return True, None

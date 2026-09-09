@@ -789,6 +789,9 @@ def get_cached_badge(
     return _cache.get(cache_key)
 
 
+SCAN_JOBS_TTL = 86400
+
+
 def cache_scan_job(
     job_id: str,
     data: dict,

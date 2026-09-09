@@ -16,7 +16,9 @@ import uuid
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/watermark_verifications.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "watermark_verifications.db"
 
 
 @contextmanager
@@ -69,19 +71,19 @@ def initialize_watermark_verification_db(db_path: Optional[Path] = None) -> None
 
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_wm_verif_doc 
+            CREATE INDEX IF NOT EXISTS idx_wm_verif_doc
             ON watermark_verifications(document_id)
             """
         )
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_wm_verif_created 
+            CREATE INDEX IF NOT EXISTS idx_wm_verif_created
             ON watermark_verifications(created_at)
             """
         )
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_wm_verif_uid 
+            CREATE INDEX IF NOT EXISTS idx_wm_verif_uid
             ON watermark_verifications(verification_id)
             """
         )
@@ -179,7 +181,7 @@ def log_watermark_verification(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO watermark_verification_logs 
+                INSERT INTO watermark_verification_logs
                 (document_id, z_score, p_value, is_watermarked, analyzed_at)
                 VALUES (?, ?, ?, ?, ?)
                 """,
@@ -233,9 +235,9 @@ def get_verifications_for_document(
         with get_connection(db_path) as conn:
             cursor = conn.execute(
                 """
-                SELECT * FROM watermark_verifications 
-                WHERE document_id = ? 
-                ORDER BY created_at DESC 
+                SELECT * FROM watermark_verifications
+                WHERE document_id = ?
+                ORDER BY created_at DESC
                 LIMIT ? OFFSET ?
                 """,
                 (document_id, limit, offset),
@@ -267,8 +269,8 @@ def list_recent_verifications(
         with get_connection(db_path) as conn:
             cursor = conn.execute(
                 """
-                SELECT * FROM watermark_verifications 
-                ORDER BY created_at DESC 
+                SELECT * FROM watermark_verifications
+                ORDER BY created_at DESC
                 LIMIT ? OFFSET ?
                 """,
                 (limit, offset),

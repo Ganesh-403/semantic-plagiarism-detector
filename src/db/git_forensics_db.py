@@ -4,14 +4,17 @@ src/db/git_forensics_db.py
 SQLite database manager for Git Forensics Logs.
 """
 
-import sqlite3, logging
+import sqlite3
+import logging
 from pathlib import Path
 from typing import Optional
 from contextlib import contextmanager
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
-DEFAULT_DB_PATH = Path("data/git_forensics.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "git_forensics.db"
 
 
 @contextmanager

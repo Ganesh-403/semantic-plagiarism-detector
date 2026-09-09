@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from src.api.middleware import get_current_user_any
+
 import logging
 from typing import Optional
 
@@ -49,7 +51,7 @@ async def register_version(
     assignment_id: str = Query(..., description="Assignment identifier"),
     filename: str = Query("untitled", description="Document filename"),
     content_text: str = Query("", description="Full document text"),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Register a new document version snapshot."""
     try:
@@ -78,7 +80,7 @@ async def list_snapshots(
     assignment_id: Optional[str] = Query(None, description="Filter by assignment"),
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(20, ge=1, le=100, description="Items per page"),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """List document version snapshots with filtering and pagination."""
     try:
@@ -102,7 +104,7 @@ async def list_snapshots(
 )
 async def get_snapshot(
     doc_hash: str,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Retrieve a single version snapshot by document hash."""
     snapshot = version_repo.get_snapshot(doc_hash)
@@ -147,7 +149,7 @@ async def list_lineages(
     assignment_id: Optional[str] = Query(None, description="Filter by assignment"),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """List all tracked version lineages."""
     try:
@@ -171,7 +173,7 @@ async def list_lineages(
 async def get_lineage(
     user_id: str,
     assignment_id: str,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Get the complete version lineage for a user + assignment."""
     lineage = version_repo.get_lineage(user_id, assignment_id)
@@ -220,7 +222,7 @@ async def register_diff(
     removed_words: int = Query(0, ge=0),
     changed_words: int = Query(0, ge=0),
     jaccard_index: float = Query(0.0, ge=0.0, le=1.0),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Register a pairwise diff between two versions."""
     try:
@@ -249,7 +251,7 @@ async def register_diff(
 async def get_diff(
     parent_hash: str,
     child_hash: str,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Get the diff record between two versions."""
     diff = version_repo.get_diff(parent_hash, child_hash)
@@ -266,7 +268,7 @@ async def get_diff(
 )
 async def get_diffs_for_version(
     doc_hash: str,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Get all diffs involving a specific version."""
     diffs = version_repo.get_diffs_for_version(doc_hash)
@@ -285,7 +287,7 @@ async def get_diffs_for_version(
     },
 )
 async def analytics_summary(
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Return aggregate statistics across all versions."""
     return version_repo.analytics_summary()
@@ -300,7 +302,7 @@ async def analytics_summary(
 async def similarity_trend(
     user_id: str,
     assignment_id: str,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Return the similarity trend across versions for a lineage."""
     trend = version_repo.similarity_trend(user_id, assignment_id)
@@ -320,7 +322,7 @@ async def similarity_trend(
 )
 async def most_revised(
     limit: int = Query(10, ge=1, le=50),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Return documents with the most versions."""
     return {"documents": version_repo.most_revised_documents(limit=limit)}
@@ -334,7 +336,7 @@ async def most_revised(
 )
 async def highest_drift(
     limit: int = Query(10, ge=1, le=50),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Return documents with the most drift between versions."""
     return {"documents": version_repo.highest_drift_documents(limit=limit)}

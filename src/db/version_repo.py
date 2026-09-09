@@ -47,7 +47,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/version_repo.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "version_repo.db"
 
 
 # ---------------------------------------------------------------------------
@@ -305,7 +307,7 @@ class DocumentSnapshotRepository:
 
             offset = (page - 1) * per_page
             cursor = conn.execute(
-                f"""SELECT * FROM document_snapshots{where}  # nosec
+                f"""SELECT * FROM document_snapshots{where}
                     ORDER BY created_at DESC LIMIT ? OFFSET ?""",
                 params + [per_page, offset],
             )
@@ -382,7 +384,7 @@ class DocumentSnapshotRepository:
 
             offset = (page - 1) * per_page
             cursor = conn.execute(
-                f"""SELECT * FROM version_lineage{where}  # nosec
+                f"""SELECT * FROM version_lineage{where}
                     ORDER BY last_created DESC LIMIT ? OFFSET ?""",
                 params + [per_page, offset],
             )

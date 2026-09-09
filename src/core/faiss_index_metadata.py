@@ -40,7 +40,7 @@ class IndexMetadata:
     total_vectors: int
     vector_mappings: Dict[int, Dict[str, Any]]
     deleted_vector_ids: List[int]
-    corpus_hash: Optional[str]
+    corpus_hash: Optional[str] = None
 
     embedding_model_identifier: Optional[str] = None
     embedding_model_version: Optional[str] = None
@@ -51,7 +51,7 @@ class IndexMetadata:
 class FAISSIndexMetadata:
     """
     Manages FAISS vector-to-document mappings and index state.
-    
+
     Enables incremental operations: add, update, delete vectors without
     rebuilding the entire index.
     """
@@ -70,14 +70,14 @@ class FAISSIndexMetadata:
     def __init__(self, metadata_path: Optional[str] = None):
         """
         Initialize metadata manager.
-        
+
         Args:
             metadata_path: Path to faiss_index_metadata.json. If None, uses default.
         """
         if metadata_path is None:
             from src.core.config import FAISS_INDEX_METADATA_PATH
             metadata_path = FAISS_INDEX_METADATA_PATH
-        
+
         self.metadata_path = metadata_path
         self.metadata: Optional[IndexMetadata] = None
         self.load()
@@ -85,7 +85,7 @@ class FAISSIndexMetadata:
     def load(self) -> bool:
         """
         Load metadata from disk, or initialize new if doesn't exist.
-        
+
         Returns:
             True if loaded from disk, False if newly initialized.
         """
@@ -93,7 +93,7 @@ class FAISSIndexMetadata:
             try:
                 with open(self.metadata_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                
+
                 self.metadata = IndexMetadata(
                     index_id=data.get("index_id", "default"),
                     created_at=data.get("created_at", datetime.now().isoformat()),
@@ -137,32 +137,19 @@ class FAISSIndexMetadata:
             total_vectors=0,
             vector_mappings={},
             deleted_vector_ids=[],
-                    corpus_hash=data.get("corpus_hash"),
-                    embedding_model_identifier=data.get(
-                        "embedding_model_identifier"
-                    ),
-                    embedding_model_version=data.get(
-                        "embedding_model_version"
-                    ),
-                    embedding_dimension=data.get("embedding_dimension"),
-                    embedding_normalization_strategy=data.get(
-                        "embedding_normalization_strategy"
-                    ),
-                    vector_schema_version=data.get(
-                        "vector_schema_version"
-                    ),
-                )
+        )
+
     def save(self) -> str:
         """
         Persist metadata to disk.
-        
+
         Returns:
             Path where metadata was saved.
         """
         if self.metadata is None:
             self._init_new()
 
-        os.makedirs(os.path.dirname(self.metadata_path), exist_ok=True)
+        os.makedirs(os.path.dirname(self.metadata_path) or ".", exist_ok=True)
 
         data = {
             "index_id": self.metadata.index_id,
@@ -197,7 +184,7 @@ class FAISSIndexMetadata:
     ) -> None:
         """
         Register a new vector in the index.
-        
+
         Args:
             vector_id: FAISS vector ID (assigned by index).
             doc_name: Name of source document.
@@ -218,7 +205,7 @@ class FAISSIndexMetadata:
     def remove_vector(self, vector_id: int) -> None:
         """
         Mark a vector as deleted (soft delete for consistency).
-        
+
         Args:
             vector_id: FAISS vector ID to remove.
         """
@@ -227,10 +214,10 @@ class FAISSIndexMetadata:
 
         if vector_id in self.metadata.vector_mappings:
             del self.metadata.vector_mappings[vector_id]
-        
+
         if vector_id not in self.metadata.deleted_vector_ids:
             self.metadata.deleted_vector_ids.append(vector_id)
-        
+
         self.metadata.total_vectors = len(self.metadata.vector_mappings)
 
     def update_vector(
@@ -240,7 +227,7 @@ class FAISSIndexMetadata:
     ) -> None:
         """
         Update embedding text for an existing vector.
-        
+
         Args:
             vector_id: FAISS vector ID.
             embedding_text: New embedding text.
@@ -255,10 +242,10 @@ class FAISSIndexMetadata:
     def get_vector_mapping(self, vector_id: int) -> Optional[Dict[str, Any]]:
         """
         Look up mapping for a single vector.
-        
+
         Args:
             vector_id: FAISS vector ID.
-        
+
         Returns:
             Mapping dict or None if not found.
         """
@@ -269,10 +256,10 @@ class FAISSIndexMetadata:
     def get_vectors_for_document(self, doc_name: str) -> List[int]:
         """
         Find all vector IDs belonging to a document.
-        
+
         Args:
             doc_name: Document name.
-        
+
         Returns:
             List of vector IDs.
         """
@@ -288,10 +275,10 @@ class FAISSIndexMetadata:
     def validate_consistency(self, index_size: int) -> bool:
         """
         Check if metadata matches actual index size.
-        
+
         Args:
             index_size: Number of vectors in FAISS index.
-        
+
         Returns:
             True if consistent, False if mismatch.
         """

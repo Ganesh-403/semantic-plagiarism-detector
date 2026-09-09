@@ -311,13 +311,9 @@ CALIBRATED_THRESHOLDS_PATH: Final[str] = os.path.join(
 )
 
 # Incremental FAISS index metadata (Issue #3913)
-FAISS_INDEX_METADATA_PATH: Final[str] = os.path.join(
-    os.path.dirname(__file__),
-    "..",
-    "..",
-    "config",
-    "faiss_index_metadata.json",
-)
+from src.core.app_config import _STATE_ROOT
+
+FAISS_INDEX_METADATA_PATH: Final[str] = str(_STATE_ROOT / "config" / "faiss_index_metadata.json")
 
 # Enable incremental index updates instead of full rebuild
 INCREMENTAL_INDEX_ENABLED: Final[bool] = os.getenv(
@@ -540,6 +536,6 @@ def get_offline_config() -> dict[str, Any]:
 
 def test_branding_config_path_exists():
     """Test that BRANDING_CONFIG_PATH resolves to an existing file."""
-    config_path = config_module.BRANDING_CONFIG_PATH  # noqa: F821
+    config_path = BRANDING_CONFIG_PATH  # noqa: F821
 
     assert os.path.isfile(config_path)

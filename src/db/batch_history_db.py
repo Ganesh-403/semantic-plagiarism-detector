@@ -36,7 +36,9 @@ _pool_lock = threading.Lock()
 # a dedicated file via src.core.app_config.
 import atexit
 
-_DB_PATH: str | os.PathLike = "plagiarism_detector.db"
+from src.core.app_config import _STATE_ROOT
+
+_DB_PATH: str | os.PathLike = _STATE_ROOT / "plagiarism_detector.db"
 
 
 def _cleanup_all_connections() -> None:

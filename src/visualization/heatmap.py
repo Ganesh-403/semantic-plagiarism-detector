@@ -84,7 +84,7 @@ except ImportError:
         return None
 
     # Default Plotly font family
-    DEFAULT_FONT_FAMILY: str = "Inter, sans-serif"
+DEFAULT_FONT_FAMILY: str = "Inter, sans-serif"
 
 
 # ── Security & Sanitization ────────────────────────────────────────────────────
@@ -401,6 +401,8 @@ def plot_similarity_heatmap(
                 )
                 legend.get_frame().set_edgecolor(theme_colors.get("border", "#E2E8F0"))
 
+        fig.tight_layout()
+        return fig
 
 # ── Interactive Visualization (Plotly) ─────────────────────────────────────────
 def plot_similarity_heatmap_plotly(
@@ -409,6 +411,7 @@ def plot_similarity_heatmap_plotly(
     threshold: float = PLAGIARISM_THRESHOLD,
     theme_colors: Optional[dict[str, str]] = None,
     colorscale: str = "Viridis",
+    colormap_name: str | None = None,
     show_annotations: bool = True,
     mask_threshold: Optional[float] = None,
     log_scale: bool = False,
@@ -453,7 +456,7 @@ def plot_similarity_heatmap_plotly(
     except MatplotlibInjectionError:
         safe_title = "Semantic Similarity Matrix"
 
-    cmap = PLOTLY_CMAP_MAPPING.get(colormap_name, "Viridis")  # noqa: F821
+    cmap = PLOTLY_CMAP_MAPPING.get(colormap_name, colorscale)  # noqa: F821
 
     try:
         clean_df = validate_similarity_matrix(similarity_df)
@@ -538,8 +541,8 @@ def plot_similarity_heatmap_plotly(
             text=hover_text,
             hovertemplate="%{text}",
             colorscale=colorscale,
-            zmin=0.0,
-            zmax=1.0,
+            zmin=zmin,
+            zmax=zmax,
             colorbar=dict(title="Cosine Similarity", thickness=15, tickformat=".0%"),
             xgap=2,
             ygap=2,

@@ -1,5 +1,7 @@
 """src/api/routers/corpus.py - Corpus document management and reset router."""
 
+from src.api.middleware import get_current_user_any
+
 import logging
 import os
 
@@ -29,7 +31,7 @@ INDEX_PATH = str(FAISS_INDEX_PATH)
     },
 )
 async def get_corpus_stats_endpoint(
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """
     Retrieve high-level statistics about the stored corpus including total documents,

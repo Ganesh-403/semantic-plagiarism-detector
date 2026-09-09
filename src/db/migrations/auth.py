@@ -6,7 +6,7 @@ import sys
 
 from .common import column_exists, run_migrations
 
-AUTH_SCHEMA_VERSION = 17
+AUTH_SCHEMA_VERSION = 18
 
 
 def migration_001_create_users(
@@ -48,8 +48,8 @@ def migration_003_add_two_factor_fields(
             """)
 
 
-def migration_005_add_preferences(db_cursor):
-    db_cursor.execute("ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}'")
+def migration_005_add_preferences(db_connection):
+    db_connection.execute("ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}'")
 
 
 def migration_004_add_role_index(
@@ -224,56 +224,16 @@ def migration_016_add_audit_log_indexes(
         """)
 
 
-def migration_017_drop_is_active(
-    connection: sqlite3.Connection,
-) -> None:
-    """Drop deprecated is_active column using the table rebuild pattern."""
-    if not column_exists(connection, "users", "is_active"):
-        return
+def migration_017_drop_is_active(connection: sqlite3.Connection) -> None:
+    """Drop only the deprecated column, preserving custom columns and references."""
+    if column_exists(connection, "users", "is_active"):
+        connection.execute("ALTER TABLE users DROP COLUMN is_active")
 
-    connection.execute("""
-        CREATE TABLE users_temp (
-            id                    INTEGER PRIMARY KEY AUTOINCREMENT,
-            username              TEXT UNIQUE NOT NULL,
-            password              TEXT NOT NULL,
-            role                  TEXT NOT NULL DEFAULT 'teacher',
-            tour_completed        INTEGER NOT NULL DEFAULT 0,
-            otp_secret            TEXT DEFAULT NULL,
-            two_factor_enabled    INTEGER NOT NULL DEFAULT 0,
-            preferences           TEXT DEFAULT '{}',
-            theme                 TEXT NOT NULL DEFAULT 'light',
-            last_login_at         TEXT DEFAULT NULL,
-            password_changed_at   TEXT DEFAULT NULL,
-            version               INTEGER DEFAULT 1,
-            status                TEXT NOT NULL DEFAULT 'active',
-            must_change_password  INTEGER NOT NULL DEFAULT 0
-        )
-    """)
 
-    connection.execute("""
-        INSERT INTO users_temp (
-            id, username, password, role, tour_completed, otp_secret,
-            two_factor_enabled, preferences, theme, last_login_at,
-            password_changed_at, version, status, must_change_password
-        )
-        SELECT
-            id, username, password, role,
-            COALESCE(tour_completed, 0),
-            otp_secret,
-            COALESCE(two_factor_enabled, 0),
-            COALESCE(preferences, '{}'),
-            COALESCE(theme, 'light'),
-            last_login_at,
-            password_changed_at,
-            COALESCE(version, 1),
-            COALESCE(status, 'active'),
-            COALESCE(must_change_password, 0)
-        FROM users
-    """)
-
-    connection.execute("DROP TABLE users")
-    connection.execute("ALTER TABLE users_temp RENAME TO users")
-    connection.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)")
+def migration_018_add_password_expiration(connection: sqlite3.Connection) -> None:
+    """Restore the expiration field required by the authentication API."""
+    if not column_exists(connection, "users", "password_expires_at"):
+        connection.execute("ALTER TABLE users ADD COLUMN password_expires_at TEXT")
 
 
 def _discover_migrations() -> dict[int, callable]:
@@ -382,6 +342,10 @@ def down_017_drop_is_active(connection: sqlite3.Connection) -> None:
         """)
 
 
+def down_018_add_password_expiration(connection: sqlite3.Connection) -> None:
+    _drop_column_if_exists(connection, "users", "password_expires_at")
+
+
 AUTH_DOWN_MIGRATIONS = {
     1: down_001_create_users,
     2: down_002_add_onboarding_state,
@@ -400,6 +364,7 @@ AUTH_DOWN_MIGRATIONS = {
     15: down_015_add_must_change_password,
     16: down_016_add_audit_log_indexes,
     17: down_017_drop_is_active,
+    18: down_018_add_password_expiration,
 }
 
 
@@ -412,4 +377,3 @@ def migrate_auth_database(
         migrations=AUTH_MIGRATIONS,
         target_version=AUTH_SCHEMA_VERSION,
     )
-

@@ -31,6 +31,16 @@ _registry = REGISTRY if PROMETHEUS_METRICS_ENABLED else None
 
 # ── Counters ───────────────────────────────────────────────────────────────────
 
+auth_failures_total = Counter(
+    "spd_auth_failures_total", "Total authentication failures", ["reason"], registry=_registry
+)
+
+
+def record_auth_failure(reason: str) -> None:
+    """Record a failure reason without storing usernames or tokens in metrics."""
+    auth_failures_total.labels(reason=reason).inc()
+
+
 documents_total = Counter(
     "spd_documents_total",
     "Cumulative number of documents ingested since process start. "
@@ -49,6 +59,7 @@ plagiarism_incidents_total = Counter(
     "spd_plagiarism_incidents_total",
     "Total plagiarism incidents flagged",
     ["severity"],
+    registry=_registry,
 )
 
 uploads_total = Counter(
@@ -62,18 +73,21 @@ cache_hits_total = Counter(
     "spd_cache_hits_total",
     "Total cache hits",
     labelnames=["cache_type"],
+    registry=_registry,
 )
 
 cache_misses_total = Counter(
     "spd_cache_misses_total",
     "Total cache misses",
     labelnames=["cache_type"],
+    registry=_registry,
 )
 
 ocr_invocations_total = Counter(
     "spd_ocr_invocations_total",
     "Total OCR extraction attempts",
     ["status"],
+    registry=_registry,
 )
 
 # ── Gauges ─────────────────────────────────────────────────────────────────────
@@ -106,11 +120,13 @@ active_users_gauge = Gauge(
 active_threads_gauge = Gauge(
     "spd_active_threads",
     "Active Python threads",
+    registry=_registry,
 )
 
 faiss_vectors_gauge = Gauge(
     "spd_faiss_vectors_total",
     "Number of vectors in FAISS index",
+    registry=_registry,
 )
 # ── Histograms ─────────────────────────────────────────────────────────────────
 
@@ -126,12 +142,14 @@ spd_scan_duration_seconds = Histogram(
     "spd_scan_duration_seconds",
     "Scan stage duration in seconds",
     ["stage"],
+    registry=_registry,
 )
 
 spd_doc_parse_seconds = Histogram(
     "spd_doc_parse_seconds",
     "Document parsing time in seconds",
     ["extension"],
+    registry=_registry,
 )
 
 doc_parse_seconds = spd_doc_parse_seconds
@@ -180,6 +198,8 @@ def timed(stage: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
 def generate_latest(*args: Any, **kwargs: Any) -> bytes:
     """Prometheus text exposition; refresh thread count before each scrape."""
     active_threads_gauge.set(threading.active_count())
+    if not args and "registry" not in kwargs:
+        kwargs["registry"] = REGISTRY
     return _prometheus_generate_latest(*args, **kwargs)
 
 
@@ -187,10 +207,8 @@ def generate_metrics_json() -> dict[str, Any]:
     """Return all metrics as a JSON-serialisable dict for non-Prometheus consumers."""
     if not PROMETHEUS_METRICS_ENABLED:
         return {}
-    from prometheus_client.parser import text_string_to_metric_families
-
-    raw = generate_latest().decode("utf-8")
-    families = list(text_string_to_metric_families(raw))
+    active_threads_gauge.set(threading.active_count())
+    families = REGISTRY.collect()
 
     metrics: dict[str, Any] = {}
     for family in families:

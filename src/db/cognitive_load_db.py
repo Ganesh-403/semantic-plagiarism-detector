@@ -12,7 +12,9 @@ from contextlib import contextmanager
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
-DEFAULT_DB_PATH = Path("data/cognitive_load.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "cognitive_load.db"
 
 
 @contextmanager

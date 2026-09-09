@@ -92,6 +92,7 @@ class FileValidator:
         self,
         max_size_bytes: int = MAX_FILE_SIZE_BYTES,
         allowed_extensions: Optional[set] = None,
+        strict_mode: bool = False,
     ):
         """Initialize the FileValidator with configurable limits.
 
@@ -103,6 +104,7 @@ class FileValidator:
                 warning and passing (Issue #3201). Off by default so existing
                 callers keep the permissive behaviour.
         """
+        self.strict_mode = strict_mode
         self.max_size_bytes = max_size_bytes
         self.allowed_extensions = allowed_extensions or ALLOWED_EXTENSIONS
 

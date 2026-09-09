@@ -46,7 +46,9 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/anomaly_alerts.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "anomaly_alerts.db"
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +234,7 @@ class AnomalyAlertRepository:
 
             offset = (page - 1) * per_page
             cursor = conn.execute(
-                f"""SELECT * FROM anomaly_scans{where}  # nosec
+                f"""SELECT * FROM anomaly_scans{where}
                     ORDER BY started_at DESC LIMIT ? OFFSET ?""",
                 params + [per_page, offset],
             )
@@ -345,7 +347,7 @@ class AnomalyAlertRepository:
 
             offset = (page - 1) * per_page
             cursor = conn.execute(
-                f"""SELECT * FROM anomaly_alerts{where}  # nosec
+                f"""SELECT * FROM anomaly_alerts{where}
                     ORDER BY detected_at DESC LIMIT ? OFFSET ?""",
                 params + [per_page, offset],
             )
@@ -549,7 +551,7 @@ class AnomalyAlertRepository:
 
         with self._conn() as conn:
             conn.execute(
-                f"UPDATE anomaly_config SET {set_clause} WHERE id = 1",  # nosec
+                f"UPDATE anomaly_config SET {set_clause}, updated_at = ? WHERE id = 1",  # nosec
                 values,
             )
         return self.get_config()

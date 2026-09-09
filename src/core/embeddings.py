@@ -15,12 +15,20 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 # Load a lightweight, fast model for semantic embeddings.
-_model = SentenceTransformer("all-MiniLM-L6-v2")
+_model = None
+_model_lock = __import__("threading").RLock()
+
+def _get_model():
+    global _model
+    with _model_lock:
+        if _model is None:
+            _model = SentenceTransformer("all-MiniLM-L6-v2")
+        return _model
 
 
 def _encode_batch(text_batch: Sequence[str]) -> np.ndarray:
     """Encode one ordered batch through the shared model."""
-    encoded = _model.encode(
+    encoded = _get_model().encode(
         list(text_batch),
         convert_to_numpy=True,
     )

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from src.api.middleware import get_current_user_any
+
 import logging
 from typing import Optional
 
@@ -40,7 +42,7 @@ router = APIRouter(tags=["Similarity Heatmap & Clustering"])
 async def compute_heatmap(
     request: Request,
     notes: Optional[str] = Query(None, description="Optional notes for this snapshot"),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """
     Compute the pairwise similarity heatmap from the current corpus embeddings
@@ -117,7 +119,7 @@ async def compute_heatmap(
 async def get_heatmap_snapshot(
     snapshot_id: int,
     request: Request,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """Retrieve a saved heatmap snapshot with its full matrix."""
     try:
@@ -158,7 +160,7 @@ async def list_heatmap_snapshots(
     request: Request,
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """List all heatmap snapshots."""
     offset = (page - 1) * per_page
@@ -216,7 +218,7 @@ async def compute_clustering(
     threshold: float = Query(0.5, ge=0.0, le=1.0, description="Distance threshold"),
     linkage: str = Query("single", description="Linkage method"),
     snapshot_id: Optional[int] = Query(None, description="Link to a heatmap snapshot"),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Compute document clustering from corpus embeddings."""
     try:
@@ -285,7 +287,7 @@ async def compute_clustering(
 async def list_clustering_results(
     request: Request,
     limit: int = Query(20, ge=1, le=100),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """List past clustering results."""
     results = heatmap_repo.list_clusterings(limit=limit)
@@ -319,7 +321,7 @@ async def list_hotspots(
     unresolved_only: bool = Query(False, description="Only unresolved"),
     min_similarity: Optional[float] = Query(None, description="Min similarity"),
     limit: int = Query(50, ge=1, le=200),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """List similarity hotspots (high-similarity document pairs)."""
     hotspots = heatmap_repo.get_hotspots(
@@ -340,7 +342,7 @@ async def list_hotspots(
 async def resolve_hotspot(
     hotspot_id: int,
     request: Request,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Mark a similarity hotspot as resolved."""
     resolved = heatmap_repo.resolve_hotspot(hotspot_id)
@@ -359,7 +361,7 @@ async def resolve_hotspot(
 )
 async def get_hotspot_summary(
     request: Request,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """Get summary statistics for similarity hotspots."""
     summary = heatmap_repo.get_hotspot_summary()

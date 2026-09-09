@@ -17,7 +17,9 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/drift_alerts.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "drift_alerts.db"
 
 
 @contextmanager
@@ -54,7 +56,7 @@ def initialize_drift_db(db_path: Optional[Path] = None) -> None:
         )
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_drift_doc 
+            CREATE INDEX IF NOT EXISTS idx_drift_doc
             ON drift_alerts(document_id)
         """
         )
@@ -70,7 +72,7 @@ def log_drift_alert(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO drift_alerts 
+                INSERT INTO drift_alerts
                 (document_id, changepoints_json, max_confidence, analyzed_at)
                 VALUES (?, ?, ?, ?)
                 """,

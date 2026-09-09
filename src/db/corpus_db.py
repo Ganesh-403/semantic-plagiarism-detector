@@ -28,6 +28,7 @@ Enables incremental updates and index rebuilding without re-embedding.
 """
 
 from __future__ import annotations
+from typing import Any
 
 import logging
 import os
@@ -391,8 +392,11 @@ def init_corpus_db() -> None:
         )
 
 
-_in_memory_total_scans = 0
+    from src.db.migrations.corpus import migrate_corpus_database
+    with _connect() as conn:
+        migrate_corpus_database(conn)
 
+_in_memory_total_scans = 0
 
 def increment_total_scans() -> int:
     """Increment the total scan count in Redis (if available) or SQLite system_metrics."""
@@ -981,7 +985,7 @@ def batch_soft_delete_documents(doc_ids: list[int]) -> int:
 
     with _connect() as conn:
         conn.execute(
-            f"""  # nosec
+            f"""
             INSERT INTO deleted_chunks (vector_id, filename, chunk_index, chunk_text, embedding)
             SELECT vector_id, filename, chunk_index, chunk_text, embedding
             FROM chunks
@@ -990,7 +994,7 @@ def batch_soft_delete_documents(doc_ids: list[int]) -> int:
             tuple(doc_ids),
         )
         conn.execute(
-            f"""  # nosec
+            f"""
             DELETE FROM chunks
             WHERE filename IN (SELECT filename FROM documents WHERE id IN ({placeholders}))
             """,
@@ -1185,7 +1189,7 @@ def get_chunks_for_documents(
     placeholders = ",".join("?" for _ in filenames)
     with _connect() as conn:
         rows = conn.execute(
-            f"""  # nosec
+            f"""
             SELECT filename, chunk_text, embedding
             FROM chunks
             WHERE filename IN ({placeholders})

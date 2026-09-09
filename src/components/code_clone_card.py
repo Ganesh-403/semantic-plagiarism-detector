@@ -51,11 +51,11 @@ def render_code_clone_card(clone: Dict[str, Any]) -> str:
                 {overall_pct}% Clone Score
             </span>
         </div>
-        
+
         <h4 style="color: white; font-weight: 900; margin: 0 0 8px 0;">
             Source: {clone.get("source_file_id")} vs Target: {clone.get("target_file_id")}
         </h4>
-        
+
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;">
             <div style="background: rgba(2, 6, 23, 0.6); padding: 12px; border-radius: 12px; border: 1px solid rgba(30, 41, 59, 1);">
                 <span style="color: #94A3B8; font-size: 11px;">AST Structural Sim:</span>
@@ -68,7 +68,10 @@ def render_code_clone_card(clone: Dict[str, Any]) -> str:
         </div>
     </div>
     """
-    Renders enterprise Streamlit UI widgets for source code clone detection,
+
+
+class CodeCloneCard:
+    """Renders enterprise Streamlit UI widgets for source code clone detection,
     Jaccard similarity telemetry, and AST token sequence comparisons.
     """
 

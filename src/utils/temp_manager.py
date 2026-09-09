@@ -68,7 +68,7 @@ def cleanup_registered_temp_paths() -> None:
                 os.remove(path)
             elif os.path.isdir(path):
                 if sys.version_info >= (3, 12):
-                    shutil.rmtree(path, on_exc=_on_rmtree_error)
+                    shutil.rmtree(path, onexc=_on_rmtree_error)
                 else:
                     shutil.rmtree(path, onerror=_on_rmtree_error)
         except OSError as exc:
@@ -139,7 +139,7 @@ def create_managed_temp_file(
     suffix: Optional[str] = None, prefix: Optional[str] = None
 ) -> str:
     """Creates a temporary file on disk and registers it for automatic deletion on exit."""
-    fd, temp_path = tempfile.mkstemp(suffix=suffix, prefix=prefix)
+    fd, temp_path = tempfile.mkstemp(suffix=suffix, prefix=prefix or "spd_")
     try:
         os.close(fd)
         register_temp_path(temp_path)
@@ -183,20 +183,22 @@ def managed_temp_file(
 def create_managed_temp_dir(    suffix: Optional[str] = None, prefix: Optional[str] = None
 ) -> str:
     """Creates a temporary directory on disk and registers it for automatic deletion on exit."""
-    temp_dir = tempfile.mkdtemp(suffix=suffix, prefix=prefix)
+    temp_dir = tempfile.mkdtemp(suffix=suffix, prefix=prefix or "spd_")
     register_temp_path(temp_dir)
     return temp_dir
 
 
-def purge_expired_temp_files(max_age_seconds: int = 7200) -> int:
+def purge_expired_temp_files(max_age_seconds: int = 7200, prefix: str = "spd_") -> int:
     """
     Scans the system temp directory and removes files whose last modification
-    time is older than max_age_seconds (default: 2 hours). Hardened against 
+    time is older than max_age_seconds (default: 2 hours). Hardened against
     symlink traversal attacks (Issue #3179).
 
     Returns:
         int: Number of files purged.
     """
+    if not prefix:
+        raise ValueError("A nonempty application-owned prefix is required")
     temp_dir = tempfile.gettempdir()
     now = time.time()
     purged_count = 0
@@ -205,10 +207,12 @@ def purge_expired_temp_files(max_age_seconds: int = 7200) -> int:
     try:
         with os.scandir(temp_dir) as entries:
             for entry in entries:
+                if not entry.name.startswith(prefix):
+                    continue
                 try:
                     # Hardening: Check and safely handle symlinks without following them
                     if entry.is_symlink():
-                        entry.unlink()
+                        os.unlink(entry.path)
                         purged_count += 1
                         continue
 
@@ -218,7 +222,7 @@ def purge_expired_temp_files(max_age_seconds: int = 7200) -> int:
                     # Hardening: Pass follow_symlinks=False explicitly to stat()
                     file_stat = entry.stat(follow_symlinks=False)
                     age_seconds = now - file_stat.st_mtime
-                    
+
                     if age_seconds > max_age_seconds:
                         file_size = file_stat.st_size
                         os.remove(entry.path)

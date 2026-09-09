@@ -20,7 +20,9 @@ from src.core.rubric_engine import Rubric, RubricCriterion, CriterionType
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/rubrics.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "rubrics.db"
 
 
 @contextmanager
@@ -72,7 +74,7 @@ def initialize_rubrics_db(db_path: Optional[Path] = None) -> None:
 
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_grading_user 
+            CREATE INDEX IF NOT EXISTS idx_grading_user
             ON grading_records(user_id)
         """
         )

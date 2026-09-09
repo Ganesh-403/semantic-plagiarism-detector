@@ -17,7 +17,9 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/reviewer_calibration.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "reviewer_calibration.db"
 
 
 @contextmanager
@@ -25,7 +27,7 @@ def get_connection(db_path: Optional[Path] = None):
     """Context manager for acquiring and releasing SQLite connections."""
     path = db_path or DEFAULT_DB_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
@@ -52,7 +54,7 @@ def initialize_calibration_db(db_path: Optional[Path] = None) -> None:
                 created_at TEXT NOT NULL
             )
         """)
-        
+
         conn.execute("""
             CREATE TABLE IF NOT EXISTS reviewer_metrics (
                 reviewer_id TEXT PRIMARY KEY,
@@ -63,12 +65,12 @@ def initialize_calibration_db(db_path: Optional[Path] = None) -> None:
                 updated_at TEXT NOT NULL
             )
         """)
-        
+
         conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_overrides_reviewer 
+            CREATE INDEX IF NOT EXISTS idx_overrides_reviewer
             ON review_overrides(reviewer_id)
         """)
-        
+
     logger.info("Reviewer calibration database initialized at %s", db_path or DEFAULT_DB_PATH)
 
 
@@ -84,7 +86,7 @@ def log_review_override(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO review_overrides 
+                INSERT INTO review_overrides
                 (reviewer_id, document_id, automated_score, manual_score, created_at)
                 VALUES (?, ?, ?, ?, ?)
                 """,
@@ -107,7 +109,7 @@ def update_reviewer_metrics(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO reviewer_metrics 
+                INSERT OR REPLACE INTO reviewer_metrics
                 (reviewer_id, mean_error, mean_absolute_error, variance, calibration_weight, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,

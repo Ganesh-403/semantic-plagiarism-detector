@@ -71,14 +71,8 @@ from src.core.parsers.text_parser import (
     _rtf_content_within_limit,
 )
 
-try:
-    import defusedxml.lxml
+from defusedxml import ElementTree as safe_etree
 
-    defusedxml.lxml.monkey_patch()
-except (AttributeError, ImportError):
-    logger.critical(
-        "defusedxml.lxml is unavailable; falling back to standard XML parsing, which is insecure and vulnerable to XXE attacks."
-    )
 from urllib.parse import urlparse
 
 import docx

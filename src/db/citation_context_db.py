@@ -14,7 +14,9 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/citation_context.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "citation_context.db"
 
 
 @contextmanager
@@ -67,7 +69,7 @@ def log_citation_alignment(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO citation_context_logs 
+                INSERT INTO citation_context_logs
                 (document_id, citation_id, alignment_score, is_bluffing, analyzed_at)
                 VALUES (?, ?, ?, ?, ?)
                 """,

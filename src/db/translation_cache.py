@@ -24,6 +24,7 @@ import hashlib
 import logging
 import os
 import sqlite3
+from contextlib import closing
 import threading
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -46,7 +47,9 @@ cache_hits = 0
 cache_misses = 0
 
 # Issue #1956 & #2985 Cache DB Path
-_CACHE_DB_PATH = _REPO_ROOT / "data" / "translation_cache.db"
+from src.core.app_config import DATA_DIR
+
+_CACHE_DB_PATH = DATA_DIR / "translation_cache.db"
 _lock = threading.Lock()
 _CORRUPTION_MESSAGE = "database disk image is malformed"
 
@@ -331,8 +334,8 @@ def _recover_corrupted_cache() -> None:
 
 def get_cached_translation(
     source_text: str,
-    source_lang: str,
-    target_lang: str,
+    source_lang: str = "auto",
+    target_lang: str = "en",
     db_path: Optional[Path] = None,
     conn: Optional[sqlite3.Connection] = None,
 ) -> Optional[str]:
@@ -348,6 +351,10 @@ def get_cached_translation(
     Returns:
         The translated text string, or None if not cached.
     """
+    if db_path is None and conn is None:
+        legacy = get_legacy_cached_translation(source_text, source_lang, target_lang)
+        if legacy is not None:
+            return legacy
     if not source_text:
         return None
 
@@ -370,8 +377,8 @@ def get_cached_translation(
                     # Update last_accessed_at for potential LRU tracking
                     conn.execute(
                         """
-                        UPDATE translation_cache 
-                        SET last_accessed_at = ? 
+                        UPDATE translation_cache
+                        SET last_accessed_at = ?
                         WHERE source_hash = ?
                         """,
                         (datetime.utcnow().isoformat(), source_hash),
@@ -396,8 +403,8 @@ def get_cached_translation(
                         # Update last_accessed_at for potential LRU tracking
                         new_conn.execute(
                             """
-                            UPDATE translation_cache 
-                            SET last_accessed_at = ? 
+                            UPDATE translation_cache
+                            SET last_accessed_at = ?
                             WHERE source_hash = ?
                             """,
                             (datetime.utcnow().isoformat(), source_hash),
@@ -539,7 +546,7 @@ def purge_old_translations(
         with _get_connection(db_path) as conn:
             cursor = conn.execute(
                 """
-                DELETE FROM translation_cache 
+                DELETE FROM translation_cache
                 WHERE created_at < ?
                 """,
                 (cutoff_iso,),
@@ -665,7 +672,7 @@ def get_legacy_cached_translation(
         return None
 
     text_hash = _hash_text(text, source_lang, target_lang)
-    with sqlite3.connect(DB_PATH) as conn:
+    with closing(sqlite3.connect(DB_PATH)) as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT translated_text FROM legacy_translation_cache WHERE text_hash = ?",
@@ -701,7 +708,7 @@ def cache_translation(
         return
 
     text_hash = _hash_text(foreign_text, source_lang, target_lang)
-    with sqlite3.connect(DB_PATH) as conn:
+    with closing(sqlite3.connect(DB_PATH)) as conn:
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -733,7 +740,7 @@ def purge_expired_translation_cache(days_old: int = 60) -> int:
         raise ValueError("days_old must be a non-negative integer.")
 
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with closing(sqlite3.connect(DB_PATH)) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -775,7 +782,7 @@ def purge_translation_cache_older_than(days: int = 30) -> int:
     cutoff_str = cutoff_dt.strftime("%Y-%m-%d %H:%M:%S")
 
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with closing(sqlite3.connect(DB_PATH)) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "DELETE FROM legacy_translation_cache WHERE created_at < ?",
@@ -803,7 +810,7 @@ def get_translation_cache_stats() -> dict[str, int]:
     """
     _init_db()
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with closing(sqlite3.connect(DB_PATH)) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM translation_cache")
             row = cursor.fetchone()

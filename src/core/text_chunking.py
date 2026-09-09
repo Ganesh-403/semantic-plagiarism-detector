@@ -27,11 +27,12 @@ Recent Additions:
 """
 
 from __future__ import annotations
+from typing import Any
 
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 try:
     import nltk  # type: ignore
@@ -64,6 +65,10 @@ _WORD_COUNT_PATTERN = re.compile(r"\b\w+\b")
 
 # ── Citation Masking Helpers (Issue #3997) ────────────────────────────────────
 
+_CITATION_INITIAL_RE = re.compile(r"\b([A-Z])\.(?=\s|\()")
+_MARKDOWN_HEADER_RE = re.compile(r"(?m)^#{1,6}[ \t]+[^\n]+")
+
+
 def mask_citation_initials(text: str) -> str:
     """
     Masks periods in author initials to prevent premature sentence splitting.
@@ -74,7 +79,7 @@ def mask_citation_initials(text: str) -> str:
     # ([A-Z]) : capture a single uppercase letter (Group 1)
     # \.      : match the literal period
     # (?=\s|\(): lookahead to ensure it's followed by a space or opening parenthesis
-    return re.sub(r'\b([A-Z])\.(?=\s|\()', lambda m: m.group(1) + '\x00', text)
+    return _CITATION_INITIAL_RE.sub(lambda m: m.group(1) + '\x00', text)
 
 def unmask_citation_initials(text: str) -> str:
     """Restores the masked periods back to their original state."""
@@ -110,6 +115,7 @@ def _split_into_sentences(text: str) -> list[str]:
     if NLTK data is unavailable so the function works in restricted environments
     (e.g. CI containers without the punkt corpus downloaded).
     """
+    global _nltk_punkt_checked
     text = mask_citation_initials(text)
 
     if nltk is not None:
@@ -122,7 +128,10 @@ def _split_into_sentences(text: str) -> list[str]:
         except LookupError:
             # punkt_tab / punkt corpus not downloaded – trigger download once
             try:
-                nltk.download("punkt_tab", quiet=True)
+                if not _nltk_punkt_checked:
+                    _nltk_punkt_checked = True
+                    import nltk as nltk_runtime
+                    nltk_runtime.download("punkt_tab", quiet=True)
                 from nltk.tokenize import sent_tokenize  # type: ignore
 
                 sentences = sent_tokenize(text)
@@ -180,47 +189,25 @@ def _align_to_sentence_boundary(
 from typing import Optional
 
 
-@dataclass
-class Chunk:
-    """Structured text chunk with position and section metadata (#4002).
+class Chunk(str):
+    """String-compatible chunk carrying source positions and section metadata."""
 
-    Attributes:
-        text: Raw text content of the chunk.
-        metadata: Additional arbitrary metadata key-value pairs.
-        page_number: Optional 1-based page number where chunk originated.
-        char_start: Starting character offset in the source document.
-        char_end: Ending character offset in the source document.
-        section_title: Optional title/heading of the section containing this chunk.
-    """
-
-    text: str
-    metadata: dict = field(default_factory=dict)
-    page_number: Optional[int] = None
-    char_start: int = 0
-    char_end: int = 0
-    section_title: Optional[str] = None
-
-    def __post_init__(self):
-        # Synchronize metadata dictionary with primary fields
-        if self.page_number is not None and "page_number" not in self.metadata:
-            self.metadata["page_number"] = self.page_number
-        elif "page_number" in self.metadata and self.page_number is None:
-            self.page_number = self.metadata["page_number"]
-
-        if self.char_start != 0 and "char_start" not in self.metadata:
-            self.metadata["char_start"] = self.char_start
-        elif "char_start" in self.metadata and self.char_start == 0:
-            self.char_start = self.metadata["char_start"]
-
-        if self.char_end != 0 and "char_end" not in self.metadata:
-            self.metadata["char_end"] = self.char_end
-        elif "char_end" in self.metadata and self.char_end == 0:
-            self.char_end = self.metadata["char_end"]
-
-        if self.section_title is not None and "section_title" not in self.metadata:
-            self.metadata["section_title"] = self.section_title
-        elif "section_title" in self.metadata and self.section_title is None:
-            self.section_title = self.metadata["section_title"]
+    def __new__(cls, text: str, metadata: dict | None = None,
+                page_number: int | None = None, char_start: int = 0,
+                char_end: int = 0, section_title: str | None = None):
+        instance = super().__new__(cls, text)
+        instance.text = text
+        instance.metadata = dict(metadata or {})
+        instance.page_number = page_number if page_number is not None else instance.metadata.get("page_number")
+        instance.char_start = char_start or instance.metadata.get("char_start", 0)
+        instance.char_end = char_end or instance.metadata.get("char_end", 0)
+        instance.section_title = section_title or instance.metadata.get("section_title")
+        instance.metadata.update(char_start=instance.char_start, char_end=instance.char_end)
+        if instance.page_number is not None:
+            instance.metadata["page_number"] = instance.page_number
+        if instance.section_title is not None:
+            instance.metadata["section_title"] = instance.section_title
+        return instance
 
 
 ChunkString = Chunk
@@ -381,7 +368,7 @@ def _find_sentence_boundary(
         if matches:
             last_match = matches[-1]
             # Return the index immediately after the punctuation
-            return start_idx + last_match.end()
+            return start_idx + (last_match.end(1) if last_match.group(1) else last_match.end())
 
     elif direction == "forward":
         end_idx = min(len(text), index + max_search)
@@ -391,7 +378,7 @@ def _find_sentence_boundary(
         if matches:
             first_match = matches[0]
             # Return the index immediately after the punctuation
-            return index + first_match.end()
+            return index + (first_match.end(1) if first_match.group(1) else first_match.end())
 
     # Fallback to original index if no boundary found
     return index
@@ -449,7 +436,7 @@ def chunk_text(
     text: str,
     chunk_size: int = DEFAULT_CHUNK_SIZE,
     chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
-    min_words: int = 10,
+    min_words: int = 5,
     overlap_percentage: float | None = None,
     max_chunks: int = 1000,
     sentence_padding: bool = True,
@@ -502,11 +489,20 @@ def chunk_text(
     if overlap_percentage is not None:
         chunk_overlap = int(chunk_size * overlap_percentage)
 
+    if chunk_overlap < 0:
+        raise ValueError("chunk_overlap must be non-negative")
+    if max_chunks <= 0:
+        raise ValueError("max_chunks must be positive")
     if chunk_overlap >= chunk_size:
         raise ValueError("chunk_overlap must be strictly smaller than chunk_size")
 
     if not text or not text.strip():
         return []
+
+    if not any(c.isspace() for c in text.strip()):
+        if len(text) > max_chunks * chunk_size:
+            logger.warning("Text length (%d chars) exceeded chunk capacity limit; text was truncated", len(text))
+        return _character_fallback_chunking(unmask_citation_initials(text), chunk_size, chunk_overlap, count_bytes)[:max_chunks]
 
     # Enforce minimum chunk size to prevent infinite loops
     if chunk_size < MIN_CHUNK_SIZE:
@@ -657,7 +653,7 @@ def chunk_text(
             text, chunk_size, chunk_overlap, count_bytes=count_bytes
         )
         chunks = [
-            ChunkString(text=unmask_citation_initials(c.text), metadata=c.metadata) 
+            ChunkString(text=unmask_citation_initials(c.text), metadata=c.metadata)
             for c in fallback_chunks
         ]
 
@@ -670,8 +666,41 @@ def chunk_text(
     return [c for c in chunks if len(c.text.split()) >= min_words]
 
 
-# Alias for backward compatibility with src/core/__init__.py
-chunk_document = chunk_text
+def chunk_document(text: str, chunk_size: int = DEFAULT_CHUNK_SIZE,
+                   chunk_overlap: int = DEFAULT_CHUNK_OVERLAP, min_words: int = 10,
+                   min_chunk_length: int = 40, **kwargs) -> list[ChunkString]:
+    """Chunk a document at Markdown sections and merge short trailing fragments.
+
+    The minimum length applies within each section so headings never attach to
+    unrelated preceding text. Source offsets remain relative to the document.
+    """
+    if min_chunk_length < 0:
+        raise ValueError("min_chunk_length must be non-negative")
+    raw = _chunking_text(text)
+    if not raw or not raw.strip():
+        return []
+    boundaries = sorted({0, *(m.start() for m in _MARKDOWN_HEADER_RE.finditer(raw)), len(raw)})
+    result = []
+    limit = kwargs.pop("max_chunks", 1000)
+    for begin, end in zip(boundaries, boundaries[1:]):
+        section = raw[begin:end]
+        heading = _MARKDOWN_HEADER_RE.match(section)
+        title = heading.group(0).lstrip("#").strip() if heading else None
+        pieces = chunk_text(section, chunk_size, chunk_overlap, min_words=0,
+                            max_chunks=max(1, limit - len(result)), **kwargs)
+        if len(pieces) > 1 and len(pieces[-1]) < min_chunk_length:
+            previous, tail = pieces[-2:]
+            merged = section[previous.char_start:tail.char_end].strip()
+            pieces[-2:] = [Chunk(merged, char_start=previous.char_start, char_end=tail.char_end)]
+        for piece in pieces:
+            if count_words(piece) >= min_words:
+                result.append(Chunk(piece.text, piece.metadata,
+                                    char_start=begin + piece.char_start,
+                                    char_end=begin + piece.char_end, section_title=title))
+        if len(result) >= limit:
+            break
+    return result[:limit]
+
 
 
 # ── Token-aware Chunking (Issue #3998) ───────────────────────────────────────
@@ -803,7 +832,7 @@ def chunk_by_sentences(
     max_chunks: int = 1000,
     min_chunk_length: int = 10,
     max_chunk_size: int = 1000,
-    min_words: int = 10,
+    min_words: int = 1,
 ) -> list[str]:
     """Split text into chunks based on natural sentence boundaries.
 
@@ -847,7 +876,7 @@ def chunk_by_sentences(
     text = text.strip()
     if not text:
         return []
-        
+
     text = mask_citation_initials(text)
 
     # Split text into individual sentences
@@ -903,7 +932,7 @@ def chunk_by_sentences(
     if current_chunk_sentences and len(chunks) < max_chunks:
         chunk_text_val = " ".join(current_chunk_sentences)
         chunk_text_val = unmask_citation_initials(chunk_text_val)
-        
+
         if (
             count_words(chunk_text_val) >= min_words
             and len(chunk_text_val) >= min_chunk_length
@@ -950,6 +979,7 @@ def chunk_text_dynamic(
     margin = int(target_size * 0.20)
     chunks: list[ChunkString] = []
     start = 0
+    min_overlap = min(min_overlap, max(0, target_size // 2))
 
     sentence_punct = {".", "!", "?"}
 
@@ -980,7 +1010,7 @@ def chunk_text_dynamic(
 
         chunk_content = clean_src[start:actual_end].strip()
         chunk_content = unmask_citation_initials(chunk_content)
-        
+
         if chunk_content:
             chunks.append(
                 Chunk(
@@ -1033,8 +1063,10 @@ def chunk_documents(
         Dictionary mapping document name to list of chunks.
     """
     chunked_docs = {}
+    if isinstance(documents, (list, tuple)):
+        documents = {f"doc_{i}": text for i, text in enumerate(documents)}
     for doc_name, text in documents.items():
-        chunked_docs[doc_name] = chunk_text(
+        chunked_docs[doc_name] = chunk_document(
             text,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,

@@ -17,7 +17,9 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/tool_signatures.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "tool_signatures.db"
 
 
 @contextmanager
@@ -81,7 +83,7 @@ def log_attribution(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO attribution_logs 
+                INSERT INTO attribution_logs
                 (document_id, attributed_tool, confidence, fingerprint_json, analyzed_at)
                 VALUES (?, ?, ?, ?, ?)
                 """,

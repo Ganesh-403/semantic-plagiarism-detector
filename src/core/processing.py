@@ -15,6 +15,7 @@ from typing import Any, Dict, List, NamedTuple, Optional
 
 import numpy as np
 import pandas as pd
+import psutil
 from sklearn.metrics.pairwise import cosine_similarity
 
 from src.core.ai_detector import detect_documents_ai_probability
@@ -26,7 +27,9 @@ from src.core.faiss_index_metadata import FAISSIndexMetadata
 from src.core.language_similarity_config import build_language_metadata
 from src.core.similarity import document_similarity_matrix, flag_plagiarism
 from src.core.corpus_duplicate_filter import detect_and_store_duplicates
-from src.core.config import CORPUS_NEAR_DUPLICATE_THRESHOLDfrom src.core.text_chunking import chunk_documentsfrom src.utils.tracing import get_tracer
+from src.core.config import CORPUS_NEAR_DUPLICATE_THRESHOLD
+from src.core.text_chunking import chunk_documents
+from src.utils.tracing import get_tracer
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +66,7 @@ def run_full_pipeline(
     existing_index: Any = None,
     existing_registry: Dict[str, ChunkRecord] = None,
     use_incremental: bool = INCREMENTAL_INDEX_ENABLED,
+    enable_ai_detection: bool = False,
 ) -> PipelineResult:
     """Execute the full document upload pipeline outside of Streamlit.
 
@@ -124,7 +128,8 @@ def run_full_pipeline(
         with tracer.start_as_current_span("pipeline.chunk") as chunk_span:
             chunked_docs = chunk_documents(
                 raw_texts, chunk_size=chunk_size, chunk_overlap=chunk_overlap
-            )            total_chunks = sum(len(chunks) for chunks in chunked_docs.values())
+            )
+            total_chunks = sum(len(chunks) for chunks in chunked_docs.values())
             chunk_span.set_attribute("chunk.count", total_chunks)
 
         with tracer.start_as_current_span("pipeline.embed") as embed_span:
@@ -194,38 +199,16 @@ def run_full_pipeline(
 
         with tracer.start_as_current_span("pipeline.faiss_search") as index_span:
             if use_incremental and existing_index is not None:
-                metadata_mgr = FAISSIndexMetadata()
-                faiss_index = existing_index
-                registry = existing_registry if existing_registry else {}
-                
-                # Add new documents incrementally
-                for doc_name, emb_list in embeddings.items():
-                    if doc_name not in registry:
-                        chunks = chunked_docs.get(doc_name, [])
-                        texts = [
-                            c.text if hasattr(c, "text") else c for c in chunks
-                        ]
-                        faiss_index, _ = add_vectors_incremental(
-                            faiss_index,
-                            emb_list,
-                            doc_name,
-                            list(range(len(chunks))),
-                            texts,
-                            metadata_mgr,
-                        )
-                        for i, chunk in enumerate(chunks):
-                            chunk_obj = chunk if isinstance(chunk, ChunkRecord) else ChunkRecord(
-                                doc_name=doc_name,
-                                chunk_index=i,
-                                chunk_text=chunk.text if hasattr(chunk, "text") else chunk,
-                            )
-                            registry[f"{doc_name}_{i}"] = chunk_obj
-                logger.info("Used incremental index update for %d documents", len(embeddings))
+                from src.core.faiss_index import add_to_index
+                registry = list(existing_registry.values()) if isinstance(existing_registry, dict) else list(existing_registry or [])
+                indexed_names = {record.doc_name for record in registry}
+                new_embeddings = {name: emb for name, emb in embeddings.items() if name not in indexed_names}
+                faiss_index, registry = add_to_index(existing_index, registry, new_embeddings, chunked_docs)
             else:
                 faiss_index, registry = build_index(embeddings, chunked_docs)
-            
+
             index_span.set_attribute("faiss.index_size", faiss_index.ntotal)
-        ai_probabilities = detect_documents_ai_probability(chunked_docs)
+        ai_probabilities = detect_documents_ai_probability(chunked_docs) if enable_ai_detection else {}
 
         flags = flag_plagiarism(
             sim_df,
@@ -233,7 +216,8 @@ def run_full_pipeline(
             chunked_docs=chunked_docs,
             embeddings=embeddings,
             candidate_pairs=scoring_pairs,
-        )        with tracer.start_as_current_span("pipeline.incident_sync"):
+        )
+        with tracer.start_as_current_span("pipeline.incident_sync"):
             pass
 
         # Enrich flags with evidence if available
@@ -427,7 +411,8 @@ def rescan_recent_documents(
         recent_filenames
     )
 
-    new_incidents: list[dict[str, Any]] = []    all_flags: list[dict[str, Any]] = []
+    new_incidents: list[dict[str, Any]] = []
+    all_flags: list[dict[str, Any]] = []
 
     with faiss_write_lock(lock_path=f"{FAISS_INDEX_PATH}.lock"):
         if not recent_embeddings:
@@ -464,7 +449,7 @@ def rescan_recent_documents(
             existing_pairs = get_existing_incident_pairs(db_path)
             for flag in all_flags:
                 incident_id = build_incident_id(flag["doc_a"], flag["doc_b"])
-                if incident_id not in existing_pairs:
+                if tuple(sorted((flag["doc_a"], flag["doc_b"]))) not in existing_pairs:
                     new_incidents.append(flag)
 
             # sync_flagged_incidents upserts via ON CONFLICT, so re-running
