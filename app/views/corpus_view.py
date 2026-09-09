@@ -177,57 +177,8 @@ def render_sidebar(user_role: str, root_dir: str, faiss_index=None):
 
         if user_role == "admin":
             st.markdown("### 🎯 Threshold Presets")
-            preset_options = {
-                "Strict (0.80)": 0.80,
-                "Balanced (0.59)": 0.59,
-                "Lenient (0.45)": 0.45,
-                "Custom": None,
-            }
-
-            current_threshold = st.session_state.get(
-                "threshold_slider", PLAGIARISM_THRESHOLD
-            )
-            current_preset = "Custom"
-            for label, value in preset_options.items():
-                if value is not None and abs(current_threshold - value) < 0.001:
-                    current_preset = label
-                    break
-
-            selected_preset = st.radio(
-                "Select Evaluation Standard:",
-                options=list(preset_options.keys()),
-                index=list(preset_options.keys()).index(current_preset),
-                key="threshold_preset_radio",
-                horizontal=True,
-                help="Choose a predefined threshold standard or use the custom slider below.",
-            )
-
-            if (
-                selected_preset != "Custom"
-                and preset_options[selected_preset] is not None
-            ):
-                st.session_state["threshold_slider"] = preset_options[selected_preset]
-                if current_preset != selected_preset:
-                    st.rerun()
-
-            threshold = st.slider(
-                "Plagiarism Threshold (Hybrid)",
-                0.10,
-                0.99,
-                value=st.session_state.get("threshold_slider", PLAGIARISM_THRESHOLD),
-                step=0.01,
-                help=(
-                    "Combined Hybrid score threshold for flagging pair plagiarism. "
-                    "Recommended Default: 0.59 (59%)."
-                ),
-                key="threshold_slider",
-                on_change=save_preferences_callback,
-            )
-
-            if abs(threshold - preset_options.get(selected_preset, -1)) > 0.001:
-                if st.session_state.get("threshold_preset_radio") != "Custom":
-                    st.session_state["threshold_preset_radio"] = "Custom"
-                    st.rerun()
+            from app.components.threshold_control import render_threshold_control
+            threshold = render_threshold_control(PLAGIARISM_THRESHOLD, save_preferences_callback)
 
             st.slider(
                 "Lexical Sensitivity Threshold",
@@ -431,25 +382,8 @@ def render_document_management_sidebar(
     if existing_docs:
         st.write(f"**{len(existing_docs)}** documents in database")
 
-    safe_last_interaction = int(last_interaction or 0)  # noqa: F841
-    st.markdown(
-        """
-        <div id="session-timer" style="
-            background-color: rgba(255, 165, 0, 0.1);
-            border: 1px solid rgba(255, 165, 0, 0.3);
-            border-radius: 8px;
-            padding: 12px;
-            margin-top: 16px;
-            text-align: center;
-            font-family: monospace;
-            font-size: 14px;
-            color: #ffa500;
-        ">
-            ⏱️ Session expires in: <span id="timer-display">15:00</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    from app.components.session_countdown import render_session_countdown
+    render_session_countdown(st.session_state.get(SessionKeys.LAST_INTERACTION, last_interaction))
 
     st.markdown("---")
     st.markdown("### 💾 Storage Space Used")
@@ -463,6 +397,9 @@ def render_document_management_sidebar(
     st.markdown("---")
     st.markdown("### 📁 Document Management & Bulk Export")
     existing_docs = get_all_documents()
+    doc_filter = st.text_input("Filter documents by filename", key="doc_mgmt_filter")
+    existing_docs = [doc for doc in existing_docs if doc_filter.casefold() in str(doc.filename if hasattr(doc, "filename") else doc["filename"]).casefold()]
+
     if existing_docs:
         raw_assignment_titles = sorted(
             list(

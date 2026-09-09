@@ -399,11 +399,15 @@ def render_fingerprint_vault() -> None:
     </style>
     """, unsafe_allow_html=True)
 
-    fps = generate_fingerprints(30)
-    matches = generate_matches(fps, 20)
-    tampers = generate_tamper_events(fps)
-    clusters = generate_clusters(fps)
-    perf = generate_hash_performance()
+    st.info("Demo data: these illustrative results are generated locally and do not analyze your uploaded documents.")
+    if "demo_document_fingerprint_vault" not in st.session_state:
+        fps = generate_fingerprints(30)
+        matches = generate_matches(fps, 20)
+        tampers = generate_tamper_events(fps)
+        clusters = generate_clusters(fps)
+        perf = generate_hash_performance()
+        st.session_state["demo_document_fingerprint_vault"] = (fps, matches, tampers, clusters, perf)
+    fps, matches, tampers, clusters, perf = st.session_state["demo_document_fingerprint_vault"]
 
     # Header
     st.markdown("""

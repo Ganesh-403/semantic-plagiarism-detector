@@ -416,10 +416,14 @@ def render_citation_integrity_dashboard() -> None:
     """, unsafe_allow_html=True)
 
     # Generate data
-    citations = generate_citations(30)
-    authenticity = generate_authenticity(citations)
-    anomalies = generate_anomalies()
-    network = generate_network()
+    st.info("Demo data: these illustrative results are generated locally and do not analyze your uploaded documents.")
+    if "demo_citation_integrity_dashboard" not in st.session_state:
+        citations = generate_citations(30)
+        authenticity = generate_authenticity(citations)
+        anomalies = generate_anomalies()
+        network = generate_network()
+        st.session_state["demo_citation_integrity_dashboard"] = (citations, authenticity, anomalies, network)
+    citations, authenticity, anomalies, network = st.session_state["demo_citation_integrity_dashboard"]
 
     # Header
     st.markdown("""

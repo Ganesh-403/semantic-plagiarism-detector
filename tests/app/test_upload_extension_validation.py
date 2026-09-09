@@ -1,6 +1,6 @@
 from pathlib import Path
 
-APP_PATH = Path("app/streamlit_app.py")
+APP_PATH = Path("app/views/upload_view.py")
 
 
 def test_upload_flow_validates_final_extension():

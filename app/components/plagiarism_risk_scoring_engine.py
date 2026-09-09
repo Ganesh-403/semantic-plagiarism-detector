@@ -444,9 +444,13 @@ def render_risk_scoring_engine() -> None:
     </style>
     """, unsafe_allow_html=True)
 
-    documents = generate_documents(25)
-    patterns = generate_patterns()
-    trends = generate_trends(30)
+    st.info("Demo data: these illustrative results are generated locally and do not analyze your uploaded documents.")
+    if "demo_plagiarism_risk_scoring_engine" not in st.session_state:
+        documents = generate_documents(25)
+        patterns = generate_patterns()
+        trends = generate_trends(30)
+        st.session_state["demo_plagiarism_risk_scoring_engine"] = (documents, patterns, trends)
+    documents, patterns, trends = st.session_state["demo_plagiarism_risk_scoring_engine"]
 
     # Header
     st.markdown("""

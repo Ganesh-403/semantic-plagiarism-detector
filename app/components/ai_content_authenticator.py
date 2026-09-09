@@ -414,10 +414,14 @@ def render_ai_authenticator() -> None:
     </style>
     """, unsafe_allow_html=True)
 
-    docs = generate_content_authenticity(25)
-    deepfakes = generate_deepfake_detections(docs)
-    models = generate_model_fingerprints()
-    timeline = generate_timeline(30)
+    st.info("Demo data: these illustrative results are generated locally and do not analyze your uploaded documents.")
+    if "demo_ai_content_authenticator" not in st.session_state:
+        docs = generate_content_authenticity(25)
+        deepfakes = generate_deepfake_detections(docs)
+        models = generate_model_fingerprints()
+        timeline = generate_timeline(30)
+        st.session_state["demo_ai_content_authenticator"] = (docs, deepfakes, models, timeline)
+    docs, deepfakes, models, timeline = st.session_state["demo_ai_content_authenticator"]
 
     # Header
     st.markdown("""

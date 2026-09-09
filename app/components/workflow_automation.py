@@ -877,7 +877,8 @@ def render_workflow_dashboard(engine: WorkflowEngine):
 
     # Chart: Workflow status distribution
     fig = make_subplots(
-        rows=1, cols=2, subplot_titles=("Workflow Status", "Approval Status")
+        rows=1, cols=2, subplot_titles=("Workflow Status", "Approval Status"),
+        specs=[[{"type": "domain"}, {"type": "domain"}]],
     )
 
     # Workflow status

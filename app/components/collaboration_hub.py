@@ -512,7 +512,7 @@ def render_case_management(hub: CollaborationHub, user: str):
             case_title = st.text_input("Case Title")
             doc_a = st.text_input("Document A")
         with col2:
-            case_priority = st.selectbox("Priority", [p.name for p in CasePriority])
+            case_priority = st.selectbox("Priority", [p.name for p in CasePriority], key="collaboration_case_priority")
             doc_b = st.text_input("Document B")
 
         case_description = st.text_area("Description")
@@ -722,7 +722,7 @@ def render_queue_management(hub: CollaborationHub):
         with col1:
             queue_name = st.text_input("Queue Name")
         with col2:
-            queue_priority = st.selectbox("Priority", [p.name for p in CasePriority])
+            queue_priority = st.selectbox("Priority", [p.name for p in CasePriority], key="collaboration_queue_priority")
 
         if st.button("Create Queue", use_container_width=True):
             if queue_name:

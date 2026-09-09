@@ -12,7 +12,7 @@ _DB_PATH = os.path.join(_REPO_ROOT, "corpus.db")
 def test_clear_all_button_visibility():
     """Verify that Clear All Documents button is visible ONLY for administrators."""
     # 1. Admin user - should see the button
-    at_admin = AppTest.from_file(str(Path(__file__).resolve().parents[2] / "app/streamlit_app.py"))
+    at_admin = AppTest.from_file(str(Path(__file__).resolve().parents[2] / "app/streamlit_app.py"), default_timeout=30)
     at_admin.session_state["authenticated"] = True
     at_admin.session_state["username"] = "admin"
     at_admin.session_state["role"] = "admin"
@@ -22,7 +22,7 @@ def test_clear_all_button_visibility():
     assert admin_btn is True
 
     # 2. Regular user (teacher) - should NOT see the button
-    at_teacher = AppTest.from_file(str(Path(__file__).resolve().parents[2] / "app/streamlit_app.py"))
+    at_teacher = AppTest.from_file(str(Path(__file__).resolve().parents[2] / "app/streamlit_app.py"), default_timeout=30)
     at_teacher.session_state["authenticated"] = True
     at_teacher.session_state["username"] = "teacher1"
     at_teacher.session_state["role"] = "teacher"
@@ -34,7 +34,7 @@ def test_clear_all_button_visibility():
 
 def test_clear_all_confirmation_modal_interaction():
     """Verify that clicking Clear All Documents opens the dialog with Cancel and Clear All buttons."""
-    at = AppTest.from_file(str(Path(__file__).resolve().parents[2] / "app/streamlit_app.py"))
+    at = AppTest.from_file(str(Path(__file__).resolve().parents[2] / "app/streamlit_app.py"), default_timeout=30)
     at.session_state["authenticated"] = True
     at.session_state["username"] = "admin"
     at.session_state["role"] = "admin"

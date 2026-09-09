@@ -43,6 +43,16 @@ MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB limit
 ARCHIVE_EXTENSIONS = (".tar.gz", ".tar.bz2", ".zip")
 
 
+def render_staged_files_summary(uploaded_files):
+    """Display the uploader's current queue, including after it is cleared."""
+    files = uploaded_files or []
+    total_size = sum(file.size for file in files)
+    st.session_state["staged_files_count"] = len(files)
+    st.session_state["staged_files_size"] = total_size
+    if files:
+        st.info(f"📁 Staged {len(files)} files (Total Size: {total_size / (1024 * 1024):.1f} MB)")
+
+
 def render_student_portal(threshold: float, faiss_top_k: int):
     """Render non-admin student quick verification search portal."""
     st.subheader("🔎 Secure Student Search Portal")
@@ -216,6 +226,7 @@ def render_upload_section(user_role: str, lang_code: str, index_path: str):
         key="file_uploader",
     )
 
+    render_staged_files_summary(uploaded_files)
     file_bytes_dict = {}
 
     if bulk_download_drive_folder is not None:
@@ -355,6 +366,34 @@ def render_upload_section(user_role: str, lang_code: str, index_path: str):
                     f"📦 Extracted {len(extracted_files)} supported document(s) "
                     f"from **'{original_name}'**."
                 )
+                continue
+
+            if safe_name.casefold().endswith(".csv"):
+                import csv
+                import io
+                from pathlib import Path
+                try:
+                    reader = csv.DictReader(io.StringIO(file_bytes.decode("utf-8-sig")))
+                    columns = reader.fieldnames or []
+                    if not columns or any(not name for name in columns) or len(set(columns)) != len(columns):
+                        raise ValueError("CSV headers must be non-empty and unique.")
+                    preferred = next((name for name in columns if name.casefold() in {"essay_response", "essay", "text", "content", "submission"}), columns[-1])
+                    text_column = st.selectbox(f"Essay text column — {safe_name}", columns, index=columns.index(preferred), key=f"csv_text_{safe_name}")
+                    id_column = st.selectbox(f"Student identifier column — {safe_name}", columns, key=f"csv_id_{safe_name}")
+                    submissions = {}
+                    for row_number, row in enumerate(reader, start=1):
+                        if row_number > 500:
+                            raise ValueError("CSV uploads support at most 500 submissions per file.")
+                        text = row.get(text_column) or ""
+                        if not text.strip():
+                            continue
+                        identifier = row.get(id_column) or str(row_number)
+                        name = unique_filename(f"{Path(safe_name).stem}_{identifier}.txt", {**file_bytes_dict, **submissions})
+                        submissions[name] = text.encode("utf-8")
+                    file_bytes_dict.update(submissions)
+                    st.info(f"Loaded {len(submissions)} submissions from {safe_name}.")
+                except (UnicodeError, csv.Error, ValueError) as exc:
+                    st.error(f"CSV upload rejected: {exc}")
                 continue
 
             file_hash = hashlib.sha256(file_bytes).hexdigest()

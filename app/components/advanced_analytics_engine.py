@@ -1022,6 +1022,8 @@ def render_analytics_engine():
             "initialized": True,
         }
 
+        st.session_state.analytics_engine_initialized = True
+
     engine = st.session_state.analytics_engine
 
     # Tabs

@@ -1,25 +1,14 @@
-"""Integration/UI tests for Storage Space Used widget in app/streamlit_app.py."""
-
-from pathlib import Path
-
-APP_PATH = Path("app/streamlit_app.py")
+from streamlit.testing.v1 import AppTest
 
 
-def test_storage_widget_imports():
-    """Verify calculate_storage_usage is imported in app/streamlit_app.py."""
-    source = APP_PATH.read_text(encoding="utf-8")
-    assert "from src.utils.storage_metrics import calculate_storage_usage" in source
+def test_storage_widget_renders_usage_for_admin(mock_db):
+    at = AppTest.from_string("from app.views.corpus_view import render_document_management_sidebar; render_document_management_sidebar('admin', '/missing/index', 'storage-test', 0)").run()
+    assert not at.exception
+    assert any(metric.label == "Total Storage Used" for metric in at.metric)
 
 
-def test_storage_widget_inside_admin_sidebar_block():
-    """Verify Storage Space Used widget is placed inside the admin user block."""
-    source = APP_PATH.read_text(encoding="utf-8")
-
-    assert 'if user_role == "admin":' in source
-    assert "### 💾 Storage Space Used" in source
-    assert 'label="Total Storage Used"' in source
-    assert "calculate_storage_usage()" in source
-
-    admin_pos = source.index('if user_role == "admin":')
-    storage_widget_pos = source.index("### 💾 Storage Space Used")
-    assert storage_widget_pos > admin_pos
+def test_storage_widget_is_hidden_from_non_admin():
+    at = AppTest.from_string("from app.views.corpus_view import render_document_management_sidebar; render_document_management_sidebar('teacher', '/missing/index', 'storage-test', 0)").run()
+    assert not at.exception
+    assert not at.metric
+    assert not at.text_input

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from typing import Any, Dict, List
 
 import numpy as np
@@ -44,8 +45,9 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
     if value is None:
         return default
     try:
-        return float(value)
-    except (ValueError, TypeError):
+        result = float(value)
+        return result if math.isfinite(result) else default
+    except (ValueError, TypeError, OverflowError):
         return default
 
 
@@ -55,12 +57,13 @@ def _safe_int(value: Any, default: int = 0) -> int:
         return default
     try:
         return int(value)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, OverflowError):
         return default
 
 
 def _compute_statistics(scores: pd.Series) -> dict[str, float | int]:
     """Compute statistical metrics for the similarity scores."""
+    scores = pd.to_numeric(scores, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
     if scores.empty:
         return {
             "total_samples": 0,
@@ -96,6 +99,7 @@ def _compute_statistics(scores: pd.Series) -> dict[str, float | int]:
 
 def _compute_percentiles(scores: pd.Series) -> dict[str, float]:
     """Compute percentile values for the similarity scores."""
+    scores = pd.to_numeric(scores, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
     if scores.empty:
         return {
             "P25": 0.0,
@@ -120,6 +124,7 @@ def _compute_percentiles(scores: pd.Series) -> dict[str, float]:
 
 def _detect_outliers(scores: pd.Series) -> dict[str, Any]:
     """Detect outliers in the scores using the Interquartile Range (IQR) method."""
+    scores = pd.to_numeric(scores, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
     if scores.empty or len(scores) < 4:
         return {
             "total_outliers": 0,
@@ -254,12 +259,12 @@ def _apply_plotly_theme(
         xaxis=dict(
             gridcolor=theme_colors.get("border", "#E2E8F0"),
             tickfont=dict(color=theme_colors.get("muted", "#64748B")),
-            titlefont=dict(color=theme_colors.get("ink", "#0F172A")),
+            title=dict(font=dict(color=theme_colors.get("ink", "#0F172A"))),
         ),
         yaxis=dict(
             gridcolor=theme_colors.get("border", "#E2E8F0"),
             tickfont=dict(color=theme_colors.get("muted", "#64748B")),
-            titlefont=dict(color=theme_colors.get("ink", "#0F172A")),
+            title=dict(font=dict(color=theme_colors.get("ink", "#0F172A"))),
         ),
     )
 
@@ -407,7 +412,7 @@ def _render_heatmap_data_summary(df: pd.DataFrame) -> None:
     top_df = df.sort_values(by="similarity_score", ascending=False).head(5)
 
     summary_lines = ["TOP 5 SIMILARITY MATRIX CELLS SUMMARY:", "-" * 40]
-    for idx, row in enumerate(top_df.itertupless(), start=1):
+    for idx, row in enumerate(top_df.itertuples(index=False), start=1):
         score = getattr(row, "similarity_score", 0.0)
         source = getattr(row, "source_document", "Doc A")
         target = getattr(row, "target_document", "Doc B")

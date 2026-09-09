@@ -1,98 +1,16 @@
-from pathlib import Path
 import io
-import os
-import sys
 import zipfile
-from unittest.mock import MagicMock, patch
-
-from streamlit.testing.v1 import AppTest
-
-from tests.conftest import MockDataFactory
-
-# Mock googleapiclient modules to avoid ModuleNotFoundError in environments without them installed
-sys.modules["googleapiclient"] = MagicMock()
-sys.modules["googleapiclient.discovery"] = MagicMock()
-sys.modules["googleapiclient.http"] = MagicMock()
-sys.modules["google.oauth2"] = MagicMock()
-sys.modules["google.oauth2.service_account"] = MagicMock()
-
-# Mock ML libraries to prevent pytest segmentation faults on Apple Silicon
-sys.modules["transformers"] = MagicMock()
-sys.modules["sentence_transformers"] = MagicMock()
-
-_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-_STALE_INDEX = os.path.join(_REPO_ROOT, "corpus.index")
-_STALE_DB = os.path.join(_REPO_ROOT, "corpus.db")
+from src.db.corpus_db import get_all_documents
 
 
-def _cleanup_stale_artifacts():
-    """Remove leftover FAISS index and SQLite DB from prior runs."""
-    for path in (_STALE_INDEX, _STALE_DB):
-        try:
-            if os.path.exists(path):
-                os.remove(path)
-        except PermissionError:
-            pass
-
-
-@patch(
-    "src.core.ai_detector.detect_documents_ai_probability",
-    return_value={
-        "assignment1.txt": {"overall": 0.1},
-        "assignment2.txt": {"overall": 0.1},
-    },
-)
-@patch("src.core.webhook.send_plagiarism_alert")
-@patch(
-    "src.core.embedding_model.get_embedding_model_info",
-    return_value=("all-MiniLM-L6-v2", 384),
-)
-@patch(
-    "src.core.embedding_model.embed_chunks", side_effect=MockDataFactory.embed_chunks
-)
-def test_app_zip_upload_integration(mock_embed, mock_model_info, mock_webhook, mock_ai):
-    _cleanup_stale_artifacts()
-
-    try:
-        # Instantiate AppTest
-        at = AppTest.from_file(str(Path(__file__).resolve().parents[2] / "app/streamlit_app.py"))
-
-        # Simulate authentication in session state
-        at.session_state["authenticated"] = True
-        at.session_state["username"] = "admin"
-        at.session_state["role"] = "admin"
-        at.session_state["page"] = "dashboard"
-
-        # Initial run to display uploader
-        at.run(timeout=30)
-
-        # Assert uploader is found
-        assert len(at.file_uploader) > 0
-
-        # Construct a ZIP archive in memory containing two text files
-        zip_stream = io.BytesIO()
-        with zipfile.ZipFile(zip_stream, "w") as zf:
-            zf.writestr(
-                "assignment1.txt",
-                b"First student assignment text for similarity checking.",
-            )
-            zf.writestr(
-                "assignment2.txt",
-                b"Second student assignment text for similarity checking.",
-            )
-        zip_bytes = zip_stream.getvalue()
-
-        # Upload the ZIP via the file uploader widget
-        at.file_uploader[0].upload("assignments.zip", zip_bytes, "application/zip")
-
-        # Execute full pipeline
-        at.run(timeout=30)
-
-        # Ensure no exceptions occurred during pipeline execution
-        assert not at.exception
-
-        # Check if analysis results are rendered correctly in the UI tabs
-        assert any("Index total:" in info.body for info in at.info)
-
-    finally:
-        _cleanup_stale_artifacts()
+def test_app_zip_upload_integration(upload_dashboard):
+    at, queue = upload_dashboard
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w") as zipped:
+        zipped.writestr("assignment1.txt", "Semantic analysis measures common ideas within written assignments. " * 6)
+        zipped.writestr("assignment2.txt", "Semantic analysis measures common concepts within student assignments. " * 6)
+    queue["assignments.zip"] = archive.getvalue()
+    at.run()
+    assert not at.exception, [(e.message,e.stack_trace) for e in at.exception]
+    assert {doc.filename for doc in get_all_documents()} == {"assignment1.txt", "assignment2.txt"}
+    assert any(m.label == "Pairs Evaluated" and str(m.value) == "1" for m in at.metric)

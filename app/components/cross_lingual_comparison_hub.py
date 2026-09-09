@@ -360,11 +360,15 @@ def render_cross_lingual_hub() -> None:
     </style>
     """, unsafe_allow_html=True)
 
-    profiles = generate_language_profiles()
-    translations = generate_translations()
-    matches = generate_cross_lingual_matches()
-    cultural = generate_cultural_contexts()
-    pair_stats = generate_language_pair_stats()
+    st.info("Demo data: these illustrative results are generated locally and do not analyze your uploaded documents.")
+    if "demo_cross_lingual_comparison_hub" not in st.session_state:
+        profiles = generate_language_profiles()
+        translations = generate_translations()
+        matches = generate_cross_lingual_matches()
+        cultural = generate_cultural_contexts()
+        pair_stats = generate_language_pair_stats()
+        st.session_state["demo_cross_lingual_comparison_hub"] = (profiles, translations, matches, cultural, pair_stats)
+    profiles, translations, matches, cultural, pair_stats = st.session_state["demo_cross_lingual_comparison_hub"]
 
     # Header
     st.markdown("""

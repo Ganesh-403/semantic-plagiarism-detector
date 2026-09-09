@@ -78,8 +78,10 @@ class TestRenderTag:
 
         # The raw script tag should NOT be in the output
         assert "<script>" not in html_out
-        # It should be escaped
-        assert "&lt;script&gt;" in html_out
+        # DocumentTag normalizes names before rendering; neither markup nor
+        # an attribute breakout may survive that normalization.
+        assert tag.name in html_out
+        assert len(__import__("bs4").BeautifulSoup(html_out, "html.parser").find_all()) == 1
 
     def test_css_classes_applied_correctly(self):
         """Verify all expected CSS classes are present in the span."""

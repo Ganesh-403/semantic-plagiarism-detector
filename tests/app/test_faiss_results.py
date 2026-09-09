@@ -1,12 +1,19 @@
 import streamlit as st
 
-# Mock st.dialog to be a no-op decorator before faiss_results is imported
-st.dialog = lambda *args, **kwargs: lambda f: f
+import pytest
+from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
 
 from app.components.faiss_results import RESULT_COLUMNS, faiss_results_dataframe
+
+
+@pytest.fixture(autouse=True)
+def dialog_without_runtime(monkeypatch):
+    import inspect
+    import app.components.faiss_results as module
+    monkeypatch.setattr(module, "inspect_diff_dialog", inspect.unwrap(module.inspect_diff_dialog))
 
 
 class MockRecord:
@@ -132,8 +139,9 @@ def test_inspect_diff_dialog():
             "query text sample", "matched text sample", "test_doc.pdf", 0.85
         )
 
-        mock_st.markdown.assert_any_call("### Match Similarity: **85.0%**")
-        mock_st.columns.assert_called_once_with(2)
+        mock_st.markdown.assert_any_call("### Match Similarity: **0.8500** (85.0%)")
+        assert mock_st.columns.call_count == 2
+        mock_st.columns.assert_called_with(2)
 
 
 def test_render_faiss_results_ui():
@@ -149,13 +157,14 @@ def test_render_faiss_results_ui():
         patch("app.components.faiss_results.st") as mock_st,
         patch("app.components.faiss_results.inspect_diff_dialog") as mock_dialog,
     ):
+        mock_st.columns.side_effect = lambda count: [MagicMock() for _ in range(count)]
         mock_st.button.return_value = True
 
         render_faiss_results_ui(results, "query text")
 
         mock_st.button.assert_called_once()
         mock_dialog.assert_called_once_with(
-            "query text", "Matched text here", "doc_a.pdf", 0.88
+            "query text", "Matched text here", "doc_a.pdf", 0.88, chunk_id="chunk_3", doc_hash=None
         )
 
 
@@ -174,6 +183,7 @@ def test_render_faiss_results_ui_passes_matching_pdf_bytes():
         patch("app.components.faiss_results.st") as mock_st,
         patch("app.components.faiss_results.inspect_diff_dialog") as mock_dialog,
     ):
+        mock_st.columns.side_effect = lambda count: [MagicMock() for _ in range(count)]
         mock_st.button.return_value = True
 
         render_faiss_results_ui(
@@ -181,7 +191,7 @@ def test_render_faiss_results_ui_passes_matching_pdf_bytes():
         )
 
         mock_dialog.assert_called_once_with(
-            "query text", "Matched text here", "doc_a.pdf", 0.88, pdf_bytes=source_bytes
+            "query text", "Matched text here", "doc_a.pdf", 0.88, pdf_bytes=source_bytes, chunk_id="chunk_3", doc_hash=None
         )
 
 
@@ -199,6 +209,7 @@ def test_render_faiss_results_ui_no_matching_pdf_bytes():
         patch("app.components.faiss_results.st") as mock_st,
         patch("app.components.faiss_results.inspect_diff_dialog") as mock_dialog,
     ):
+        mock_st.columns.side_effect = lambda count: [MagicMock() for _ in range(count)]
         mock_st.button.return_value = True
 
         render_faiss_results_ui(
@@ -206,7 +217,7 @@ def test_render_faiss_results_ui_no_matching_pdf_bytes():
         )
 
         mock_dialog.assert_called_once_with(
-            "query text", "Matched text here", "doc_a.pdf", 0.88
+            "query text", "Matched text here", "doc_a.pdf", 0.88, chunk_id="chunk_3", doc_hash=None
         )
 
 
@@ -281,6 +292,8 @@ def test_render_faiss_results_ui_doc_hash_copy_box():
     results = [(record, 0.88)]
 
     with patch("app.components.faiss_results.st") as mock_st:
+        mock_st.columns.return_value = (MagicMock(), MagicMock())
+        mock_st.button.return_value = False
         render_faiss_results_ui(results, "query text")
         mock_st.code.assert_any_call(sample_hash, language="text")
 

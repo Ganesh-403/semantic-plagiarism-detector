@@ -916,7 +916,7 @@ def render_audit_trail(engine: dict):
         user_filter = st.text_input("User", placeholder="Filter by user")
     with col2:
         severity_filter = st.selectbox(
-            "Severity", ["All"] + [s.value for s in AuditSeverity]
+            "Severity", ["All"] + [s.value for s in AuditSeverity], key="audit_event_severity"
         )
     with col3:
         action_filter = st.text_input("Action", placeholder="Filter by action")
@@ -982,7 +982,7 @@ def render_violation_management(engine: dict):
         )
     with col2:
         severity_filter = st.selectbox(
-            "Severity", ["All"] + [s.value for s in AuditSeverity]
+            "Severity", ["All"] + [s.value for s in AuditSeverity], key="audit_violation_severity"
         )
     with col3:
         resolution_filter = st.selectbox("Resolution", ["All", "Resolved", "Open"])

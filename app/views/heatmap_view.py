@@ -18,7 +18,8 @@ def render_heatmap_view(active_sim_df, threshold: float, doc_names: list):
     """Render Tab 4: Heatmap & Network Graph."""
     st.subheader("🗺️ Heatmap & Network")
     heatmap_fig = None
-    if active_sim_df is not None:
+    load_heatmap = st.checkbox("Show similarity heatmap", key="load_similarity_heatmap")
+    if load_heatmap and active_sim_df is not None:
         heatmap_fig = ui_exception_handler("Similarity Heatmap")(
             plot_similarity_heatmap
         )(active_sim_df, threshold=threshold, theme_colors=get_chart_colors())
@@ -42,7 +43,8 @@ def render_heatmap_view(active_sim_df, threshold: float, doc_names: list):
     )
 
     network_fig = None
-    if active_sim_df is not None:
+    load_network = st.checkbox("Show plagiarism network", key="load_plagiarism_network")
+    if load_network and active_sim_df is not None:
         network_fig = ui_exception_handler("Plagiarism Network")(
             plot_similarity_network
         )(

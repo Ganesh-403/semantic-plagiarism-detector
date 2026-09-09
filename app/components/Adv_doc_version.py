@@ -4,6 +4,8 @@
 
 import difflib
 import hashlib
+from html import escape as escape_html
+from pathlib import Path
 import json
 import zlib
 from collections import defaultdict
@@ -26,7 +28,7 @@ class DocumentVersion:
         self.content = content
         self.content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
         self.timestamp = datetime.now()
-        self.size = len(content)
+        self.size = len(content.encode("utf-8"))
         self.word_count = len(content.split())
         self.similarity_score = None
         self.parent_version = None
@@ -46,6 +48,7 @@ class DocumentVersion:
             "similarity_score": self.similarity_score,
             "parent_version": self.parent_version,
             "metadata": self.metadata,
+            "change_summary": self.change_summary,
         }
 
     @classmethod
@@ -59,6 +62,7 @@ class DocumentVersion:
         version.similarity_score = data.get("similarity_score")
         version.parent_version = data.get("parent_version")
         version.metadata = data.get("metadata", {})
+        version.change_summary = data.get("change_summary")
         return version
 
     def compress(self) -> bytes:
@@ -80,6 +84,7 @@ class VersionManager:
         self.current_versions = {}  # doc_name -> version_id
         self.version_index = {}  # doc_name -> {hash: version_id}
         self.metadata_store = {}  # doc_name -> metadata
+        self._next_version_ids = defaultdict(lambda: 1)
 
     def add_version(
         self,
@@ -87,13 +92,14 @@ class VersionManager:
         content: str,
         parent_version: Optional[int] = None,
         metadata: Optional[Dict] = None,
+        *, _force_new: bool = False,
     ) -> int:
         """Add a new version of a document"""
-        version_id = len(self.versions[doc_name]) + 1
+        version_id = self._next_version_ids[doc_name]
 
         # Check if content already exists
         content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
-        if doc_name in self.version_index:
+        if not _force_new and doc_name in self.version_index:
             if content_hash in self.version_index[doc_name]:
                 return self.version_index[doc_name][content_hash]
 
@@ -105,6 +111,7 @@ class VersionManager:
 
         # Store version
         self.versions[doc_name].append(version)
+        self._next_version_ids[doc_name] = version_id + 1
         self.current_versions[doc_name] = version_id
 
         # Update index
@@ -124,10 +131,10 @@ class VersionManager:
         return version_id
 
     def get_version(self, doc_name: str, version_id: int) -> Optional[DocumentVersion]:
-        """Get a specific version of a document"""
-        if doc_name in self.versions and version_id <= len(self.versions[doc_name]):
-            return self.versions[doc_name][version_id - 1]
-        return None
+        """Look up a stable, positive revision identifier."""
+        if not isinstance(version_id, int) or version_id < 1:
+            return None
+        return next((v for v in self.versions.get(doc_name, []) if v.version_id == version_id), None)
 
     def get_current_version(self, doc_name: str) -> Optional[DocumentVersion]:
         """Get the current version of a document"""
@@ -168,22 +175,19 @@ class VersionManager:
         return pd.DataFrame(data)
 
     def delete_version(self, doc_name: str, version_id: int) -> bool:
-        """Delete a specific version"""
-        if doc_name in self.versions:
-            versions = self.versions[doc_name]
-            if version_id <= len(versions):
-                # Remove version
-                del versions[version_id - 1]
-                # Update version IDs
-                for i, v in enumerate(versions, 1):
-                    v.version_id = i
-                # Update current version if needed
-                if self.current_versions.get(doc_name) == version_id:
-                    self.current_versions[doc_name] = (
-                        len(versions) if versions else None
-                    )
-                return True
-        return False
+        """Remove a revision without renumbering surviving revision references."""
+        version = self.get_version(doc_name, version_id)
+        if version is None:
+            return False
+        versions = self.versions[doc_name]
+        versions.remove(version)
+        self.version_index[doc_name] = {v.content_hash: v.version_id for v in versions}
+        for child in versions:
+            if child.parent_version == version_id:
+                child.parent_version = version.parent_version
+        if self.current_versions.get(doc_name) == version_id:
+            self.current_versions[doc_name] = versions[-1].version_id if versions else None
+        return True
 
     def restore_version(self, doc_name: str, version_id: int) -> Optional[str]:
         """Restore a previous version as current version"""
@@ -194,6 +198,7 @@ class VersionManager:
                 version.content,
                 parent_version=version_id,
                 metadata={"restored_from": version_id},
+                _force_new=True,
             )
             return version.content
         return None
@@ -204,21 +209,38 @@ class VersionManager:
         return {
             "doc_name": doc_name,
             "total_versions": len(versions),
+            "next_version_id": self._next_version_ids[doc_name],
             "current_version": self.current_versions.get(doc_name),
             "versions": [v.to_dict() for v in versions],
         }
 
     def import_history(self, data: Dict) -> bool:
-        """Import version history from dictionary"""
+        """Validate a complete history before replacing any existing state."""
         try:
             doc_name = data["doc_name"]
-            for version_data in data["versions"]:
-                version = DocumentVersion.from_dict(version_data)
-                self.versions[doc_name].append(version)
-                if version_data["version_id"] == data["current_version"]:
-                    self.current_versions[doc_name] = version.version_id
+            if not isinstance(doc_name, str) or not doc_name:
+                return False
+            versions = [DocumentVersion.from_dict(item) for item in data["versions"]]
+            ids = {v.version_id for v in versions}
+            if len(ids) != len(versions) or any(type(i) is not int or i < 1 for i in ids):
+                return False
+            for version in versions:
+                if version.doc_name != doc_name or version.content_hash != hashlib.sha256(version.content.encode("utf-8")).hexdigest():
+                    return False
+                if version.parent_version is not None and (version.parent_version not in ids or version.parent_version >= version.version_id):
+                    return False
+            current = data["current_version"]
+            if (versions and current not in ids) or (not versions and current is not None):
+                return False
+            next_id = data.get("next_version_id", max(ids, default=0) + 1)
+            if type(next_id) is not int or next_id <= max(ids, default=0):
+                return False
+            self.versions[doc_name] = sorted(versions, key=lambda v: v.version_id)
+            self.current_versions[doc_name] = current
+            self.version_index[doc_name] = {v.content_hash: v.version_id for v in self.versions[doc_name]}
+            self._next_version_ids[doc_name] = next_id
             return True
-        except Exception:
+        except (KeyError, TypeError, ValueError, AttributeError):
             return False
 
 
@@ -290,7 +312,13 @@ class ChangeTracker:
             return nltk.edit_distance(old_content, new_content)
         except ImportError:
             # Fallback to simple diff length
-            return len(difflib.ndiff(old_content, new_content))
+            previous = list(range(len(new_content) + 1))
+            for i, left in enumerate(old_content, 1):
+                current = [i]
+                for j, right in enumerate(new_content, 1):
+                    current.append(min(current[-1] + 1, previous[j] + 1, previous[j - 1] + (left != right)))
+                previous = current
+            return previous[-1]
 
     def detect_suspicious_patterns(self, changes: Dict) -> List[str]:
         """Detect suspicious editing patterns"""
@@ -403,27 +431,27 @@ class VersionDiffGenerator:
         for opcode, i1, i2, j1, j2 in opcodes:
             if opcode == "equal":
                 for line in old_lines[i1:i2]:
-                    diff_lines.append(f'<div class="diff-line equal">{line}</div>')
+                    diff_lines.append(f'<div class="diff-line equal">{escape_html(line)}</div>')
             elif opcode == "insert":
                 for line in new_lines[j1:j2]:
-                    diff_lines.append(f'<div class="diff-line insert">+ {line}</div>')
+                    diff_lines.append(f'<div class="diff-line insert">+ {escape_html(line)}</div>')
             elif opcode == "delete":
                 for line in old_lines[i1:i2]:
-                    diff_lines.append(f'<div class="diff-line delete">- {line}</div>')
+                    diff_lines.append(f'<div class="diff-line delete">- {escape_html(line)}</div>')
             elif opcode == "replace":
                 # Show old lines as deleted
                 for line in old_lines[i1:i2]:
                     diff_lines.append(
-                        f'<div class="diff-line replace-old">- {line}</div>'
+                        f'<div class="diff-line replace-old">- {escape_html(line)}</div>'
                     )
                 # Show new lines as added
                 for line in new_lines[j1:j2]:
                     diff_lines.append(
-                        f'<div class="diff-line replace-new">+ {line}</div>'
+                        f'<div class="diff-line replace-new">+ {escape_html(line)}</div>'
                     )
 
         html = self.css_styles + self.html_template.format(
-            old_ver=old_ver, new_ver=new_ver, diff_lines="\n".join(diff_lines)
+            old_ver=escape_html(str(old_ver)), new_ver=escape_html(str(new_ver)), diff_lines="\n".join(diff_lines)
         )
         return html
 
@@ -874,40 +902,46 @@ class VersionStorageManager:
 
         os.makedirs(self.storage_path, exist_ok=True)
 
-    def save_version_manager(
-        self, version_manager: VersionManager, doc_name: str
-    ) -> bool:
-        """Save version manager state for a document"""
+    def save_version_manager(self, version_manager: VersionManager, doc_name: str) -> bool:
+        """Write a complete UTF-8 snapshot atomically inside the storage directory."""
+        import os
+        import tempfile
+        temporary = None
         try:
-            import os
-
-            file_path = os.path.join(self.storage_path, f"{doc_name}.json")
-
+            target = self._document_path(doc_name)
             data = version_manager.export_history(doc_name)
-            with open(file_path, "w") as f:
-                json.dump(data, f, indent=2, default=str)
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=target.parent, delete=False) as stream:
+                temporary = stream.name
+                json.dump(data, stream, indent=2, ensure_ascii=False, default=str)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, target)
             return True
-        except Exception:
+        except (OSError, ValueError, TypeError):
             return False
+        finally:
+            if temporary:
+                Path(temporary).unlink(missing_ok=True)
 
     def load_version_manager(self, doc_name: str) -> Optional[VersionManager]:
-        """Load version manager state for a document"""
+        """Load only valid snapshots contained within the configured storage directory."""
         try:
-            import os
-
-            file_path = os.path.join(self.storage_path, f"{doc_name}.json")
-
-            if not os.path.exists(file_path):
+            data = json.loads(self._document_path(doc_name).read_text(encoding="utf-8"))
+            if data.get("doc_name") != doc_name:
                 return None
-
-            with open(file_path, "r") as f:
-                data = json.load(f)
-
-            vm = VersionManager()
-            vm.import_history(data)
-            return vm
-        except Exception:
+            manager = VersionManager()
+            return manager if manager.import_history(data) else None
+        except (OSError, ValueError, TypeError, AttributeError):
             return None
+
+    def _document_path(self, doc_name: str) -> Path:
+        if not isinstance(doc_name, str) or not doc_name or doc_name in (".", "..") or any(c in doc_name for c in ("/", "\\", ":", "\0")):
+            raise ValueError("Document names must be plain filenames")
+        root = Path(self.storage_path).resolve()
+        target = (root / (doc_name + ".json")).resolve()
+        if target.parent != root:
+            raise ValueError("Document path escapes version storage")
+        return target
 
     def list_documents(self) -> List[str]:
         """List all documents with stored versions"""

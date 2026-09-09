@@ -1,39 +1,54 @@
 from pathlib import Path
 
-APP_PATH = Path("app/streamlit_app.py")
+import pytest
+from streamlit.testing.v1 import AppTest
+from src.db import auth
+
+PAGE = Path(__file__).resolve().parents[2] / "app/pages/2_Settings.py"
 
 
-def test_settings_render_notification_toggles():
-    source = APP_PATH.read_text(encoding="utf-8")
-
-    assert "### 🔔 Notification Preferences" in source
-    assert '"📧 Email notifications"' in source
-    assert '"🔗 Webhook notifications"' in source
-
-
-def test_settings_load_persisted_preferences():
-    source = APP_PATH.read_text(encoding="utf-8")
-
-    assert ("persisted_notifications = get_notification_preferences(") in source
-    assert 'st.session_state["email_notifications_toggle"]' in source
-    assert 'st.session_state["webhook_notifications_toggle"]' in source
+@pytest.fixture
+def settings(mock_db):
+    auth.add_user("preferences_user", "TestPassword123!", "teacher")
+    at = AppTest.from_file(str(PAGE))
+    at.session_state["authenticated"] = True
+    at.session_state["username"] = "preferences_user"
+    at.session_state["role"] = "teacher"
+    return at
 
 
-def test_settings_save_preferences_to_database():
-    source = APP_PATH.read_text(encoding="utf-8")
+def test_settings_load_and_save_preferences(settings):
+    auth.update_notification_preferences("preferences_user", False, True)
+    settings.run()
+    assert not settings.exception
+    assert [toggle.value for toggle in settings.toggle] == [False, True]
+    settings.toggle[0].set_value(True)
+    settings.toggle[1].set_value(False)
+    settings.button(key="save_notification_preferences").click().run()
+    assert not settings.exception
+    assert auth.get_notification_preferences("preferences_user") == {
+        "email_notifications": True, "webhook_notifications": False,
+    }
+    assert any("saved" in item.value for item in settings.success)
 
-    assert "update_notification_preferences(" in source
-    assert 'key="save_notification_preferences"' in source
-    assert "Notification preferences saved." in source
+
+def test_preferences_available_without_admin_controls(settings):
+    settings.run()
+    assert len(settings.toggle) == 2
+    assert not settings.slider
+    assert not settings.download_button
 
 
-def test_notification_section_is_available_before_admin_only_settings():
-    source = APP_PATH.read_text(encoding="utf-8")
+def test_signed_out_user_cannot_change_preferences():
+    at = AppTest.from_file(str(PAGE)).run()
+    assert not at.exception
+    assert not at.toggle
+    assert not at.button
 
-    notification_position = source.index("### 🔔 Notification Preferences")
-    admin_position = source.index(
-        "### ⚙️ Advanced Configuration",
-        notification_position,
-    )
 
-    assert notification_position < admin_position
+def test_admin_can_access_preferences_and_configuration(settings):
+    settings.session_state["role"] = "admin"
+    settings.run()
+    assert not settings.exception
+    assert len(settings.toggle) == 2
+    assert len(settings.slider) == 5

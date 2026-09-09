@@ -177,6 +177,16 @@ def init_api_server_daemon():
         app_config.api_server_process.start()
 
 
+def _backup_timestamp(value, default):
+    """Reject malformed, negative and non-finite cache timestamps."""
+    import math
+    try:
+        timestamp = float(value)
+    except (ValueError, TypeError):
+        return default
+    return timestamp if math.isfinite(timestamp) and timestamp >= 0 else default
+
+
 def _run_backup_daemon():
     """Background loop to create backups after inactivity."""
     last_backup_time = 0.0
@@ -186,7 +196,7 @@ def _run_backup_daemon():
         cache = get_cache()
         cached = cache.get("spd:v1:global:last_backup_time")
         if cached is not None:
-            last_backup_time = float(cached)
+            last_backup_time = _backup_timestamp(cached, 0.0)
     except Exception:
         pass
 
@@ -214,16 +224,10 @@ def _run_backup_daemon():
             # We track this explicit condition rather than using an arbitrary sleep/continue.
             is_startup_phase = (now - daemon_start_time) < timeout
 
-            last_activity = cache.get("spd:v1:global:last_activity")
-            if last_activity is None:
-                last_activity = now
-                cache.set("spd:v1:global:last_activity", last_activity)
-            else:
-                try:
-                    last_activity = float(last_activity)
-                except (ValueError, TypeError):
-                    last_activity = now
-                    cache.set("spd:v1:global:last_activity", last_activity)
+            cached_activity = cache.get("spd:v1:global:last_activity")
+            last_activity = _backup_timestamp(cached_activity, now)
+            if last_activity == now and cached_activity != now:
+                cache.set("spd:v1:global:last_activity", now)
 
             idle = now - last_activity
 

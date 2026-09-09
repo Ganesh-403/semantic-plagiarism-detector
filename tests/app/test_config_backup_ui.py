@@ -1,43 +1,21 @@
 import json
-from pathlib import Path
-
-APP_PATH = Path("app/streamlit_app.py")
-
-
-def test_admin_settings_contains_config_backup_download():
-    source = APP_PATH.read_text(encoding="utf-8")
-
-    assert 'label="📥 Backup Configuration (JSON)"' in source
-    assert 'file_name="plagiarism_config_backup.json"' in source
-    assert 'mime="application/json"' in source
-    assert 'key="backup_config_button"' in source
+from unittest.mock import patch
+from tests.app.settings_helpers import settings_page
 
 
-def test_config_backup_is_inside_admin_settings_block():
-    source = APP_PATH.read_text(encoding="utf-8")
+def test_configuration_download_reflects_current_settings(mock_db):
+    with patch("streamlit.download_button") as download:
+        at = settings_page().run()
+        at.slider(key="threshold_slider").set_value(.75).run()
+    assert not at.exception
+    backups = [call.kwargs for call in download.call_args_list if call.kwargs.get("key") == "backup_config_button"]
+    assert backups[-1]["mime"] == "application/json"
+    assert backups[-1]["file_name"] == "plagiarism_config_backup.json"
+    assert json.loads(backups[-1]["data"])["threshold"] == .75
 
-    admin_position = source.index('if user_role == "admin":')
-    backup_position = source.index('label="📥 Backup Configuration (JSON)"')
 
-    assert backup_position > admin_position
-
-
-def test_config_backup_serialization_logic():
-    # Verify that a dummy config dict serializes cleanly to valid JSON
-    dummy_config = {
-        "theme": "Dark",
-        "threshold": 0.75,
-        "class_filter": "CS101",
-        "use_chunk_matrix": True,
-        "faiss_top_k": 10,
-        "ignore_phrases": "test phrase",
-        "chunk_size": 1000,
-        "chunk_overlap": 100,
-        "ocr_language": "eng",
-        "ocr_dpi": 300,
-    }
-    json_str = json.dumps(dummy_config, indent=2)
-    loaded = json.loads(json_str)
-    assert loaded == dummy_config
-    assert loaded["theme"] == "Dark"
-    assert loaded["threshold"] == 0.75
+def test_non_admin_cannot_export_system_configuration(mock_db):
+    with patch("streamlit.download_button") as download:
+        at = settings_page("teacher").run()
+    assert not at.exception
+    download.assert_not_called()

@@ -8,6 +8,7 @@ formatting, and displaying vector search results.
 from __future__ import annotations
 
 import os
+from html import escape
 from collections.abc import Iterable, Mapping
 from typing import Any
 
@@ -153,7 +154,7 @@ def inspect_diff_dialog(
             highlight_pdf_matches = None
 
         if highlight_pdf_matches is None:
-            st.caption("⚠️ PDF highlighting is unavailable (PyMuPDF is not installed).")
+            st.caption("⚠️ PDF highlighting is unavailable.")
         else:
             try:
                 annotated_pdf = highlight_pdf_matches(pdf_bytes, [matched_text])
@@ -209,7 +210,7 @@ def render_faiss_results_ui(
 
         st.markdown(
             f"<div style='border: 1px solid var(--spd-border, #e2e8f0); padding: 12px; border-radius: 8px; margin-bottom: 8px;'>"
-            f"<strong>📄 {doc_name}</strong> (Chunk #{chunk_index + 1}) · "
+            f"<strong>📄 {escape(doc_name)}</strong> (Chunk #{chunk_index + 1}) · "
             f"<span style='color: var(--spd-primary, #3b82f6); font-weight: bold;'>Similarity: {formatted_score} ({score:.1%})</span>"
             f"</div>",
             unsafe_allow_html=True,
@@ -229,6 +230,9 @@ def render_faiss_results_ui(
             st.code(doc_hash, language="text")
 
         st.caption(chunk_text[:300] + ("..." if len(chunk_text) > 300 else ""))
+        with st.expander("Copy full matched text", expanded=False):
+            st.caption("📋 Matched Text")
+            st.code(chunk_text, language="text")
 
         if st.button("🔍 Inspect Diff", key=f"diff_btn_{i}_{doc_name}_{chunk_index}"):
             source_pdf_bytes = (
