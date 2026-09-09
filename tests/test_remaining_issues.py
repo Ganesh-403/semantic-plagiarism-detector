@@ -140,7 +140,7 @@ def test_encrypted_rotated_pdf_colors(angle):
             encryption=fitz.PDF_ENCRYPT_AES_256, user_pw="secret123", owner_pw="owner"
         )
     result = highlight_pdf_matches(
-        data, [("matching phrase", 0.95)], password="secret123"
+        data, [("matching phrase", 0.95)], password="secret123"  # pragma: allowlist secret -- synthetic test credential
     )
     with fitz.open(stream=result, filetype="pdf") as doc:
         if doc.is_encrypted:
@@ -471,13 +471,13 @@ def test_api_login_verifies_password_and_issues_scoped_tokens(mock_db):
         assert client.post("/auth/login", json={}).status_code == 422
         assert (
             client.post(
-                "/auth/login", json={"username": "api_teacher", "password": "wrong"}
+                "/auth/login", json={"username": "api_teacher", "password": "wrong"}  # pragma: allowlist secret -- synthetic test credential
             ).status_code
             == 401
         )
         response = client.post(
             "/auth/login",
-            json={"username": "api_teacher", "password": "Teacher-Password!493"},
+            json={"username": "api_teacher", "password": "Teacher-Password!493"},  # pragma: allowlist secret -- synthetic test credential
         )
     assert response.status_code == 200
     payload = verify_access_token(response.json()["token"])
@@ -503,7 +503,7 @@ def test_api_login_requires_second_factor(mock_db):
     app.state.limiter = limiter
     app.include_router(router)
     with TestClient(app) as client:
-        credentials = {"username": "two_factor", "password": "Two-Factor-Password!492"}
+        credentials = {"username": "two_factor", "password": "Two-Factor-Password!492"}  # pragma: allowlist secret -- synthetic test credential
         assert client.post("/auth/login", json=credentials).status_code == 401
         credentials["otp_code"] = pyotp.TOTP(secret).now()
         assert client.post("/auth/login", json=credentials).status_code == 200
@@ -527,12 +527,12 @@ def test_api_2fa_setup_requires_password_and_never_returns_existing_secret(mock_
         )
         assert (
             client.post(
-                "/auth/2fa/setup", json={"username": "enroll_user", "password": "wrong"}
+                "/auth/2fa/setup", json={"username": "enroll_user", "password": "wrong"}  # pragma: allowlist secret -- synthetic test credential
             ).status_code
             == 401
         )
         assert get_2fa_status("enroll_user")[0] is False
-        credentials = {"username": "enroll_user", "password": "Enroll-Password!493"}
+        credentials = {"username": "enroll_user", "password": "Enroll-Password!493"}  # pragma: allowlist secret -- synthetic test credential
         first = client.post("/auth/2fa/setup", json=credentials)
         assert first.status_code == 200
         assert get_2fa_status("enroll_user") == (True, first.json()["secret"])
@@ -542,11 +542,17 @@ def test_api_2fa_setup_requires_password_and_never_returns_existing_secret(mock_
 
 
 def test_enabling_2fa_cannot_create_an_administrator(mock_db):
-    from src.db.auth import enable_2fa, get_user_role
+    from src.db.auth import enable_2fa, _connect
 
     with pytest.raises(ValueError, match="missing user"):
         enable_2fa("unknown_user", "JBSWY3DPEHPK3PXP")
-    assert get_user_role("unknown_user") is None
+    with _connect() as conn:
+        assert (
+            conn.execute(
+                "SELECT 1 FROM users WHERE username = ?", ("unknown_user",)
+            ).fetchone()
+            is None
+        )
 
 
 def test_api_refresh_rejects_revoked_token(mock_db):

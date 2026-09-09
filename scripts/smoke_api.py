@@ -26,7 +26,7 @@ def main():
         assert client.get("/api/v1/corpus/stats").status_code == 401
         response = client.post(
             "/auth/login",
-            json={"username": "api_smoke", "password": "API-Smoke-Password!824"},
+            json={"username": "api_smoke", "password": "API-Smoke-Password!824"},  # pragma: allowlist secret -- synthetic test credential
         )
         assert response.status_code == 200, response.text
         token = response.json()["access_token"]

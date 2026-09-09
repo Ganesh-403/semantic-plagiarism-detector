@@ -86,7 +86,8 @@ access rejection. Both smoke scripts use isolated temporary state.
 The full suite uses `python -m pytest -n 2 --dist=loadscope`. Existing coverage
 thresholds (85% overall, 90% changed lines) and existing legacy exclusions remain
 visible. No new exclusions or expected failures were added to hide failures.
-See the PR description for final run counts. Docker execution, Linux installation,
+See [the validation report](recovery-validation.md) for run counts and failing test
+modules. Docker execution, Linux installation,
 and the maintained Streamlit Community Cloud deployment require their respective
 runners; local success does not deploy the upstream site.
 
