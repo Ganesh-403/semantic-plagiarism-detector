@@ -18,26 +18,17 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 from src.core.app_config import DATA_DIR
+from src.db.connection import get_connection as managed_connection
 
 DEFAULT_DB_PATH = DATA_DIR / "patchwriting_logs.db"
 
 
 @contextmanager
 def get_connection(db_path: Optional[Path] = None):
-    """Context manager for SQLite connections."""
-    path = db_path or DEFAULT_DB_PATH
-    path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(path))
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    """Use shared connection settings and commit or roll back one transaction."""
+    with managed_connection(db_path or DEFAULT_DB_PATH) as connection:
+        with connection:
+            yield connection
 
 
 def initialize_patchwriting_db(db_path: Optional[Path] = None) -> None:
@@ -60,7 +51,9 @@ def initialize_patchwriting_db(db_path: Optional[Path] = None) -> None:
             ON patchwriting_logs(document_a_id, document_b_id)
         """)
 
-    logger.info("Patchwriting logs database initialized at %s", db_path or DEFAULT_DB_PATH)
+    logger.info(
+        "Patchwriting logs database initialized at %s", db_path or DEFAULT_DB_PATH
+    )
 
 
 def log_patchwriting_detection(
@@ -69,7 +62,7 @@ def log_patchwriting_detection(
     jaccard: float,
     ngram_overlap: float,
     is_flagged: bool,
-    db_path: Optional[Path] = None
+    db_path: Optional[Path] = None,
 ) -> bool:
     """Log a patchwriting detection event."""
     try:
@@ -80,7 +73,14 @@ def log_patchwriting_detection(
                 (document_a_id, document_b_id, syntactic_jaccard, ngram_overlap, is_flagged, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (doc_a_id, doc_b_id, jaccard, ngram_overlap, 1 if is_flagged else 0, datetime.utcnow().isoformat())
+                (
+                    doc_a_id,
+                    doc_b_id,
+                    jaccard,
+                    ngram_overlap,
+                    1 if is_flagged else 0,
+                    datetime.utcnow().isoformat(),
+                ),
             )
         return True
     except sqlite3.Error as e:
@@ -93,29 +93,76 @@ def log_patchwriting_detection(
 from typing import List, Dict, Any
 from datetime import datetime
 
+
 class PatchwritingLogsDB:
     """
     Logs detected structural clones and the specific POS patterns matched
     during mosaic plagiarism detection scans.
     """
-    def __init__(self):
-        self.logs_store: list[dict[str, Any]] = []
 
-    def log_structural_clone(self, submission_id: str, source_id: str, similarity_score: float, metrics: dict[str, Any]) -> None:
+    def __init__(self, db_path: Optional[Path] = None):
+        self.db_path = db_path or DEFAULT_DB_PATH
+        initialize_patchwriting_db(self.db_path)
+        with get_connection(self.db_path) as connection:
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS structural_clone_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT NOT NULL,
+                    submission_id TEXT NOT NULL,
+                    source_id TEXT NOT NULL,
+                    similarity_score REAL NOT NULL,
+                    metrics_json TEXT NOT NULL
+                )
+            """)
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_structural_clone_submission ON structural_clone_logs(submission_id)"
+            )
+
+    def log_structural_clone(
+        self,
+        submission_id: str,
+        source_id: str,
+        similarity_score: float,
+        metrics: dict[str, Any],
+    ) -> None:
         """Persists a structural clone detection record."""
-        record = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "submission_id": submission_id,
-            "source_id": source_id,
-            "similarity_score": similarity_score,
-            "metrics": metrics
-        }
-        self.logs_store.append(record)
+        if not 0 <= similarity_score <= 1:
+            raise ValueError("similarity_score must be between zero and one")
+        with get_connection(self.db_path) as connection:
+            connection.execute(
+                "INSERT INTO structural_clone_logs (timestamp, submission_id, source_id, similarity_score, metrics_json) VALUES (?, ?, ?, ?, ?)",
+                (
+                    datetime.utcnow().isoformat(),
+                    submission_id,
+                    source_id,
+                    similarity_score,
+                    json.dumps(metrics, allow_nan=False),
+                ),
+            )
 
     def fetch_logs_by_submission(self, submission_id: str) -> list[dict[str, Any]]:
         """Retrieves all patchwriting logs for a given submission."""
-        return [log for log in self.logs_store if log["submission_id"] == submission_id]
+        with get_connection(self.db_path) as connection:
+            rows = connection.execute(
+                "SELECT * FROM structural_clone_logs WHERE submission_id = ? ORDER BY id",
+                (submission_id,),
+            ).fetchall()
+        return [self._record(row) for row in rows]
 
     def fetch_all_logs(self) -> list[dict[str, Any]]:
         """Retrieves all recorded patchwriting logs."""
-        return self.logs_store
+        with get_connection(self.db_path) as connection:
+            rows = connection.execute(
+                "SELECT * FROM structural_clone_logs ORDER BY id"
+            ).fetchall()
+        return [self._record(row) for row in rows]
+
+    @staticmethod
+    def _record(row) -> dict[str, Any]:
+        return {
+            "timestamp": row["timestamp"],
+            "submission_id": row["submission_id"],
+            "source_id": row["source_id"],
+            "similarity_score": row["similarity_score"],
+            "metrics": json.loads(row["metrics_json"]),
+        }

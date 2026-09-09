@@ -18,27 +18,17 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 from src.core.app_config import DATA_DIR
+from src.db.connection import get_connection as managed_connection
 
 DEFAULT_DB_PATH = DATA_DIR / "reviewer_calibration.db"
 
 
 @contextmanager
 def get_connection(db_path: Optional[Path] = None):
-    """Context manager for acquiring and releasing SQLite connections."""
-    path = db_path or DEFAULT_DB_PATH
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    conn = sqlite3.connect(str(path))
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    """Use shared connection settings and commit or roll back one transaction."""
+    with managed_connection(db_path or DEFAULT_DB_PATH) as connection:
+        with connection:
+            yield connection
 
 
 def initialize_calibration_db(db_path: Optional[Path] = None) -> None:
@@ -71,7 +61,9 @@ def initialize_calibration_db(db_path: Optional[Path] = None) -> None:
             ON review_overrides(reviewer_id)
         """)
 
-    logger.info("Reviewer calibration database initialized at %s", db_path or DEFAULT_DB_PATH)
+    logger.info(
+        "Reviewer calibration database initialized at %s", db_path or DEFAULT_DB_PATH
+    )
 
 
 def log_review_override(
@@ -79,7 +71,7 @@ def log_review_override(
     document_id: str,
     automated_score: float,
     manual_score: float,
-    db_path: Optional[Path] = None
+    db_path: Optional[Path] = None,
 ) -> bool:
     """Log a manual review override against an automated score."""
     try:
@@ -90,7 +82,13 @@ def log_review_override(
                 (reviewer_id, document_id, automated_score, manual_score, created_at)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                (reviewer_id, document_id, automated_score, manual_score, datetime.utcnow().isoformat())
+                (
+                    reviewer_id,
+                    document_id,
+                    automated_score,
+                    manual_score,
+                    datetime.utcnow().isoformat(),
+                ),
             )
         return True
     except sqlite3.Error as e:
@@ -102,7 +100,7 @@ def update_reviewer_metrics(
     reviewer_id: str,
     metrics: dict[str, float],
     weight: float,
-    db_path: Optional[Path] = None
+    db_path: Optional[Path] = None,
 ) -> bool:
     """Update the aggregated calibration metrics for a reviewer."""
     try:
@@ -119,8 +117,8 @@ def update_reviewer_metrics(
                     metrics["mean_absolute_error"],
                     metrics["variance"],
                     weight,
-                    datetime.utcnow().isoformat()
-                )
+                    datetime.utcnow().isoformat(),
+                ),
             )
         return True
     except sqlite3.Error as e:
@@ -134,7 +132,7 @@ def get_reviewer_weight(reviewer_id: str, db_path: Optional[Path] = None) -> flo
         with get_connection(db_path) as conn:
             cursor = conn.execute(
                 "SELECT calibration_weight FROM reviewer_metrics WHERE reviewer_id = ?",
-                (reviewer_id,)
+                (reviewer_id,),
             )
             row = cursor.fetchone()
             return row["calibration_weight"] if row else 1.0
@@ -147,30 +145,54 @@ def get_reviewer_weight(reviewer_id: str, db_path: Optional[Path] = None) -> flo
 
 from typing import List, Dict, Any
 
+
 class ReviewerCalibrationDB:
     """
     Persists historical review overrides and computes reviewer bias metrics.
     """
-    def __init__(self):
-        # In-memory storage mock for demonstration (replace with SQL/ORM in production)
-        self.overrides_store: list[dict[str, Any]] = []
 
-    def save_review_override(self, submission_id: str, reviewer_id: str, assigned_score: float, consensus_score: float) -> None:
+    def __init__(self, db_path: Optional[Path] = None):
+        self.db_path = db_path or DEFAULT_DB_PATH
+        initialize_calibration_db(self.db_path)
+
+    def save_review_override(
+        self,
+        submission_id: str,
+        reviewer_id: str,
+        assigned_score: float,
+        consensus_score: float,
+    ) -> None:
         """Persists a reviewer override event along with its deviation from consensus."""
-        deviation = assigned_score - consensus_score
-        record = {
-            "submission_id": submission_id,
-            "reviewer_id": reviewer_id,
-            "assigned_score": assigned_score,
-            "consensus_score": consensus_score,
-            "consensus_deviation": deviation
-        }
-        self.overrides_store.append(record)
+        if not 0 <= assigned_score <= 1 or not 0 <= consensus_score <= 1:
+            raise ValueError("review scores must be between zero and one")
+        if not log_review_override(
+            reviewer_id, submission_id, consensus_score, assigned_score, self.db_path
+        ):
+            raise sqlite3.OperationalError("Failed to persist review override")
 
     def fetch_reviewer_history(self, reviewer_id: str) -> list[dict[str, Any]]:
         """Retrieves all historical review overrides for a specific reviewer."""
-        return [r for r in self.overrides_store if r["reviewer_id"] == reviewer_id]
+        with get_connection(self.db_path) as connection:
+            rows = connection.execute(
+                "SELECT * FROM review_overrides WHERE reviewer_id = ? ORDER BY id",
+                (reviewer_id,),
+            ).fetchall()
+        return [self._record(row) for row in rows]
 
     def fetch_all_overrides(self) -> list[dict[str, Any]]:
         """Retrieves entire override dataset for committee IRR calculations."""
-        return self.overrides_store
+        with get_connection(self.db_path) as connection:
+            rows = connection.execute(
+                "SELECT * FROM review_overrides ORDER BY id"
+            ).fetchall()
+        return [self._record(row) for row in rows]
+
+    @staticmethod
+    def _record(row) -> dict[str, Any]:
+        return {
+            "submission_id": row["document_id"],
+            "reviewer_id": row["reviewer_id"],
+            "assigned_score": row["manual_score"],
+            "consensus_score": row["automated_score"],
+            "consensus_deviation": row["manual_score"] - row["automated_score"],
+        }

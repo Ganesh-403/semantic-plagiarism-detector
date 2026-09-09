@@ -18,26 +18,17 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 from src.core.app_config import DATA_DIR
+from src.db.connection import get_connection as managed_connection
 
 DEFAULT_DB_PATH = DATA_DIR / "provenance_logs.db"
 
 
 @contextmanager
 def get_connection(db_path: Optional[Path] = None):
-    """Context manager for SQLite connections."""
-    path = db_path or DEFAULT_DB_PATH
-    path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(path))
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    """Use shared connection settings and commit or roll back one transaction."""
+    with managed_connection(db_path or DEFAULT_DB_PATH) as connection:
+        with connection:
+            yield connection
 
 
 def initialize_provenance_db(db_path: Optional[Path] = None) -> None:

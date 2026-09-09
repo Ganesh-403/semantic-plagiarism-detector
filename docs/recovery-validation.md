@@ -98,6 +98,25 @@ fallback. A delete test now creates its own fallback entry, and six unconditiona
 assertions now verify actual availability, lookup and hit-rate results. Secret
 baseline changes update existing line locations only.
 
+At `5ba668d3`, Python 3.12 and 3.13 each pass **10,002 tests**; Python 3.11 passes
+10,001 with one timer microbenchmark failure. All startup, changed-line coverage,
+dependency, security, license and lint checks pass. Overall coverage reaches
+**63% combined**, still below 85%. The timer benchmark measured coverage tracing
+overhead against its 0.1 ms production budget. Its timing-only cases now execute
+in clean child processes, retaining every original budget and iteration count.
+All **77 timer/benchmark checks pass** when the parent runs under coverage.
+
+Analysis logging adapters now use the shared SQLite connection factory for WAL,
+15-second busy timeout, normal synchronization and foreign-key enforcement. This
+also prevents federation signatures from referencing unregistered institutions.
+Reviewer and patchwriting repository classes now persist records in SQLite and
+return independent snapshots; their former lists lost all records on restart.
+All **73 adapter/contention checks pass under coverage**, measuring **100% line
+coverage in all 34 changed adapters**. Tests read actual stored values, preserve
+Unicode and quoted identifiers, check rollback and closed connections, reject
+invalid writes, and reload repositories from their files. These focused results
+do not replace the latest full-matrix coverage measurement.
+
 The legacy `src.reports` package now imports and accepts explicit analysis results
 through `ReportRequest.analysis_data`. It validates matrices and matches, derives
 statistics from unique document pairs and exports populated, completed snapshots.
