@@ -5,6 +5,7 @@ This guide provides step-by-step instructions for integrating the Semantic Plagi
 ## Overview
 
 The Semantic Plagiarism Detector API allows LMS platforms to programmatically:
+
 - Upload student assignments for plagiarism checking
 - Compare submissions against a corpus of existing documents
 - Receive real-time webhook alerts for high-similarity matches
@@ -38,11 +39,12 @@ export API_BEARER_TOKEN="your-secret-token"
 
 Check if the API is running and ready.
 
-```
+```text
 GET /health
 ```
 
 **Response:**
+
 ```json
 {
   "status": "healthy",
@@ -55,28 +57,31 @@ GET /health
 
 Upload and analyze a document for plagiarism.
 
-```
+```text
 POST /api/v1/scan
 ```
 
 **Query Parameters:**
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `threshold` | float | 0.59 | Similarity threshold for flagging plagiarism (0.0 to 1.0) |
-| `top_k` | int | 3 | Number of top matching paragraph pairs per matched document (1 to 10) |
+
+| Parameter   | Type  | Default | Description                                                           |
+| ----------- | ----- | ------- | --------------------------------------------------------------------- |
+| `threshold` | float | 0.59    | Similarity threshold for flagging plagiarism (0.0 to 1.0)             |
+| `top_k`     | int   | 3       | Number of top matching paragraph pairs per matched document (1 to 10) |
 
 **Request Headers:**
-| Header | Value |
-|--------|-------|
+
+| Header          | Value                     |
+| --------------- | ------------------------- |
 | `Authorization` | `Bearer <your-api-token>` |
 
 **Request Body:** Form data with `file` field
 
-| Field | Type | Description |
-|-------|------|-------------|
+| Field  | Type                | Description                       |
+| ------ | ------------------- | --------------------------------- |
 | `file` | multipart/form-data | Document file (.pdf, .docx, .txt) |
 
 **Response:**
+
 ```json
 {
   "filename": "student_essay.pdf",
@@ -106,26 +111,28 @@ POST /api/v1/scan
 ```
 
 **Response Fields:**
-| Field | Type | Description |
-|-------|------|-------------|
-| `filename` | string | Original filename uploaded |
-| `word_count` | integer | Number of words in the document |
-| `chunk_count` | integer | Number of text chunks created |
-| `plagiarism_flagged` | boolean | Whether any matches were found |
-| `threshold_used` | float | Threshold value used for comparison |
-| `overall_document_similarity` | float | Document-level similarity score |
-| `max_chunk_similarity` | float | Highest chunk-level similarity score |
-| `matched_documents_count` | integer | Number of matched documents |
-| `matched_documents` | array | List of matched documents with details |
+
+| Field                         | Type    | Description                            |
+| ----------------------------- | ------- | -------------------------------------- |
+| `filename`                    | string  | Original filename uploaded             |
+| `word_count`                  | integer | Number of words in the document        |
+| `chunk_count`                 | integer | Number of text chunks created          |
+| `plagiarism_flagged`          | boolean | Whether any matches were found         |
+| `threshold_used`              | float   | Threshold value used for comparison    |
+| `overall_document_similarity` | float   | Document-level similarity score        |
+| `max_chunk_similarity`        | float   | Highest chunk-level similarity score   |
+| `matched_documents_count`     | integer | Number of matched documents            |
+| `matched_documents`           | array   | List of matched documents with details |
 
 **matched_documents fields:**
-| Field | Type | Description |
-|-------|------|-------------|
-| `filename` | string | Name of matched document in corpus |
-| `document_similarity_score` | float | Document-level cosine similarity |
-| `max_chunk_similarity_score` | float | Highest chunk-to-chunk similarity |
-| `severity` | string | "🔴 High" (≥0.90) or "🟡 Medium" (≥0.75) |
-| `flagged_chunks` | array | List of matching paragraph pairs |
+
+| Field                        | Type   | Description                              |
+| ---------------------------- | ------ | ---------------------------------------- |
+| `filename`                   | string | Name of matched document in corpus       |
+| `document_similarity_score`  | float  | Document-level cosine similarity         |
+| `max_chunk_similarity_score` | float  | Highest chunk-to-chunk similarity        |
+| `severity`                   | string | "🔴 High" (≥0.90) or "🟡 Medium" (≥0.75) |
+| `flagged_chunks`             | array  | List of matching paragraph pairs         |
 
 ---
 
@@ -153,10 +160,10 @@ Authorization: Bearer your-api-token-here
 
 ### Authentication Errors
 
-| Status Code | Response | Description |
-|-------------|----------|-------------|
-| 401 | `{"detail": "Invalid or missing authentication token."}` | Missing or invalid token |
-| 403 | `{"detail": "Invalid or missing authentication token."}` | Token validation failed |
+| Status Code | Response                                                 | Description              |
+| ----------- | -------------------------------------------------------- | ------------------------ |
+| 401         | `{"detail": "Invalid or missing authentication token."}` | Missing or invalid token |
+| 403         | `{"detail": "Invalid or missing authentication token."}` | Token validation failed  |
 
 ---
 
@@ -190,6 +197,7 @@ The LMS makes the file available as bytes/stream.
 #### 3. Send to Plagiarism API
 
 **Python Example:**
+
 ```python
 import requests
 
@@ -214,34 +222,35 @@ print(f"Plagiarism flagged: {result['plagiarism_flagged']}")
 ```
 
 **JavaScript (Node.js) Example:**
-```javascript
-const fs = require('fs');
-const FormData = require('form-data');
-const axios = require('axios');
 
-const API_URL = 'http://localhost:8000';
-const API_TOKEN = 'your-api-token';
+```javascript
+const fs = require("fs");
+const FormData = require("form-data");
+const axios = require("axios");
+
+const API_URL = "http://localhost:8000";
+const API_TOKEN = "your-api-token";
 
 async function scanDocument(filePath, threshold = 0.59) {
   const url = `${API_URL}/api/v1/scan?threshold=${threshold}`;
   const headers = {
-    'Authorization': `Bearer ${API_TOKEN}`
+    Authorization: `Bearer ${API_TOKEN}`,
   };
 
   const form = new FormData();
-  form.append('file', fs.createReadStream(filePath));
+  form.append("file", fs.createReadStream(filePath));
 
   const response = await axios.post(url, form, { headers });
   return response.data;
 }
 
-scanDocument('assignment1.pdf')
-  .then(result => {
-    console.log(`Plagiarism flagged: ${result.plagiarism_flagged}`);
-  });
+scanDocument("assignment1.pdf").then((result) => {
+  console.log(`Plagiarism flagged: ${result.plagiarism_flagged}`);
+});
 ```
 
 **PHP Example:**
+
 ```php
 <?php
 $apiUrl = 'http://localhost:8000';
@@ -302,6 +311,7 @@ def scan_multiple_documents(file_paths: list, threshold: float = 0.59):
 ### Understanding the Response
 
 #### Low Severity (No Flag)
+
 ```json
 {
   "filename": "assignment1.pdf",
@@ -317,6 +327,7 @@ def scan_multiple_documents(file_paths: list, threshold: float = 0.59):
 ```
 
 #### High Severity (Flagged)
+
 ```json
 {
   "filename": "assignment2.pdf",
@@ -348,6 +359,7 @@ def scan_multiple_documents(file_paths: list, threshold: float = 0.59):
 ### Processing Logic
 
 #### Python
+
 ```python
 def process_scan_result(result: dict):
     """Process a scan result and return severity information."""
@@ -371,33 +383,36 @@ def process_scan_result(result: dict):
 ```
 
 #### JavaScript
+
 ```javascript
 function processScanResult(result) {
-    if (!result.plagiarism_flagged) {
-        return {
-            status: 'clean',
-            score: result.max_chunk_similarity
-        };
-    }
-
-    const flaggedMatches = result.matched_documents;
-    const highestMatch = flaggedMatches.reduce((max, m) =>
-        m.max_chunk_similarity_score > max.max_chunk_similarity_score ? m : max
-    );
-
-    const severity = highestMatch.max_chunk_similarity_score >= 0.90 ? 'high' : 'medium';
-
+  if (!result.plagiarism_flagged) {
     return {
-        status: 'flagged',
-        score: highestMatch.max_chunk_similarity_score,
-        severity: severity,
-        matchedDocument: highestMatch.filename,
-        flaggedChunks: highestMatch.flagged_chunks
+      status: "clean",
+      score: result.max_chunk_similarity,
     };
+  }
+
+  const flaggedMatches = result.matched_documents;
+  const highestMatch = flaggedMatches.reduce((max, m) =>
+    m.max_chunk_similarity_score > max.max_chunk_similarity_score ? m : max,
+  );
+
+  const severity =
+    highestMatch.max_chunk_similarity_score >= 0.9 ? "high" : "medium";
+
+  return {
+    status: "flagged",
+    score: highestMatch.max_chunk_similarity_score,
+    severity: severity,
+    matchedDocument: highestMatch.filename,
+    flaggedChunks: highestMatch.flagged_chunks,
+  };
 }
 ```
 
 #### PHP
+
 ```php
 function processScanResult($result) {
     if (!$result['plagiarism_flagged']) {
@@ -458,6 +473,7 @@ export PLAGIARISM_WEBHOOK_URL="YOUR-WEBHOOK-URL-HERE"
 ```
 
 **Supported Webhook Types:**
+
 - **Slack Webhooks** - Standard Slack incoming webhooks
 - **Discord Webhooks** - Discord webhook URLs
 - **Custom Webhooks** - Any HTTP endpoint accepting JSON
@@ -473,11 +489,12 @@ export PLAGIARISM_WEBHOOK_URL="YOUR-WEBHOOK-URL-HERE"
 
 ### Webhook Message Structure
 
-| Field | Description |
-|-------|-------------|
-| `text` | Slack-compatible message format |
-| `content` | Discord-compatible message format |
-| Both fields contain the same message for maximum compatibility. |
+| Field                                                           | Description                       |
+| --------------------------------------------------------------- | --------------------------------- |
+| `text`                                                          | Slack-compatible message format   |
+| `content`                                                       | Discord-compatible message format |
+
+Both fields contain the same message for maximum compatibility.
 
 ### Custom Webhook Integration
 
@@ -498,17 +515,20 @@ payload = {
 Replace the placeholders with your actual webhook URL:
 
 **Slack:**
-```
+
+```text
 https://hooks.slack.com/services/{YOUR-SUBDOMAIN}/{YOUR-ID}/{YOUR-TOKEN}
 ```
 
 **Discord:**
-```
+
+```text
 https://discord.com/api/webhooks/{YOUR-WEBHOOK-ID}/{YOUR-TOKEN}
 ```
 
 **Custom HTTP Endpoint:**
-```
+
+```text
 https://your-lms.com/api/plagiarism/alerts
 ```
 
@@ -519,27 +539,33 @@ https://your-lms.com/api/plagiarism/alerts
 ### Common Errors
 
 #### 400 Bad Request
+
 ```json
 {
   "detail": "Uploaded file is empty."
 }
 ```
+
 **Cause:** File upload contains no data.
 
 #### 422 Unprocessable Entity
+
 ```json
 {
   "detail": "Failed to extract readable text from the uploaded file."
 }
 ```
+
 **Cause:** File format is not supported or text extraction failed.
 
 #### 401/403 Unauthorized
+
 ```json
 {
   "detail": "Invalid or missing authentication token."
 }
 ```
+
 **Cause:** Missing or invalid API token.
 
 ### Retry Strategy
@@ -639,7 +665,7 @@ response = requests.post(
 )
 ```
 
-2. **Submit Assignment to Plagiarism API**
+1. **Submit Assignment to Plagiarism API**
 
 ```python
 def submit_to_plagiarism_detector(canvas_submission, api_token):
@@ -665,7 +691,7 @@ def submit_to_plagiarism_detector(canvas_submission, api_token):
 
 #### Canvas Integration Diagram
 
-```
+```text
 Student submits assignment
          |
          v
@@ -690,10 +716,11 @@ Moodle uses the Atto editor and submission plugins.
 1. **Configure Web Service Protocol**
 
 Enable Web Services in Moodle:
+
 - Site admin → Advanced features → Enable web services
 - Site admin → Plugins → Web services → Enable REST protocol
 
-2. **Create External Service**
+1. **Create External Service**
 
 ```php
 // Create Moodle external service
@@ -709,7 +736,7 @@ $service = [
 // Use Moodle's external API to create service
 ```
 
-3. **Submit to Plagiarism API**
+1. **Submit to Plagiarism API**
 
 ```php
 function submit_to_plagiarism_detector($filepath, $apikey) {
@@ -755,7 +782,7 @@ Blackboard uses the Building Blocks API.
 </building-block>
 ```
 
-2. **Submission Integration**
+1. **Submission Integration**
 
 ```java
 // Blackboard Java integration
@@ -784,11 +811,11 @@ public class PlagiarismSubmission {
 
 ## Environment Variables Reference
 
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `API_BEARER_TOKEN` | Authentication token for API | `dev-bearer-token` | Yes |
-| `PLAGIARISM_WEBHOOK_URL` | URL for plagiarism alert webhooks | None | No |
-| `APP_BASE_URL` | Base URL for dashboard links | `http://localhost:8501` | No |
+| Variable                 | Description                       | Default                 | Required |
+| ------------------------ | --------------------------------- | ----------------------- | -------- |
+| `API_BEARER_TOKEN`       | Authentication token for API      | `dev-bearer-token`      | Yes      |
+| `PLAGIARISM_WEBHOOK_URL` | URL for plagiarism alert webhooks | None                    | No       |
+| `APP_BASE_URL`           | Base URL for dashboard links      | `http://localhost:8501` | No       |
 
 ### Example .env File
 
@@ -883,11 +910,13 @@ app.add_middleware(
 ### Manual Testing
 
 1. **Test Health Endpoint**
+
 ```bash
 curl http://localhost:8000/health
 ```
 
-2. **Test Document Upload**
+1. **Test Document Upload**
+
 ```bash
 curl -X POST "http://localhost:8000/api/v1/scan" \
   -H "Authorization: Bearer your-token" \
@@ -948,6 +977,7 @@ def test_scan_document(api_token):
 ### Issue: Webhook not sending
 
 **Solution:**
+
 1. Verify `PLAGIARISM_WEBHOOK_URL` is set
 2. Check webhook URL is accessible
 3. Review server logs for request failures
@@ -955,6 +985,7 @@ def test_scan_document(api_token):
 ### Issue: High memory usage
 
 **Solution:**
+
 1. Limit `top_k` parameter
 2. Reduce `threshold` to scan fewer documents
 3. Restart server after large batches
@@ -970,4 +1001,4 @@ def test_scan_document(api_token):
 
 ---
 
-*Last updated: August 2026*
+Last updated: August 2026

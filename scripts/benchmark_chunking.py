@@ -29,19 +29,8 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-try:
-    from utils.chunking import chunk_text, chunk_by_sentences, ContextPreservingChunker
-except ImportError:
-    # Fallback mock implementations if core module is structured differently
-    def chunk_text(text: str, chunk_size: int = 500) -> list[str]:
-        return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
-    
-    def chunk_by_sentences(text: str) -> list[str]:
-        return [s.strip() for s in text.split('.') if s.strip()]
-        
-    class ContextPreservingChunker:
-        def chunk(self, text: str) -> list[str]:
-            return [text[i:i+1000] for i in range(0, len(text), 1000)]
+from src.core.text_chunking import chunk_text, chunk_by_sentences
+from app.components.advanced_analytics import ContextPreservingChunker
 
 # Configure logging
 logging.basicConfig(
@@ -61,17 +50,17 @@ _VOCABULARY = [
     "processing", "similarity", "cosine", "distance", "metric", "threshold"
 ]
 
-def generate_synthetic_text(size_mb: int) -> str:
+def generate_synthetic_text(size_mb: float) -> str:
     """Generates synthetic text of a specified size in megabytes."""
-    sample_sentence = "Natural language processing and semantic plagiarism detection systems require efficient text chunking algorithms. "
-    chars_target = size_mb * 1024 * 1024
-    repeats = (chars_target // len(sample_sentence)) + 1
-    
+    if size_mb < 0:
+        raise ValueError("Sample size must be non-negative")
+    chars_target = int(size_mb * 1024 * 1024)
+
     # Build text efficiently
     corpus = []
     current_chars = 0
     while current_chars < chars_target:
-        sentence = "".join(random.choice(_VOCABULARY) for _ in range(12)) + ". "
+        sentence = " ".join(random.choice(_VOCABULARY) for _ in range(12)) + ". "
         corpus.append(sentence)
         current_chars += len(sentence)
         
@@ -114,16 +103,16 @@ def benchmark_algorithm(name: str, func, text: str, size_mb: int) -> dict[str, A
     }
 
 
-def run_benchmarks() -> list[dict[str, Any]]:
-    sizes = [1, 5, 20]
+def run_benchmarks(sizes=None) -> list[dict[str, Any]]:
+    sizes = [1, 5, 20] if sizes is None else sizes
     results = []
     
     context_chunker = ContextPreservingChunker()
     
     algorithms = [
-        ("chunk_text", lambda t: chunk_text(t)),
-        ("chunk_by_sentences", lambda t: chunk_by_sentences(t)),
-        ("ContextPreservingChunker", lambda t: context_chunker.chunk(t))
+        ("chunk_text", lambda t: chunk_text(t, max_chunks=max(1000, len(t)))),
+        ("chunk_by_sentences", lambda t: chunk_by_sentences(t, max_chunks=max(1000, len(t)))),
+        ("ContextPreservingChunker", lambda t: context_chunker.chunk_with_context(t))
     ]
     
     for size in sizes:

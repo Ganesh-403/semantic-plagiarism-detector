@@ -28,20 +28,20 @@ similarity, and **FAISS vector search**.
 
 ## ✨ Features
 
-| Feature | Detail |
-|---|---|
-| **Semantic understanding** | Detects paraphrased plagiarism, not just copy-paste |
+| Feature                    | Detail                                                                    |
+| -------------------------- | ------------------------------------------------------------------------- |
+| **Semantic understanding** | Detects paraphrased plagiarism, not just copy-paste                       |
 | **Transformer embeddings** | `paraphrase-multilingual-MiniLM-L12-v2` (384-dim, multilingual, accurate) |
-| **FAISS vector search** | Adaptive indexing (Flat / IVF) — scales to thousands of assignments |
-| **Paragraph chunking** | Detects localised section-level plagiarism |
-| **Similarity matrix** | Full N×N pairwise document comparison; downloadable as CSV or Excel |
-| **Interactive heatmap** | Plotly heatmap with hover tooltips; toggle to static Seaborn view |
-| **Pair drill-down** | See exactly which paragraphs match |
-| **Custom text query** | Paste any snippet to search against all uploaded assignments |
-| **Authentication** | Login system with role-based access (admin / teacher) |
-| **User management** | Admin can create, reset passwords, and delete users |
-| **Streamlit dashboard** | Clean, teacher-friendly web interface |
-| **Configurable threshold** | Adjustable via sidebar slider (default 0.59) |
+| **FAISS vector search**    | Adaptive indexing (Flat / IVF) — scales to thousands of assignments       |
+| **Paragraph chunking**     | Detects localised section-level plagiarism                                |
+| **Similarity matrix**      | Full N×N pairwise document comparison; downloadable as CSV or Excel       |
+| **Interactive heatmap**    | Plotly heatmap with hover tooltips; toggle to static Seaborn view         |
+| **Pair drill-down**        | See exactly which paragraphs match                                        |
+| **Custom text query**      | Paste any snippet to search against all uploaded assignments              |
+| **Authentication**         | Login system with role-based access (admin / teacher)                     |
+| **User management**        | Admin can create, reset passwords, and delete users                       |
+| **Streamlit dashboard**    | Clean, teacher-friendly web interface                                     |
+| **Configurable threshold** | Adjustable via sidebar slider (default 0.59)                              |
 
 ---
 
@@ -71,19 +71,19 @@ similarity, and **FAISS vector search**.
 
 ### Module Responsibilities
 
-| Module | Responsibility |
-|---|---|
-| `src/core/document_parser.py` | Extract raw text from PDF, DOCX, and TXT files |
-| `src/core/text_chunking.py` | Split text into paragraph chunks (20–200 words) |
-| `src/core/embedding_model.py` | Generate L2-normalised embeddings via SentenceTransformers |
-| `src/core/faiss_index.py` | Build FAISS index (Flat/IVF); chunk-level search across all documents |
-| `src/core/similarity.py` | Compute cosine similarity matrices; flag plagiarism |
-| `src/core/translator.py` | Translate non-English matching paragraphs to English |
-| `src/db/auth.py` | SQLite-backed authentication with bcrypt password hashing |
-| `src/db/corpus_db.py` | SQLite database manager for metadata, text chunks, and embedding vectors |
-| `src/visualization/heatmap.py` | Render Seaborn/Plotly heatmaps (document-level & chunk-level) |
-| `src/visualization/network_graph.py` | Render interactive Plotly plagiarism networks using spring layout |
-| `app/streamlit_app.py` | Streamlit UI: login, upload, warnings, FAISS search, heatmap, drill-down |
+| Module                               | Responsibility                                                           |
+| ------------------------------------ | ------------------------------------------------------------------------ |
+| `src/core/document_parser.py`        | Extract raw text from PDF, DOCX, and TXT files                           |
+| `src/core/text_chunking.py`          | Split text into paragraph chunks (20–200 words)                          |
+| `src/core/embedding_model.py`        | Generate L2-normalised embeddings via SentenceTransformers               |
+| `src/core/faiss_index.py`            | Build FAISS index (Flat/IVF); chunk-level search across all documents    |
+| `src/core/similarity.py`             | Compute cosine similarity matrices; flag plagiarism                      |
+| `src/core/translator.py`             | Translate non-English matching paragraphs to English                     |
+| `src/db/auth.py`                     | SQLite-backed authentication with bcrypt password hashing                |
+| `src/db/corpus_db.py`                | SQLite database manager for metadata, text chunks, and embedding vectors |
+| `src/visualization/heatmap.py`       | Render Seaborn/Plotly heatmaps (document-level & chunk-level)            |
+| `src/visualization/network_graph.py` | Render interactive Plotly plagiarism networks using spring layout        |
+| `app/streamlit_app.py`               | Streamlit UI: login, upload, warnings, FAISS search, heatmap, drill-down |
 
 ---
 
@@ -181,8 +181,8 @@ make load-seed   # Or: python scripts/manage_seed.py load
 
 After loading the seed data, launch the Streamlit dashboard and log in with the pre-configured contributor accounts:
 
-* **Admin**: `admin` / `admin123`
-* **Teacher**: `teacher` / `teacher123`
+- **Admin**: `admin` / `admin123`
+- **Teacher**: `teacher` / `teacher123`
 
 ### Docker Deployment (recommended for quick setup)
 
@@ -192,8 +192,8 @@ an optional Redis cache.
 
 **Prerequisites:**
 
-* Docker Engine 20.10+
-* Docker Compose v2+
+- Docker Engine 20.10+
+- Docker Compose v2+
 
 **Start the app:**
 
@@ -205,7 +205,7 @@ The dashboard is available at **<http://localhost:8501>**.
 
 **Optional services:**
 
-* **Redis** is included in `docker-compose.yml` for session caching and rate-limiting.
+- **Redis** is included in `docker-compose.yml` for session caching and rate-limiting.
   The app runs without Redis and falls back to local in-memory state, so you can
   comment out the `redis` service if you only need the Streamlit UI.
 
@@ -214,16 +214,16 @@ The dashboard is available at **<http://localhost:8501>**.
 Customize behavior via a `.env` file in the project root or inline in
 `docker-compose.yml`. Key variables:
 
-| Variable | Default | Description |
-|---|---|---|
-| `REDIS_URL` | `redis://redis:6379/0` | Redis connection URL |
-| `APP_BASE_URL` | `http://localhost:8501` | Base URL used in notifications |
-| `SMTP_SERVER` | `smtp.gmail.com` | SMTP server for daily summary emails |
-| `SMTP_PORT` | `587` | SMTP port |
-| `SMTP_USERNAME` | | SMTP username |
-| `SMTP_PASSWORD` | | SMTP password |
-| `API_BEARER_TOKEN` | | Bearer token for REST API |
-| `BACKUP_IDLE_TIMEOUT_MINUTES` | `30` | Duration of zero user activity (in minutes) before automated DB backup runs |
+| Variable                      | Default                 | Description                                                                 |
+| ----------------------------- | ----------------------- | --------------------------------------------------------------------------- |
+| `REDIS_URL`                   | `redis://redis:6379/0`  | Redis connection URL                                                        |
+| `APP_BASE_URL`                | `http://localhost:8501` | Base URL used in notifications                                              |
+| `SMTP_SERVER`                 | `smtp.gmail.com`        | SMTP server for daily summary emails                                        |
+| `SMTP_PORT`                   | `587`                   | SMTP port                                                                   |
+| `SMTP_USERNAME`               |                         | SMTP username                                                               |
+| `SMTP_PASSWORD`               |                         | SMTP password                                                               |
+| `API_BEARER_TOKEN`            |                         | Bearer token for REST API                                                   |
+| `BACKUP_IDLE_TIMEOUT_MINUTES` | `30`                    | Duration of zero user activity (in minutes) before automated DB backup runs |
 
 See `.env.example` for the full list.
 
@@ -250,7 +250,7 @@ straight to `redis-py`'s `redis.from_url()`, which natively understands the
    services:
      app:
        volumes:
-         - ./certs:/app/certs:ro   # add alongside the existing volumes
+         - ./certs:/app/certs:ro # add alongside the existing volumes
 
      redis:
        image: redis:7-alpine
@@ -304,12 +304,13 @@ docker compose build --no-cache
 docker compose up
 ```
 
-```markdown
+````markdown
 **Stop the app:**
 
 ```bash
 docker compose down
-```
+```text
+````
 
 ### Administrator account
 
@@ -328,15 +329,15 @@ data survives `down` / `up` cycles.
 
 ### What is persisted
 
-| Volume name            | Container path | Holds                                           | Wiped by `down -v`? |
-|------------------------|----------------|-------------------------------------------------|----------------------|
-| `plagiarism_data`      | `/state/data`    | `corpus.db`, `corpus.index`, `backups/`         | ✅ Yes |
-| `plagiarism_users`     | `/state`       | `users.db` (auth, roles, password hashes)        | ✅ Yes |
-| `redis_data`           | `/data`        | Redis dump (session cache, rate-limit counters)  | ✅ Yes |
+| Volume name        | Container path | Holds                                           | Wiped by `down -v`? |
+| ------------------ | -------------- | ----------------------------------------------- | ------------------- |
+| `plagiarism_data`  | `/state/data`  | `corpus.db`, `corpus.index`, `backups/`         | ✅ Yes              |
+| `plagiarism_users` | `/state`       | `users.db` (auth, roles, password hashes)       | ✅ Yes              |
+| `redis_data`       | `/data`        | Redis dump (session cache, rate-limit counters) | ✅ Yes              |
 
 ### Safe operations
 
-```bash
+````bash
 # Stop the app — data is preserved.
 docker compose down
 
@@ -366,20 +367,20 @@ To maintain code quality and styling standards, we use client-side Git hooks man
 1. Install the `pre-commit` utility:
    ```bash
    pip install pre-commit
-   ```
+````text
 
-2. Install the Git hooks:
+1. Install the Git hooks:
 
    ```bash
    pre-commit install
-   ```
+   ```text
 
 After installation, the following checks run automatically on every staged file:
 
-* **`black`**: Formats Python code.
-* **`isort`**: Sorts import lines.
-* **`ruff`**: Checks for lint warnings and errors.
-* **`pre-commit-hooks`**: Performs basic validation (trailing whitespace, end-of-file fixer, check-yaml, check-added-large-files).
+- **`black`**: Formats Python code.
+- **`isort`**: Sorts import lines.
+- **`ruff`**: Checks for lint warnings and errors.
+- **`pre-commit-hooks`**: Performs basic validation (trailing whitespace, end-of-file fixer, check-yaml, check-added-large-files).
 
 ### Run Hooks Manually
 
@@ -387,7 +388,7 @@ You can manually trigger all hooks on all files in the repository at any time:
 
 ```bash
 pre-commit run --all-files
-```
+```text
 
 ---
 
@@ -397,20 +398,20 @@ The system includes an automated background backup daemon that safely creates sn
 
 ### Idle Trigger & Daemon Semantics
 
-* **Background Daemon:** A background thread polls every 30 seconds to monitor user session activity.
-* **Idle Threshold:** When all user sessions are idle and no active user requests occur for the configured duration (default: **30 minutes** of zero activity), the daemon creates a timestamped database snapshot.
-* **Rotation & Retention:** Automated backup rotation keeps only the **10 most recent backups** and automatically deletes backups older than **30 days** to prevent disk space exhaustion.
+- **Background Daemon:** A background thread polls every 30 seconds to monitor user session activity.
+- **Idle Threshold:** When all user sessions are idle and no active user requests occur for the configured duration (default: **30 minutes** of zero activity), the daemon creates a timestamped database snapshot.
+- **Rotation & Retention:** Automated backup rotation keeps only the **10 most recent backups** and automatically deletes backups older than **30 days** to prevent disk space exhaustion.
 
 ### Configuration Keys (`.env`)
 
-| Key | Default | Description |
-|---|---|---|
-| `BACKUP_IDLE_TIMEOUT_MINUTES` | `30` | Duration of zero user activity (in minutes) required to trigger an automated database snapshot |
+| Key                           | Default | Description                                                                                    |
+| ----------------------------- | ------- | ---------------------------------------------------------------------------------------------- |
+| `BACKUP_IDLE_TIMEOUT_MINUTES` | `30`    | Duration of zero user activity (in minutes) required to trigger an automated database snapshot |
 
 ### Storage Location
 
-* Automated backups are saved in the `data/backups/` directory (relative to the corpus database location).
-* Backup files are timestamped using the naming convention `corpus_backup_YYYYMMDD_HHMMSS.db`.
+- Automated backups are saved in the `data/backups/` directory (relative to the corpus database location).
+- Backup files are timestamped using the naming convention `corpus_backup_YYYYMMDD_HHMMSS.db`.
 
 ---
 
@@ -425,7 +426,7 @@ chunking, embedding, FAISS, and similarity pipeline as regular PDFs.
 
 ```bash
 python -m pip install pytesseract pymupdf pillow
-```
+```text
 
 ### Tesseract system dependency
 
@@ -435,19 +436,19 @@ On Windows, it is commonly installed at:
 
 ```text
 C:\Program Files\Tesseract-OCR\tesseract.exe
-```
+```text
 
 When it is not available on PATH, set:
 
 ```powershell
 $env:TESSERACT_CMD="C:\Program Files\Tesseract-OCR\tesseract.exe"
-```
+```text
 
 Verify the installation:
 
 ```powershell
 tesseract --version
-```
+```text
 
 OCR is performed locally; uploaded documents are not sent to an external OCR
 service.
@@ -456,26 +457,26 @@ service.
 
 ## 🖥️ Dashboard — 5 Tabs
 
-| Tab | What it shows |
-|---|---|
-| **Plagiarism Warnings** | All flagged pairs sorted by severity (High / Medium); downloadable CSV |
-| **FAISS Chunk Search** | Chunk-level ANN search across all documents; custom text query box |
-| **Similarity Matrix** | Full N×N similarity table; downloadable as CSV or Excel |
-| **Heatmap** | Interactive Plotly heatmap (hover values) or static Seaborn view; downloadable PNG |
-| **Pair Drill-Down** | Select any two docs to see which specific paragraphs match |
+| Tab                     | What it shows                                                                      |
+| ----------------------- | ---------------------------------------------------------------------------------- |
+| **Plagiarism Warnings** | All flagged pairs sorted by severity (High / Medium); downloadable CSV             |
+| **FAISS Chunk Search**  | Chunk-level ANN search across all documents; custom text query box                 |
+| **Similarity Matrix**   | Full N×N similarity table; downloadable as CSV or Excel                            |
+| **Heatmap**             | Interactive Plotly heatmap (hover values) or static Seaborn view; downloadable PNG |
+| **Pair Drill-Down**     | Select any two docs to see which specific paragraphs match                         |
 
 ---
 
 ## ⚙️ Configuration
 
-| Setting | Default | Description |
-|---|---|---|
-| Plagiarism threshold | `0.59` | Pairs above this score are flagged |
-| FAISS matches per chunk | `5` | Nearest neighbours retrieved per chunk |
-| Chunk min words | `20` | Paragraphs shorter than this are discarded |
-| Chunk max words | `200` | Longer paragraphs are sub-split at sentence boundaries |
-| Embedding model | `paraphrase-multilingual-MiniLM-L12-v2` | Change in `src/core/embedding_model.py` or set `SEMANTIC_PLAGIARISM_MODEL` |
-| Batch size | `64` | Tune for GPU/CPU in `src/core/embedding_model.py` |
+| Setting                 | Default                                 | Description                                                                |
+| ----------------------- | --------------------------------------- | -------------------------------------------------------------------------- |
+| Plagiarism threshold    | `0.59`                                  | Pairs above this score are flagged                                         |
+| FAISS matches per chunk | `5`                                     | Nearest neighbours retrieved per chunk                                     |
+| Chunk min words         | `20`                                    | Paragraphs shorter than this are discarded                                 |
+| Chunk max words         | `200`                                   | Longer paragraphs are sub-split at sentence boundaries                     |
+| Embedding model         | `paraphrase-multilingual-MiniLM-L12-v2` | Change in `src/core/embedding_model.py` or set `SEMANTIC_PLAGIARISM_MODEL` |
+| Batch size              | `64`                                    | Tune for GPU/CPU in `src/core/embedding_model.py`                          |
 
 ---
 
@@ -496,34 +497,35 @@ Short chunks (headers, captions) are discarded; long chunks are sub-split at sen
 
 Each chunk is passed through `paraphrase-multilingual-MiniLM-L12-v2`:
 
-* Output: 384-dimensional, L2-normalised vector
-* L2 normalisation means cosine similarity = dot product (fast)
+- Output: 384-dimensional, L2-normalised vector
+- L2 normalisation means cosine similarity = dot product (fast)
 
 ### Step 4 – FAISS Index
 
 All chunk vectors are added to a FAISS index. The system automatically selects the
 best index type based on collection size:
 
-* **< 5 000 vectors → `IndexFlatIP`** (exact inner-product search, O(N) per query)
-* **≥ 5 000 vectors → `IndexIVFFlat`** (inverted-file approximate search, sub-linear per query)
+- **< 5 000 vectors → `IndexFlatIP`** (exact inner-product search, O(N) per query)
+- **≥ 5 000 vectors → `IndexIVFFlat`** (inverted-file approximate search, sub-linear per query)
 
 Since embeddings are L2-normalised, inner product equals cosine similarity.
 
 ### Step 5 – Similarity Computation
 
-* **Document-level:** mean-pooled chunk embeddings → cosine similarity matrix
-* **Chunk-level:** FAISS ANN search → max similarity per chunk pair
+- **Document-level:** mean-pooled chunk embeddings → cosine similarity matrix
+- **Chunk-level:** FAISS ANN search → max similarity per chunk pair
 
 ### Step 6 – Flagging
 
 Pairs with similarity >= threshold are flagged:
 
-* **High**: >= 0.90
-* **Medium**: >= 0.75 (default)
+- **High**: >= 0.90
+- **Medium**: >= 0.75 (default)
 
 ### Why semantic similarity catches paraphrasing
 
 The model encodes **meaning**, not surface words:
+
 > "The quick brown fox jumped over the lazy dog."
 > "A nimble auburn canine leapt above a lethargic hound."
 
@@ -533,13 +535,13 @@ Both sentences produce nearly identical embeddings because the semantic content 
 
 ## 📊 Performance
 
-| Scenario | Expected time |
-|---|---|
-| First load (model download) | ~30–60 s (once only) |
-| 5 documents, CPU | ~10–15 s |
-| 10 documents, CPU | ~20–30 s |
-| 10 documents, GPU | ~5–8 s |
-| 1000 documents, FAISS | Feasible — auto-switches to IVF index |
+| Scenario                    | Expected time                         |
+| --------------------------- | ------------------------------------- |
+| First load (model download) | ~30–60 s (once only)                  |
+| 5 documents, CPU            | ~10–15 s                              |
+| 10 documents, CPU           | ~20–30 s                              |
+| 10 documents, GPU           | ~5–8 s                                |
+| 1000 documents, FAISS       | Feasible — auto-switches to IVF index |
 
 Results are **cached by Streamlit** — re-uploading the same files is instant.
 
@@ -547,10 +549,10 @@ Results are **cached by Streamlit** — re-uploading the same files is instant.
 
 ## 🔒 Privacy & Ethics
 
-* All processing runs **locally**; no data leaves your machine.
-* This tool is an **aid** for academic review, not a final verdict.
-* A high similarity score should prompt **manual review**, not automatic sanctions.
-* Consider informing students that submitted work will be checked.
+- All processing runs **locally**; no data leaves your machine.
+- This tool is an **aid** for academic review, not a final verdict.
+- A high similarity score should prompt **manual review**, not automatic sanctions.
+- Consider informing students that submitted work will be checked.
 
 ---
 
@@ -562,13 +564,13 @@ Expose a secure FastAPI endpoint for Learning Management Systems (Canvas, Moodle
 
 ```bash
 uvicorn src.api.app:app --reload --port 8000
-```
+```text
 
 ### Endpoints
 
-| Endpoint | Method | Auth | Description |
-|---|---|---|---|
-| `/health` | `GET` | None | API health and readiness check |
+| Endpoint       | Method | Auth         | Description                                                          |
+| -------------- | ------ | ------------ | -------------------------------------------------------------------- |
+| `/health`      | `GET`  | None         | API health and readiness check                                       |
 | `/api/v1/scan` | `POST` | Bearer Token | Scan a document (`.pdf`, `.docx`, `.txt`) against the indexed corpus |
 
 ### Example Request (`curl`)
@@ -577,7 +579,7 @@ uvicorn src.api.app:app --reload --port 8000
 curl -X POST "http://localhost:8000/api/v1/scan?threshold=0.59" \
   -H "Authorization: Bearer dev-bearer-token" \
   -F "file=@student_essay.pdf"
-```
+```text
 
 ### Example Response (`JSON`)
 
@@ -607,7 +609,7 @@ curl -X POST "http://localhost:8000/api/v1/scan?threshold=0.59" \
     }
   ]
 }
-```
+```text
 
 ---
 
@@ -616,14 +618,14 @@ curl -X POST "http://localhost:8000/api/v1/scan?threshold=0.59" \
 The system supports a wide range of document formats for semantic analysis. Below is the compatibility matrix outlining parsing capabilities for each format:
 
 | Format | Extension | Text Extraction | OCR Support | Table Parsing | Metadata Extraction |
-|--------|-----------|-----------------|-------------|---------------|---------------------|
-| PDF    | `.pdf`    | ✅ Native        | ✅ Yes       | ✅ Yes         | ✅ Yes               |
-| Word   | `.docx`   | ✅ Native        | ❌ No        | ✅ Yes         | ✅ Yes               |
-| Text   | `.txt`    | ✅ Native        | ❌ No        | ❌ No          | ❌ No                |
-| ODT    | `.odt`    | ✅ Native        | ❌ No        | ✅ Yes         | ✅ Yes               |
-| RTF    | `.rtf`    | ✅ Native        | ❌ No        | ❌ No          | ❌ No                |
-| CSV    | `.csv`    | ✅ Native        | ❌ No        | ✅ Yes         | ❌ No                |
-| MD     | `.md`     | ✅ Native        | ❌ No        | ✅ Yes         | ❌ No                |
+| ------ | --------- | --------------- | ----------- | ------------- | ------------------- |
+| PDF    | `.pdf`    | ✅ Native       | ✅ Yes      | ✅ Yes        | ✅ Yes              |
+| Word   | `.docx`   | ✅ Native       | ❌ No       | ✅ Yes        | ✅ Yes              |
+| Text   | `.txt`    | ✅ Native       | ❌ No       | ❌ No         | ❌ No               |
+| ODT    | `.odt`    | ✅ Native       | ❌ No       | ✅ Yes        | ✅ Yes              |
+| RTF    | `.rtf`    | ✅ Native       | ❌ No       | ❌ No         | ❌ No               |
+| CSV    | `.csv`    | ✅ Native       | ❌ No       | ✅ Yes        | ❌ No               |
+| MD     | `.md`     | ✅ Native       | ❌ No       | ✅ Yes        | ❌ No               |
 
 > **Note:** Image-based PDFs are automatically processed via Tesseract OCR if native text extraction yields insufficient text.
 
@@ -633,1062 +635,1062 @@ The system supports a wide range of document formats for semantic analysis. Belo
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 2
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 3
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 4
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 5
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 6
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 7
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 8
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 9
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 10
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 11
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 12
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 13
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 14
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 15
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 16
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 17
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 18
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 19
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 20
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 21
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 22
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 23
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 24
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 25
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 26
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 27
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 28
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 29
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 30
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 31
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 32
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 33
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 34
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 35
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 36
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 37
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 38
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 39
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 40
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 41
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 42
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 43
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 44
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 45
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 46
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 47
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 48
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 49
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 50
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 51
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 52
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 53
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 54
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 55
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 56
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 57
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 58
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 59
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 60
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 61
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 62
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 63
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 64
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 65
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 66
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 67
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 68
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 69
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 70
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 71
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 72
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 73
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 74
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 75
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 76
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 77
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 78
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 79
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 80
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 81
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 82
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 83
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 84
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 85
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 86
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 87
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 88
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 89
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 90
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 91
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 92
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 93
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 94
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 95
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 96
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 97
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 98
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 99
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 100
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 101
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 102
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 103
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 104
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 105
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 106
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 107
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 108
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 109
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 110
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 111
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 112
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 113
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 114
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 115
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 116
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 117
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 118
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 119
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 120
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 121
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 122
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 123
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 124
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 125
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 126
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 127
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 128
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 129
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 130
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 131
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 132
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 133
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 134
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 135
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 136
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 137
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 138
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 139
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 140
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 141
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 142
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 143
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 144
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 145
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 146
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 147
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 148
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ### Enterprise Standard Format Compatibility Details - Section 149
 
 This section outlines the detailed enterprise compatibility requirements for automated semantic ingestion.
 
-* **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
-* **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
+- **Text Analytics Framework:** All parsing falls back to UTF-8 decoding where applicable.
+- **Validation Layer:** Enforces strict mime-type validation before passing to the parser.
 
 ## 📦 Dependencies
 
-| Library | Purpose |
-|---|---|
-| `sentence-transformers` | Pre-trained transformer embeddings |
-| `faiss-cpu` | Vector search (exact / approximate nearest-neighbour) |
-| `PyPDF2` | PDF text extraction |
-| `streamlit` | Web dashboard |
-| `bcrypt` | Password hashing for authentication |
-| `python-dotenv` | Load environment variables from `.env` |
-| `numpy` | Numerical operations |
-| `pandas` | Similarity DataFrame |
-| `scikit-learn` | `cosine_similarity` utility |
-| `plotly` | Interactive heatmap with hover tooltips |
-| `seaborn` | Static heatmap styling |
-| `matplotlib` | Figure rendering |
-| `openpyxl` | Excel export for similarity matrix |
+| Library                 | Purpose                                               |
+| ----------------------- | ----------------------------------------------------- |
+| `sentence-transformers` | Pre-trained transformer embeddings                    |
+| `faiss-cpu`             | Vector search (exact / approximate nearest-neighbour) |
+| `PyPDF2`                | PDF text extraction                                   |
+| `streamlit`             | Web dashboard                                         |
+| `bcrypt`                | Password hashing for authentication                   |
+| `python-dotenv`         | Load environment variables from `.env`                |
+| `numpy`                 | Numerical operations                                  |
+| `pandas`                | Similarity DataFrame                                  |
+| `scikit-learn`          | `cosine_similarity` utility                           |
+| `plotly`                | Interactive heatmap with hover tooltips               |
+| `seaborn`               | Static heatmap styling                                |
+| `matplotlib`            | Figure rendering                                      |
+| `openpyxl`              | Excel export for similarity matrix                    |
 
 ---
 
@@ -1701,33 +1703,33 @@ Run the evaluation yourself:
 
 ```bash
 python -m evaluation.evaluate
-```
+```text
 
 For benchmark schema, contributor guidance, threshold sweeps, and output details,
 see the [Evaluation and Benchmark Dataset Guide](evaluation/README.md).
 
 Results are saved to `evaluation/results/` and include:
 
-| Output | Description |
-|---|---|
-| `metrics.json` | Precision, recall, F1, ROC-AUC at optimal threshold |
-| `threshold_sweep_semantic.csv` | Metrics at every threshold (0.30 – 0.95) |
-| `roc_curve.png` | ROC curve — Semantic vs TF-IDF baseline |
-| `pr_curve.png` | Precision-Recall curve |
-| `similarity_distribution.png` | Score histograms by label |
+| Output                         | Description                                         |
+| ------------------------------ | --------------------------------------------------- |
+| `metrics.json`                 | Precision, recall, F1, ROC-AUC at optimal threshold |
+| `threshold_sweep_semantic.csv` | Metrics at every threshold (0.30 – 0.95)            |
+| `roc_curve.png`                | ROC curve — Semantic vs TF-IDF baseline             |
+| `pr_curve.png`                 | Precision-Recall curve                              |
+| `similarity_distribution.png`  | Score histograms by label                           |
 
 ### Benchmark Results
 
 Evaluated on 25 text pairs (10 plagiarized, 15 not plagiarized):
 
-| Metric | Sentence Transformers | TF-IDF Baseline | Δ |
-|---|---|---|---|
-| **ROC-AUC** | **1.000** | 0.973 | +0.027 |
-| **Best F1** | **1.000** | 0.667 | +0.333 |
-| Precision | 1.000 | 1.000 | — |
-| Recall | **1.000** | 0.500 | +0.500 |
-| Accuracy | **1.000** | 0.800 | +0.200 |
-| Optimal Threshold | 0.59 | 0.30 | — |
+| Metric            | Sentence Transformers | TF-IDF Baseline | Δ      |
+| ----------------- | --------------------- | --------------- | ------ |
+| **ROC-AUC**       | **1.000**             | 0.973           | +0.027 |
+| **Best F1**       | **1.000**             | 0.667           | +0.333 |
+| Precision         | 1.000                 | 1.000           | —      |
+| Recall            | **1.000**             | 0.500           | +0.500 |
+| Accuracy          | **1.000**             | 0.800           | +0.200 |
+| Optimal Threshold | 0.59                  | 0.30            | —      |
 
 **Key finding:** TF-IDF misses **all 5 heavy paraphrases** (scoring 0.18–0.27) while
 Sentence Transformers correctly flags them (scoring 0.60–0.82). Light paraphrases are
@@ -1744,17 +1746,17 @@ methods miss entirely.
 All plagiarism and severity boundaries are defined in
 `src/core/config.py`.
 
-| Rule | Default |
-|---|---:|
+| Rule                          |   Default |
+| ----------------------------- | --------: |
 | Pair is flagged as plagiarism | `>= 0.59` |
-| Medium severity | `>= 0.75` |
-| High severity | `>= 0.90` |
+| Medium severity               | `>= 0.75` |
+| High severity                 | `>= 0.90` |
 
 The required ordering is:
 
 ```text
 0.0 <= plagiarism <= medium <= high <= 1.0
-```
+```text
 
 The administrator slider controls which pairs are flagged. It does not redefine
 the Medium or High severity bands.
@@ -1773,7 +1775,7 @@ Migration definitions live in:
 src/db/migrations/auth.py
 src/db/migrations/corpus.py
 src/db/migrations/common.py
-```
+```text
 
 Each upgrade:
 
@@ -1795,19 +1797,19 @@ Run all lint checks with:
 
 ```bash
 make lint
-```
+```text
 
 ## Documentation
 
-* [Architecture](docs/ARCHITECTURE.md)
-* [API Reference](docs/API.md)
-* [Document Parsing & Formats](docs/PARSING.md)
-* [NLP Architecture & Similarity Algorithm Guide](docs/ALGORITHMS.md)
-* [Single Sign-On (SSO) Setup](docs/SSO_SETUP.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [API Reference](docs/API.md)
+- [Document Parsing & Formats](docs/PARSING.md)
+- [NLP Architecture & Similarity Algorithm Guide](docs/ALGORITHMS.md)
+- [Single Sign-On (SSO) Setup](docs/SSO_SETUP.md)
 
-* [Bulk Export Formats & Data Fields](docs/EXPORTS.md)
+- [Bulk Export Formats & Data Fields](docs/EXPORTS.md)
 
-* [UI Customization and Theme Guide](docs/THEMING.md)
+- [UI Customization and Theme Guide](docs/THEMING.md)
 
 ---
 
@@ -1822,9 +1824,9 @@ three times with exponential backoff.
 
 Retries apply to:
 
-* connection failures and request timeouts,
-* HTTP 408, 425, and 429,
-* HTTP 500, 502, 503, and 504.
+- connection failures and request timeouts,
+- HTTP 408, 425, and 429,
+- HTTP 500, 502, 503, and 504.
 
 Permanent client errors such as HTTP 400 and 401 are not retried. Webhook SSRF
 validation runs before dispatch and is never bypassed or retried.

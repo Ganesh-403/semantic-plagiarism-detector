@@ -17,23 +17,23 @@ diverse, inclusive, and healthy community.
 Examples of behavior that contributes to a positive environment for our
 community include:
 
-* Demonstrating empathy and kindness toward other people
-* Being respectful of differing opinions, viewpoints, and experiences
-* Giving and gracefully accepting constructive feedback
-* Accepting responsibility and apologizing to those affected by our mistakes,
+- Demonstrating empathy and kindness toward other people
+- Being respectful of differing opinions, viewpoints, and experiences
+- Giving and gracefully accepting constructive feedback
+- Accepting responsibility and apologizing to those affected by our mistakes,
   and learning from the experience
-* Focusing on what is best not just for us as individuals, but for the overall
+- Focusing on what is best not just for us as individuals, but for the overall
   community
 
 Examples of unacceptable behavior include:
 
-* The use of sexualized language or imagery, and sexual attention or advances of
+- The use of sexualized language or imagery, and sexual attention or advances of
   any kind
-* Trolling, insulting or derogatory comments, and personal or political attacks
-* Public or private harassment
-* Publishing others' private information, such as a physical or email address,
+- Trolling, insulting or derogatory comments, and personal or political attacks
+- Public or private harassment
+- Publishing others' private information, such as a physical or email address,
   without explicit permission
-* Other conduct which could reasonably be considered inappropriate in a
+- Other conduct which could reasonably be considered inappropriate in a
   professional setting
 
 ## Enforcement Responsibilities
@@ -64,10 +64,10 @@ Instances of abusive, harassing, or otherwise unacceptable behavior may be repor
 
 If you experience or witness unacceptable behavior, please report it to us via:
 
-* **Email:** [gkambli70@gmail.com](mailto:gkambli70@gmail.com)
-* **GitHub Direct Message:** Contact a maintainer privately
+- **Email:** [gkambli70@gmail.com](mailto:gkambli70@gmail.com)
+- **GitHub Direct Message:** Contact a maintainer privately
 
-*We currently accept reports via email or GitHub DM only. Regardless of channel, every report is handled with the same strict confidentiality outlined below.*
+_We currently accept reports via email or GitHub DM only. Regardless of channel, every report is handled with the same strict confidentiality outlined below._
 
 When reporting, please include a description of the incident, relevant links, screenshots or logs, and the names (or usernames) of the people involved.
 
@@ -79,14 +79,14 @@ All community leaders are obligated to respect the privacy and security of the r
 
 ### Response Timeline
 
-* **Acknowledgment:** Within **3 business days**
-* **Initial Review:** Within **10 business days** of acknowledgment
-* **Updates:** If a longer investigation is needed, we will provide progress updates at least once every 10 business days until the issue is resolved.
+- **Acknowledgment:** Within **3 business days**
+- **Initial Review:** Within **10 business days** of acknowledgment
+- **Updates:** If a longer investigation is needed, we will provide progress updates at least once every 10 business days until the issue is resolved.
 
 ## Attribution
 
 This Code of Conduct is adapted from the [Contributor Covenant][homepage],
 version 2.1, available at
-https://www.contributor-covenant.org/version/2/1/code_of_conduct.html.
+<https://www.contributor-covenant.org/version/2/1/code_of_conduct.html>.
 
 [homepage]: https://www.contributor-covenant.org

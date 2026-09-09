@@ -38,7 +38,7 @@ jobs:
           pip install pip-audit bandit
 
       - name: Run vulnerability scan
-        run: pip-audit -f json -o security-audit.json
+        run: python scripts/audit_dependencies.py --output security-audit.json
 
       - name: Run bandit security scan
         if: always()

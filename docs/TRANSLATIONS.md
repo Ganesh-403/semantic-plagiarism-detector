@@ -12,13 +12,13 @@ Example:
 src/i18n/de.json
 ```
 
-2. Copy the contents of `src/i18n/en.json` into the new file.
+1. Copy the contents of `src/i18n/en.json` into the new file.
 
-3. Replace the English text with translations while keeping every key unchanged.
+2. Replace the English text with translations while keeping every key unchanged.
 
-4. Register the language in `src/i18n/translator.py` by adding it to the `_SUPPORTED_LANGUAGES` dictionary.
+3. Register the language in `src/i18n/translator.py` by adding it to the `_SUPPORTED_LANGUAGES` dictionary.
 
-5. Restart the application so the new translation file is loaded.
+4. Restart the application so the new translation file is loaded.
 
 Example:
 

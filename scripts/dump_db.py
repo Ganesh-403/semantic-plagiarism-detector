@@ -75,7 +75,7 @@ def dump_database(db_path: Path, output_path: Path) -> bool:
 
         size_kb = output_path.stat().st_size / 1024
         print(
-            f"  [OK] {db_path.name} → {output_path.name} "
+            f"  [OK] {db_path.name} -> {output_path.name} "
             f"({size_kb:.1f} KB)"
         )
         return True
@@ -117,7 +117,7 @@ def main() -> None:
     if args.db in ("auth", "all"):
         databases.append(("auth", AUTH_DB_PATH))
 
-    print(f"Database dump — {timestamp}")
+    print(f"Database dump - {timestamp}")
     print(f"Output directory: {output_dir.resolve()}")
     print()
 

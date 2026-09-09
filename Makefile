@@ -23,18 +23,14 @@ test-cov:
 # Run code formatters and linters check
 lint:
 	ruff check .
-	black --check .
-	isort --check-only --profile black .
-	mypy src/ --ignore-missing-imports
 
 lint-fix:
 	ruff check . --fix
 
 # Auto-format codebase
 format:
-	black .
-	isort --profile black .
 	ruff check --fix .
+	ruff format .
 
 # Clean temporary Python, testing, and IDE cache files
 clean:

@@ -2,13 +2,13 @@
 
 ## Supported Versions
 
-| Version | Supported |
-|---------|-----------|
-| main | ✅ |
-| latest release | ✅ |
-| 1.0.x | ✅ |
-| < 1.0 | ❌ |
-| older releases | ❌ |
+| Version        | Supported |
+| -------------- | --------- |
+| main           | ✅        |
+| latest release | ✅        |
+| 1.0.x          | ✅        |
+| < 1.0          | ❌        |
+| older releases | ❌        |
 
 ## Reporting a Vulnerability
 
@@ -18,9 +18,10 @@ We take the security of the **Semantic Plagiarism Detection System** seriously. 
 
 **Please do NOT open a public GitHub issue for security vulnerabilities.** We request that you do not disclose the vulnerability publicly before a fix is released.
 
-Instead, please report vulnerabilities privately using **GitHub Private Vulnerability Reporting**. 
+Instead, please report vulnerabilities privately using **GitHub Private Vulnerability Reporting**.
 
 To report a vulnerability:
+
 1. Navigate to the **Security** tab of this repository.
 2. Click on **Advisories** in the left sidebar (under Vulnerability reporting).
 3. Click on the **Report a vulnerability** button.
@@ -75,20 +76,25 @@ To help protect the application from malicious or unsafe file uploads, all uploa
 To protect cache data, session states, and FAISS indices from unauthorized access, configure your Redis production instances using the following security best practices.
 
 ### 1. Transport Layer Security (TLS) Encryption
+
 - **Encrypt Traffic in Transit:** Enable TLS encryption (`rediss://` protocol) for all connections between the application server and the Redis host to prevent packet sniffing.
 - **Client Certificate Verification:** Configure Redis to require client certificates (`tls-auth-clients yes`) to ensure only authorized application nodes can establish connections.
 
 ### 2. Password Protection & Authentication
+
 - **Require Strong Passwords:** Set a complex, high-entropy password in `redis.conf` using the `requirepass` directive.
 - **Environment Variables:** Inject the Redis password into the application container using secure secrets (e.g., environment variables) rather than hardcoding credentials in config files.
 
 ### 3. Access Control Lists (ACLs)
+
 - **Least Privilege Access:** Utilize Redis ACLs (available in Redis 6.0+) to define strict permissions instead of using a global administrator user.
 - **Restricted Users:** Create a dedicated user for the plagiarism detector that is only allowed access to the specific keyspaces it uses:
+
   ```redis
   user spd_app on >StrongPassword ~spd:v1:* +@all -@dangerous
+  ```
 
-```
+````text
 
 * **Disable Unused Commands:** Block high-risk commands such as `FLUSHALL`, `FLUSHDB`, `KEYS`, `CONFIG`, and `SHUTDOWN` for the application user.
 
@@ -112,17 +118,19 @@ Security researchers who wish to send encrypted vulnerability disclosure reports
 1. **Import the Public PGP Key:**
    ```bash
    gpg --keyserver keys.openpgp.org --recv-keys 4A2F8B9C1E3D5F70A1B2C3D4E5F6789012345678
-   ```
+````text
 
-2. **Verify Fingerprint:**
+1. **Verify Fingerprint:**
+
    ```bash
    gpg --fingerprint security@domain.com
    # Expected output: 4A2F 8B9C 1E3D 5F70 A1B2  C3D4 E5F6 7890 1234 5678
-   ```
+   ```text
 
-3. **Encrypt Disclosure File:**
+2. **Encrypt Disclosure File:**
+
    ```bash
    gpg --encrypt --armor --recipient security@domain.com vulnerability_report.txt
-   ```
+   ```text
 
-Attach the resulting `.asc` encrypted payload file when emailing your report to `security@domain.com`.
+Attach the resulting `.asc` encrypted payload file when emailing your report to `security@domain.com`.

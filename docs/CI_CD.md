@@ -8,31 +8,33 @@ This repository uses GitHub Actions for continuous integration, issue and pull r
 
 File: [.github/workflows/ci.yml](../.github/workflows/ci.yml)
 
-**Purpose**
+#### Purpose
 
 Runs code quality checks, static analysis, dependency vulnerability scanning, and the test suite.
 
-**Triggers**
+#### Triggers
 
 - `push` to `main` and `develop`
 - `pull_request` targeting `main` and `develop`
 
-**Behavior**
+#### Behavior
 
 - Cancels in-progress runs for the same ref when a newer run starts.
-- Uses Python 3.10 for linting, type checking, and dependency scanning.
-- Runs `ruff` for linting.
-- Runs `mypy` against `src/`.
-- Runs `pip-audit` against `requirements.txt` and uploads a JSON report when the job fails.
-- Runs the test suite on Python 3.9, 3.10, and 3.11 with coverage enabled.
-- Uploads coverage artifacts from each matrix job.
+- Uses Python 3.11 for syntax checks, Ruff and YAML linting.
+- Enforces Markdown linting.
+- Runs the test suite on Python 3.11, 3.12 and 3.13, with Streamlit/API startup checks.
+- Measures both `src` and `app`, retaining the 85% overall and 90% changed-line gates.
+- Uploads HTML coverage artifacts even when the test or coverage step fails.
+- Audits installed runtime dependencies and uploads the full JSON report.
+  Reviewed applicability assessments are bounded by package version, source hashes
+  and an expiry date; they do not remove findings from the audit output.
 
-**Notes**
+The current local coverage is below the required gate. See
+[recovery validation](recovery-validation.md) for measured results and limitations.
+The independent [license workflow](../.github/workflows/license-check.yml) checks
+installed runtime dependencies; development tools are not application dependencies.
 
-- The test job currently declares a dependency on `security-scan` in addition to `lint-and-type-check`.
-- If that job is not defined in the workflow file, the workflow definition should be corrected before relying on it in CI.
-
-**Secrets / permissions**
+#### Secrets / permissions
 
 - No repository secret is referenced directly in this workflow.
 - The workflow relies on the standard `GITHUB_TOKEN` that GitHub provides to Actions.
@@ -41,16 +43,16 @@ Runs code quality checks, static analysis, dependency vulnerability scanning, an
 
 File: [.github/workflows/release.yml](../.github/workflows/release.yml)
 
-**Purpose**
+#### Purpose
 
 Creates a draft GitHub Release automatically when a semantic version tag is pushed.
 
-**Triggers**
+#### Triggers
 
 - `push` of tags matching `v<major>.<minor>.<patch>`
 - `push` of prerelease tags such as `v1.2.3-beta`
 
-**Behavior**
+#### Behavior
 
 - Checks out the full repository history so previous tags are available.
 - Extracts the pushed tag name and uses it as the release name.
@@ -58,7 +60,7 @@ Creates a draft GitHub Release automatically when a semantic version tag is push
 - Creates a draft release with `softprops/action-gh-release`.
 - Marks prerelease tags as prereleases.
 
-**Secrets / permissions**
+#### Secrets / permissions
 
 - Requires `contents: write` so the workflow can create a release.
 - Uses the built-in `GITHUB_TOKEN`; no custom secret is listed in the workflow.
@@ -67,18 +69,18 @@ Creates a draft GitHub Release automatically when a semantic version tag is push
 
 File: [.github/workflows/ecsoc-automation.yml](../.github/workflows/ecsoc-automation.yml)
 
-**Purpose**
+#### Purpose
 
 Automates issue claiming, pull request onboarding, and stale-claim cleanup for the ECSoC contribution flow.
 
-**Triggers**
+#### Triggers
 
 - `issue_comment` with `created`
 - `pull_request_target` with `opened`
 - `schedule` at `0 0 * * *` UTC
 - `workflow_dispatch`
 
-**Behavior**
+#### Behavior
 
 - On issue comments, ignores pull request comments, bot comments, the issue author, the repository owner, and already assigned issues.
 - Adds the `ECSoC26` label and assigns the commenter when a claim is accepted.
@@ -86,14 +88,14 @@ Automates issue claiming, pull request onboarding, and stale-claim cleanup for t
 - On pull request open events, assigns the author, adds the `ECSoC26` label, and posts a welcome comment.
 - On scheduled or manual runs, unassigns users who exceed the open-issue limit and clears stale claims older than four days when there is no recent activity and no linked PR.
 
-**Secrets / permissions**
+#### Secrets / permissions
 
 - Requests `issues: write` and `pull-requests: write`.
 - Uses the standard GitHub Actions token; no extra repository secrets are referenced.
 
 ## Deployment and Runtime Setup
 
-The repository does not define a separate production deployment workflow. The documented deployment path is container-based local deployment with Docker Compose, plus direct local execution for development.
+The repository does not define a separate production deployment workflow. Use the [Streamlit Community Cloud redeployment guide](streamlit-redeploy.md) for the hosted site. Docker Compose and direct local execution are also supported.
 
 ### Docker Compose deployment
 
@@ -105,9 +107,9 @@ The repository does not define a separate production deployment workflow. The do
 docker compose up --build
 ```
 
-4. Open the dashboard at `http://localhost:8501`.
-5. Stop the stack with `docker compose down`.
-6. Remove the Redis volume as well with `docker compose down -v` if needed.
+1. Open the dashboard at `http://localhost:8501`.
+2. Stop the stack with `docker compose down`.
+3. Remove the Redis volume as well with `docker compose down -v` if needed.
 
 ### Direct local run
 
@@ -123,24 +125,24 @@ streamlit run app/streamlit_app.py
 
 The following settings are configured through environment variables rather than GitHub Actions secrets:
 
-| Variable | Purpose |
-|---|---|
-| `APP_TITLE` | Optional application branding |
-| `PLAGIARISM_WEBHOOK_URL` | Slack or Discord notifications for plagiarism events |
-| `APP_BASE_URL` | Base URL used in notification links |
-| `REDIS_URL` | Redis connection string |
-| `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`, `REDIS_PASSWORD` | Fallback Redis settings |
-| `SMTP_SERVER`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` | Daily summary email delivery |
-| `FROM_EMAIL` | Sender address for daily summary emails |
-| `ADMIN_EMAIL` | Fallback admin email address |
-| `API_BEARER_TOKEN` | Bearer token for REST API access from LMS integrations |
-| `LOCK_TIMEOUT_SECONDS` | Timeout for synchronization locks |
+| Variable                                                     | Purpose                                                |
+| ------------------------------------------------------------ | ------------------------------------------------------ |
+| `APP_TITLE`                                                  | Optional application branding                          |
+| `PLAGIARISM_WEBHOOK_URL`                                     | Slack or Discord notifications for plagiarism events   |
+| `APP_BASE_URL`                                               | Base URL used in notification links                    |
+| `REDIS_URL`                                                  | Redis connection string                                |
+| `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`, `REDIS_PASSWORD`     | Fallback Redis settings                                |
+| `SMTP_SERVER`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` | Daily summary email delivery                           |
+| `FROM_EMAIL`                                                 | Sender address for daily summary emails                |
+| `ADMIN_EMAIL`                                                | Fallback admin email address                           |
+| `API_BEARER_TOKEN`                                           | Bearer token for REST API access from LMS integrations |
+| `LOCK_TIMEOUT_SECONDS`                                       | Timeout for synchronization locks                      |
 
 See [.env.example](../.env.example) for default values and comments.
 
 ## Setup Checklist
 
-- Confirm the three workflow files exist under [.github/workflows](../.github/workflows).
-- Keep `requirements.txt` aligned with the tools used in CI: `ruff`, `mypy`, `pytest`, `pytest-cov`, and `pip-audit`.
+- Review the workflow definitions under [.github/workflows](../.github/workflows).
+- Keep application packages in `requirements.txt` and test/quality tools in `requirements-dev.txt`.
 - Ensure the semantic version tag format used for releases is `vX.Y.Z` or a prerelease variant such as `vX.Y.Z-beta`.
 - Provide the runtime environment variables needed for webhooks, Redis, email, and LMS API access before deployment.

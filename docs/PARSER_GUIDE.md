@@ -19,7 +19,7 @@ The extracted text is then processed using helper functions such as text cleanin
 
 ---
 
-# Parser Flow
+## Parser Flow
 
 When a document is uploaded, the parsing pipeline works as follows:
 
@@ -32,7 +32,7 @@ When a document is uploaded, the parsing pipeline works as follows:
 
 ---
 
-# Parser Interface
+## Parser Interface
 
 Every custom parser should follow the same interface used throughout `document_parser.py`.
 
@@ -56,7 +56,7 @@ A parser should:
 
 ---
 
-# Creating a New Parser
+## Creating a New Parser
 
 To add support for a new document format:
 
@@ -98,7 +98,7 @@ This ensures consistent output across all supported formats.
 
 ---
 
-# Integrating the Parser into `document_parser.py`
+## Integrating the Parser into `document_parser.py`
 
 After implementing the parser, register it inside the `extract_text()` dispatcher by adding support for the new file extension.
 
@@ -125,7 +125,7 @@ After registration, verify that the new parser is selected correctly when a file
 
 ---
 
-# Error Handling Conventions
+## Error Handling Conventions
 
 All parser implementations should follow the project's existing error handling conventions.
 
@@ -144,7 +144,7 @@ Examples of project-specific exceptions include:
 
 ---
 
-# Writing Tests
+## Writing Tests
 
 Every new parser should include unit tests.
 
@@ -169,7 +169,7 @@ Tests should verify that:
 
 ---
 
-# Best Practices
+## Best Practices
 
 - Keep parser functions focused on text extraction.
 - Return plain text only.
@@ -182,7 +182,7 @@ Tests should verify that:
 
 ---
 
-# Example Workflow
+## Example Workflow
 
 To add support for a new document type:
 

@@ -153,6 +153,9 @@ def verify_project_structure(
         if not full_path.exists():
             missing_paths.append(f"FILE: {file_path}")
             logger.error("Missing required file: %s", full_path)
+        elif not full_path.is_file():
+            missing_paths.append(f"FILE (is dir): {file_path}")
+            logger.error("Path exists but is not a file: %s", full_path)
         else:
             found_paths.append(f"FILE: {file_path}")
 

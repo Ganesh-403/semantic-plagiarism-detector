@@ -269,7 +269,7 @@ class TestSortWarningsEdgeCases:
 
         assert warnings == original_copy
 
-    @pytest.mark.parametrize("field", list(VALID_SORT_FIELDS))
+    @pytest.mark.parametrize("field", sorted(VALID_SORT_FIELDS))
     def test_all_valid_fields_accepted_without_warning(self, field, caplog):
         """Verify all fields in VALID_SORT_FIELDS do not trigger fallback warnings."""
         warnings = [

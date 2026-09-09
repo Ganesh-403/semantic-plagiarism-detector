@@ -68,7 +68,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           mkdir -p reports
-          pip-audit --format json -o reports/pip-audit.json
+          python scripts/audit_dependencies.py --output reports/pip-audit.json
 
       - name: Upload vulnerability report
         if: always()

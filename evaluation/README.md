@@ -76,13 +76,13 @@ that was actually configured.
 
 The JSON root is an object with these fields:
 
-| Field | Type | Required by current file | Description |
-|---|---|---:|---|
-| `name` | string | Yes in the current dataset | Human-readable benchmark name. |
-| `version` | string | Yes in the current dataset | Dataset version string. |
-| `description` | string | Yes in the current dataset | Summary of the benchmark contents. |
-| `label_schema` | object | Yes in the current dataset | Maps each label string to its meaning. |
-| `pairs` | array | Yes | Text-pair records consumed by `evaluate.py`. |
+| Field          | Type   |   Required by current file | Description                                  |
+| -------------- | ------ | -------------------------: | -------------------------------------------- |
+| `name`         | string | Yes in the current dataset | Human-readable benchmark name.               |
+| `version`      | string | Yes in the current dataset | Dataset version string.                      |
+| `description`  | string | Yes in the current dataset | Summary of the benchmark contents.           |
+| `label_schema` | object | Yes in the current dataset | Maps each label string to its meaning.       |
+| `pairs`        | array  |                        Yes | Text-pair records consumed by `evaluate.py`. |
 
 The parser does not validate the metadata fields. Evaluation requires the root
 object to contain `pairs`; the current evaluator then reads the fields described
@@ -105,14 +105,14 @@ Each `pairs` item is an object. A minimal record with the current field names is
 
 ### Field Reference
 
-| Field | Type | Required for evaluation | Description |
-|---|---|---:|---|
-| `id` | string | Yes for the per-pair report | Unique record identifier, such as `HP-01`. |
-| `category` | string | Yes for the per-pair report | Current dataset category, such as `heavy_paraphrase`. |
-| `label` | string | Yes | `plagiarized` or `not_plagiarized`. |
-| `text_a` | string | Yes | First passage in the pair. |
-| `text_b` | string | Yes | Second passage in the pair. |
-| `notes` | string | Present in current records; not read by evaluator | Human explanation of the example. |
+| Field      | Type   |                           Required for evaluation | Description                                           |
+| ---------- | ------ | ------------------------------------------------: | ----------------------------------------------------- |
+| `id`       | string |                       Yes for the per-pair report | Unique record identifier, such as `HP-01`.            |
+| `category` | string |                       Yes for the per-pair report | Current dataset category, such as `heavy_paraphrase`. |
+| `label`    | string |                                               Yes | `plagiarized` or `not_plagiarized`.                   |
+| `text_a`   | string |                                               Yes | First passage in the pair.                            |
+| `text_b`   | string |                                               Yes | Second passage in the pair.                           |
+| `notes`    | string | Present in current records; not read by evaluator | Human explanation of the example.                     |
 
 The evaluator maps exactly `"plagiarized"` to positive class `1`. Any other label
 value is treated as negative class `0` by the current code, so contributors must
@@ -339,15 +339,15 @@ the four confusion counts.
 Every run creates `evaluation/results/` if it does not exist and overwrites these
 files:
 
-| File | Format | Meaning |
-|---|---|---|
-| `metrics.json` | JSON | Dataset counts; ROC-AUC, best threshold, best F1, precision, recall, and accuracy for semantic, TF-IDF, and hybrid approaches; plus per-pair scores. |
-| `threshold_sweep_semantic.csv` | CSV | Threshold metrics for semantic scores. |
-| `threshold_sweep_tfidf.csv` | CSV | Threshold metrics for TF-IDF scores. |
-| `threshold_sweep_hybrid.csv` | CSV | Threshold metrics for hybrid scores. |
-| `roc_curve.png` | PNG | ROC curves comparing Sentence Transformers and TF-IDF. |
-| `pr_curve.png` | PNG | Precision-recall curves comparing Sentence Transformers and TF-IDF. |
-| `similarity_distribution.png` | PNG | Semantic and TF-IDF score histograms split by label. |
+| File                           | Format | Meaning                                                                                                                                              |
+| ------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `metrics.json`                 | JSON   | Dataset counts; ROC-AUC, best threshold, best F1, precision, recall, and accuracy for semantic, TF-IDF, and hybrid approaches; plus per-pair scores. |
+| `threshold_sweep_semantic.csv` | CSV    | Threshold metrics for semantic scores.                                                                                                               |
+| `threshold_sweep_tfidf.csv`    | CSV    | Threshold metrics for TF-IDF scores.                                                                                                                 |
+| `threshold_sweep_hybrid.csv`   | CSV    | Threshold metrics for hybrid scores.                                                                                                                 |
+| `roc_curve.png`                | PNG    | ROC curves comparing Sentence Transformers and TF-IDF.                                                                                               |
+| `pr_curve.png`                 | PNG    | Precision-recall curves comparing Sentence Transformers and TF-IDF.                                                                                  |
+| `similarity_distribution.png`  | PNG    | Semantic and TF-IDF score histograms split by label.                                                                                                 |
 
 The console additionally prints the overall report, confusion counts, and one row
 of semantic/TF-IDF/hybrid scores for every pair. The output directory is ignored by

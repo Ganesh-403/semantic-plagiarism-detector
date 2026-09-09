@@ -36,6 +36,7 @@ Welcome to the **Semantic Plagiarism Detector REST API** documentation. This API
 ## Overview & Architecture
 
 The REST API is built on **FastAPI** and uses high-performance asynchronous request handling. Under the hood, document processing leverages:
+
 - **SentenceTransformers (`paraphrase-multilingual-MiniLM-L12-v2`)** for 384-dimensional dense semantic vector embeddings.
 - **FAISS (Facebook AI Similarity Search)** for high-speed vector index retrieval.
 - **SQLite Database (`corpus.db`)** for persistent document metadata, text chunk storage, and incident history.
@@ -62,19 +63,19 @@ Authorization: Bearer <YOUR_API_BEARER_TOKEN>
 
 ### Public vs. Authenticated Endpoints
 
-| Endpoint Path | Access Level | Description |
-| :--- | :--- | :--- |
-| `POST /api/v1/auth/login` | **Public** | Generate an authentication token |
-| `GET /api/v1/healthz` | **Public** | Orchestration readiness & liveness health probe |
-| `GET /healthz` | **Public** | Alias for health probe |
-| `GET /health` | **Public** | Simple service health check |
-| `GET /metrics` | **Public** | Prometheus format metrics export |
-| `GET /metrics/json` | **Public** | JSON format operational metrics |
-| `GET /api/v1/version` | **Public** | API version indicator |
-| `GET /api/v1/rate_limit` | **Public** | Telemetry rate limit check |
-| `POST /api/v1/scan` | **Bearer Auth** | Document upload & semantic scanning |
-| `GET /api/v1/incidents` | **Bearer Auth** | Query flagged plagiarism incidents |
-| `POST /api/v1/clear` | **Bearer Auth (Admin)** | Reset database and FAISS index |
+| Endpoint Path             | Access Level            | Description                                     |
+| :------------------------ | :---------------------- | :---------------------------------------------- |
+| `POST /api/v1/auth/login` | **Public**              | Generate an authentication token                |
+| `GET /api/v1/healthz`     | **Public**              | Orchestration readiness & liveness health probe |
+| `GET /healthz`            | **Public**              | Alias for health probe                          |
+| `GET /health`             | **Public**              | Simple service health check                     |
+| `GET /metrics`            | **Public**              | Prometheus format metrics export                |
+| `GET /metrics/json`       | **Public**              | JSON format operational metrics                 |
+| `GET /api/v1/version`     | **Public**              | API version indicator                           |
+| `GET /api/v1/rate_limit`  | **Public**              | Telemetry rate limit check                      |
+| `POST /api/v1/scan`       | **Bearer Auth**         | Document upload & semantic scanning             |
+| `GET /api/v1/incidents`   | **Bearer Auth**         | Query flagged plagiarism incidents              |
+| `POST /api/v1/clear`      | **Bearer Auth (Admin)** | Reset database and FAISS index                  |
 
 ---
 
@@ -84,11 +85,11 @@ The API enforces rate limits using the SlowAPI token bucket algorithm per IP add
 
 ### Rate Limit Response Headers
 
-| Header Name | Type | Description |
-| :--- | :--- | :--- |
-| `X-RateLimit-Limit` | Integer | Total requests permitted per time window |
-| `X-RateLimit-Remaining` | Integer | Number of remaining allowed requests |
-| `X-RateLimit-Reset` | Integer | Seconds remaining until limit window resets |
+| Header Name             | Type    | Description                                 |
+| :---------------------- | :------ | :------------------------------------------ |
+| `X-RateLimit-Limit`     | Integer | Total requests permitted per time window    |
+| `X-RateLimit-Remaining` | Integer | Number of remaining allowed requests        |
+| `X-RateLimit-Reset`     | Integer | Seconds remaining until limit window resets |
 
 When rate limits are exceeded, the API responds with HTTP status code `429 Too Many Requests`.
 
@@ -127,10 +128,10 @@ All error responses return a standardized JSON payload:
 
 ##### Request Body Parameters
 
-| Field | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `email` | String | Yes | Registered user email address |
-| `password` | String | Yes | Account password |
+| Field      | Type   | Required | Description                   |
+| :--------- | :----- | :------- | :---------------------------- |
+| `email`    | String | Yes      | Registered user email address |
+| `password` | String | Yes      | Account password              |
 
 ##### Example Request (cURL)
 
@@ -154,6 +155,7 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
 ##### Error Responses
 
 - **`400 Bad Request`** (Invalid JSON or payload body):
+
 ```json
 {
   "detail": "Invalid JSON request payload body."
@@ -161,6 +163,7 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
 ```
 
 - **`401 Unauthorized`** (Invalid credentials):
+
 ```json
 {
   "detail": "Invalid credentials provided."
@@ -187,11 +190,11 @@ Content-Type: multipart/form-data
 
 ##### Form Parameters
 
-| Parameter Name | Type | Required | Default | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `file` | Binary File | Yes | — | Document file (`.pdf`, `.docx`, `.txt`) |
-| `threshold` | Float | No | `0.59` | Plagiarism similarity threshold (`0.0` to `1.0`) |
-| `top_k` | Integer | No | `3` | Number of top paragraph-level chunk matches per doc (`1` to `10`) |
+| Parameter Name | Type        | Required | Default | Description                                                       |
+| :------------- | :---------- | :------- | :------ | :---------------------------------------------------------------- |
+| `file`         | Binary File | Yes      | —       | Document file (`.pdf`, `.docx`, `.txt`)                           |
+| `threshold`    | Float       | No       | `0.59`  | Plagiarism similarity threshold (`0.0` to `1.0`)                  |
+| `top_k`        | Integer     | No       | `3`     | Number of top paragraph-level chunk matches per doc (`1` to `10`) |
 
 ##### Example Request (cURL)
 
@@ -230,20 +233,20 @@ curl -X POST http://localhost:8000/api/v1/scan \
         {
           "uploaded_chunk": "Transformers utilize multi-head self-attention mechanisms to construct contextual token embeddings.",
           "matched_chunk": "Transformer networks employ multi-head self-attention to generate contextual word embeddings.",
-          "similarity_score": 0.8920
+          "similarity_score": 0.892
         }
       ]
     },
     {
       "filename": "reference_paper_alpha.docx",
-      "document_similarity_score": 0.6720,
-      "max_chunk_similarity_score": 0.7110,
+      "document_similarity_score": 0.672,
+      "max_chunk_similarity_score": 0.711,
       "severity": "🟡 Medium",
       "flagged_chunks": [
         {
           "uploaded_chunk": "The gradient descent optimizer adjusts weight parameters iteratively to minimize loss functions.",
           "matched_chunk": "Gradient descent optimization updates model weights iteratively to minimize target objective functions.",
-          "similarity_score": 0.7110
+          "similarity_score": 0.711
         }
       ]
     }
@@ -260,8 +263,8 @@ curl -X POST http://localhost:8000/api/v1/scan \
   "chunk_count": 4,
   "plagiarism_flagged": false,
   "threshold_used": 0.65,
-  "overall_document_similarity": 0.3120,
-  "max_chunk_similarity": 0.4210,
+  "overall_document_similarity": 0.312,
+  "max_chunk_similarity": 0.421,
   "matched_documents_count": 0,
   "matched_documents": []
 }
@@ -270,6 +273,7 @@ curl -X POST http://localhost:8000/api/v1/scan \
 ##### Error Responses
 
 - **`400 Bad Request`** (Empty file uploaded or missing filename):
+
 ```json
 {
   "detail": "Uploaded file is empty (0 bytes)"
@@ -277,6 +281,7 @@ curl -X POST http://localhost:8000/api/v1/scan \
 ```
 
 - **`401 Unauthorized`** (Missing or invalid Bearer token):
+
 ```json
 {
   "detail": "Invalid or missing authentication token."
@@ -284,6 +289,7 @@ curl -X POST http://localhost:8000/api/v1/scan \
 ```
 
 - **`415 Unsupported Media Type`** (Non-multipart form content type):
+
 ```json
 {
   "detail": "Unsupported Media Type: Request must be multipart/form-data"
@@ -291,6 +297,7 @@ curl -X POST http://localhost:8000/api/v1/scan \
 ```
 
 - **`422 Unprocessable Entity`** (Unextractable text or parameter error):
+
 ```json
 {
   "error": true,
@@ -316,10 +323,10 @@ curl -X POST http://localhost:8000/api/v1/scan \
 
 ##### Query Parameters
 
-| Parameter | Type | Required | Default | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `limit` | Integer | No | `50` | Maximum number of records to return (`1` to `500`) |
-| `offset` | Integer | No | `0` | Number of initial records to skip for pagination |
+| Parameter | Type    | Required | Default | Description                                        |
+| :-------- | :------ | :------- | :------ | :------------------------------------------------- |
+| `limit`   | Integer | No       | `50`    | Maximum number of records to return (`1` to `500`) |
+| `offset`  | Integer | No       | `0`     | Number of initial records to skip for pagination   |
 
 ##### Example Request (cURL)
 
@@ -347,7 +354,7 @@ curl -X GET "http://localhost:8000/api/v1/incidents?limit=10&offset=0" \
       "incident_id": "INC-3D1E9F4A7C0B",
       "document_a": "lab_report_charlie.docx",
       "document_b": "reference_dataset_2025.pdf",
-      "similarity_score": 0.7850,
+      "similarity_score": 0.785,
       "severity_rank": "Medium",
       "review_status": "Resolved",
       "date_flagged": "2026-08-02T15:30:00Z",
@@ -363,6 +370,7 @@ curl -X GET "http://localhost:8000/api/v1/incidents?limit=10&offset=0" \
 ##### Error Responses
 
 - **`401 Unauthorized`**:
+
 ```json
 {
   "detail": "Invalid or missing authentication token."
@@ -370,6 +378,7 @@ curl -X GET "http://localhost:8000/api/v1/incidents?limit=10&offset=0" \
 ```
 
 - **`500 Internal Server Error`**:
+
 ```json
 {
   "detail": "Failed to fetch incidents: Database operational lock error."
@@ -558,9 +567,9 @@ curl -X GET http://localhost:8000/api/v1/version
 
 ##### Query Parameters
 
-| Parameter | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `username` | String | Yes | Administrator username executing purge |
+| Parameter  | Type   | Required | Description                            |
+| :--------- | :----- | :------- | :------------------------------------- |
+| `username` | String | Yes      | Administrator username executing purge |
 
 ##### Example Request (cURL)
 
@@ -581,6 +590,7 @@ curl -X POST "http://localhost:8000/api/v1/clear?username=admin_user" \
 ##### Error Responses
 
 - **`403 Forbidden`** (Non-administrator role):
+
 ```json
 {
   "detail": "Forbidden: Only administrators are authorized to clear all documents."
@@ -631,33 +641,33 @@ print("Incident Records:", incidents_res.json())
 ### JavaScript / Node.js Integration (`fetch`)
 
 ```javascript
-const fs = require('fs');
-const FormData = require('form-data');
-const fetch = require('node-fetch');
+const fs = require("fs");
+const FormData = require("form-data");
+const fetch = require("node-fetch");
 
-const API_BASE_URL = 'http://localhost:8000';
-const BEARER_TOKEN = 'dev-bearer-token';
+const API_BASE_URL = "http://localhost:8000";
+const BEARER_TOKEN = "dev-bearer-token";
 
 async function scanDocument(filePath) {
   const form = new FormData();
-  form.append('file', fs.createReadStream(filePath));
-  form.append('threshold', '0.65');
-  form.append('top_k', '3');
+  form.append("file", fs.createReadStream(filePath));
+  form.append("threshold", "0.65");
+  form.append("top_k", "3");
 
   const response = await fetch(`${API_BASE_URL}/api/v1/scan`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Authorization': `Bearer ${BEARER_TOKEN}`,
-      ...form.getHeaders()
+      Authorization: `Bearer ${BEARER_TOKEN}`,
+      ...form.getHeaders(),
     },
-    body: form
+    body: form,
   });
 
   const data = await response.json();
-  console.log('Scan Output:', JSON.stringify(data, null, 2));
+  console.log("Scan Output:", JSON.stringify(data, null, 2));
 }
 
-scanDocument('student_submission.docx');
+scanDocument("student_submission.docx");
 ```
 
 ---
