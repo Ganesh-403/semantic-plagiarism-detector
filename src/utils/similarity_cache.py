@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Union
 
+from src.utils.redis_cache import normalize_cache_key_path
+
 
 def build_similarity_cache_key(
     session_id: Union[str, Path], *, use_hybrid: bool
@@ -10,14 +12,9 @@ def build_similarity_cache_key(
     Lexical and Hybrid scoring produce different result spaces. Keeping the
     mode in the key prevents a result generated in one mode from being reused
     after the UI switches to the other mode.
-    Converts pathing logic using pathlib.Path(p).as_posix() explicitly for cross-platform support (Issue #2939, #3028).
+    Normalize Windows and POSIX spellings identically on every host OS.
     """
-    if isinstance(session_id, Path):
-        sid_str = session_id.as_posix()
-    elif session_id is not None:
-        sid_str = Path(str(session_id)).as_posix()
-    else:
-        sid_str = ""
+    sid_str = normalize_cache_key_path(session_id)
 
     suffix = "hybrid_v1" if use_hybrid else "lexical"
     return f"{sid_str}:analysis_results_{suffix}"
