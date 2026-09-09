@@ -8,6 +8,7 @@ import warnings
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
+from html import escape
 from typing import Any, Dict, List
 
 import numpy as np
@@ -129,36 +130,77 @@ class PatternRecognitionEngine:
         }
 
     def detect_patterns(
-        self, documents: Dict[str, str], similarity_matrix: np.ndarray
+        self,
+        documents: Dict[str, str],
+        similarity_matrix: np.ndarray,
+        *,
+        enabled_types=None,
     ) -> List[PlagiarismPattern]:
         """Detect patterns in document collection"""
         detected_patterns = []
+        enabled = (
+            set(enabled_types)
+            if enabled_types is not None
+            else {"copy_paste", "structural", "citation", "hybrid"}
+        )
+        if not enabled <= {"copy_paste", "structural", "citation", "hybrid"}:
+            raise ValueError("Unsupported pattern type")
+        similarity_matrix = np.asarray(similarity_matrix, dtype=float)
+        if (
+            similarity_matrix.shape != (len(documents), len(documents))
+            or not np.isfinite(similarity_matrix).all()
+            or np.any((similarity_matrix < 0) | (similarity_matrix > 1))
+        ):
+            raise ValueError(
+                "Similarity matrix must be square, finite and between zero and one"
+            )
 
         # Extract features
         features = self._extract_features(documents, similarity_matrix)
 
         # Detect copy-paste patterns
-        copy_paste = self._detect_copy_paste(documents, similarity_matrix)
+        copy_paste = (
+            self._detect_copy_paste(documents, similarity_matrix)
+            if "copy_paste" in enabled
+            else []
+        )
         if copy_paste:
             detected_patterns.extend(copy_paste)
 
         # Detect structural patterns
-        structural = self._detect_structural(documents)
+        structural = (
+            self._detect_structural(documents) if "structural" in enabled else []
+        )
         if structural:
             detected_patterns.extend(structural)
 
         # Detect citation patterns
-        citation = self._detect_citation(documents)
+        citation = self._detect_citation(documents) if "citation" in enabled else []
         if citation:
             detected_patterns.extend(citation)
 
         # Detect hybrid patterns
-        hybrid = self._detect_hybrid(documents, similarity_matrix)
+        hybrid = (
+            self._detect_hybrid(documents, similarity_matrix)
+            if "hybrid" in enabled
+            else []
+        )
         if hybrid:
             detected_patterns.extend(hybrid)
 
         # Store patterns
         for pattern in detected_patterns:
+            pattern.id = str(
+                uuid.uuid5(
+                    uuid.NAMESPACE_URL,
+                    pattern.pattern_type + repr(sorted(pattern.documents)),
+                )
+            )
+            previous = self.patterns.get(pattern.id)
+            if previous is not None:
+                pattern.first_detected = previous.first_detected
+                pattern.frequency = previous.frequency + 1
+                pattern.evolution = previous.evolution
             self.patterns[pattern.id] = pattern
             self.pattern_counts[pattern.pattern_type] += 1
 
@@ -188,7 +230,11 @@ class PatternRecognitionEngine:
             features["word_counts"][doc_name] = len(words)
 
             # Sentence count
-            sentences = re.split(r"[.!?]+", content)
+            sentences = [
+                sentence
+                for sentence in re.split(r"[.!?]+", content)
+                if sentence.strip()
+            ]
             features["sentence_counts"][doc_name] = len(sentences)
 
             # Average word length
@@ -202,9 +248,13 @@ class PatternRecognitionEngine:
 
             # Similarity stats
             if i < len(similarity_matrix):
-                row = similarity_matrix[i]
-                features["avg_similarity"][doc_name] = np.mean(row)
-                features["max_similarity"][doc_name] = np.max(row)
+                row = np.delete(similarity_matrix[i], i)
+                features["avg_similarity"][doc_name] = (
+                    float(np.mean(row)) if row.size else 0.0
+                )
+                features["max_similarity"][doc_name] = (
+                    float(np.max(row)) if row.size else 0.0
+                )
 
             # Document length
             features["document_lengths"][doc_name] = len(content)
@@ -483,13 +533,20 @@ class PredictionEngine:
                 labels.append(item.get("risk_level", 0))
 
             # Scale features
-            features_scaled = self.scaler.fit_transform(features)
+            if (
+                any(label not in (0, 1) for label in labels)
+                or not np.isfinite(features).all()
+            ):
+                return False
+            scaler = StandardScaler()
+            features_scaled = scaler.fit_transform(features)
 
             # Train random forest
-            self.prediction_model = RandomForestClassifier(
+            model = RandomForestClassifier(
                 n_estimators=100, random_state=42, max_depth=10
             )
-            self.prediction_model.fit(features_scaled, labels)
+            model.fit(features_scaled, labels)
+            self.scaler, self.prediction_model = scaler, model
             self.model_trained = True
             return True
 
@@ -501,6 +558,16 @@ class PredictionEngine:
         self, document_name: str, document_content: str, similarity_scores: List[float]
     ) -> RiskPrediction:
         """Predict risk for a single document"""
+        similarity_scores = np.asarray(similarity_scores, dtype=float)
+        if (
+            similarity_scores.ndim != 1
+            or not np.isfinite(similarity_scores).all()
+            or np.any((similarity_scores < 0) | (similarity_scores > 1))
+        ):
+            raise ValueError(
+                "Similarity scores must be finite values between zero and one"
+            )
+        similarity_scores = similarity_scores.tolist()
         # Extract features
         words = document_content.split()
         sentences = re.split(r"[.!?]+", document_content)
@@ -519,12 +586,14 @@ class PredictionEngine:
         # Make prediction
         if self.model_trained:
             features_scaled = self.scaler.transform([features])
-            prediction = self.prediction_model.predict(features_scaled)[0]
-            confidence = np.max(self.prediction_model.predict_proba(features_scaled)[0])
+            probabilities = self.prediction_model.predict_proba(features_scaled)[0]
+            classes = list(self.prediction_model.classes_)
+            prediction = probabilities[classes.index(1)] if 1 in classes else 0.0
+            confidence = float(np.max(probabilities))
         else:
             # Fallback to heuristic
             prediction = self._heuristic_risk_score(features)
-            confidence = 0.7
+            confidence = 0.0  # Heuristics have no calibrated probability estimate.
 
         # Determine risk level
         risk_level = self._get_risk_level(prediction)
@@ -543,6 +612,7 @@ class PredictionEngine:
             confidence=confidence,
             prediction_date=datetime.now(),
             recommendations=recommendations,
+            metadata={"method": "model" if self.model_trained else "heuristic"},
         )
 
         self.pattern_engine.predictions[prediction_id] = risk_prediction
@@ -696,7 +766,9 @@ class PatternEvolutionTracker:
                 pattern_id=pattern_id,
                 pattern_name=pattern.name,
                 time_period=f"{history[0]['timestamp'].strftime('%Y-%m-%d')} to {history[-1]['timestamp'].strftime('%Y-%m-%d')}",
-                frequency_change=freq_change / len(recent) if recent else 0,
+                frequency_change=freq_change / recent[0]["data"].get("frequency", 0)
+                if recent[0]["data"].get("frequency", 0)
+                else 0.0,
                 new_documents=recent[-1]["data"].get("new_documents", 0),
                 risk_trend=trend_dir,
                 forecast=self._generate_forecast(history),
@@ -712,8 +784,8 @@ class PatternEvolutionTracker:
         # Simple linear trend
         frequencies = [h["data"].get("frequency", 0) for h in history]
         if len(frequencies) > 1:
-            trend = (frequencies[-1] - frequencies[0]) / len(frequencies)
-            next_freq = frequencies[-1] + trend
+            trend = (frequencies[-1] - frequencies[0]) / (len(frequencies) - 1)
+            next_freq = max(0.0, frequencies[-1] + trend)
 
             return {
                 "next_frequency": next_freq,
@@ -791,6 +863,9 @@ def render_detection_tab(pattern_engine: PatternRecognitionEngine):
     if len(documents) < 2:
         st.warning("Need at least 2 documents for pattern detection.")
         return
+    if similarity_matrix is None:
+        st.warning("Run document comparison before detecting patterns.")
+        return
 
     # Pattern detection options
     col1, col2 = st.columns(2)
@@ -804,7 +879,19 @@ def render_detection_tab(pattern_engine: PatternRecognitionEngine):
 
     if st.button("🔍 Detect Patterns", type="primary"):
         with st.spinner("Analyzing documents for patterns..."):
-            patterns = pattern_engine.detect_patterns(documents, similarity_matrix)
+            enabled = [
+                name
+                for name, selected in (
+                    ("copy_paste", detect_copy_paste),
+                    ("structural", detect_structural),
+                    ("citation", detect_citation),
+                    ("hybrid", detect_hybrid),
+                )
+                if selected
+            ]
+            patterns = pattern_engine.detect_patterns(
+                documents, similarity_matrix, enabled_types=enabled
+            )
 
             if patterns:
                 st.success(f"✅ Detected {len(patterns)} patterns")
@@ -944,28 +1031,10 @@ def render_predictions_tab(pattern_engine: PatternRecognitionEngine):
         st.warning("No documents available for prediction.")
         return
 
-    # Train model if enough data
-    if len(pattern_engine.patterns) >= 5:
-        training_data = []
-        for pattern in pattern_engine.patterns.values():
-            training_data.append(
-                {
-                    "similarity_score": pattern.confidence,
-                    "document_length": len(" ".join(pattern.documents)),
-                    "word_count": sum(len(d.split()) for d in pattern.documents)
-                    / len(pattern.documents)
-                    if pattern.documents
-                    else 0,
-                    "unique_words_ratio": 0.5,  # Placeholder
-                    "complexity_score": 0.3,  # Placeholder
-                    "pattern_count": len(pattern_engine.patterns),
-                    "avg_similarity": pattern.confidence,
-                    "max_similarity": pattern.confidence,
-                    "risk_level": 1 if pattern.severity in ["high", "critical"] else 0,
-                }
-            )
-
-        prediction_engine.train_model(training_data)
+    if not prediction_engine.model_trained:
+        st.caption(
+            "Risk scores use heuristics. Confidence is not calibrated; model training requires independently labeled historical data."
+        )
 
     # Predict for each document
     if st.button("🔮 Generate Predictions", type="primary"):
@@ -978,7 +1047,9 @@ def render_predictions_tab(pattern_engine: PatternRecognitionEngine):
                 if similarity_matrix is not None:
                     doc_index = list(documents.keys()).index(doc_name)
                     if doc_index < len(similarity_matrix):
-                        scores = similarity_matrix[doc_index]
+                        scores = np.delete(
+                            similarity_matrix[doc_index], doc_index
+                        ).tolist()
                     else:
                         scores = []
                 else:
@@ -999,15 +1070,20 @@ def render_predictions_tab(pattern_engine: PatternRecognitionEngine):
                         "low": "#4CAF50",
                     }
                     color = color_map.get(pred.risk_level, "#666")
+                    confidence_label = (
+                        f"{pred.confidence:.1%}"
+                        if pred.metadata.get("method") == "model"
+                        else "Not calibrated"
+                    )
 
                     st.markdown(
                         f"""
                     <div style='background:{color}20;padding:15px;border-radius:8px;border-left:4px solid {color};margin:10px 0;'>
-                        <h4 style='margin:0;'>{pred.document_name}</h4>
+                        <h4 style='margin:0;'>{escape(pred.document_name)}</h4>
                         <p style='margin:5px 0;'>
                             <strong>Risk Level:</strong> <span style='color:{color};font-weight:bold;'>{pred.risk_level.upper()}</span>
                             | <strong>Score:</strong> {pred.predicted_risk_score:.1%}
-                            | <strong>Confidence:</strong> {pred.confidence:.1%}
+                            | <strong>Confidence:</strong> {confidence_label}
                         </p>
                         <p style='margin:5px 0;font-size:14px;'><strong>Factors:</strong> {", ".join(pred.contributing_factors)}</p>
                         <p style='margin:5px 0;font-size:14px;'><strong>Recommendations:</strong></p>

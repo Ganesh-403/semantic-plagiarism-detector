@@ -66,6 +66,24 @@ Plotly traces, decode generated PNGs and verify figures close when saving fails.
 Forecast values now align with their timestamps, nonpositive result limits return
 empty charts, and invalid moving-average periods raise a clear error.
 
+At `8c7abce5`, the test runner, both startup smoke tests and changed-line coverage
+pass on Python 3.11, 3.12 and 3.13. Python 3.13 reports **9,931 passed**, 24 skipped
+and one expected failure. The overall gate still fails at **61% combined**; all
+other workflows pass. The preceding revision exposed intermittent contention in
+a SQLite stress test whose workers bypassed the production connection factory.
+The revised test uses production connections and retains 20 workers and 1,000
+writes, checks every worker's persisted rows, concurrent readers and database
+integrity. Both database checks pass locally under coverage.
+
+Pattern-recognition regressions add **24 passing checks**, measuring **99.41% line
+and 94.09% branch coverage** of that module. They exercise all four detectors,
+rescans, a real random forest, evolution forecasts and the Streamlit controls.
+Detection toggles now affect results, rescans preserve identity, self-similarity
+is excluded from risk features, and NumPy score arrays no longer crash the view.
+The dashboard no longer trains a model from its own fabricated labels; heuristic
+scores are explicitly uncalibrated. The combined pattern/database group passes
+all 26 checks. These module results do not satisfy the overall coverage gate.
+
 ## Runtime, dependency and quality checks
 
 - Fresh Streamlit process: password login and authenticated dashboard pass.
