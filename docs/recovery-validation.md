@@ -84,6 +84,24 @@ The dashboard no longer trains a model from its own fabricated labels; heuristic
 scores are explicitly uncalibrated. The combined pattern/database group passes
 all 26 checks. These module results do not satisfy the overall coverage gate.
 
+At `4c43432b`, Python 3.11 and 3.13 each pass **9,956 tests**. Python 3.12 passes
+9,955 with one failure: corruption tests leave a mocked Redis client attached to
+the singleton, causing a later real compression round-trip to read corrupt data.
+This failure also reproduces locally when those two test files run in that order.
+Overall coverage rises to **62% combined**; changed-line coverage and both startup
+smokes pass on all three versions. All other workflows pass.
+
+The legacy `src.reports` package now imports and accepts explicit analysis results
+through `ReportRequest.analysis_data`. It validates matrices and matches, derives
+statistics from unique document pairs and exports populated, completed snapshots.
+It no longer fabricates document names, similarity scores or processing times.
+Display limits apply to exports; failed publication preserves existing files and
+sets the correct report's failure state. HTML text is escaped, CSV names are kept
+literal and PDF tables paginate. Deletion is restricted to the output directory.
+All **44 artifact/lifecycle checks pass under coverage**. They measure **100% line
+coverage** of the reports package and new model, and exercise actual PDF, PNG,
+HTML, CSV and JSON artifacts. See the [report API guide](report-exports.md).
+
 ## Runtime, dependency and quality checks
 
 - Fresh Streamlit process: password login and authenticated dashboard pass.
@@ -125,10 +143,8 @@ and comparison. Five standalone dashboards explicitly label illustrative data an
 retain it across navigation; they do not analyze uploaded documents.
 
 Container deployment and the updated public hosted app still require verification.
-The separate legacy `src.reports` package also fails to import because
-`src.models.report` is absent. Its generator contains placeholder analysis data;
-restoring that unused package requires a real data contract and regression tests.
-The working Streamlit export paths use other report implementations. This legacy
-package remains unresolved and is not excluded from coverage.
+The restored `src.reports` library is separate from the active Streamlit export
+paths. Its report registry is local to the generator instance; it does not provide
+an HTTP download endpoint or durable job scheduling.
 For configuration, backups, SMTP and Cloud reboot/redeployment, use the
 [Streamlit redeployment guide](streamlit-redeploy.md).
