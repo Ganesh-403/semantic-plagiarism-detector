@@ -3,6 +3,7 @@ Semantic Plagiarism Detector - Main Streamlit Application Entry Point.
 Lightweight coordinator responsible for page setup, routing, state management initialization,
 and delegating view rendering to modular components.
 """
+from __future__ import annotations
 import asyncio
 import hashlib
 import io as _io
@@ -12,19 +13,20 @@ import os
 import sys
 import time
 from datetime import date, datetime, timedelta, timezone
-from src.core.hybrid_scorer import HybridScorer, HybridConfig
 from pathlib import Path
 import numpy as np
 import pandas as pd
 import psutil
 import streamlit as st
-from src.errors import UI_SESSION_EXPIRED, EmptyDocumentError
 # Fix Streamlit import paths safely by appending to sys.path rather than prepending (insert(0)),
 # avoiding standard library module shadowing (Issue #2784).
 FILE_PATH = Path(__file__).resolve()
 ROOT_DIR = FILE_PATH.parent.parent  # Points to semantic-plagiarism-detector/
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
+
+from src.core.hybrid_scorer import HybridScorer, HybridConfig
+from src.errors import UI_SESSION_EXPIRED, EmptyDocumentError
 
 # Issue #2781: Apply OS-specific asyncio patches via centralized utility
 # This replaces the inline `if sys.platform == "win32":` block that was
@@ -64,14 +66,11 @@ from src.core.lexical_similarity import (
     n_gram_overlap,
     scale_lexical_score,
     compute_char_ngram_similarity,
-    render_report_generator_ui
 )
 from app.components.cross_lingual_ui import (
     render_cross_lingual_settings,
-    render_cross_lingual_ui_in_drilldown,
     get_cross_lingual_metadata,
     is_cross_lingual_enabled,
-    render_cross_lingual_stats,
 )
 # ── Document Version Control Imports ─────────────────────────────────────
 from app.components.document_version_control import (
@@ -81,16 +80,6 @@ from app.components.document_version_control import (
     ChangeTracker,
     DocumentVersion,
     VersionDiff,
-    VersionDiffGenerator,
-    VersionStorageManager,
-    PlagiarismEvolutionAnalyzer,
-    SmartChangePatternDetector,
-    render_plagiarism_evolution_ui,
-    render_smart_detection_ui,
-    render_global_version_dashboard,
-    render_version_control_dashboard,
-    integrate_version_control_with_analysis,
-    migrate_existing_documents_to_version_control,
 )
 # ── Smart Notifications Imports ──────────────────────────────────────────
 from app.components.smart_notifications import (
@@ -232,7 +221,7 @@ class DocumentCategory:
     tags: list[str] = None
     created_at: datetime = None
     metadata: dict = None
-    
+
     def __post_init__(self):
         if self.tags is None:
             self.tags = []
@@ -240,7 +229,7 @@ class DocumentCategory:
             self.metadata = {}
         if self.created_at is None:
             self.created_at = datetime.now()
-    
+
     def to_dict(self) -> dict:
         return {
             **asdict(self),
@@ -256,7 +245,7 @@ class TagAssignment:
     assigned_at: datetime
     assigned_by: str
     is_auto: bool = False
-    
+
     def to_dict(self) -> dict:
         return {
             **asdict(self),
@@ -267,7 +256,7 @@ class TagAssignment:
 
 class IntelligentTagGenerator:
     """Generates intelligent tags from document content"""
-    
+
     def __init__(self):
         self.common_words = {
             'plagiarism': ['academic', 'integrity', 'ethics', 'copying', 'similarity'],
@@ -279,136 +268,136 @@ class IntelligentTagGenerator:
             'education': ['learning', 'teaching', 'curriculum', 'student', 'assessment'],
             'ethics': ['privacy', 'security', 'compliance', 'policy', 'regulation']
         }
-        
-        self.stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 
+
+        self.stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to',
                          'for', 'of', 'with', 'without', 'by', 'from', 'up', 'down',
                          'is', 'are', 'was', 'were', 'be', 'been', 'being'}
-        
+
         self.tag_cache = {}
-    
+
     def generate_tags(self, content: str, max_tags: int = 10) -> list[tuple[str, float]]:
         """Generate tags from document content"""
         if not content:
             return []
-        
+
         # Check cache
         content_hash = hashlib.md5(content.encode()).hexdigest()
         if content_hash in self.tag_cache:
             return self.tag_cache[content_hash]
-        
+
         # Extract keywords
         keywords = self._extract_keywords(content)
-        
+
         # Score tags
         tags = self._score_tags(keywords, content)
-        
+
         # Sort by confidence and limit
         tags = sorted(tags, key=lambda x: x[1], reverse=True)[:max_tags]
-        
+
         # Cache results
         self.tag_cache[content_hash] = tags
-        
+
         return tags
-    
+
     def _extract_keywords(self, content: str) -> dict[str, float]:
         """Extract keywords from content with TF-IDF scoring"""
         # Simple keyword extraction
         words = re.findall(r'\b[a-zA-Z]{3,}\b', content.lower())
-        
+
         # Remove stopwords
         words = [w for w in words if w not in self.stopwords]
-        
+
         # Count frequencies
         freq = Counter(words)
         total = len(words) or 1
-        
+
         # Calculate scores (simple TF)
         scores = {word: count/total for word, count in freq.items()}
-        
+
         # Boost common topics
         for topic, keywords in self.common_words.items():
             for keyword in keywords:
                 if keyword in scores:
                     scores[keyword] *= 1.5
-        
+
         return scores
-    
+
     def _score_tags(self, keywords: dict[str, float], content: str) -> list[tuple[str, float]]:
         """Score potential tags"""
         tags = []
-        
+
         # Direct keywords
         for word, score in keywords.items():
             if score > 0.01 and len(word) > 2:
                 tags.append((word, min(score * 2, 1.0)))
-        
+
         # Topic detection
         topic_scores = self._detect_topics(content)
         for topic, score in topic_scores:
             tags.append((topic, min(score, 1.0)))
-        
+
         # Remove duplicates
         unique_tags = {}
         for tag, score in tags:
             if tag not in unique_tags or score > unique_tags[tag]:
                 unique_tags[tag] = score
-        
+
         return list(unique_tags.items())
-    
+
     def _detect_topics(self, content: str) -> list[tuple[str, float]]:
         """Detect topics in content using keyword matching"""
         content_lower = content.lower()
         topic_scores = []
-        
+
         for topic, keywords in self.common_words.items():
             matches = 0
             total_keywords = len(keywords)
-            
+
             for keyword in keywords:
                 if keyword in content_lower:
                     matches += 1
-            
+
             if matches > 0:
                 score = matches / total_keywords
                 topic_scores.append((topic, score))
-        
+
         return topic_scores
-    
+
     def generate_categories(self, content: str) -> tuple[str, float]:
         """Generate category prediction for document"""
         if not content:
             return 'Uncategorized', 0.0
-        
+
         topic_scores = self._detect_topics(content)
-        
+
         if topic_scores:
             best_topic, best_score = max(topic_scores, key=lambda x: x[1])
             if best_score > 0.3:
                 return best_topic.title(), best_score
-        
+
         # Default categories
         categories = ['Academic', 'Research', 'Technical', 'Review', 'Report']
         for category in categories:
             if category.lower() in content.lower():
                 return category, 0.6
-        
+
         return 'Uncategorized', 0.3
 
 # ── Tag Manager ─────────────────────────────────────────────────────────────
 
 class TagManager:
     """Manages document tags and categories"""
-    
+
     def __init__(self):
         self.tags: dict[str, DocumentTag] = {}
         self.categories: dict[str, DocumentCategory] = {}
         self.assignments: list[TagAssignment] = []
         self.tag_counter = Counter()
         self.tag_usage = defaultdict(int)
-        
+
         # Initialize default categories
         self._init_default_categories()
-    
+
     def _init_default_categories(self):
         """Initialize default categories"""
         defaults = [
@@ -418,7 +407,7 @@ class TagManager:
             ('review', 'Review', 'Document reviews and analysis', '#9C27B0'),
             ('report', 'Report', 'Reports and summaries', '#F44336'),
         ]
-        
+
         for id, name, desc, color in defaults:
             if id not in self.categories:
                 self.categories[id] = DocumentCategory(
@@ -427,8 +416,8 @@ class TagManager:
                     description=desc,
                     color=color
                 )
-    
-    def add_tag(self, name: str, category: str = 'custom', 
+
+    def add_tag(self, name: str, category: str = 'custom',
                 confidence: float = 1.0, auto_generated: bool = False,
                 user_id: str = 'system') -> DocumentTag:
         """Add a new tag"""
@@ -436,7 +425,7 @@ class TagManager:
         existing = self.get_tag_by_name(name)
         if existing:
             return existing
-        
+
         tag_id = str(uuid.uuid4())
         tag = DocumentTag(
             id=tag_id,
@@ -450,29 +439,29 @@ class TagManager:
         self.tags[tag_id] = tag
         self.tag_counter[name] = 0
         return tag
-    
+
     def get_tag(self, tag_id: str) -> Optional[DocumentTag]:
         """Get a tag by ID"""
         return self.tags.get(tag_id)
-    
+
     def get_tag_by_name(self, name: str) -> Optional[DocumentTag]:
         """Get a tag by name"""
         for tag in self.tags.values():
             if tag.name == name:
                 return tag
         return None
-    
+
     def get_all_tags(self) -> list[DocumentTag]:
         """Get all tags"""
         return list(self.tags.values())
-    
-    def assign_tag(self, document_name: str, tag_name: str, 
+
+    def assign_tag(self, document_name: str, tag_name: str,
                    user_id: str = 'system', auto: bool = False) -> Optional[str]:
         """Assign a tag to a document"""
         tag = self.get_tag_by_name(tag_name)
         if not tag:
             tag = self.add_tag(tag_name, auto_generated=auto, user_id=user_id)
-        
+
         assignment = TagAssignment(
             id=str(uuid.uuid4()),
             document_name=document_name,
@@ -485,34 +474,34 @@ class TagManager:
         self.tag_counter[tag_name] += 1
         self.tag_usage[tag_name] += 1
         return assignment.id
-    
+
     def unassign_tag(self, document_name: str, tag_name: str) -> bool:
         """Remove a tag assignment"""
         tag = self.get_tag_by_name(tag_name)
         if not tag:
             return False
-        
+
         self.assignments = [
-            a for a in self.assignments 
+            a for a in self.assignments
             if not (a.document_name == document_name and a.tag_id == tag.id)
         ]
 
         if self.tag_counter[tag_name] > 0:
             self.tag_counter[tag_name] -= 1
         return True
-    
+
     def get_document_tags(self, document_name: str) -> list[DocumentTag]:
         """Get all tags for a document"""
         doc_assignments = [a for a in self.assignments if a.document_name == document_name]
         return [self.tags[a.tag_id] for a in doc_assignments if a.tag_id in self.tags]
-    
+
     def get_documents_by_tag(self, tag_name: str) -> list[str]:
         """Get all documents with a specific tag"""
         tag = self.get_tag_by_name(tag_name)
         if not tag:
             return []
         return [a.document_name for a in self.assignments if a.tag_id == tag.id]
-    
+
     def add_category(self, name: str, description: str, parent_id: Optional[str] = None,
                      color: str = '#808080') -> DocumentCategory:
         """Add a new category"""
@@ -526,15 +515,15 @@ class TagManager:
         )
         self.categories[category_id] = category
         return category
-    
+
     def get_category(self, category_id: str) -> Optional[DocumentCategory]:
         """Get a category by ID"""
         return self.categories.get(category_id)
-    
+
     def get_all_categories(self) -> list[DocumentCategory]:
         """Get all categories"""
         return list(self.categories.values())
-    
+
     def get_tag_stats(self) -> dict:
         """Get tag statistics"""
         return {
@@ -976,6 +965,11 @@ except Exception:
     bulk_download_drive_folder = None
 
 
+from src.db.corpus_db import init_corpus_db
+from src.db.auth import init_db
+from src.utils.temp_manager import purge_expired_temp_files
+from app.components.IntelligentTagging_Doc import DocumentTag
+
 # Initialize databases
 init_corpus_db()
 init_db()
@@ -988,7 +982,8 @@ from src.core.embedding_model import warmup_embedding_model
 @st.cache_resource
 def run_warmup():
     warmup_embedding_model()
-run_warmup()
+if os.getenv("PRELOAD_EMBEDDING_MODEL", "false").lower() == "true":
+    run_warmup()
 # Start lightweight REST API server for /healthz endpoint in background
 import threading
 
@@ -1202,6 +1197,11 @@ try:
     from src.utils.google_drive import bulk_download_drive_folder
 except Exception:
     bulk_download_drive_folder = None
+from src.db.corpus_db import init_corpus_db
+from src.db.auth import init_db
+from src.utils.temp_manager import purge_expired_temp_files
+from app.components.IntelligentTagging_Doc import DocumentTag
+
 # Initialize databases
 init_corpus_db()
 init_db()
@@ -1229,7 +1229,7 @@ def _start_api_server():
         port=8000,
         log_level="warning",
     )
-if not getattr(app_config, "_api_server_started", False):
+if os.getenv("ENABLE_EMBEDDED_API", "false").lower() == "true" and not getattr(app_config, "_api_server_started", False):
     app_config._api_server_started = True
     from starlette.middleware.base import BaseHTTPMiddleware
     class ActivityMiddleware(BaseHTTPMiddleware):
@@ -1544,98 +1544,6 @@ if last_interaction and st.session_state.get(SessionKeys.AUTHENTICATED, False):
     else:
         st.session_state[SessionKeys.LAST_INTERACTION] = time.time()
         cache_session_state(SESSION_ID, SessionKeys.LAST_INTERACTION, time.time())
-# ── Handle OAuth Callback (GitHub / Google SSO) ──────────────────────────────
-if not st.session_state.get(SessionKeys.AUTHENTICATED, False):
-    if "code" in st.query_params and "state" in st.query_params:
-        _code = st.query_params["code"]
-        _state = st.query_params["state"]
-        from src.db.auth import get_or_create_sso_user
-        from src.utils.sso import exchange_github_code, exchange_google_code
-        _user_info, _error_msg = None, None
-        if _state.startswith("google_"):
-            _user_info, _error_msg = exchange_google_code(_code)
-        elif _state.startswith("github_"):
-            _user_info, _error_msg = exchange_github_code(_code)
-        if _user_info and _user_info.get("email"):
-            _email = _user_info["email"]
-            if not is_user_active(_email):
-                st.error("🚨 Account suspended. Please contact your Administrator.")
-                st.query_params.clear()
-        last_interaction = None
-    if last_interaction and st.session_state.get(SessionKeys.AUTHENTICATED, False):
-        elapsed_time = time.time() - last_interaction
-        if elapsed_time > TIMEOUT_LIMIT:
-            for key in [
-                SessionKeys.AUTHENTICATED,
-                SessionKeys.USERNAME,
-                SessionKeys.ROLE,
-                SessionKeys.LAST_INTERACTION,
-            ]:
-                if key in st.session_state:
-                    del st.session_state[key]
-            clear_session(SESSION_ID)
-            from src.errors import UI_SESSION_EXPIRED
-            st.warning(UI_SESSION_EXPIRED)
-            st.stop()
-        else:
-            st.session_state[SessionKeys.LAST_INTERACTION] = time.time()
-            cache_session_state(SESSION_ID, SessionKeys.LAST_INTERACTION, time.time())
-    # ── Handle OAuth Callback (GitHub / Google SSO) ──────────────────────────────
-    if not st.session_state.get(SessionKeys.AUTHENTICATED, False):
-        if "code" in st.query_params and "state" in st.query_params:
-            _code = st.query_params["code"]
-            _state = st.query_params["state"]
-            from src.db.auth import get_or_create_sso_user
-            from src.utils.sso import (
-                SSOConfigurationError,
-                exchange_github_code,
-                exchange_google_code,
-            )
-            _user_info, _error_msg = None, None
-            try:
-                if _state.startswith("google_"):
-                    _user_info, _error_msg = exchange_google_code(_code)
-                elif _state.startswith("github_"):
-                    _user_info, _error_msg = exchange_github_code(_code)
-            except (SSOConfigurationError, ValueError) as _exc:
-                _user_info, _error_msg = None, f"Configuration Error: {_exc}"
-            if _user_info and _user_info.get("email"):
-                _email = _user_info["email"]
-                if not is_user_active(_email):
-                    st.error("🚨 Account suspended. Please contact your Administrator.")
-                    st.query_params.clear()
-                else:
-                    _role = get_or_create_sso_user(_email)
-                    st.session_state[SessionKeys.AUTHENTICATED] = True
-                    st.session_state[SessionKeys.USERNAME] = _email
-                    st.session_state[SessionKeys.ROLE] = _role
-                    st.session_state[SessionKeys.LAST_INTERACTION] = time.time()
-                    cache_session_state(SESSION_ID, SessionKeys.AUTHENTICATED, True)
-                    cache_session_state(SESSION_ID, SessionKeys.USERNAME, _email)
-                    cache_session_state(SESSION_ID, SessionKeys.ROLE, _role)
-                    cache_session_state(
-                        SESSION_ID, SessionKeys.LAST_INTERACTION, time.time()
-                    )
-                    st.query_params.clear()
-                    st.rerun()
-            else:
-                _role = get_or_create_sso_user(_email)
-                st.session_state[SessionKeys.AUTHENTICATED] = True
-                st.session_state[SessionKeys.USERNAME] = _email
-                st.session_state[SessionKeys.ROLE] = _role
-                st.session_state[SessionKeys.LAST_INTERACTION] = time.time()
-                cache_session_state(SESSION_ID, SessionKeys.AUTHENTICATED, True)
-                cache_session_state(SESSION_ID, SessionKeys.USERNAME, _email)
-                cache_session_state(SESSION_ID, SessionKeys.ROLE, _role)
-                cache_session_state(
-                    SESSION_ID, SessionKeys.LAST_INTERACTION, time.time()
-                )
-                st.query_params.clear()
-                st.rerun()
-        else:
-            _err = _error_msg or "Could not retrieve your email."
-            st.error(f"🚨 SSO authentication failed: {_err}")
-            st.query_params.clear()
 # Render Login UI if not authenticated
 if not st.session_state.get(SessionKeys.AUTHENTICATED, False):
     render_login_view(SESSION_ID)
@@ -1694,35 +1602,6 @@ def logout_dialog():
                     del st.session_state[key]
             clear_session(SESSION_ID)
             st.rerun()
-# ── Corpus Overview Header & Quick Actions (#1242) ───────────────────────────
-header_col, action_col1, action_col2 = st.columns([0.5, 0.25, 0.25])
-with header_col:
-    st.subheader("📚 Corpus Overview")
-with action_col1:
-    if st.button(
-        "🔄 Refresh Corpus Data", key="refresh_corpus_btn", use_container_width=True
-    ):
-        keys_to_clear = [
-            SessionKeys.ANALYSIS_RESULTS,
-            SessionKeys.ANALYSIS_FILE_SIGNATURE,
-            SessionKeys.DRIVE_FILES_DICT,
-            SessionKeys.FAILED_DOCUMENTS,
-            SessionKeys.WARNING_PAGE,
-        ]
-        for key in keys_to_clear:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.cache_data.clear()
-        st.toast("Corpus dataset refreshed.", icon="✅")
-        st.rerun()
-with action_col2:
-    if st.button(
-        "🗑️ Clear All Data",
-        key="open_clear_dialog_btn",
-        type="secondary",
-        use_container_width=True,
-    ):
-        clear_all_dialog()  # type: ignore
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     # ── Account Info (Issue: logged-in user details expander) ──────────────
@@ -1812,7 +1691,7 @@ with st.sidebar:
         on_change=save_preferences_callback,
     )
     # If user manually changes slider, reset preset to "Custom"
-    if abs(threshold - preset_options.get(selected_preset, -1)) > 0.001:
+    if selected_preset != "Custom" and abs(threshold - preset_options[selected_preset]) > 0.001:
         if st.session_state.get("threshold_preset_radio") != "Custom":
             st.session_state["threshold_preset_radio"] = "Custom"
             st.rerun()
@@ -1857,31 +1736,8 @@ with st.sidebar:
         value=5,
         key=SessionKeys.FAISS_TOP_K_SLIDER,
     )
-    use_chunk_matrix = st.checkbox(
-        "Use chunk-level similarity matrix",
-        value=False,
-        key=SessionKeys.CHUNK_MATRIX_CHECKBOX,
-    )
-    faiss_top_k = st.slider(
-        "FAISS: matches per chunk",
-        1,
-        20,
-        value=5,
-        key=SessionKeys.FAISS_TOP_K_SLIDER,
-    )
     # ========== ADD THIS ==========
     # Cross-Lingual Detection Toggle (Issue #1956)
-    cross_lingual_mode = st.toggle(
-        "🌐 Cross-Lingual Detection (Beta)",
-        value=False,
-        key="cross_lingual_mode_toggle",
-        help=(
-            "Enable back-translation to detect translated plagiarism. "
-            "Chunks in foreign languages will be translated to English "
-            "before similarity matching. May increase processing time."
-        ),
-    )
-    # ==============================
     from app.components.faiss_results import render_faiss_metric_badge
     render_faiss_metric_badge(st.session_state.get("faiss_index", None))
     # ── FAISS Vector Index Memory Footprint Badge (Issue #1563) ────────────
@@ -1955,7 +1811,8 @@ with st.sidebar:
             - **Latin**: Basic Unicode normalization
             """)
         # Show detected script for current text
-        if 'raw_texts' in locals() and raw_texts:
+        if st.session_state.get('analysis_results'):
+            raw_texts = getattr(st.session_state.analysis_results, 'raw_texts', {})
             from src.core.script_normalizer import ScriptDetector
             detector = ScriptDetector()
             scripts = {}
@@ -2078,11 +1935,8 @@ with st.sidebar:
     # The local `faiss_index` is not built until further down this script, so
     # read the cached handle from session state instead of referencing a name
     # that does not exist yet. render_sidebar() applies the same fallback.
-    lang_code = render_sidebar(
-        user_role,
-        str(ROOT_DIR),
-        st.session_state.get("faiss_index"),
-    )
+    lang_code = {v: k for k, v in _SUPPORTED_LANGUAGES.items()}.get(
+        st.session_state.get(SessionKeys.LANG_SELECTOR, "English"), "en")
     # ── System Health Widget (Issue #1246) ──────────────────────────────────────
     with st.expander("🖥️ System Health & Memory", expanded=False):
         try:
@@ -2201,8 +2055,9 @@ with col3:
     st.metric("Flagged Incidents", f"{flagged_incidents:,}")
 with col4:
     st.metric("Corpus Size", f"{corpus_size:,}")
-if enable_ai_detection and 'ai_probabilities' in locals() and ai_probabilities:
-    suspicious_count = sum(1 for p in ai_probabilities.values() if p > ai_threshold)
+ai_probabilities = getattr(st.session_state.get('analysis_results'), 'ai_probabilities', {})
+if enable_ai_detection and ai_probabilities:
+    suspicious_count = sum(1 for p in ai_probabilities.values() if (p.get("probability", 0) if isinstance(p, dict) else p) > ai_threshold)
     st.metric("🤖 AI Generated", suspicious_count, delta=f"of {len(ai_probabilities)} docs")
 else:
     st.metric("🤖 AI Generated", "0")
@@ -2213,514 +2068,6 @@ with st.expander("ℹ️ How Semantic Plagiarism Detection Works"):
     - **2. AI vector embeddings generated** — The documents are converted into vector embeddings for semantic comparison.
     - **3. View similarity heatmap & incident logs** — Review detected similarities through the heatmap and incident logs.
     """)
-uploaded_files = st.file_uploader(
-    "📂 Upload Assignments",
-    type=["pdf", "docx", "txt", "md", "markdown", "mdown"],
-    accept_multiple_files=True,
-    key="file_uploader",
-    on_change=file_uploader_callback,
-)
-if st.session_state.get("staged_files_count", 0) > 0:
-    staged_count = st.session_state["staged_files_count"]
-    staged_size_mb = st.session_state["staged_files_size"] / (1024 * 1024)
-    st.info(f"📁 Staged {staged_count} files (Total Size: {staged_size_mb:.1f} MB)")
-if user_role != "admin":
-    st.subheader("🔎 Secure Student Search Portal")
-    st.caption(
-        "Paste a text snippet below to check its similarity against existing indexed assignments."
-    )
-    st.info(
-        "🔒 Note: Direct assignment uploads and detailed breakdown panels are restricted to Administrator access. Your queries are anonymized for privacy."
-    )
-    query_text = st.text_area(
-        "Paste a text snippet to check against index:",
-        height=150,
-        placeholder="Paste a paragraph here to check for plagiarism...",
-    )
-    if st.button("🔍 Run Quick Verification", key="user_query") and query_text.strip():
-        from src.core.faiss_index import build_index_from_matrix
-        from src.db.corpus_db import get_all_embeddings, get_chunk_registry
-        with st.spinner("Loading index and searching..."):
-            try:
-                registry = get_chunk_registry()
-                embeddings_matrix = get_all_embeddings()
-                if embeddings_matrix.shape[0] == 0:
-                    from src.errors import UI_NO_DOCUMENTS_INDEXED
-                    st.warning(UI_NO_DOCUMENTS_INDEXED)
-                else:
-                    faiss_index = build_index_from_matrix(
-                        embeddings_matrix, index_type="auto"
-                    )
-                    from src.core.embedding_model import embed_chunks
-                    query_vec = embed_chunks([query_text.strip()])[0]
-                    faiss_threshold = threshold
-                    results = search_similar_chunks(
-                        query_vec,
-                        faiss_index,
-                        registry,
-                        top_k=faiss_top_k,
-                        threshold=faiss_threshold,
-                    )
-                    if not results:
-                        st.success(
-                            "✅ No significant matches found in the assignment database."
-                        )
-                    else:
-                        st.success(
-                            f"Found **{len(results)}** potentially similar passages."
-                        )
-                        doc_id_map = {}
-                        anon_counter = 1
-                        for record, score in results:
-                            if record.doc_name not in doc_id_map:
-                                doc_id_map[record.doc_name] = (
-                                    f"Document-{anon_counter:03d}"
-                                )
-                                anon_counter += 1
-                        for rank, (record, score) in enumerate(results, 1):
-                            anon_doc_name = doc_id_map[record.doc_name]
-                            color = "#ff4b4b" if score >= 0.90 else "#ffa500"
-                            with st.expander(
-                                f"#{rank} · {anon_doc_name} (chunk #{record.chunk_index + 1}) "
-                                f"— {score:.1%}",
-                                expanded=(rank == 1),
-                            ):
-                                cq, cm = st.columns(2)
-                                with cq:
-                                    st.markdown("**Your query:**")
-                                    st.info(query_text.strip())
-                                with cm:
-                                    st.markdown(
-                                        f"**Matching passage in {anon_doc_name}:**"
-                                    )
-                                    st.warning(record.chunk_text)
-                                    st.markdown(
-                                        f"<div style='text-align:right;'>"
-                                        f"<span style='background:{color};color:white;padding:3px 12px;"
-                                        f"border-radius:10px;font-size:0.85rem;font-weight:700;'>"
-                                        f"Similarity: {score * 100:.1f}%</span></div>",
-                                        unsafe_allow_html=True,
-                                    )
-                                st.caption(
-                                    "🔒 Document names are anonymized to protect student privacy."
-                                )
-            except Exception as e:
-                from src.errors import UI_INDEX_LOAD_FAILED
-                st.error(UI_INDEX_LOAD_FAILED.format(error=str(e)))
-                st.info(
-                    "Please ensure documents have been indexed by an administrator."
-                )
-else:
-    if os.path.exists(_INDEX_PATH):
-        faiss_index = load_index(_INDEX_PATH)
-        registry = get_chunk_registry()
-        if faiss_index is not None and faiss_index.ntotal != len(registry):
-            all_embs = get_all_embeddings()
-            if len(all_embs) > 0 and len(all_embs) == len(registry):
-                faiss_index = build_index_from_matrix(all_embs)
-                save_index(faiss_index, _INDEX_PATH)
-            elif len(all_embs) == 0:
-                faiss_index = None
-                registry = []
-        if faiss_index is not None:
-            st.info(f"📂 Loaded existing FAISS index with {faiss_index.ntotal} vectors")
-        else:
-            st.markdown(
-                "<span style='color:#999;font-size:0.85rem;'>○ No index loaded</span>",
-                unsafe_allow_html=True,
-            )
-    st.markdown("---")
-    file_bytes_dict = (
-        {uploaded_file.name: uploaded_file.getvalue() for uploaded_file in uploaded_files}
-        if uploaded_files
-        else {}
-    )
-    with st.spinner("🧠 Processing files and building embeddings…"):
-        analysis_results = run_pipeline_with_tracking(
-            file_bytes_dict,
-            ocr_language,
-            ocr_dpi,
-            chunk_size,
-            chunk_overlap,
-        )
-        (
-            raw_texts,
-            chunked_docs,
-            embeddings,
-            sim_df,
-            chunk_sim_df,
-            faiss_index,
-            registry,
-            ai_probabilities,
-        ) = analysis_results
-        active_sim_df = chunk_sim_df if use_chunk_matrix else sim_df
-        flags = flag_plagiarism(active_sim_df, threshold=threshold)
-        st.subheader("📊 Analysis Summary")
-        st.write(f"Processed **{len(raw_texts)}** documents with Chunk Size: `{chunk_size}` and Overlap: `{chunk_overlap}`.")
-        selected_class = st.selectbox(
-            "Select Class/Section",
-            unique_classes,
-            index=0,
-            key="class_filter_selectbox",
-        )
-        st.write(
-            f"Processed **{len(raw_texts)}** documents with Chunk Size: `{chunk_size}` and Overlap: `{chunk_overlap}`."
-        )
-        st.markdown("---")
-        st.markdown("""
-        **How it works**
-        1. Upload **PDF, DOCX, TXT, or Markdown** assignment files or import from Google Drive
-        2. Text is extracted according to the file type
-        3. Text is split into **paragraph chunks**
-        4. Chunks are embedded with **SentenceTransformers**
-        5. A **FAISS index** is built over all chunk vectors
-        6. Pairs above threshold are flagged
-        """)
-        st.markdown("---")
-        st.caption("Semantic Plagiarism Detector · FAISS edition")
-        if user_role == "admin":
-            st.markdown("---")
-            st.markdown("### 📁 Document Management")
-            existing_docs = get_all_documents()
-            if existing_docs:
-                st.write(f"**{len(existing_docs)}** documents in database")
-                for doc in existing_docs:
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.text(f"📄 {doc['filename']}")
-                    with col2:
-                        if st.button("🗑️", key=f"del_{doc['filename']}"):
-                            delete_document(doc["filename"])
-                            embeddings_matrix = get_all_embeddings()
-                            if embeddings_matrix.size > 0:
-                                new_index = build_index_from_matrix(embeddings_matrix)
-                                save_index(new_index, _INDEX_PATH)
-                            else:
-                                if os.path.exists(_INDEX_PATH):
-                                    os.remove(_INDEX_PATH)
-                            st.rerun()
-            if user_role == "admin":
-                st.markdown("---")
-                st.markdown("### 📁 Document Management")
-                existing_docs = get_all_documents()
-                if existing_docs:
-                    st.write(f"**{len(existing_docs)}** documents in database")
-                    for doc in existing_docs:
-                        st.text(doc)
-            safe_last_interaction = int(last_interaction or time.time())
-            st.markdown(
-                f"""
-                <div id="session-timer" style="
-                background-color: rgba(255, 165, 0, 0.1);
-                border: 1px solid rgba(255, 165, 0, 0.3);
-                border-radius: 8px;
-                padding: 12px;
-                margin-top: 16px;
-                text-align: center;
-                font-family: monospace;
-                font-size: 14px;
-                color: #ffa500;
-                ">
-                ⏱️ Session expires in: <span id="timer-display">15:00</span>
-                </div>
-                <script>
-                (function() {{
-                const timeoutLimit = {TIMEOUT_LIMIT};
-                const lastInteraction = {safe_last_interaction};
-                const display = document.getElementById('timer-display');
-                function updateTimer() {{
-                const now = Math.floor(Date.now() / 1000);
-                const elapsed = now - lastInteraction;
-                const remaining = Math.max(0, timeoutLimit - elapsed);
-                if (remaining <= 0) {{
-                display.textContent = "00:00";
-                display.parentElement.style.borderColor = "#ff4b4b";
-                display.parentElement.style.color = "#ff4b4b";
-                display.parentElement.innerHTML = "⚠️ Session Expired. Reloading...";
-                setTimeout(() => window.location.reload(), 2000);
-                return;
-                }}
-                const minutes = Math.floor(remaining / 60);
-                const seconds = remaining % 60;
-                display.textContent = `${{minutes.toString().padStart(2, '0')}}:${{seconds.toString().padStart(2, '0')}}`;
-                if (remaining < 60) {{
-                display.parentElement.style.borderColor = "#ff4b4b";
-                display.parentElement.style.color = "#ff4b4b";
-                }}
-                }}
-                updateTimer();
-                setInterval(updateTimer, 1000);
-                }})();
-                </script>
-                """,
-                unsafe_allow_html=True,
-            )
-# Render Upload & Student Portal Section
-file_bytes_dict = render_upload_section(user_role, lang_code, _INDEX_PATH)
-# Threshold & Chunking Parameters from Session State
-threshold = st.session_state.get(SessionKeys.THRESHOLD_SLIDER, PLAGIARISM_THRESHOLD)
-use_chunk_matrix = st.session_state.get(SessionKeys.CHUNK_MATRIX_CHECKBOX, False)
-faiss_top_k = st.session_state.get(SessionKeys.FAISS_TOP_K_SLIDER, 5)
-chunk_size = st.session_state.get(SessionKeys.CHUNK_SIZE_SLIDER, 500)
-chunk_overlap = st.session_state.get(SessionKeys.CHUNK_OVERLAP_SLIDER, 50)
-ocr_language = st.session_state.get(SessionKeys.OCR_LANGUAGE_SELECTOR, "eng")
-ocr_dpi = st.session_state.get(SessionKeys.OCR_DPI_SLIDER, 250)
-has_enough_files = len(file_bytes_dict) >= 2
-if has_enough_files:
-    with st.spinner("🧠 Processing files and building embeddings…"):
-        analysis_results = run_pipeline(
-            file_bytes_dict,
-            ocr_language,
-            ocr_dpi,
-            chunk_size,
-            chunk_overlap,
-        )
-        st.markdown("---")
-        st.markdown("### 📁 Document Management & Bulk Export")
-        existing_docs = get_all_documents()
-        if existing_docs:
-            raw_assignment_titles = sorted(
-                list(
-                    {
-                        (
-                            doc.assignment_title
-                            if hasattr(doc, "assignment_title")
-                            else (doc.get("assignment_title") if isinstance(doc, dict) else None)
-                        )
-                        for doc in existing_docs
-                    }
-                    - {None, ""}
-                )
-            )
-            assignment_titles = ["All Assignments"] + raw_assignment_titles
-            selected_assignment = st.selectbox(
-                "Filter by Assignment",
-                options=assignment_titles,
-                key="corpus_assignment_filter_selectbox",
-            )
-            if selected_assignment != "All Assignments":
-                existing_docs = [
-                    doc
-                    for doc in existing_docs
-                    if (
-                        doc.assignment_title
-                        if hasattr(doc, "assignment_title")
-                        else (doc.get("assignment_title") if isinstance(doc, dict) else None)
-                    )
-                    == selected_assignment
-                ]
-            # ── File Extension Filter Dropdown (Issue #1883) ─────────────────────
-            # Extract unique file extensions from the currently filtered documents
-            # to dynamically populate the dropdown, while ensuring standard types
-            # are always available for user convenience.
-            from pathlib import Path
-            # Define standard extensions that should always appear in the filter
-            standard_extensions = ["All", ".pdf", ".docx", ".txt", ".csv", ".md"]
-            # Extract extensions from the current document list
-            available_extensions = set()
-            for doc in existing_docs:
-                fn = (
-                    doc.filename
-                    if hasattr(doc, "filename")
-                    else (doc.get("filename") if isinstance(doc, dict) else str(doc))
-                )
-                ext = Path(fn).suffix.lower()
-                if ext:
-                    available_extensions.add(ext)
-            # Combine standard and available extensions, maintaining order
-            filter_options = ["All"]
-            for ext in standard_extensions[1:]:
-                if ext in available_extensions or ext in [".pdf", ".docx", ".txt", ".csv", ".md"]:
-                    filter_options.append(ext)
-            # Add any non-standard extensions found in the database
-            for ext in sorted(list(available_extensions)):
-                if ext not in filter_options:
-                    filter_options.append(ext)
-            # Render the selectbox with a unique key to prevent state collisions
-            selected_file_type = st.selectbox(
-                "Filter by File Type",
-                options=filter_options,
-                index=0,
-                key="corpus_file_type_filter_selectbox",
-                help="Filter the document corpus table to show only specific file extensions.",
-            )
-            # Apply the file extension filter to the existing_docs list
-            if selected_file_type != "All":
-                existing_docs = [
-                    doc for doc in existing_docs
-                    if Path(
-                        doc.filename if hasattr(doc, "filename")
-                        else (doc.get("filename") if isinstance(doc, dict) else str(doc))
-                    ).suffix.lower() == selected_file_type
-                ]
-            # ── End File Extension Filter (Issue #1883) ──────────────────────────
-            # Update the document count display to reflect BOTH assignment and file type filters
-            st.write(
-                f"**{len(existing_docs)}** documents in database"
-                + (f" (Filtered by: {selected_file_type})" if selected_file_type != "All" else "")
-                + (f" | Assignment: {selected_assignment}" if selected_assignment != "All Assignments" else "")
-            )
-            import pandas as pd
-            from src.db.corpus_db import (
-                get_document_char_counts,
-                get_document_word_counts,
-            )
-            word_counts = get_document_word_counts()
-            char_counts = get_document_char_counts()
-            doc_rows = []
-            for doc in existing_docs:
-                fn = (
-                    doc.filename
-                    if hasattr(doc, "filename")
-                    else (doc.get("filename") if isinstance(doc, dict) else str(doc))
-                )
-                doc_rows.append(
-                    {
-                        "Select": False,
-                        "Format": format_extension_badge(fn),
-                        "Filename": fn,
-                        "Word Count": word_counts.get(fn, 0),
-                        "Char Count": char_counts.get(fn, 0),
-                    }
-                )
-            corpus_df = pd.DataFrame(doc_rows)
-            sel_col1, sel_col2 = st.columns(2)
-            with sel_col1:
-                if st.button(
-                    "☑️ Select All",
-                    key="sidebar_select_all_corpus_btn",
-                    use_container_width=True,
-                ):
-                    st.session_state["corpus_select_all_toggle"] = True
-                    st.rerun()
-            with sel_col2:
-                if st.button(
-                    "⬜ Clear",
-                    key="sidebar_clear_corpus_btn",
-                    use_container_width=True,
-                ):
-                    st.session_state["corpus_select_all_toggle"] = False
-                    st.rerun()
-            if st.session_state.get("corpus_select_all_toggle", False):
-                corpus_df["Select"] = True
-            edited_df = st.data_editor(
-                corpus_df,
-                column_config={
-                    "Select": st.column_config.CheckboxColumn(
-                        "Select",
-                        default=False,
-                        help="Select for bulk ZIP export",
-                    ),
-                    "Format": st.column_config.TextColumn("Format", disabled=True, width="small"),
-                    "Filename": st.column_config.TextColumn("Filename", disabled=True),
-                    "Word Count": st.column_config.NumberColumn(
-                        "Word Count", format="%d words", disabled=True
-                    ),
-                    "Char Count": st.column_config.NumberColumn(
-                        "Char Count", format="%d chars", disabled=True
-                    ),
-                },
-                disabled=["Format", "Filename", "Word Count", "Char Count"],
-                hide_index=True,
-                key="sidebar_corpus_data_editor",
-                use_container_width=True,
-            )
-            selected_rows = edited_df[edited_df["Select"]]
-            selected_filenames = selected_rows["Filename"].tolist()
-            if selected_filenames:
-                zip_data = create_documents_bulk_zip_archive(selected_filenames)
-                st.download_button(
-                    label=f"📦 Export Selected as ZIP ({len(selected_filenames)})",
-                    data=zip_data,
-                    file_name=f"corpus_export_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.zip",
-                    mime="application/zip",
-                    key="sidebar_export_selected_zip_btn",
-                    use_container_width=True,
-                    type="primary",
-                )
-            else:
-                st.button(
-                    "📦 Export Selected as ZIP (0)",
-                    disabled=True,
-                    key="sidebar_export_zip_disabled_btn",
-                    use_container_width=True,
-                )
-            st.markdown("---")
-            for doc in existing_docs:
-                fn = (
-                    doc.filename
-                    if hasattr(doc, "filename")
-                    else (doc.get("filename") if isinstance(doc, dict) else str(doc))
-                )
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.text(f"{format_extension_badge(fn)} {fn}")
-                with col2:
-                    if st.button("🗑️", key=f"del_{fn}"):
-                        delete_document(fn)
-                        embeddings_matrix = get_all_embeddings()
-                        if embeddings_matrix.size > 0:
-                            new_index = build_index_from_matrix(embeddings_matrix)
-                            save_index(new_index, _INDEX_PATH)
-                        else:
-                            if os.path.exists(_INDEX_PATH):
-                                os.remove(_INDEX_PATH)
-                        st.rerun()
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button(
-                "🗑️ Clear All Documents",
-                key="clear_all_documents_button",
-                use_container_width=True,
-            ):
-                clear_all_dialog()  # type: ignore
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("---")
-            if st.button("🚪 Log Out", use_container_width=True, key="logout_button"):
-                for key in ["authenticated", "username", "role", "last_interaction"]:
-                    if key in st.session_state:
-                        del st.session_state[key]
-                clear_session(SESSION_ID)
-                st.rerun()
-# ── Onboarding Tour for First-Time Admin Users ───────────────────────────────────
-# Onboarding Tour
-if (
-    Tour is not None
-    and user_role == "admin"
-    and not get_tour_completed(st.session_state[SessionKeys.USERNAME])
-):
-    username = st.session_state[SessionKeys.USERNAME]
-    if st.button("🎯 Start Guided Tour", key="start_tour_button", type="primary"):
-        st.session_state[SessionKeys.SHOW_TOUR] = True
-    if st.session_state.get(SessionKeys.SHOW_TOUR, False):
-        tour_steps = [
-            Tour.info(
-                title="👋 Welcome to the Plagiarism Detection System!",
-                desc="This guided tour will walk you through the key features to help you get started.",
-            ),
-            Tour.bind(
-                SessionKeys.THRESHOLD_SLIDER,
-                title="⚙️ Plagiarism Threshold",
-                desc=f"Adjust the flagging threshold. Default is {DEFAULT_THRESHOLDS.plagiarism:.0%}.",
-                side="right",
-            ),
-            Tour.bind(
-                SessionKeys.CLASS_FILTER_SELECTBOX,
-                title="🔍 Class Filter",
-                desc="Filter analysis results by specific class sections.",
-                side="right",
-            ),
-            Tour.info(
-                title="📊 Analysis Dashboard",
-                desc="View similarity metrics, flagged pairs, and comparisons in the tabs below.",
-            ),
-        ]
-        tour = Tour(steps=tour_steps)
-        tour.start()
-        if st.button("✅ Finish Tour", use_container_width=True):
-            set_tour_completed(username, True)
-            st.session_state[SessionKeys.SHOW_TOUR] = False
-            st.success("✅ Onboarding tour completed!")
-            st.rerun()
 st.title(get_text("title", lang=lang_code))
 st.markdown(get_text("subtitle", lang=lang_code))
 st.divider()
@@ -2786,130 +2133,15 @@ if user_role == "admin":
     registry = get_chunk_registry()
 else:
     faiss_index = load_index(_INDEX_PATH) if os.path.exists(_INDEX_PATH) else None
-uploaded_files = st.file_uploader(
-    get_text("upload_title", lang=lang_code),
-    type=["pdf", "docx", "txt", "md", "markdown", "mdown", "zip", "csv"],
-    accept_multiple_files=True,
-    key="file_uploader",
-    on_change=file_uploader_callback,
-)
-if st.session_state.get("staged_files_count", 0) > 0:
-    staged_count = st.session_state["staged_files_count"]
-    staged_size_mb = st.session_state["staged_files_size"] / (1024 * 1024)
-    st.info(f"📁 Staged {staged_count} files (Total Size: {staged_size_mb:.1f} MB)")
-MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB limit
-file_bytes_dict = {}
-if bulk_download_drive_folder is not None:
-    with st.expander("📁 Import from Google Drive", expanded=False):
-        drive_folder_input = st.text_input(
-            "Google Drive folder URL or ID",
-            key="drive_folder_input",
-            placeholder="https://drive.google.com/drive/folders/…",
-        )
-        drive_api_key = st.text_input(
-            "Google Drive API key",
-            key="drive_api_key",
-            type="password",
-            help="Optional if GOOGLE_DRIVE_API_KEY is set in the environment.",
-        )
-        if st.button("Import from Drive", key="drive_import_btn"):
-            if not drive_folder_input:
-                st.error("Please enter a Google Drive folder URL or ID.")
-            else:
-                drive_progress_bar = st.progress(
-                    0, text="Connecting to Google Drive…"
-                )
-                def _update_drive_progress(bytes_downloaded, total_bytes):
-                    fraction = (
-                        min(bytes_downloaded / total_bytes, 1.0)
-                        if total_bytes
-                        else 0
-                    )
-                    drive_progress_bar.progress(
-                        fraction,
-                        text=(
-                            f"Downloading from Drive… "
-                            f"{bytes_downloaded / 1024:.0f} KB"
-                            + (
-                                f" / {total_bytes / 1024:.0f} KB"
-                                if total_bytes
-                                else ""
-                            )
-                        ),
-                    )
-                try:
-                    drive_files, drive_names = bulk_download_drive_folder(
-                        drive_folder_input,
-                        api_key=drive_api_key or None,
-                        progress_callback=_update_drive_progress,
-                    )
-                    st.session_state.setdefault("drive_imported_files", {})
-                    st.session_state["drive_imported_files"].update(drive_files)
-                    drive_progress_bar.progress(
-                        1.0, text=f"Imported {len(drive_names)} file(s)."
-                    )
-                    st.success(
-                        f"Imported {len(drive_names)} file(s) from Google Drive: "
-                        f"{', '.join(drive_names)}"
-                    )
-                except Exception as exc:
-                    drive_progress_bar.empty()
-                    st.error(f"⚠️ Google Drive import failed: {exc}")
-if uploaded_files:
-    for uploaded_file in uploaded_files:
-        original_name = uploaded_file.name
-        try:
-            validate_document_extension(
-                original_name,
-                allowed_extensions={
-                    ".csv",
-                    ".docx",
-                    ".md",
-                    ".markdown",
-                    ".mdown",
-                    ".pdf",
-                    ".txt",
-                    ".zip",
-                },
-            )
-        except InvalidFileExtensionError as exc:
-            st.error(
-                f"⚠️ File **'{sanitize_filename(original_name)}'** was rejected: {exc}"
-            )
-            continue
-        safe_name = unique_filename(original_name, file_bytes_dict)
-        if uploaded_file.size > MAX_FILE_SIZE_BYTES:
-            st.error(
-                f"⚠️ File **'{safe_name}'** exceeds maximum size limit of 10MB."
-            )
-            continue
-        file_bytes = uploaded_file.read()
-        file_hash = hashlib.sha256(file_bytes).hexdigest()
-        existing_doc = get_document_by_hash(file_hash)
-        if existing_doc:
-            st.warning(f"⚠️ File **'{original_name}'** is identical to **'{existing_doc}'** already in the database.")
-            action = st.radio(
-                f"Action for duplicate file '{original_name}':",
-                ["Skip", "Reprocess"],
-                key=f"dup_{file_hash}_{original_name}",
-                horizontal=True
-            )
-            if action == "Skip":
-                continue
-        file_bytes_dict[safe_name] = strip_exif_metadata(
-            file_bytes, safe_name
-        )
-for drive_name, drive_bytes in st.session_state.get(
-    "drive_imported_files", {}
-).items():
-    safe_drive_name = unique_filename(drive_name, file_bytes_dict)
-    file_bytes_dict[safe_drive_name] = drive_bytes
+file_bytes_dict = render_upload_section(user_role, lang_code, _INDEX_PATH)
 has_enough_files = len(file_bytes_dict) >= 2
 @st.cache_data(show_spinner=False)
 def run_extraction_pipeline(
     raw_texts_items: tuple,
     chunk_size: int = 500,
     chunk_overlap: int = 50,
+    enable_ai_detection: bool = False,
+    ai_threshold: float = 0.65,
 ):
     raw_texts_dict = dict(raw_texts_items)
     chunked_docs = chunk_documents(
@@ -2941,7 +2173,6 @@ def run_extraction_pipeline(
                 chunk_mat[j, i] = score
     chunk_sim_df = pd.DataFrame(chunk_mat, index=names, columns=names)
     faiss_index, registry = build_index(embeddings, chunked_docs)
-    ai_probabilities = detect_documents_ai_probability(chunked_docs)
     # ========== ADD AI DETECTION HERE ==========
     if enable_ai_detection:
         from src.core.ai_detector_enhanced import detect_ai_probability_enhanced
@@ -3028,8 +2259,18 @@ if has_enough_files:
         raw_texts_tuple,
         chunk_size,
         chunk_overlap,
+        enable_ai_detection,
+        ai_threshold,
     )
-    # ========== ADD THIS BLOCK ==========
+    from src.core.corpus_ingestion import persist_analyzed_documents
+    try:
+        persist_analyzed_documents(
+            file_bytes_dict, chunked_docs, embeddings,
+            owner=st.session_state.get(SessionKeys.USERNAME), index_path=_INDEX_PATH,
+        )
+    except Exception:
+        logger.exception("Could not save analyzed documents to the corpus")
+        st.error("Analysis completed, but saving to the searchable corpus failed. Check the server logs before uploading again.")
     from src.utils.redis_cache import store_large_data
     # Store large results in Redis with compression
     large_results = {
@@ -3154,7 +2395,6 @@ with tab_warnings:
             interval=30 * 1000,
             key="incident_stream_autorefresh",
         )
-    st.session_state[SessionKeys.INCIDENT_STREAM_AUTO_REFRESH] = auto_refresh_enabled
     if auto_refresh_enabled:
         if st_autorefresh is None:
             st.warning(
@@ -3171,7 +2411,7 @@ with tab_warnings:
         st.markdown("### 🤖 AI-Generated Text Detection")
         # Summary metrics
         ai_col1, ai_col2, ai_col3 = st.columns(3)
-        suspicious_count = sum(1 for p in ai_probabilities.values() if p > ai_threshold)
+        suspicious_count = sum(1 for p in ai_probabilities.values() if (p.get("probability", 0) if isinstance(p, dict) else p) > ai_threshold)
         avg_ai_prob = sum(ai_probabilities.values()) / len(ai_probabilities) if ai_probabilities else 0
         with ai_col1:
             st.metric("Documents Analyzed", len(ai_probabilities))
@@ -3363,7 +2603,6 @@ with tab_heatmap:
 # ══ TAB 5: PAIR DRILL-DOWN ════════════════════════════════════════════════
 with tab_drill:
     update_page_title("Drill Down")
-    render_drilldown_view(active_sim_df, raw_texts, flags, doc_names)
     st.markdown("---")
     if active_sim_df is not None and len(doc_names) >= 2:
         c1, c2 = st.columns(2)
@@ -3372,13 +2611,13 @@ with tab_drill:
         with c2:
             db = st.selectbox("Document B", [d for d in doc_names if d != da], key="db")
         sim_val = float(active_sim_df.loc[da, db])
-        
+
         # Compute Plagiarism Density for da against db
         density_a = 0.0
         density_b = 0.0
         emb_a = embeddings.get(da, np.array([]))
         emb_b = embeddings.get(db, np.array([]))
-        
+
         if emb_a.size > 0 and emb_b.size > 0:
             from src.core.similarity import cosine_similarity
             sim_matrix = cosine_similarity(emb_a, emb_b)
@@ -3451,12 +2690,12 @@ with tab_drill:
             snip_b = str(flag.get("snippet_b", ""))
             if flag.get("doc_a") == db:
                 snip_a, snip_b = snip_b, snip_a
-            
+
             if snip_a and snip_a in full_a:
                 full_a = full_a.replace(snip_a, f'<mark style="background-color: #fca5a5; padding: 0.1em; border-radius: 2px;">{snip_a}</mark>')
             if snip_b and snip_b in full_b:
                 full_b = full_b.replace(snip_b, f'<mark style="background-color: #fca5a5; padding: 0.1em; border-radius: 2px;">{snip_b}</mark>')
-        
+
         full_a_html = full_a.replace("\n", "<br>")
         full_b_html = full_b.replace("\n", "<br>")
 
@@ -3660,180 +2899,6 @@ with tab_audit:
     )
 # Sidebar document management details
 render_document_management_sidebar(user_role, _INDEX_PATH, SESSION_ID, last_interaction)
-# ── Document Management & Bulk Export (Admin Only) ────────────────────────────
-if user_role == "admin":
-    st.markdown("---")
-    st.markdown("### 📁 Document Management & Bulk Export")
-    existing_docs = get_all_documents()
-    if existing_docs:
-        # ── File Extension Filter Dropdown (Issue #1883) ─────────────────────
-        from pathlib import Path
-        # Define standard extensions that should always appear in the filter
-        standard_extensions = ["All", ".pdf", ".docx", ".txt", ".csv", ".md"]
-        # Extract extensions from the current document list
-        available_extensions = set()
-        for doc in existing_docs:
-            fn = (
-                doc.filename
-                if hasattr(doc, "filename")
-                else (doc.get("filename") if isinstance(doc, dict) else str(doc))
-            )
-            ext = Path(fn).suffix.lower()
-            if ext:
-                available_extensions.add(ext)
-        # Combine standard and available extensions, maintaining order
-        filter_options = ["All"]
-        for ext in standard_extensions[1:]:
-            if ext in available_extensions or ext in [".pdf", ".docx", ".txt", ".csv", ".md"]:
-                filter_options.append(ext)
-        # Add any non-standard extensions found in the database
-        for ext in sorted(list(available_extensions)):
-            if ext not in filter_options:
-                filter_options.append(ext)
-        # Render the selectbox with a unique key to prevent state collisions
-        selected_file_type = st.selectbox(
-            "Filter by File Type",
-            options=filter_options,
-            index=0,
-            key="corpus_file_type_filter_selectbox_footer",
-            help="Filter the document corpus table to show only specific file extensions.",
-        )
-        # Apply the file extension filter to the existing_docs list
-        if selected_file_type != "All":
-            existing_docs = [
-                doc for doc in existing_docs
-                if Path(
-                    doc.filename if hasattr(doc, "filename")
-                    else (doc.get("filename") if isinstance(doc, dict) else str(doc))
-                ).suffix.lower() == selected_file_type
-            ]
-        # ── End File Extension Filter (Issue #1883) ──────────────────────────
-        st.write(
-            f"**{len(existing_docs)}** documents in database"
-            + (f" (Filtered by: {selected_file_type})" if selected_file_type != "All" else "")
-        )
-        # Bulk selection and export logic
-        import pandas as pd
-        from src.db.corpus_db import (
-            get_document_char_counts,
-            get_document_word_counts,
-        )
-        word_counts = get_document_word_counts()
-        char_counts = get_document_char_counts()
-        doc_rows = []
-        for doc in existing_docs:
-            fn = (
-                doc.filename
-                if hasattr(doc, "filename")
-                else (doc.get("filename") if isinstance(doc, dict) else str(doc))
-            )
-            doc_rows.append(
-                {
-                    "Select": False,
-                    "Format": format_extension_badge(fn),
-                    "Filename": fn,
-                    "Word Count": word_counts.get(fn, 0),
-                    "Char Count": char_counts.get(fn, 0),
-                }
-            )
-        corpus_df = pd.DataFrame(doc_rows)
-        if st.session_state.get("corpus_select_all_toggle", False):
-            corpus_df["Select"] = True
-        edited_df = st.data_editor(
-            corpus_df,
-            column_config={
-                "Select": st.column_config.CheckboxColumn("Select", default=False),
-                "Format": st.column_config.TextColumn("Format", disabled=True, width="small"),
-                "Filename": st.column_config.TextColumn("Filename", disabled=True),
-                "Word Count": st.column_config.NumberColumn("Word Count", format="%d words", disabled=True),
-                "Char Count": st.column_config.NumberColumn("Char Count", format="%d chars", disabled=True),
-            },
-            disabled=["Format", "Filename", "Word Count", "Char Count"],
-            hide_index=True,
-            key="sidebar_corpus_data_editor",
-            use_container_width=True,
-        )
-        selected_rows = edited_df[edited_df["Select"]]
-        selected_filenames = selected_rows["Filename"].tolist()
-        if selected_filenames:
-            zip_data = create_documents_bulk_zip_archive(selected_filenames)
-            st.download_button(
-                label=f"📦 Export Selected as ZIP ({len(selected_filenames)})",
-                data=zip_data,
-                file_name=f"corpus_export_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.zip",
-                mime="application/zip",
-                key="sidebar_export_selected_zip_btn",
-                use_container_width=True,
-                type="primary",
-            )
-        st.markdown("---")
-        for doc in existing_docs:
-            fn = (
-                doc.filename
-                if hasattr(doc, "filename")
-                else (doc.get("filename") if isinstance(doc, dict) else str(doc))
-            )
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.text(f"{format_extension_badge(fn)} {fn}")
-            with col2:
-                if st.button("🗑️", key=f"del_{fn}"):
-                    delete_document(fn)
-                    embeddings_matrix = get_all_embeddings()
-                    if embeddings_matrix.size > 0:
-                        new_index = build_index_from_matrix(embeddings_matrix)
-                        save_index(new_index, _INDEX_PATH)
-                    else:
-                        if os.path.exists(_INDEX_PATH):
-                            os.remove(_INDEX_PATH)
-                    st.rerun()
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button(
-            "🗑️ Clear All Documents",
-            key="clear_all_documents_button",
-            use_container_width=True,
-        ):
-            clear_all_dialog()  # type: ignore
-# ── Onboarding Tour for First-Time Admin Users ───────────────────────────────────
-if (
-    Tour is not None
-    and user_role == "admin"
-    and st.session_state.get(SessionKeys.USERNAME)
-    and not get_tour_completed(st.session_state[SessionKeys.USERNAME])
-):
-    username = st.session_state[SessionKeys.USERNAME]
-    if st.button("🎯 Start Guided Tour", key="start_tour_button", type="primary"):
-        st.session_state[SessionKeys.SHOW_TOUR] = True
-    if st.session_state.get(SessionKeys.SHOW_TOUR, False):
-        tour_steps = [
-            Tour.info(
-                title="👋 Welcome to the Plagiarism Detection System!",
-                desc="This guided tour will walk you through the key features to help you get started.",
-            ),
-            Tour.bind(
-                SessionKeys.THRESHOLD_SLIDER,
-                title="⚙️ Plagiarism Threshold",
-                desc=f"Adjust the flagging threshold. Default is {DEFAULT_THRESHOLDS.plagiarism:.0%}.",
-                side="right",
-            ),
-            Tour.bind(
-                SessionKeys.CLASS_FILTER_SELECTBOX,
-                title="🔍 Class Filter",
-                desc="Filter analysis results by specific class sections.",
-                side="right",
-            ),
-            Tour.info(
-                title="📊 Analysis Dashboard",
-                desc="View similarity metrics, flagged pairs, and comparisons in the tabs below.",
-            ),
-        ]
-        tour = Tour(steps=tour_steps)
-        tour.start()
-        if st.button("✅ Finish Tour", use_container_width=True):
-            set_tour_completed(username, True)
-            st.session_state[SessionKeys.SHOW_TOUR] = False
-            st.success("✅ Onboarding tour completed!")
-            st.rerun()
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.divider()
 from src.utils.version_check import APP_VERSION, check_for_update_sync

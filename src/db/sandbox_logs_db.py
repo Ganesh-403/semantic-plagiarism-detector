@@ -17,7 +17,9 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/sandbox_logs.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "sandbox_logs.db"
 
 
 @contextmanager
@@ -55,7 +57,7 @@ def initialize_sandbox_db(db_path: Optional[Path] = None) -> None:
 
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_traces_behavioral 
+            CREATE INDEX IF NOT EXISTS idx_traces_behavioral
             ON execution_traces(behavioral_hash)
         """
         )
@@ -74,7 +76,7 @@ def log_execution_trace(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO execution_traces 
+                INSERT OR REPLACE INTO execution_traces
                 (submission_hash, behavioral_hash, trace_json, executed_at)
                 VALUES (?, ?, ?, ?)
                 """,

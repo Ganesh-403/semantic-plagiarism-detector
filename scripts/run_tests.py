@@ -30,7 +30,7 @@ def run_tests(args):
     Executes the pytest test suite dynamically based on parsed arguments.
     Enforces coverage thresholds and builds JUnit XML reports.
     """
-    cmd = ["pytest"]
+    cmd = [sys.executable, "-m", "pytest"]
 
     # 1. Scope selection
     if args.unit:
@@ -40,7 +40,7 @@ def run_tests(args):
 
     # 2. Parallel execution
     if getattr(args, "parallel", False):
-        cmd.extend(["-n", "auto"])
+        cmd.extend(["-n", "2", "--dist=loadscope"])
 
     # 3. Coverage flags
     if getattr(args, "coverage", False) or args.enforce_coverage:

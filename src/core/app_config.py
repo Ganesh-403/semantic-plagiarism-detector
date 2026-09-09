@@ -67,6 +67,9 @@ logger = logging.getLogger(__name__)
 # process that imports this module.
 
 _REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
+# Keep persistent state separate from the checkout when hosting or testing.
+_STATE_ROOT: Final[Path] = Path(os.getenv("SPD_STATE_DIR", str(_REPO_ROOT))).resolve()
+_STATE_ROOT.mkdir(parents=True, exist_ok=True)
 
 # ─── Environment & Secrets Validation (Issue #3748) ────────────────────────
 APP_ENV: Final[str] = os.getenv("APP_ENV", "development").strip().lower()
@@ -236,24 +239,24 @@ SUPPORTED_OCR_LANGUAGES = {
 # Primary corpus DB.  Lives under ``<repo>/data/corpus.db`` – this matches the
 # original resolution used by ``src/db/corpus_db.py`` (and incidentally by
 # ``src/db/incidents.py`` and ``src/db/translation_cache.py``).
-CORPUS_DB_PATH: Final[Path] = _REPO_ROOT / "data" / "corpus.db"
+CORPUS_DB_PATH: Final[Path] = _STATE_ROOT / "data" / "corpus.db"
 
 # Auth DB.  Lives directly at the repo root (``<repo>/users.db``) – this
 # matches the original resolution used by ``src/db/auth.py``.
-AUTH_DB_PATH: Final[Path] = _REPO_ROOT / "users.db"
+AUTH_DB_PATH: Final[Path] = _STATE_ROOT / "users.db"
 
 # FAISS index file.  Lives directly at the repo root (``<repo>/corpus.index``)
 # – this matches the original resolution used by ``app/streamlit_app.py``,
 # ``src/api/app.py`` and ``src/utils/mock_data.py``.  (``src/cli.py``
 # previously resolved it to ``<repo>/src/corpus.index``, which was a latent
 # bug; centralizing it here fixes that drift.)
-FAISS_INDEX_PATH: Final[Path] = _REPO_ROOT / "corpus.index"
+FAISS_INDEX_PATH: Final[Path] = _STATE_ROOT / "corpus.index"
 
 # ─── Base directory constants (issue #3743) ────────────────────────────────
 # Centralized so modules stop independently computing paths like
 # ``Path(__file__).parent.parent / "data"``, which risks drifting if a file
 # is ever moved to a different depth in the tree.
-DATA_DIR: Final[Path] = _REPO_ROOT / "data"
+DATA_DIR: Final[Path] = _STATE_ROOT / "data"
 LOGS_DIR: Final[Path] = _REPO_ROOT / "logs"
 MODELS_DIR: Final[Path] = _REPO_ROOT / "models"
 
@@ -575,12 +578,12 @@ def print_startup_config_summary() -> None:
     """
     # 1. Harvest environmental parameters with standard defaults
     config_data = {
-        "AI Model Architecture": os.getenv("AI_MODEL_NAME", "llama-3-8b-instruct"),
-        "Execution Device": os.getenv("COMPUTE_DEVICE", "cuda (GPU)"),
-        "Database Storage Path": os.getenv("DATABASE_URL", "sqlite:///./production.db"),
-        "Cache Infrastructure": os.getenv("CACHE_MODE", "Redis_Cluster"),
-        "System Secret (JWT)": mask_credential(os.getenv("JWT_SECRET_KEY", "super_secret_jwt_sign_token")),
-        "DB Password Profile": mask_credential(os.getenv("DB_PASSWORD", "admin_root_pass_2026"))
+        "AI Model Architecture": os.getenv("SEMANTIC_PLAGIARISM_MODEL", "paraphrase-multilingual-MiniLM-L12-v2"),
+        "Execution Device": os.getenv("COMPUTE_DEVICE", "auto"),
+        "Database Storage Path": str(CORPUS_DB_PATH),
+        "Cache Infrastructure": os.getenv("CACHE_MODE", "optional Redis with in-process fallback"),
+        "System Secret (JWT)": mask_credential(os.getenv("JWT_SECRET_KEY")),
+        "DB Password Profile": mask_credential(os.getenv("DB_PASSWORD"))
     }
 
     # 2. Build a scannable text-based layout grid without third-party dependencies

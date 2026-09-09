@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from src.api.middleware import get_current_user_any
+
 import logging
 from typing import Optional
 
@@ -42,7 +44,7 @@ async def create_batch_run(
     request: Request,
     threshold: float = Query(0.75, ge=0.0, le=1.0, description="Similarity threshold"),
     trigger: str = Query("manual", description="Trigger source"),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Start a new batch analysis run."""
     try:
@@ -87,7 +89,7 @@ async def list_batch_runs(
     end_date: Optional[str] = Query(None, description="ISO end date"),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """List batch analysis runs with filtering and pagination."""
     try:
@@ -134,7 +136,7 @@ async def list_batch_runs(
 async def get_batch_run_detail(
     run_id: int,
     request: Request,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """Retrieve detailed information about a specific batch run including its documents."""
     try:
@@ -177,7 +179,7 @@ async def complete_batch_run(
     avg_similarity: float = Query(0.0),
     max_similarity: float = Query(0.0),
     duration_ms: int = Query(0),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Mark a batch run as completed with summary statistics."""
     try:
@@ -239,7 +241,7 @@ async def fail_batch_run(
     run_id: int,
     request: Request,
     error_message: str = Query("Unknown error"),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Mark a batch run as failed."""
     try:
@@ -326,7 +328,7 @@ async def add_batch_document(
     similarity_score: float = Query(0.0, description="Similarity score"),
     severity: str = Query("none", description="Severity level"),
     flagged: bool = Query(False, description="Whether flagged as plagiarized"),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Add a document result to an existing batch run."""
     try:
@@ -382,7 +384,7 @@ async def get_timeline(
     severity: Optional[str] = Query(None, description="Filter by severity"),
     start_date: Optional[str] = Query(None, description="ISO start date"),
     limit: int = Query(50, ge=1, le=200),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """Retrieve the audit trail timeline events."""
     try:
@@ -419,7 +421,7 @@ async def get_alerts(
     request: Request,
     is_read: Optional[bool] = Query(None, description="Filter by read status"),
     limit: int = Query(50, ge=1, le=200),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """Retrieve alerts with optional read-status filter."""
     try:
@@ -439,7 +441,7 @@ async def get_alerts(
 )
 async def mark_all_alerts_read(
     request: Request,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Mark all unread alerts as read."""
     try:
@@ -459,7 +461,7 @@ async def mark_all_alerts_read(
 )
 async def get_unread_alert_count(
     request: Request,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """Get the count of unread alerts."""
     try:
@@ -488,7 +490,7 @@ async def get_unread_alert_count(
 )
 async def get_summary(
     request: Request,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """Get high-level summary statistics for all batch runs."""
     try:
@@ -513,7 +515,7 @@ async def get_summary(
 async def get_trends(
     request: Request,
     days: int = Query(30, ge=1, le=365, description="Number of days"),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """Get daily trend data for the last N days."""
     try:
@@ -537,7 +539,7 @@ async def get_trends(
 async def get_severity_distribution(
     request: Request,
     run_id: Optional[int] = Query(None, description="Filter by specific run"),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """Get the severity distribution across document results."""
     try:

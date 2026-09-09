@@ -48,11 +48,11 @@ def render_stylometric_card(match: Dict[str, Any]) -> str:
                 {status_text} ({confidence}% Conf)
             </span>
         </div>
-        
+
         <h4 style="color: white; font-weight: 900; margin: 0 0 8px 0;">
             Query Doc: {match.get("query_document_id")} ↔ Candidate Doc: {match.get("candidate_document_id")}
         </h4>
-        
+
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;">
             <div style="background: rgba(2, 6, 23, 0.6); padding: 12px; border-radius: 12px; border: 1px solid rgba(30, 41, 59, 1);">
                 <span style="color: #94A3B8; font-size: 11px;">Stylometric Distance:</span>
@@ -65,7 +65,10 @@ def render_stylometric_card(match: Dict[str, Any]) -> str:
         </div>
     </div>
     """
-    Renders interactive Streamlit UI widgets for writeprint metrics,
+
+
+class StylometricAuthorCard:
+    """Renders interactive Streamlit UI widgets for writeprint metrics,
     vocabulary richness metrics, and authorship classification scores.
     """
 

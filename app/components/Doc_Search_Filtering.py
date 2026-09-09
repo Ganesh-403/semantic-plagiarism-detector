@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+import uuid
+from app.components.collaboration_system import initialize_review_system
 # ───────────────────────────────────────────────────────────────────────────────
 # ── SECTION: ADVANCED DOCUMENT SEARCH & SMART FILTERING (Issue #1987) ──────
 # ───────────────────────────────────────────────────────────────────────────────
@@ -532,13 +535,13 @@ def render_search_bar(search_engine: SearchEngine):
         - Use `AND`, `OR`, `NOT` between terms: `plagiarism AND detection`
         - Use quotes for exact phrases: `"semantic similarity"`
         - Exclude terms with `-`: `-citations`
-        
+
         **Field Search:**
         - `author:"John Doe"` - Search by author
         - `date:>2024-01-01` - Search by date
         - `similarity:>0.7` - Search by similarity score
         - `tags:research` - Search by tags
-        
+
         **Examples:**
         - `"machine learning" OR "deep learning"`
         - `author:Smith AND date:>2024-01-01`

@@ -7,6 +7,10 @@ Supports incremental index updates (Issue #3913).
 
 import logging
 import os
+import threading
+import tempfile
+from functools import wraps
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 # FAISS has no official type stubs; suppress Pylance false positives
@@ -23,6 +27,18 @@ from src.core.metrics import faiss_vectors_gauge
 from src.core.text_chunking import ChunkString
 
 logger = logging.getLogger(__name__)
+
+_INDEX_LOCK = threading.RLock()
+
+
+def _locked(operation):
+    """Serialize FAISS calls and their associated registry changes."""
+    @wraps(operation)
+    def guarded(*args, **kwargs):
+        with _INDEX_LOCK:
+            return operation(*args, **kwargs)
+    return guarded
+
 
 # ── Threshold for automatic index selection ────────────────────────────────────
 _IVF_THRESHOLD = 5_000  # Switch from flat to IVF when vectors exceed this
@@ -81,6 +97,7 @@ class FaissIndexManager:
             self.index = None
 
     @property
+    @_locked
     def total_vectors(self) -> int:
         """Return the total number of vectors in the index, or 0 if uninitialized."""
         if self.index is None:
@@ -92,6 +109,7 @@ class FaissIndexManager:
         """Alias for total_vectors returning the underlying index.ntotal or 0."""
         return self.total_vectors
 
+    @_locked
     def add(
         self,
         vectors: Any,
@@ -116,9 +134,15 @@ class FaissIndexManager:
         norms = np.linalg.norm(arr, axis=1, keepdims=True)
         norms = np.where(norms == 0, 1.0, norms)
         arr = arr / norms
-        self.index.add(arr)
+        if isinstance(self.index, faiss.IndexIDMap):
+            ids = faiss.vector_to_array(self.index.id_map)
+            first_id = int(ids.max()) + 1 if len(ids) else 0
+            self.index.add_with_ids(arr, np.arange(first_id, first_id + len(arr), dtype=np.int64))
+        else:
+            self.index.add(arr)
         faiss_vectors_gauge.set(self.total_vectors)
 
+    @_locked
     def search(
         self,
         query: Any,
@@ -151,6 +175,7 @@ class FaissIndexManager:
 
 FAISSIndex = FaissIndexManager
 
+@_locked
 def build_index(
     embeddings: dict[str, np.ndarray],
     chunked_docs: dict[str, list[str]],
@@ -257,6 +282,7 @@ def build_index(
     return index, registry
 
 
+@_locked
 def search_similar_chunks(
     query_embedding: np.ndarray,
     index: faiss.Index,
@@ -311,6 +337,7 @@ def search_similar_chunks(
     return results
 
 
+@_locked
 def search_batch_vectors(
     query_matrix: np.ndarray,
     index: faiss.Index,
@@ -348,6 +375,7 @@ def search_batch_vectors(
     return distances, indices
 
 
+@_locked
 def search_index(
     query_vectors: np.ndarray | list[list[float]] | list[float],
     index: Optional[faiss.Index] = None,
@@ -444,6 +472,7 @@ def search_index(
     return matches[:top_k]
 
 
+@_locked
 def find_plagiarised_chunks(
     embeddings: dict[str, np.ndarray],
     chunked_docs: dict[str, list[str]],
@@ -508,11 +537,13 @@ def find_plagiarised_chunks(
     return matches
 
 
+@_locked
 def add_to_index(
     index: faiss.Index,
     registry: list[ChunkRecord],
     embeddings: dict[str, np.ndarray],
     chunked_docs: dict[str, list[str]],
+    auto_save: bool = True,
 ) -> tuple[faiss.Index, list[ChunkRecord]]:
     """
     Incrementally add new chunk vectors to an existing FAISS index without a full rebuild.
@@ -564,7 +595,12 @@ def add_to_index(
 
     # Wrap bare index with IndexIDMap on first incremental add
     if not isinstance(index, faiss.IndexIDMap):
-        index = faiss.IndexIDMap(index)
+        # IndexIDMap can only wrap an empty index. Preserve existing vectors.
+        existing = index.reconstruct_n(0, index.ntotal)
+        base = faiss.IndexFlatIP(index.d)
+        index = faiss.IndexIDMap(base)
+        if len(existing):
+            index.add_with_ids(existing, np.arange(len(existing), dtype=np.int64))
 
     index.add_with_ids(matrix, ids)
     logger.info(
@@ -572,9 +608,13 @@ def add_to_index(
         f"(total: {index.ntotal})"
     )
     faiss_vectors_gauge.set(index.ntotal)
+    if auto_save:
+        from src.core.app_config import FAISS_INDEX_PATH
+        save_index(index, str(FAISS_INDEX_PATH))
     return index, registry + new_registry
 
 
+@_locked
 def remove_vectors_by_doc(
     index: faiss.Index,
     registry: list[ChunkRecord],
@@ -639,6 +679,7 @@ def remove_vectors_by_doc(
     return index, updated_registry
 
 
+@_locked
 def compact_index(
     index: faiss.Index,
     registry: list[ChunkRecord],
@@ -671,6 +712,7 @@ def compact_index(
     return new_index, registry
 
 
+@_locked
 def remove_document_from_index(
     index: faiss.Index,
     registry: list[ChunkRecord],
@@ -797,9 +839,19 @@ def remove_document_from_index(
     return new_index, pruned_registry
 
 
+@_locked
 def save_index(index: faiss.Index, path: str) -> None:
     """Persist a FAISS index to disk with restrictive file permissions (0o600)."""
-    faiss.write_index(index, path)
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=destination.name + ".", suffix=".tmp", dir=destination.parent)
+    os.close(fd)
+    try:
+        faiss.write_index(index, temporary)
+        os.replace(temporary, destination)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
     try:
         os.chmod(path, 0o600)
     except OSError:
@@ -807,6 +859,7 @@ def save_index(index: faiss.Index, path: str) -> None:
     logger.info(f"[faiss_index] Index saved → {path}  ({index.ntotal} vectors)")
 
 
+@_locked
 def load_index(path: str) -> faiss.Index:
     """Load a FAISS index from disk."""
     index = faiss.read_index(path)
@@ -814,6 +867,7 @@ def load_index(path: str) -> faiss.Index:
     return index
 
 
+@_locked
 def build_index_from_matrix(
     matrix: np.ndarray,
     index_type: str = "auto",
@@ -904,6 +958,7 @@ def build_index_from_matrix(
     return index
 
 
+@_locked
 def validate_index(
     index: Optional[faiss.Index], expected_count: int, expected_dimension: int = 384
 ) -> bool:
@@ -916,6 +971,7 @@ def validate_index(
         return False
 
 
+@_locked
 def load_or_rebuild_index(filepath: str) -> tuple[faiss.Index, list[ChunkRecord], bool]:
     """
     Load a FAISS index from disk if valid, otherwise rebuild it from corpus.db.
@@ -1024,6 +1080,7 @@ def load_or_rebuild_index(filepath: str) -> tuple[faiss.Index, list[ChunkRecord]
 # ── FAISS Index Optimization Helper (Issue #1354) ───────────────────────────
 
 
+@_locked
 def optimize_faiss_index(index_manager: Any, nlist: int = 100) -> bool:
     """Optimize FAISS index structures by converting flat index to trained IVF quantizer.
 
@@ -1100,6 +1157,7 @@ def optimize_faiss_index(index_manager: Any, nlist: int = 100) -> bool:
 # ── FAISS Memory Footprint Helper (Issue #1563) ───────────────────────────────
 
 
+@_locked
 def get_faiss_index_memory_bytes(index: Optional[Any] = None) -> int:
     """Calculate the RAM memory footprint of a FAISS vector index in bytes.
 
@@ -1145,6 +1203,7 @@ def get_faiss_index_memory_bytes(index: Optional[Any] = None) -> int:
         return 0
 
 
+@_locked
 def format_faiss_memory_badge(index: Optional[Any] = None) -> str:
     """Format the FAISS vector index memory footprint badge text for display.
 
@@ -1176,6 +1235,7 @@ def format_faiss_memory_badge(index: Optional[Any] = None) -> str:
     return f"FAISS Memory: {mb_val:.1f} MB"
 
 
+@_locked
 def add_vectors_incremental(
     index: Any,
     embeddings: List[Any],
@@ -1226,6 +1286,7 @@ def add_vectors_incremental(
     return index, vector_ids
 
 
+@_locked
 def remove_vectors_incremental(
     index: Any,
     vector_ids: List[int],
@@ -1298,6 +1359,7 @@ def remove_vectors_incremental(
     return new_index
 
 
+@_locked
 def get_index_consistency_status(
     index: Any,
     metadata_manager: Optional[FAISSIndexMetadata] = None,
@@ -1332,6 +1394,7 @@ def get_index_consistency_status(
     return status
 
 
+@_locked
 def rebuild_index_from_db(
     db_path: Optional[Any] = None,
     index_path: Optional[Any] = None,
@@ -1404,4 +1467,3 @@ def rebuild_index_from_db(
 
 
 rebuild_index_from_database = rebuild_index_from_db
-

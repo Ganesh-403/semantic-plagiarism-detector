@@ -2,7 +2,7 @@ import hashlib
 import os
 
 import streamlit as st
-from streamlit.web.server.websocket_headers import _get_websocket_headers
+
 
 
 def get_client_fingerprint() -> str:
@@ -10,7 +10,7 @@ def get_client_fingerprint() -> str:
     Extracts browser context signatures securely from incoming WebSocket request headers.
     Falls back to environment attributes if headers are dropped by proxies.
     """
-    headers = _get_websocket_headers() or {}
+    headers = st.context.headers
 
     # 1. Resolve Remote Client IP address (accounting for Reverse Proxy routing headers)
     ip_address = (

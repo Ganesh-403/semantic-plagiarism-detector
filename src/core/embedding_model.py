@@ -38,6 +38,7 @@ from typing import Callable, Dict, List, Optional
 
 import numpy as np
 import torch
+import psutil
 import torch.quantization
 from sentence_transformers import SentenceTransformer
 
@@ -54,6 +55,7 @@ except ImportError:
 
 # ── Singleton model loader ─────────────────────────────────────────────────────
 _DEFAULT_MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
+_active_model_name: str | None = None
 _model: SentenceTransformer | None = None
 _quantized_model: SentenceTransformer | None = None
 _model_lock = threading.Lock()
@@ -207,7 +209,7 @@ def get_embedding_model_info() -> tuple[str, int]:
     Return the active embedding model name and embedding dimension.
     """
     model = _get_model()
-    return _get_model_name(), model.get_sentence_embedding_dimension()
+    return _active_model_name or _get_model_name(), model.get_sentence_embedding_dimension()
 
 
 def is_quantization_enabled() -> bool:
@@ -272,7 +274,7 @@ class EmbeddingModelManager:
         return cls._instance
 
     def get_model(self) -> SentenceTransformer:
-        global _model, _quantized_model
+        global _model, _quantized_model, _active_model_name
 
         if self.quantize_model:
             if _quantized_model is not None:
@@ -291,6 +293,12 @@ class EmbeddingModelManager:
 
             primary = _get_model_name()
             fallback = os.getenv("SEMANTIC_PLAGIARISM_FALLBACK_MODEL", "all-MiniLM-L6-v2")
+            try:
+                if psutil.virtual_memory().available < 1.5 * 1024**3 and primary != "all-MiniLM-L6-v2":
+                    logger.warning("Available RAM is below 1.5 GiB; using all-MiniLM-L6-v2 (English only).")
+                    primary = "all-MiniLM-L6-v2"
+            except (OSError, AttributeError):
+                logger.debug("Could not determine available memory", exc_info=True)
             cache_dir = _get_cache_dir()
             logger.info(f"[embedding_model] Loading model: {primary} ...")
             logger.info(
@@ -305,11 +313,12 @@ class EmbeddingModelManager:
                     logger.info("[embedding_model] optimum[onnxruntime] detected. Enabling ONNX backend for 2x-3x CPU speedup.")
 
                 loaded_model = SentenceTransformer(primary, cache_folder=cache_dir, **kwargs)
+                _active_model_name = primary
                 device = _detect_device(loaded_model)
                 logger.info(
-                    "Initialized Embedding Model: %s | Dimensions: %d | Target Device: %s",
+                    "Initialized Embedding Model: %s | Dimensions: %s | Target Device: %s",
                     primary,
-                    loaded_model.get_sentence_embedding_dimension(),
+                    getattr(loaded_model, "get_sentence_embedding_dimension", lambda: "unknown")(),
                     device,
                 )
                 logger.info("[embedding_model] Model loaded successfully.")
@@ -341,11 +350,12 @@ class EmbeddingModelManager:
                         "--local-dir /opt/models/all-MiniLM-L6-v2`. "
                         f"Primary error: {primary_exc!r}; fallback error: {fallback_exc!r}"
                     ) from fallback_exc
+                _active_model_name = fallback
                 device = _detect_device(loaded_model)
                 logger.info(
-                    "Initialized Fallback Embedding Model: %s | Dimensions: %d | Target Device: %s",
+                    "Initialized Fallback Embedding Model: %s | Dimensions: %s | Target Device: %s",
                     fallback,
-                    loaded_model.get_sentence_embedding_dimension(),
+                    getattr(loaded_model, "get_sentence_embedding_dimension", lambda: "unknown")(),
                     device,
                 )
 
@@ -627,8 +637,7 @@ def embed_documents(
     doc_names: list[str] = []
 
     # Initialize all documents with empty arrays to ensure consistent return types
-    model = _get_model()
-    embedding_dimension = model.get_sentence_embedding_dimension()
+    embedding_dimension = 384
 
     for doc_name in chunked_docs.keys():
         embeddings[doc_name] = np.empty(
@@ -648,6 +657,9 @@ def embed_documents(
 
     if not all_chunks:
         logger.info("[embedding_model] No chunks to embed across all documents.")
+        if embeddings:
+            empty = embed_chunks([])
+            return {name: empty.copy() for name in embeddings}
         return embeddings
 
     effective_batch_size = (
@@ -664,6 +676,10 @@ def embed_documents(
     # Call embed_chunks once for the entire flattened batch of chunks
     # embed_chunks handles the internal mini-batching for memory optimization
     all_embeddings = embed_chunks(all_chunks, batch_size=batch_size)
+
+    for name, values in embeddings.items():
+        if values.shape[0] == 0:
+            embeddings[name] = np.empty((0, all_embeddings.shape[1]), dtype=np.float32)
 
     # Map the combined embeddings back to the original documents
     start_idx = 0

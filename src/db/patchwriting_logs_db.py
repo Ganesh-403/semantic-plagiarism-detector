@@ -17,7 +17,9 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/patchwriting_logs.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "patchwriting_logs.db"
 
 
 @contextmanager
@@ -52,12 +54,12 @@ def initialize_patchwriting_db(db_path: Optional[Path] = None) -> None:
                 created_at TEXT NOT NULL
             )
         """)
-        
+
         conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_patchwriting_docs 
+            CREATE INDEX IF NOT EXISTS idx_patchwriting_docs
             ON patchwriting_logs(document_a_id, document_b_id)
         """)
-        
+
     logger.info("Patchwriting logs database initialized at %s", db_path or DEFAULT_DB_PATH)
 
 
@@ -74,7 +76,7 @@ def log_patchwriting_detection(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO patchwriting_logs 
+                INSERT INTO patchwriting_logs
                 (document_a_id, document_b_id, syntactic_jaccard, ngram_overlap, is_flagged, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
@@ -93,7 +95,7 @@ from datetime import datetime
 
 class PatchwritingLogsDB:
     """
-    Logs detected structural clones and the specific POS patterns matched 
+    Logs detected structural clones and the specific POS patterns matched
     during mosaic plagiarism detection scans.
     """
     def __init__(self):

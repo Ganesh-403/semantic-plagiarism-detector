@@ -50,6 +50,8 @@ from src.core.embedding_model import embed_chunks  # noqa: E402
 logger = logging.getLogger(__name__)
 
 # ── Constants ──────────────────────────────────────────────────────────────
+import os
+
 RESULTS_DIR = Path(__file__).parent / "results"
 DEFAULT_THRESHOLD = float(os.getenv("DETECTION_THRESHOLD", "0.75"))
 REGRESSION_THRESHOLD = float(os.getenv("REGRESSION_THRESHOLD", "0.10"))

@@ -46,7 +46,10 @@ logger = logging.getLogger(__name__)
 DetectorFactory.seed = 0
 
 ENGLISH_CODES = {"en"}
-MIN_DETECTION_CHARACTERS = 20
+try:
+    MIN_DETECTION_CHARACTERS = max(0, int(os.getenv("MIN_LANGUAGE_DETECTION_CHARS", "20")))
+except ValueError:
+    MIN_DETECTION_CHARACTERS = 20
 
 # Target language for back-translation (primary corpus language)
 TARGET_LANGUAGE = "en"
@@ -103,6 +106,9 @@ def detect_chunk_language(text: str) -> str:
         ISO 639-1 language code (e.g., 'es', 'fr', 'zh') or 'en' as default.
     """
     if not text or not isinstance(text, str):
+        return TARGET_LANGUAGE
+
+    if len(text.strip()) < MIN_DETECTION_CHARACTERS:
         return TARGET_LANGUAGE
 
     # Generate SHA-256 hash for cache key
@@ -421,7 +427,10 @@ def verify_semantic_fidelity(
     cosine_sim = np.dot(vec_a, vec_b) / (norm_a * norm_b)
     if not np.isfinite(cosine_sim):
         return 0.0
-    return float(np.clip(cosine_sim, 0.0, 1.0))
+    score = float(np.clip(cosine_sim, 0.0, 1.0))
+    if score < 0.60:
+        logger.warning("Low semantic fidelity after translation: %.3f (threshold 0.60)", score)
+    return score
 
 
 # ── In-Memory Translation Cache (Original) ───────────────────────────────────

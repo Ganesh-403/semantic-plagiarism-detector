@@ -544,6 +544,20 @@ class ReportGenerator:
         else:
             return "#81c784"
 
+    def _generate_flagged_cases_section(self, data: Dict) -> str:
+        from html import escape
+        rows = data.get("flagged_cases", data.get("flags", []))
+        if not rows:
+            return "<p>No flagged cases.</p>"
+        body = "".join("<tr><td>" + escape(str(row.get("doc_a", ""))) + "</td><td>" +
+                       escape(str(row.get("doc_b", ""))) + "</td><td>" +
+                       escape(str(row.get("similarity", ""))) + "</td></tr>" for row in rows)
+        return '<table><thead><tr><th>Document A</th><th>Document B</th><th>Similarity</th></tr></thead><tbody>' + body + '</tbody></table>'
+
+    def _generate_appendix_section(self, data: Dict) -> str:
+        from html import escape
+        return "<pre>" + escape(json.dumps(data.get("appendix", {}), indent=2, default=str)) + "</pre>"
+
     def _generate_trend_section(self, data: Dict) -> str:
         """Generate trend analysis section"""
         trends = data.get("trends", {})
@@ -658,7 +672,7 @@ class ReportGenerator:
         for action in actions:
             html += f"""
             <li>
-                <strong>{action.get("type", "Action")}</strong> - 
+                <strong>{action.get("type", "Action")}</strong> -
                 {action.get("description", "")}
                 <small>({action.get("timestamp", "")})</small>
             </li>
@@ -1245,3 +1259,6 @@ def integrate_report_generator():
 
 # ── End of Report Generator ───────────────────────────────────────────────
 # ───────────────────────────────────────────────────────────────────────────────
+
+
+AutomaticReportGenerator = ReportGenerator

@@ -134,10 +134,10 @@ class ComplianceCertificate:
     recipient: str
     regulation: Regulation
     issued_at: float
-    expires_at: Optional[float] = None
     status: ComplianceStatus
     certificate_hash: str
     issued_by: str
+    expires_at: Optional[float] = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

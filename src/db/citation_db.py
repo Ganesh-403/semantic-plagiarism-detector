@@ -58,6 +58,9 @@ def _connect(readonly: bool = False):
     except Exception:
         conn.rollback()
         raise
+    finally:
+        conn.close()
+        pool.pop(path, None)
 
 
 def init_citation_db() -> None:

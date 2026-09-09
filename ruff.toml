@@ -1,7 +1,7 @@
-target-version = "py310"
+target-version = "py311"
 
 [lint]
-select = ["E"]
+select = ["E", "F821", "F822", "F823"]
 # E402: Module level import not at top of file
 #   Required because app/streamlit_app.py and evaluation/evaluate.py
 #   modify sys.path before importing project modules.

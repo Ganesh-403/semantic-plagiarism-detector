@@ -34,7 +34,9 @@ _pool_lock = threading.Lock()
 
 import atexit
 
-_DB_PATH: str | os.PathLike = "plagiarism_detector.db"
+from src.core.app_config import _STATE_ROOT
+
+_DB_PATH: str | os.PathLike = _STATE_ROOT / "plagiarism_detector.db"
 
 
 def _cleanup_all_connections() -> None:
@@ -61,7 +63,7 @@ def _pool() -> dict[str, sqlite3.Connection]:
 @contextmanager
 def _connect():
     """Open a pooled connection."""
-    path = os.path.abspath(_DB_PATH)
+    path = os.path.abspath(get_heatmap_db_path())
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
     except (OSError, PermissionError):
@@ -499,3 +501,7 @@ class HeatmapRepository(BaseRepository):
 # ---------------------------------------------------------------------------
 
 heatmap_repo = HeatmapRepository(_DB_PATH)
+
+
+def get_heatmap_db_path() -> str:
+    return os.fspath(_DB_PATH)

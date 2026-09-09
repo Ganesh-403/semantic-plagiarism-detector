@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import os
 from typing import Any, Optional
+from contextlib import contextmanager
 
 try:
     from opentelemetry import trace
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
     from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter
@@ -19,6 +20,19 @@ except ImportError:
     trace = None
     TracerProvider = Any
     SpanExporter = Any
+
+class _NoOpSpan:
+    def set_attribute(self, *args, **kwargs):
+        pass
+    def record_exception(self, *args, **kwargs):
+        pass
+    def set_status(self, *args, **kwargs):
+        pass
+
+class _NoOpTracer:
+    @contextmanager
+    def start_as_current_span(self, *args, **kwargs):
+        yield _NoOpSpan()
 
 _tracer_provider: Optional[Any] = None
 _initialized = False
@@ -56,7 +70,7 @@ def init_tracer_provider(exporter: Optional[Any] = None) -> Any:
 def get_tracer(name: str = "semantic-plagiarism.detector") -> Any:
     """Get an OpenTelemetry tracer instance lazily."""
     if not HAS_OPENTELEMETRY:
-        return None
+        return _NoOpTracer()
     if not _tracer_provider:
         init_tracer_provider()
     return trace.get_tracer(name)

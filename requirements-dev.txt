@@ -1,9 +1,20 @@
-# ── Development & Code Quality ─────────────────────────────────────────────────
-# Development-only dependencies: linters, formatters, and git hooks. Install
-# with `pip install -r requirements-dev.txt`. Not needed for deployment.
-ruff>=0.16.5
-pylint>=3.0.0
-black>=24.1.0
-isort>=5.13.0
-pre-commit>=3.6.0
-pytest-xdist>=3.5.0
+# Install alongside requirements.txt (or requirements-no-torch.txt for unit tests).
+ruff==0.16.5
+mypy>=1.10
+pre-commit>=4.0
+pytest>=8.0
+pytest-cov>=5.0
+pytest-xdist>=3.5
+pytest-asyncio>=0.24
+pytest-env>=1.1
+hypothesis>=6.100
+jsonschema>=4.20
+responses>=0.25
+fakeredis>=2.23
+pyfakefs>=5.4
+yamllint>=1.35
+pip-audit>=2.7
+
+pygit2>=1.17
+web3>=7
+pytest-mock>=3.14

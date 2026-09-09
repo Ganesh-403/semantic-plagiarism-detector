@@ -38,6 +38,8 @@ async def stream_upload_file_to_disk(
         HTTPException 400: If uploaded file is empty (0 bytes).
         HTTPException 413: If total size exceeds max_bytes during chunk streaming.
     """
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be positive")
     effective_max_bytes = (
         max_bytes
         if max_bytes is not None
@@ -93,6 +95,10 @@ async def stream_upload_file_to_disk(
         return temp_path
 
     except HTTPException:
+        try:
+            temp_file.close()
+        except Exception:
+            pass
         if os.path.exists(temp_path):
             try:
                 os.unlink(temp_path)
@@ -100,6 +106,10 @@ async def stream_upload_file_to_disk(
                 pass
         raise
     except Exception as exc:
+        try:
+            temp_file.close()
+        except Exception:
+            pass
         if os.path.exists(temp_path):
             try:
                 os.unlink(temp_path)

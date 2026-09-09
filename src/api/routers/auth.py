@@ -34,6 +34,7 @@ from src.api.dependencies import limiter
 from src.api.schemas import (
     ErrorResponse,
     LoginResponse,
+    LoginRequest,
     RefreshRequest,
     RevokeRequest,
     RevokeResponse,
@@ -92,9 +93,50 @@ def generate_totp_qr_code_data_uri(otpauth_url: str) -> str:
     },
 )
 @limiter.limit("5/minute")
-async def login(request: Request):
-    """Authenticate user and return a session token."""
-    return {"token": "dummy-token"}  # nosec B105
+async def login(request: Request, payload: LoginRequest):
+    """Authenticate credentials and 2FA before issuing signed access/refresh tokens."""
+    from datetime import datetime, timedelta, timezone
+    from starlette.concurrency import run_in_threadpool
+    from src.db.auth import verify_user, get_user_role, get_2fa_status
+    from src.security.jwt_utils import create_access_token, create_refresh_token
+
+    username = payload.username.strip().lower()
+    result = await run_in_threadpool(
+        verify_user, username, payload.password, return_details=True
+    )
+    if not result.get("authenticated"):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    enabled, secret = get_2fa_status(username)
+    if enabled and (
+        not secret
+        or not payload.otp_code
+        or not pyotp.TOTP(secret).verify(payload.otp_code)
+    ):
+        raise HTTPException(
+            status_code=401, detail="A valid two-factor code is required"
+        )
+    if result.get("must_change_password") or result.get("password_expired"):
+        raise HTTPException(
+            status_code=403,
+            detail="Change your password in the dashboard before using the API",
+        )
+    role = get_user_role(username)
+    scopes = ["read", "viewer"]
+    if role in {"admin", "teacher", "analyst"}:
+        scopes += ["write", "scan", "analyst"]
+    if role == "admin":
+        scopes.append("admin")
+    access_token = create_access_token(sub=username, scopes=scopes, expires_in=3600)
+    return {
+        "token": access_token,
+        "access_token": access_token,
+        "refresh_token": create_refresh_token(sub=username, scopes=scopes),
+        "token_type": "bearer",
+        "expires_in": 3600,
+        "expires_at": (
+            datetime.now(timezone.utc) + timedelta(seconds=3600)
+        ).isoformat(),
+    }
 
 
 @router.post(
@@ -162,8 +204,12 @@ async def refresh_token_endpoint(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    sub = token_payload.get("sub", "user")
-    scopes = token_payload.get("scopes", ["read", "write"])
+    from src.db.auth import is_token_revoked, is_user_active
+
+    sub = token_payload.get("sub")
+    if not sub or is_token_revoked(refresh_token) or not is_user_active(sub):
+        raise HTTPException(status_code=401, detail="Refresh token is no longer valid")
+    scopes = token_payload.get("scopes", [])
     new_access_token = create_access_token(sub=sub, scopes=scopes, expires_in=3600)
 
     return {
@@ -249,62 +295,36 @@ async def revoke_token_endpoint(
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
+@limiter.limit("5/minute")
 async def setup_two_factor_auth_endpoint(
-    request: Request,
-    payload: TwoFactorSetupRequest | None = None,
+    request: Request, payload: TwoFactorSetupRequest
 ):
-    """
-    Initialize TOTP 2FA setup for a user or admin.
-    Generates a Base32 TOTP secret, otpauth:// URL, and a base64-encoded PNG QR code data URI
-    suitable for instant scanning in Google Authenticator or Authy.
-    """
-    username = None
-    issuer = "SemanticPlagiarismDetector"
+    """Enroll the credential owner without exposing an existing second-factor secret."""
+    from starlette.concurrency import run_in_threadpool
+    from src.db.auth import enable_2fa, get_2fa_status, verify_user
 
-    if payload:
-        username = payload.username
-        if payload.issuer:
-            issuer = payload.issuer
-
-    if not username:
-        try:
-            body = await request.json()
-            if isinstance(body, dict):
-                username = body.get("username")
-                if body.get("issuer"):
-                    issuer = body.get("issuer")
-        except Exception:
-            logger.debug("Failed to parse request payload")
-
-    if not username:
-        username = "admin"
-
-    try:
-        from src.db.auth import enable_2fa, get_2fa_status, init_db
-
-        init_db()
-        enabled, existing_secret = get_2fa_status(username)
-        secret = existing_secret or pyotp.random_base32()
-
-        enable_2fa(username, secret)
-
-        totp = pyotp.TOTP(secret)
-        otpauth_url = totp.provisioning_uri(name=username, issuer_name=issuer)
-        qr_code_data_uri = generate_totp_qr_code_data_uri(otpauth_url)
-
-        return {
-            "secret": secret,
-            "otpauth_url": otpauth_url,
-            "qr_code_data_uri": qr_code_data_uri,
-            "message": "2FA setup initialized successfully. Scan QR code in Google Authenticator or Authy.",
-        }
-    except Exception as e:
-        logger.error("Failed to initialize 2FA setup for user %s: %s", username, e)
+    username = payload.username.strip().lower()
+    if not await run_in_threadpool(verify_user, username, payload.password):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    enabled, existing_secret = get_2fa_status(username)
+    if enabled or existing_secret:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to initialize 2FA setup: {str(e)}",
+            status_code=409,
+            detail="2FA is already configured; disable it with your current code before reenrolling",
         )
-
+    secret = pyotp.random_base32()
+    enable_2fa(username, secret)
+    if get_2fa_status(username) != (True, secret):
+        raise HTTPException(status_code=500, detail="Unable to configure 2FA")
+    otpauth_url = pyotp.TOTP(secret).provisioning_uri(
+        name=username, issuer_name=payload.issuer or "SemanticPlagiarismDetector"
+    )
+    return {
+        "secret": secret,
+        "otpauth_url": otpauth_url,
+        "qr_code_data_uri": generate_totp_qr_code_data_uri(otpauth_url),
+        "message": "2FA enabled. Scan this QR code now and store the secret securely.",
+    }
 
 
 # ============================================================================
@@ -322,21 +342,30 @@ import uuid
 import hashlib
 import hmac
 
+
 class Enterprise2FAValidationException(Exception):
     """Base exception for all enterprise 2FA validation errors."""
+
     pass
+
 
 class AuthenticationChallengeFailedException(Enterprise2FAValidationException):
     """Raised when the primary authentication challenge (password) fails."""
+
     pass
+
 
 class TokenValidationFailedException(Enterprise2FAValidationException):
     """Raised when the secondary authentication challenge (OTP) fails."""
+
     pass
+
 
 class TwoFactorNotConfiguredException(Enterprise2FAValidationException):
     """Raised when 2FA operations are attempted on a non-configured account."""
+
     pass
+
 
 class IEnterpriseTwoFactorValidator(abc.ABC):
     """
@@ -344,53 +373,69 @@ class IEnterpriseTwoFactorValidator(abc.ABC):
     validators. Future implementations may support WebAuthn, SMS, Email,
     or push notifications alongside TOTP.
     """
-    
+
     @abc.abstractmethod
     def validate_primary_credential(self, username: str, credential: str) -> bool:
         """Validates the primary user credential (typically a password)."""
         pass
-        
+
     @abc.abstractmethod
-    def validate_secondary_credential(self, username: str, secret: str, token: str) -> bool:
+    def validate_secondary_credential(
+        self, username: str, secret: str, token: str
+    ) -> bool:
         """Validates the secondary user credential (typically a TOTP token)."""
         pass
+
 
 class EnterpriseTOTPValidatorStrategy(IEnterpriseTwoFactorValidator):
     """
     Concrete implementation of the 2FA validator strategy using Time-based
     One-Time Passwords (TOTP). This ensures strict adherence to RFC 6238.
     """
-    
+
     def __init__(self, allowed_time_drift_seconds: int = 30):
         self.allowed_time_drift_seconds = allowed_time_drift_seconds
         self.logger = logging.getLogger(self.__class__.__name__)
-        
+
     def validate_primary_credential(self, username: str, credential: str) -> bool:
         from src.db.auth import authenticate_user
+
         try:
-            self.logger.debug(f"Initiating primary credential validation for user: {username}")
+            self.logger.debug(
+                f"Initiating primary credential validation for user: {username}"
+            )
             auth_result = authenticate_user(username, credential)
             is_valid = auth_result.get("authenticated", False)
             if not is_valid:
-                self.logger.warning(f"Primary credential validation failed for user: {username}")
+                self.logger.warning(
+                    f"Primary credential validation failed for user: {username}"
+                )
             return is_valid
         except Exception as e:
             self.logger.error(f"Error during primary credential validation: {str(e)}")
             return False
 
-    def validate_secondary_credential(self, username: str, secret: str, token: str) -> bool:
+    def validate_secondary_credential(
+        self, username: str, secret: str, token: str
+    ) -> bool:
         import pyotp
+
         try:
-            self.logger.debug(f"Initiating secondary credential (TOTP) validation for user: {username}")
+            self.logger.debug(
+                f"Initiating secondary credential (TOTP) validation for user: {username}"
+            )
             totp = pyotp.TOTP(secret)
             # Standard verification with drift allowance
             is_valid = totp.verify(token)
             if not is_valid:
-                self.logger.warning(f"Secondary credential (TOTP) validation failed for user: {username}")
+                self.logger.warning(
+                    f"Secondary credential (TOTP) validation failed for user: {username}"
+                )
             return is_valid
         except Exception as e:
             self.logger.error(f"Error during secondary credential validation: {str(e)}")
             return False
+
 
 class EnterpriseTwoFactorStateTransitionManager:
     """
@@ -398,69 +443,113 @@ class EnterpriseTwoFactorStateTransitionManager:
     Enforces that state transitions only occur after successful cryptographic
     and credential verification challenges.
     """
-    
+
     def __init__(self, validator_strategy: IEnterpriseTwoFactorValidator):
         self._validator = validator_strategy
         self.logger = logging.getLogger(self.__class__.__name__)
         self._transaction_id = str(uuid.uuid4())
-        
-    def _audit_log_transition(self, username: str, action: str, status: str, details: str = ""):
+
+    def _audit_log_transition(
+        self, username: str, action: str, status: str, details: str = ""
+    ):
         """Internal method to emit audit logs for state transitions."""
         timestamp = time.time()
         self.logger.info(
             f"[{self._transaction_id}] [2FA_TRANSITION] User: {username} | Action: {action} | "
             f"Status: {status} | Timestamp: {timestamp} | Details: {details}"
         )
-        
-    def disable_two_factor_authentication(self, username: str, password: str, otp_token: str) -> bool:
+
+    def disable_two_factor_authentication(
+        self, username: str, password: str, otp_token: str
+    ) -> bool:
         """
         Orchestrates the secure disablement of 2FA.
         Executes a sequence of cryptographic and state-based verifications before
         permitting the mutation of the user's security posture.
         """
         from src.db.auth import get_2fa_status, disable_2fa
-        
-        self.logger.info(f"[{self._transaction_id}] Starting 2FA disablement workflow for user: {username}")
-        
+
+        self.logger.info(
+            f"[{self._transaction_id}] Starting 2FA disablement workflow for user: {username}"
+        )
+
         try:
             # Step 1: Pre-condition check - Verify 2FA is actually enabled
-            self.logger.debug(f"[{self._transaction_id}] Checking 2FA status pre-conditions")
+            self.logger.debug(
+                f"[{self._transaction_id}] Checking 2FA status pre-conditions"
+            )
             enabled, existing_secret = get_2fa_status(username)
             if not enabled or not existing_secret:
-                self._audit_log_transition(username, "DISABLE_2FA", "FAILED", "2FA not configured")
-                raise TwoFactorNotConfiguredException("Cannot disable 2FA: Not currently configured.")
-                
+                self._audit_log_transition(
+                    username, "DISABLE_2FA", "FAILED", "2FA not configured"
+                )
+                raise TwoFactorNotConfiguredException(
+                    "Cannot disable 2FA: Not currently configured."
+                )
+
             # Step 2: Primary Challenge - Password verification
-            self.logger.debug(f"[{self._transaction_id}] Executing primary credential challenge")
+            self.logger.debug(
+                f"[{self._transaction_id}] Executing primary credential challenge"
+            )
             if not self._validator.validate_primary_credential(username, password):
-                self._audit_log_transition(username, "DISABLE_2FA", "FAILED", "Primary authentication rejected")
-                raise AuthenticationChallengeFailedException("Primary credential verification failed.")
-                
+                self._audit_log_transition(
+                    username, "DISABLE_2FA", "FAILED", "Primary authentication rejected"
+                )
+                raise AuthenticationChallengeFailedException(
+                    "Primary credential verification failed."
+                )
+
             # Step 3: Secondary Challenge - TOTP verification
-            self.logger.debug(f"[{self._transaction_id}] Executing secondary credential challenge")
-            if not self._validator.validate_secondary_credential(username, existing_secret, otp_token):
-                self._audit_log_transition(username, "DISABLE_2FA", "FAILED", "Secondary authentication rejected")
-                raise TokenValidationFailedException("Secondary credential verification failed.")
-                
+            self.logger.debug(
+                f"[{self._transaction_id}] Executing secondary credential challenge"
+            )
+            if not self._validator.validate_secondary_credential(
+                username, existing_secret, otp_token
+            ):
+                self._audit_log_transition(
+                    username,
+                    "DISABLE_2FA",
+                    "FAILED",
+                    "Secondary authentication rejected",
+                )
+                raise TokenValidationFailedException(
+                    "Secondary credential verification failed."
+                )
+
             # Step 4: State Mutation - Execute the disablement
-            self.logger.debug(f"[{self._transaction_id}] All challenges passed. Mutating security state.")
+            self.logger.debug(
+                f"[{self._transaction_id}] All challenges passed. Mutating security state."
+            )
             disable_2fa(username)
-            
+
             # Step 5: Post-condition audit
-            self._audit_log_transition(username, "DISABLE_2FA", "SUCCESS", "2FA successfully removed from account")
+            self._audit_log_transition(
+                username,
+                "DISABLE_2FA",
+                "SUCCESS",
+                "2FA successfully removed from account",
+            )
             return True
-            
+
         except Enterprise2FAValidationException as e:
-            self.logger.warning(f"[{self._transaction_id}] 2FA disablement halted due to validation exception: {str(e)}")
+            self.logger.warning(
+                f"[{self._transaction_id}] 2FA disablement halted due to validation exception: {str(e)}"
+            )
             raise
         except Exception as e:
-            self.logger.error(f"[{self._transaction_id}] Unhandled exception during 2FA disablement: {str(e)}")
-            self._audit_log_transition(username, "DISABLE_2FA", "ERROR", f"Unhandled exception: {str(e)}")
+            self.logger.error(
+                f"[{self._transaction_id}] Unhandled exception during 2FA disablement: {str(e)}"
+            )
+            self._audit_log_transition(
+                username, "DISABLE_2FA", "ERROR", f"Unhandled exception: {str(e)}"
+            )
             raise
+
 
 # ============================================================================
 # Legacy/Direct implementation replaced by Enterprise Framework above
 # ============================================================================
+
 
 @router.post(
     "/auth/2fa/disable",
@@ -558,7 +647,10 @@ async def disable_two_factor_auth_endpoint(
     responses={
         400: {"model": ErrorResponse, "description": "Bad Request"},
         401: {"model": ErrorResponse, "description": "Unauthorized / Invalid 2FA Code"},
-        429: {"model": ErrorResponse, "description": "Rate limit exceeded (max 5 attempts per minute)"},
+        429: {
+            "model": ErrorResponse,
+            "description": "Rate limit exceeded (max 5 attempts per minute)",
+        },
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
@@ -570,7 +662,10 @@ async def disable_two_factor_auth_endpoint(
     responses={
         400: {"model": ErrorResponse, "description": "Bad Request"},
         401: {"model": ErrorResponse, "description": "Unauthorized / Invalid 2FA Code"},
-        429: {"model": ErrorResponse, "description": "Rate limit exceeded (max 5 attempts per minute)"},
+        429: {
+            "model": ErrorResponse,
+            "description": "Rate limit exceeded (max 5 attempts per minute)",
+        },
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
@@ -603,7 +698,11 @@ async def verify_two_factor_auth_endpoint(
 
         enabled, existing_secret = get_2fa_status(username)
         if not enabled or not existing_secret:
-            log_security_event("2FA_VERIFY_FAILED", username, f"Client IP: {client_ip} | 2FA not enabled")
+            log_security_event(
+                "2FA_VERIFY_FAILED",
+                username,
+                f"Client IP: {client_ip} | 2FA not enabled",
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="2FA is not enabled for this user.",
@@ -611,7 +710,11 @@ async def verify_two_factor_auth_endpoint(
 
         totp = pyotp.TOTP(existing_secret)
         if not totp.verify(otp_code):
-            log_security_event("2FA_VERIFY_FAILED", username, f"Client IP: {client_ip} | Invalid OTP code")
+            log_security_event(
+                "2FA_VERIFY_FAILED",
+                username,
+                f"Client IP: {client_ip} | Invalid OTP code",
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid 2FA verification code.",
@@ -631,3 +734,30 @@ async def verify_two_factor_auth_endpoint(
             detail=f"Failed to verify 2FA code: {str(e)}",
         )
 
+
+def create_reset_token(email: str) -> str:
+    """Generates a secure, cryptographically signed short-lived reset token (15-minute expiration)."""
+    from src.security.jwt_utils import create_jwt_token
+
+    return create_jwt_token(
+        {"sub": email, "type": "reset", "action": "password_reset"},
+        expires_in_seconds=900,
+    )
+
+
+def verify_reset_token(token: str) -> str:
+    """Verifies signature bounds and expiration limits of the reset token."""
+    from src.security.jwt_utils import _verify_jwt_token
+
+    try:
+        payload = _verify_jwt_token(token, expected_type="reset")
+        email = payload.get("sub")
+        action = payload.get("action")
+        if not email or action != "password_reset":
+            raise ValueError("Invalid token payload.")
+        return email
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset token has expired or is cryptographically invalid.",
+        )

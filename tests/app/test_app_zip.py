@@ -1,3 +1,4 @@
+from pathlib import Path
 import io
 import os
 import sys
@@ -54,7 +55,7 @@ def test_app_zip_upload_integration(mock_embed, mock_model_info, mock_webhook, m
 
     try:
         # Instantiate AppTest
-        at = AppTest.from_file("app/streamlit_app.py")
+        at = AppTest.from_file(str(Path(__file__).resolve().parents[2] / "app/streamlit_app.py"))
 
         # Simulate authentication in session state
         at.session_state["authenticated"] = True

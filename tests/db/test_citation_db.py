@@ -18,19 +18,11 @@ from src.db.corpus_db import _DB_PATH
 
 
 @pytest.fixture(autouse=True)
-def setup_teardown_db():
-    # Setup test database
-    if os.path.exists(_DB_PATH):
-        os.remove(_DB_PATH)
-
+def setup_teardown_db(tmp_path, monkeypatch):
+    # Each test owns its database, without unlinking a pooled corpus database.
+    monkeypatch.setattr("src.db.citation_db._DB_PATH", str(tmp_path / "citations.db"))
     init_citation_db()
     yield
-    # Teardown test database
-    if os.path.exists(_DB_PATH):
-        try:
-            os.remove(_DB_PATH)
-        except PermissionError:
-            pass
 
 
 def test_add_document_citations_duplicate_count():

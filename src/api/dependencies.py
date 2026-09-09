@@ -27,7 +27,7 @@ from src.db.corpus_db import _connect, init_corpus_db
 logger = logging.getLogger(__name__)
 
 # SlowAPI Rate Limiter instance
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=get_remote_address, headers_enabled=False)
 
 
 def custom_rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
@@ -51,6 +51,7 @@ def custom_rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded)
     response = request.app.state.limiter._inject_headers(
         response, request.state.view_rate_limit
     )
+    response.headers["Retry-After"] = str(exc.limit.limit.get_expiry())
     return response
 
 

@@ -20,7 +20,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from src.core.scheduler import start_scheduler, stop_scheduler
-from src.utils.tracing import _tracer_provider, init_tracer_provider
+from src.utils import tracing
+from src.utils.tracing import init_tracer_provider
 from src.api.middleware import validate_bearer_tokens_config
 
 DEFAULT_MAX_REQUEST_BYTES = 52_428_800
@@ -350,14 +351,15 @@ async def _lifespan(app):
     init_tracer_provider()
     validate_bearer_tokens_config()
     await start_scheduler()
-    from src.core.embedding_model import warmup_embedding_model
-    warmup_embedding_model()
+    if os.getenv("PRELOAD_EMBEDDING_MODEL", "false").lower() == "true":
+        from src.api.app import _warmup_embedding_model
+        _warmup_embedding_model()
     try:
         yield
     finally:
         await stop_scheduler()
-        if _tracer_provider and hasattr(_tracer_provider, "shutdown"):
-            _tracer_provider.shutdown()
+        if tracing._tracer_provider and hasattr(tracing._tracer_provider, "shutdown"):
+            tracing._tracer_provider.shutdown()
 
 
 app = st.App(

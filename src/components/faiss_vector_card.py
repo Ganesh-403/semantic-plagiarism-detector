@@ -49,11 +49,11 @@ def render_vector_match_card(match: Dict[str, Any]) -> str:
                 {sim_pct}% Cosine Similarity
             </span>
         </div>
-        
+
         <h4 style="color: white; font-weight: 900; margin: 0 0 8px 0;">
             Document: {match.get("matched_document_title")} ({match.get("matched_chunk_id")})
         </h4>
-        
+
         <p style="color: #94A3B8; font-size: 13px; font-style: italic; margin-bottom: 16px; background: rgba(2, 6, 23, 0.5); padding: 12px; border-radius: 12px; border: 1px solid rgba(30, 41, 59, 0.8);">
             "{match.get("matched_text_snippet")}"
         </p>
@@ -70,7 +70,10 @@ def render_vector_match_card(match: Dict[str, Any]) -> str:
         </div>
     </div>
     """
-    Renders enterprise Streamlit UI widgets for FAISS dense vector search,
+
+
+class FaissVectorCard:
+    """Renders enterprise Streamlit UI widgets for FAISS dense vector search,
     L2 distance distribution, and nearest neighbor matches.
     """
 

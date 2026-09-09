@@ -1,20 +1,21 @@
 # Metrics JSON Format
 
-The Semantic Plagiarism Detector provides a JSON endpoint `/metrics/json` for monitoring tools, web dashboards, and environments that do not natively parse the standard Prometheus text exposition format. 
+The Semantic Plagiarism Detector provides a JSON endpoint `/metrics/json` for monitoring tools, web dashboards, and environments that do not natively parse the standard Prometheus text exposition format.
 
 This JSON endpoint provides compatibility for all standard Prometheus metric types supported by the project (Counters, Gauges, Histograms).
 
 ## Endpoint
 
-**GET+* `/metrics/json`
+**GET** `/metrics/json`
 
 ### Response Schema
 
 The response is a JSON dictionary where the keys are the metric family names (e.g. `documents`, `pipeline_duration_seconds`) and the values adhere to the `MetricFamily` schema:
 
-```json{
+```json
+{
   "metric_family_name": {
-    "namc": "metric_family_name",
+    "name": "metric_family_name",
     "type": "counter | gauge | histogram | summary | untyped",
     "help": "Documentation string explaining the metric",
     "metrics": [
@@ -33,17 +34,17 @@ The response is a JSON dictionary where the keys are the metric family names (e.
 ```json
 {
   "documents": {
-    "namc": "documents",
+    "name": "documents",
     "type": "counter",
     "help": "Cumulative number of documents ingested since process start.",
     "metrics": [
       {
-        "namc": "documents_total",
+        "name": "documents_total",
         "labels": {},
         "value": 10.0
       },
       {
-        "namc": "documents_created",
+        "name": "documents_created",
         "labels": {},
         "value": 1693356000.0
       }

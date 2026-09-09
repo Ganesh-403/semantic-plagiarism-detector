@@ -17,7 +17,9 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/watermark_logs.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "watermark_logs.db"
 
 
 @contextmanager
@@ -57,13 +59,13 @@ def initialize_watermark_db(db_path: Optional[Path] = None) -> None:
 
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_watermark_user 
+            CREATE INDEX IF NOT EXISTS idx_watermark_user
             ON watermark_logs(user_id)
         """
         )
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_watermark_doc 
+            CREATE INDEX IF NOT EXISTS idx_watermark_doc
             ON watermark_logs(document_hash)
         """
         )
@@ -83,7 +85,7 @@ def log_watermark_generation(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT OR IGNORE INTO watermark_logs 
+                INSERT OR IGNORE INTO watermark_logs
                 (watermark_id, user_id, document_hash, strategy, created_at)
                 VALUES (?, ?, ?, ?, ?)
                 """,

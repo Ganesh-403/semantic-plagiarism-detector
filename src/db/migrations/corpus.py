@@ -1,12 +1,16 @@
 """Versioned migrations for corpus.db."""
 
 from __future__ import annotations
+from pathlib import Path
+import shutil
+import logging
+logger = logging.getLogger(__name__)
 
 import sqlite3
 
 from .common import column_exists, run_migrations, table_exists
 
-CORPUS_SCHEMA_VERSION = 20
+CORPUS_SCHEMA_VERSION = 21
 
 
 def migration_001_create_base_schema(
@@ -89,9 +93,9 @@ def migration_004_add_plagiarism_incidents(
         """)
 
 
-def migration_005_add_false_positives(cursor):
+def migration_005_add_false_positives(connection: sqlite3.Connection) -> None:
     """Adds a table to track dismissed false-positive plagiarism pairs."""
-    cursor.execute("""
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS false_positives (
             document_a TEXT,
             document_b TEXT,
@@ -443,6 +447,10 @@ def migration_020_add_embedding_metadata(
         ("vector_schema_version", "INTEGER"),
     )
 
+    connection.execute("""CREATE TABLE IF NOT EXISTS deleted_chunks (
+        vector_id INTEGER PRIMARY KEY, filename TEXT NOT NULL,
+        chunk_index INTEGER NOT NULL, chunk_text TEXT NOT NULL,
+        embedding BLOB NOT NULL, deleted_at TEXT DEFAULT CURRENT_TIMESTAMP)""")
     for column_name, column_type in columns:
         if not column_exists(connection, "chunks", column_name):
             connection.execute(
@@ -725,7 +733,8 @@ CORPUS_DOWN_MIGRATIONS = {
     17: down_017_add_incident_date_flagged_index,
     18: down_018_add_false_positives_audit_columns,
     19: down_019_add_times_flagged,
-    20: down_020_add_corpus_duplicate_detection,
+    20: down_020_add_embedding_metadata,
+    21: down_020_add_corpus_duplicate_detection,
 }
 
 
@@ -750,21 +759,11 @@ def migrate_corpus_database(
     db_path = _corpus_db_file_path(connection)
     backup_path = db_path.with_name("corpus_pre_migrate.db.bak") if db_path else None
 
-    if backup_path is not None:
-        shutil.copy2(db_path, backup_path)
-
-    try:
-        return run_migrations(
-            connection,
-            migrations=CORPUS_MIGRATIONS,
-            target_version=CORPUS_SCHEMA_VERSION,
-        )
-    except Exception:
-        if backup_path is not None and backup_path.exists():
-            logger.error(
-                "Migration failed; restoring corpus.db from backup %s.",
-                backup_path,
-            )
-            connection.close()
-            shutil.copy2(backup_path, db_path)
-        raise
+    if backup_path is not None and connection.execute("PRAGMA user_version").fetchone()[0] < CORPUS_SCHEMA_VERSION:
+        # Copy through SQLite so WAL content is included. Never close or replace
+        # the caller's live database after an error; migrations roll back atomically.
+        from contextlib import closing
+        with closing(sqlite3.connect(str(db_path))) as source, closing(sqlite3.connect(str(backup_path))) as backup:
+            source.backup(backup)
+    return run_migrations(connection, migrations=CORPUS_MIGRATIONS,
+                          target_version=CORPUS_SCHEMA_VERSION)

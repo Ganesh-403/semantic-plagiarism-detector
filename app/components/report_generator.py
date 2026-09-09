@@ -10,6 +10,7 @@ Features:
 - Scheduled report generation
 - Email delivery integration
 """
+from dataclasses import dataclass
 
 import io
 import json

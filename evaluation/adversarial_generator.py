@@ -737,6 +737,7 @@ def transform_compression(text: str, factor: float = 0.5) -> str:
         "whom", "while", "about", "up", "it", "its",
     }
     # Keep content words, drop stop words proportional to factor
+    rng = random.Random(42)
     keep_fraction = max(0.1, min(1.0, factor))
     result: list[str] = []
     for token in tokens:

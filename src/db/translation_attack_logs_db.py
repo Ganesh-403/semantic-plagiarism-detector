@@ -16,7 +16,9 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/translation_attack_logs.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "translation_attack_logs.db"
 
 
 @contextmanager
@@ -55,7 +57,7 @@ def initialize_translation_logs_db(db_path: Optional[Path] = None) -> None:
         )
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_translation_doc 
+            CREATE INDEX IF NOT EXISTS idx_translation_doc
             ON translation_attack_logs(document_id)
         """
         )
@@ -77,7 +79,7 @@ def log_translation_attack(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO translation_attack_logs 
+                INSERT INTO translation_attack_logs
                 (document_id, lexical_drift, structural_variance, invariance_score, is_obfuscated, analyzed_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,

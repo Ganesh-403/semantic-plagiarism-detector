@@ -244,10 +244,10 @@ def _batch_sentences(text: str, max_chars: int = 4500) -> list[str]:
     """Helper to split long text into smaller batches by sentence boundaries."""
     # Split by punctuation followed by space (basic sentence boundary)
     sentences = re.split(r'(?<=[.!?])\s+', text)
-    
+
     batches = []
     current_batch = ""
-    
+
     for sentence in sentences:
         if len(current_batch) + len(sentence) + 1 <= max_chars:
             current_batch += (sentence + " ").lstrip()
@@ -255,10 +255,10 @@ def _batch_sentences(text: str, max_chars: int = 4500) -> list[str]:
             if current_batch:
                 batches.append(current_batch.strip())
             current_batch = sentence + " "
-            
+
     if current_batch.strip():
         batches.append(current_batch.strip())
-        
+
     # Safety net: If a single sentence without punctuation is still longer than max_chars
     final_batches = []
     for batch in batches:
@@ -708,3 +708,8 @@ def get_common_translation_pairs() -> list[tuple[str, str]]:
         ("it", "en"),
     ]
 # Helper function verified for issue 3993
+
+
+def is_translation_error(text: str | None) -> bool:
+    """Return whether a translation result carries the standard error prefix."""
+    return isinstance(text, str) and text.startswith("(Translation Error:")

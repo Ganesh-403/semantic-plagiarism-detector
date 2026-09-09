@@ -1,6 +1,7 @@
+from __future__ import annotations
 """Tests for corpus-level exact and near-duplicate detection."""
 
-from __future__ import annotations
+
 
 from src.core.corpus_duplicate_filter import (
     build_fingerprint,
@@ -114,7 +115,7 @@ def test_similarity_is_bounded():
 
     """Tests for corpus-level exact and near-duplicate detection."""
 
-from __future__ import annotations
+
 
 from src.core.corpus_duplicate_filter import (
     build_fingerprint,

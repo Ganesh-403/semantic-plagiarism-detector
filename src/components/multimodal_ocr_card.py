@@ -51,11 +51,11 @@ def render_ocr_match_card(match: Dict[str, Any]) -> str:
                 {overall_pct}% Multimodal Score
             </span>
         </div>
-        
+
         <h4 style="color: white; font-weight: 900; margin: 0 0 8px 0;">
             Image: {match.get("source_image_name")} ↔ Target: {match.get("target_reference_title")}
         </h4>
-        
+
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;">
             <div style="background: rgba(2, 6, 23, 0.6); padding: 12px; border-radius: 12px; border: 1px solid rgba(30, 41, 59, 1);">
                 <span style="color: #94A3B8; font-size: 11px;">OCR Text Similarity:</span>
@@ -68,7 +68,10 @@ def render_ocr_match_card(match: Dict[str, Any]) -> str:
         </div>
     </div>
     """
-    Renders enterprise Streamlit dashboard interface for multimodal OCR
+
+
+class MultimodalOCRCard:
+    """Renders enterprise Streamlit dashboard interface for multimodal OCR
     and neural paraphrase detection telemetry.
     """
 

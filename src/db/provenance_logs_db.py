@@ -17,7 +17,9 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/provenance_logs.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "provenance_logs.db"
 
 
 @contextmanager
@@ -56,7 +58,7 @@ def initialize_provenance_db(db_path: Optional[Path] = None) -> None:
         )
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_provenance_doc 
+            CREATE INDEX IF NOT EXISTS idx_provenance_doc
             ON provenance_logs(document_id)
         """
         )
@@ -78,7 +80,7 @@ def log_provenance_analysis(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO provenance_logs 
+                INSERT INTO provenance_logs
                 (document_id, file_type, risk_score, is_suspicious, metadata_json, analyzed_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,

@@ -1,13 +1,14 @@
-name: Generate Release Notes
+name: Regenerate Existing Release Notes
 
+# Automatic drafts and notes are created by release.yml. This manual workflow
+# updates only an existing release, retaining its draft/prerelease settings.
 on:
   workflow_dispatch:
-  release:
-    types: [created]
-
-  push:
-    tags:
-      - "v*"
+    inputs:
+      tag:
+        description: Existing release tag
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -16,9 +17,15 @@ permissions:
 jobs:
   generate-release-notes:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Generate Release Notes
-        uses: softprops/action-gh-release@v2
+      - name: Update notes on the existing release
+        uses: actions/github-script@v7
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
         with:
-          generate_release_notes: true
+          script: |
+            const { owner, repo } = context.repo;
+            const tag = process.env.RELEASE_TAG;
+            const { data: release } = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+            const { data: notes } = await github.rest.repos.generateReleaseNotes({ owner, repo, tag_name: tag });
+            await github.rest.repos.updateRelease({ owner, repo, release_id: release.id, body: notes.body });

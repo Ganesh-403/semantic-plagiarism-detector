@@ -346,7 +346,6 @@ def render_upload_section(user_role: str, lang_code: str, index_path: str):
                             f"⚠️ File **'{member_name}'** from **'{original_name}'** "
                             f"is identical to **'{existing_doc}'** already in the database."
                         )
-                        continue
 
                     file_bytes_dict[member_name] = strip_exif_metadata(
                         member_bytes, member_name
@@ -367,7 +366,7 @@ def render_upload_section(user_role: str, lang_code: str, index_path: str):
                 )
                 action = st.radio(
                     f"Action for duplicate file '{original_name}':",
-                    ["Skip", "Reprocess"],
+                    ["Reprocess", "Skip"],
                     key=f"dup_{file_hash}_{original_name}",
                     horizontal=True,
                 )

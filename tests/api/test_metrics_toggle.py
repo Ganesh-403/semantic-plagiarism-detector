@@ -20,24 +20,24 @@ def test_app():
 class TestMetricsToggleEnvironmentLoading:
     """Tests that the PROMETHEUS_METRICS_ENABLED environment variable is parsed correctly
     at module initialization time, and handles the global Prometheus registry assignment."""
-    
+
     def run_import_test(self, env_value: str | None) -> dict:
         """Run a subprocess to import the metrics module and print its state.
         This provides perfect isolation and proves module-level initialization behavior."""
-        
+
         env = os.environ.copy()
         if env_value is not None:
             env["PROMETHEUS_METRICS_ENABLED"] = env_value
         elif "PROMETHEUS_METRICS_ENABLED" in env:
             del env["PROMETHEUS_METRICS_ENABLED"]
-            
+
         # The python script to execute in the isolated environment
         script = '''
 import sys
 import json
 try:
     from src.core.metrics import PROMETHEUS_METRICS_ENABLED, _registry, documents_total
-    
+
     # We serialize the state
     state = {
         "enabled": PROMETHEUS_METRICS_ENABLED,
@@ -57,9 +57,9 @@ except Exception as e:
         )
         if result.returncode != 0:
             pytest.fail(f"Subprocess failed: {result.stderr}")
-            
+
         return json.loads(result.stdout)
-        
+
     def test_default_is_true_when_missing(self):
         """1. Environment variable missing -> metrics enabled."""
         state = self.run_import_test(None)
@@ -72,7 +72,7 @@ except Exception as e:
         state = self.run_import_test(true_val)
         assert state["enabled"] is True
         assert state["registry_is_none"] is False
-        
+
     @pytest.mark.parametrize("false_val", ["False", "false", "0", "f", "no", "anything"])
     def test_explicit_false_value(self, false_val):
         """3. Explicit false value -> disabled."""
@@ -84,10 +84,10 @@ except Exception as e:
 class TestMetricsToggleEndpoints:
     """Tests that the API endpoints correctly respect the PROMETHEUS_METRICS_ENABLED flag
     and return 404 when disabled, or the expected payload when enabled."""
-    
+
     def test_metrics_prometheus_returns_404_when_disabled(self, test_app):
         """4. /metrics returns 404 when disabled."""
-        with mock.patch("src.api.routers.admin.PROMETHEUS_METRICS_ENABLED", False):
+        with mock.patch("src.core.metrics.PROMETHEUS_METRICS_ENABLED", False):
             client = TestClient(test_app)
             response = client.get("/metrics")
             assert response.status_code == 404
@@ -95,7 +95,7 @@ class TestMetricsToggleEndpoints:
 
     def test_metrics_json_returns_404_when_disabled(self, test_app):
         """4. /metrics/json returns 404 when disabled."""
-        with mock.patch("src.api.routers.admin.PROMETHEUS_METRICS_ENABLED", False):
+        with mock.patch("src.core.metrics.PROMETHEUS_METRICS_ENABLED", False):
             client = TestClient(test_app)
             response = client.get("/metrics/json")
             assert response.status_code == 404
@@ -103,9 +103,9 @@ class TestMetricsToggleEndpoints:
 
     def test_metrics_prometheus_works_when_enabled(self, test_app):
         """5. /metrics continues working when enabled."""
-        with mock.patch("src.api.routers.admin.PROMETHEUS_METRICS_ENABLED", True):
+        with mock.patch("src.core.metrics.PROMETHEUS_METRICS_ENABLED", True):
             # We mock _gen so we don't have to populate a real registry here
-            with mock.patch("src.api.routers.admin._gen", return_value=b"test_metric 1.0\\n"):
+            with mock.patch("src.core.metrics.generate_latest", return_value=b"test_metric 1.0\\n"):
                 client = TestClient(test_app)
                 response = client.get("/metrics")
                 assert response.status_code == 200
@@ -113,8 +113,8 @@ class TestMetricsToggleEndpoints:
 
     def test_metrics_json_works_when_enabled(self, test_app):
         """5. /metrics/json continues working when enabled."""
-        with mock.patch("src.api.routers.admin.PROMETHEUS_METRICS_ENABLED", True):
-            with mock.patch("src.api.routers.admin.generate_metrics_json", return_value={"test": {"type": "counter"}}):
+        with mock.patch("src.core.metrics.PROMETHEUS_METRICS_ENABLED", True):
+            with mock.patch("src.core.metrics.generate_metrics_json", return_value={"test": {"type": "counter"}}):
                 client = TestClient(test_app)
                 response = client.get("/metrics/json")
                 assert response.status_code == 200
@@ -123,19 +123,19 @@ class TestMetricsToggleEndpoints:
 
 class TestMetricsToggleEdgeCases:
     """Tests relevant edge cases in the existing implementation when metrics are disabled."""
-    
+
     @mock.patch("src.core.metrics.PROMETHEUS_METRICS_ENABLED", False)
     def test_generate_metrics_json_internal_function_empty(self):
         """7. Edge case: if internal generate_metrics_json is called while disabled, it returns empty dict."""
         from src.core.metrics import generate_metrics_json
         result = generate_metrics_json()
         assert result == {}
-        
+
     def test_metric_decorators_and_helpers_do_not_crash(self):
         """7. Edge case: when metrics are disabled, the _registry is None, but the metric objects
         are still instantiated with registry=None. We must verify that calling .inc() or .observe()
         on an unregistered metric does not crash the application."""
-        
+
         # We spawn a subprocess with metrics disabled and test the helpers
         script = '''
 import os
@@ -151,16 +151,16 @@ try:
     record_documents(5)
     record_upload("success")
     record_incidents(1)
-    
+
     @timed("test_stage")
     def dummy_work():
         return "ok"
-        
+
     assert dummy_work() == "ok"
-    
+
     # This shouldn't crash either (though it may log warnings if DB is not mocked, but the metric part is safe)
     # We skip sync_telemetry_gauges because it requires database connections which might fail for unrelated reasons
-    
+
     print("SUCCESS")
 except Exception as e:
     print(f"FAILED: {e}")
@@ -180,21 +180,21 @@ except Exception as e:
 
 class TestMetricsToggleConfiguration:
     """Heavily extended tests of the metrics configuration injection"""
-    
+
     @mock.patch("src.core.metrics.PROMETHEUS_METRICS_ENABLED", False)
     def test_sync_telemetry_gauges_when_disabled(self):
         """Edge case: sync_telemetry_gauges should not crash if metrics are disabled."""
         from src.core.metrics import sync_telemetry_gauges, active_users_gauge
-        
+
         # We mock the telemetry service DB calls so it doesn't hit an actual DB
         with mock.patch("src.core.telemetry.TelemetryService.get_active_user_count", return_value=999):
             with mock.patch("src.core.telemetry.TelemetryService.get_document_count", return_value=50):
                 with mock.patch("os.path.getsize", return_value=1024):
                     sync_telemetry_gauges()
-        
+
         # It should still set the value on the unregistered metric
         assert active_users_gauge._value.get() == 999-0
-        
+
     def test_generate_metrics_json_handles_disabled_state(self):
         """Verify that `original generate_metrics_json` is safe and returns empty if disabled directly"""
         from src.core.metrics import generate_metrics_json
@@ -204,7 +204,7 @@ class TestMetricsToggleConfiguration:
 
     def test_security_authentication_on_metrics_endpoints(self, test_app):
         """Tests that even if metrics are mocked as authorized, the 404 still precedes."""
-        with mock.patch("src.api.routers.admin.PROMETHEUS_METRICS_ENABLED", False):
+        with mock.patch("src.core.metrics.PROMETHEUS_METRICS_ENABLED", False):
             client = TestClient(test_app)
             response = client.get("/metrics?token=fake")
             assert response.status_code == 404

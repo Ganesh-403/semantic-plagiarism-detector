@@ -363,7 +363,7 @@ def n_gram_overlap(
     -------
     float
         Overlap score bounded between 0.0 and 1.0.
-    
+
     Raises
     ------
     ValueError
@@ -893,7 +893,7 @@ def compute_vectorized_jaccard_matrix(documents: list[str]) -> np.ndarray:
     """
     if not documents:
         return np.array([])
-    
+
     # Vectorize documents into binary bag-of-words (Boolean arrays)
     vectorizer = CountVectorizer(binary=True, token_pattern=r"(?u)\b\w+\b")
     try:
@@ -905,18 +905,18 @@ def compute_vectorized_jaccard_matrix(documents: list[str]) -> np.ndarray:
 
     # X is shape (N, V). Intersection is dot product of binary matrices
     intersection = X.dot(X.T).toarray()
-    
+
     # Sum across columns to get the number of unique words per document
     row_sums = X.sum(axis=1).A.flatten()
-    
+
     # Union = |A| + |B| - |A ∩ B|
     # row_sums[:, None] creates a column vector, row_sums[None, :] a row vector
     union = row_sums[:, None] + row_sums[None, :] - intersection
-    
+
     # Avoid division by zero
     with np.errstate(divide='ignore', invalid='ignore'):
         jaccard_matrix = np.where(union != 0, intersection / union, 0.0)
-        
+
     return jaccard_matrix
 
 
@@ -1013,3 +1013,21 @@ def compute_char_ngram_similarity(text_a: str, text_b: str, n: int = 5) -> float
     )
 
     return similarity
+
+
+def levenshtein_similarity(str_a: str, str_b: str) -> float:
+    """Return 1 - edit_distance / max_length, with two empty strings identical."""
+    if str_a == str_b:
+        return 1.0
+    if not str_a or not str_b:
+        return 0.0
+    if len(str_a) < len(str_b):
+        str_a, str_b = str_b, str_a
+    previous = list(range(len(str_b) + 1))
+    for i, char_a in enumerate(str_a, 1):
+        current = [i]
+        for j, char_b in enumerate(str_b, 1):
+            current.append(min(current[-1] + 1, previous[j] + 1,
+                               previous[j - 1] + (char_a != char_b)))
+        previous = current
+    return 1.0 - previous[-1] / len(str_a)

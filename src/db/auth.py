@@ -374,9 +374,9 @@ from contextlib import contextmanager
 
 
 @contextmanager
-def _connect() -> Generator[sqlite3.Connection, None, None]:
+def _connect(db_path=None) -> Generator[sqlite3.Connection, None, None]:
     """Establish a connection to the SQLite database with configured timeout and close on exit."""
-    conn = sqlite3.connect(_DB_PATH, timeout=SQLITE_TIMEOUT, check_same_thread=False)
+    conn = sqlite3.connect(db_path or _DB_PATH, timeout=SQLITE_TIMEOUT, check_same_thread=False)
     try:
         yield conn
     finally:
@@ -548,8 +548,10 @@ def init_db() -> None:
             ).fetchone()
             exists = bool(row and row[0])
 
-            if not exists:
-                hashed = str(_hash_password("Admin123!"))
+            bootstrap_password = os.getenv("ADMIN_BOOTSTRAP_PASSWORD")
+            if not exists and bootstrap_password:
+                validate_password_complexity(bootstrap_password)
+                hashed = str(_hash_password(bootstrap_password))
                 conn.execute(
                     """
                     INSERT INTO users (username, password, role)
@@ -581,6 +583,8 @@ def verify_user(
     Implements account lockout protection (Issue #2704) by checking for
     recent failed login attempts before verifying the password hash.
     """
+    from src.core.metrics import record_auth_failure
+
     try:
         username = _validate_username(username)
         password = _validate_password(password)
@@ -597,6 +601,7 @@ def verify_user(
             ).fetchone()
 
         if not row:
+            record_auth_failure("invalid_password")
             if return_details:
                 return {"authenticated": False, "must_change_password": False}
             return False
@@ -651,6 +656,9 @@ def verify_user(
                     authenticated = True
             except Exception:
                 authenticated = False
+
+        if not authenticated:
+            record_auth_failure("invalid_password")
 
         # Check password expiration after successful authentication (Issue #2716)
         password_expired = False
@@ -876,19 +884,30 @@ def delete_user(username: str) -> None:
 
 @with_sqlite_retry
 def update_password(
-    username: str, new_password: str, current_user: str | None = None
+    username: str, new_password: str, current_user: str | None = None, *, old_password: str | None = None
 ) -> None:
     """Update a user's password with a new Argon2 hash and record password_changed_at timestamp."""
+    def audit_failure(reason: str) -> None:
+        try:
+            log_security_event("password_change_failed", username, json.dumps({"reason": reason}))
+        except Exception:
+            logger.exception("Could not record password change failure")
+
     if current_user and current_user != username:
         if get_user_role(current_user) != "admin":
+            audit_failure("unauthorized_actor")
             raise PermissionError(
                 "Unauthorized password modifications for foreign user_ids"
             )
 
     try:
         username = _validate_username(username)
-        new_password = _validate_password(new_password)
-        validate_password_complexity(new_password)
+        try:
+            new_password = _validate_password(new_password)
+            validate_password_complexity(new_password)
+        except ValueError:
+            audit_failure("complexity_failed")
+            raise
 
         with _connect() as conn:
             cursor = conn.execute(
@@ -897,8 +916,12 @@ def update_password(
             )
             row = cursor.fetchone()
             if not row:
+                audit_failure("user_not_found")
                 raise ValueError("User not found.")
             current_hash = row[0]
+            if old_password is not None and not _verify_password_hash(old_password, current_hash):
+                audit_failure("incorrect_old_password")
+                raise ValueError("Current password is incorrect")
 
             history_rows = conn.execute(
                 """
@@ -916,6 +939,7 @@ def update_password(
 
             for old_hash in recent_hashes:
                 if _verify_password_hash(new_password, old_hash):
+                    audit_failure("password_reuse")
                     raise ValueError(
                         "New password cannot be one of your last 3 passwords"
                     )
@@ -950,6 +974,7 @@ def update_password(
     except (ValueError, PermissionError):
         raise
     except sqlite3.Error as e:
+        audit_failure("database_error")
         raise sqlite3.Error(f"Failed to update password: {e}") from e
     except Exception as e:
         logger.error("Failed to update password for user %s: %s", username, e)
@@ -1046,10 +1071,7 @@ def enable_2fa(username: str, secret: str) -> None:
             (encrypted_secret, username.lower()),
         )
         if cursor.rowcount == 0:
-            conn.execute(
-                "INSERT INTO users (username, password, role, two_factor_enabled, otp_secret) VALUES (?, ?, 'admin', 1, ?)",
-                (username.lower(), _hash_password("Placeholder123!"), encrypted_secret),
-            )
+            raise ValueError("Cannot enable 2FA for a missing user")
         conn.commit()
 
 
@@ -1101,7 +1123,7 @@ def clear_login_attempts(username: str) -> None:
 DEFAULT_PASSWORD_LIFETIME_DAYS = 90
 
 
-def is_password_expired(username: str) -> bool:
+def is_password_expired(username: str, db_path=None) -> bool:
     """Check if a user's password has expired based on password_expires_at.
 
     Args:
@@ -1116,7 +1138,7 @@ def is_password_expired(username: str) -> bool:
 
     try:
         username = _validate_username(username)
-        with _connect() as conn:
+        with (_connect(db_path) if db_path is not None else _connect()) as conn:
             row = conn.execute(
                 "SELECT password_expires_at FROM users WHERE username = ?", (username,)
             ).fetchone()
@@ -1127,6 +1149,9 @@ def is_password_expired(username: str) -> bool:
 
             expires_at_str = row[0]
             expires_at = dt.fromisoformat(expires_at_str.replace("Z", "+00:00"))
+
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
 
             # Compare with current UTC time
             now_utc = dt.now(timezone.utc)
@@ -1768,14 +1793,14 @@ def is_token_revoked(token: str) -> bool:
         try:
             import base64
             import json
-            
+
             payload_b64 = parts[1]
             rem = len(payload_b64) % 4
             if rem > 0:
                 payload_b64 += "=" * (4 - rem)
             payload_bytes = base64.urlsafe_b64decode(payload_b64.encode("utf-8"))
             payload = json.loads(payload_bytes.decode("utf-8"))
-            
+
             sub = payload.get("sub")
             iat = payload.get("iat")
             if sub and iat is not None:
@@ -1788,7 +1813,7 @@ def is_token_revoked(token: str) -> bool:
                         p_changed_str = row[0].replace("Z", "+00:00")
                         password_changed_dt = dt.fromisoformat(p_changed_str)
                         password_changed_ts = int(password_changed_dt.timestamp())
-                        
+
                         if int(iat) < password_changed_ts:
                             _revoked_token_cache[token] = True
                             _revoked_token_cache[signature] = True

@@ -11,6 +11,8 @@ Features:
 - Pattern recognition
 - Automated reporting with insights
 """
+import logging
+logger = logging.getLogger(__name__)
 
 import time
 from dataclasses import dataclass, field

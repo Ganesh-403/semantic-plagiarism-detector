@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from src.api.middleware import get_current_user_any
+
 import logging
 from typing import Optional
 
@@ -42,7 +44,7 @@ except Exception:
 async def create_scan(
     request: Request,
     scan_type: str = Query("full", description="Scan type"),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Start a new anomaly detection scan."""
     try:
@@ -65,7 +67,7 @@ async def list_scans(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     scan_status: Optional[str] = Query(None, alias="status"),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """List anomaly detection scans."""
     try:
@@ -81,7 +83,7 @@ async def list_scans(
 )
 async def get_scan(
     scan_id: int,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Get details of a specific scan."""
     scan = anomaly_repo.get_scan(scan_id)
@@ -98,7 +100,7 @@ async def complete_scan(
     scan_id: int,
     documents_scanned: int = Query(0, ge=0),
     anomalies_found: int = Query(0, ge=0),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Mark a scan as completed."""
     scan = anomaly_repo.get_scan(scan_id)
@@ -115,7 +117,7 @@ async def complete_scan(
 async def fail_scan(
     scan_id: int,
     error_message: str = Query("Unknown error"),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Mark a scan as failed."""
     scan = anomaly_repo.get_scan(scan_id)
@@ -142,7 +144,7 @@ async def create_alert(
     title: str = Query(..., description="Alert title"),
     description: str = Query("", description="Detailed description"),
     confidence: float = Query(0.0, ge=0.0, le=1.0),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Create a new anomaly alert."""
     try:
@@ -173,7 +175,7 @@ async def list_alerts(
     acknowledged: Optional[bool] = Query(None),
     resolved: Optional[bool] = Query(None),
     scan_id: Optional[int] = Query(None),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """List anomaly alerts with filtering."""
     try:
@@ -194,7 +196,7 @@ async def list_alerts(
 )
 async def get_alert(
     alert_id: int,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Get details of a specific alert."""
     alert = anomaly_repo.get_alert(alert_id)
@@ -209,7 +211,7 @@ async def get_alert(
 )
 async def acknowledge_alert(
     alert_id: int,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Acknowledge an alert."""
     acked = anomaly_repo.acknowledge_alert(alert_id, by=_user.get("sub", "system"))
@@ -225,7 +227,7 @@ async def acknowledge_alert(
 async def resolve_alert(
     alert_id: int,
     notes: str = Query("", description="Resolution notes"),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Resolve an alert."""
     resolved = anomaly_repo.resolve_alert(alert_id, by=_user.get("sub", "system"), notes=notes)
@@ -270,7 +272,7 @@ async def delete_alert(
     responses={200: {"description": "Analytics summary"}},
 )
 async def analytics_summary(
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Return aggregate anomaly statistics."""
     return anomaly_repo.analytics_summary()
@@ -281,7 +283,7 @@ async def analytics_summary(
     responses={200: {"description": "Severity distribution"}},
 )
 async def severity_distribution(
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Return alert counts per severity level."""
     return {"distribution": anomaly_repo.severity_distribution()}
@@ -292,7 +294,7 @@ async def severity_distribution(
     responses={200: {"description": "Type distribution"}},
 )
 async def type_distribution(
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Return alert counts per anomaly type."""
     return {"distribution": anomaly_repo.type_distribution()}
@@ -305,7 +307,7 @@ async def type_distribution(
 async def high_confidence_alerts(
     min_confidence: float = Query(0.8, ge=0.0, le=1.0),
     limit: int = Query(10, ge=1, le=50),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Return high-confidence unresolved alerts."""
     return {"alerts": anomaly_repo.high_confidence_alerts(min_confidence, limit)}
@@ -320,7 +322,7 @@ async def high_confidence_alerts(
     responses={200: {"description": "Detection config"}},
 )
 async def get_config(
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Get the current anomaly detection configuration."""
     return anomaly_repo.get_config()

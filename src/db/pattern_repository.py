@@ -149,7 +149,7 @@ class PatternRepository(BaseRepository):
                 ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
             )
             rows = conn.execute(
-                f"""  # nosec
+                f"""
                 SELECT * FROM plagiarism_patterns
                 {where_sql}
                 ORDER BY confidence_score DESC, occurrence_count DESC

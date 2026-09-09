@@ -1,3 +1,4 @@
+from pathlib import Path
 import io
 import os
 import sys
@@ -91,7 +92,7 @@ def test_app_smoke(mock_embed, mock_model_info, mock_webhook, mock_ai_detector):
 
     _cleanup_stale_artifacts()
     try:
-        at = AppTest.from_file("app/streamlit_app.py", default_timeout=30)
+        at = AppTest.from_file(str(Path(__file__).resolve().parents[2] / "app/streamlit_app.py"), default_timeout=30)
 
         # Pre-seed session state for authentication
         at.session_state["authenticated"] = True

@@ -17,7 +17,9 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/cfg_logs.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "cfg_logs.db"
 
 
 @contextmanager
@@ -58,7 +60,7 @@ def initialize_cfg_db(db_path: Optional[Path] = None) -> None:
         )
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_cfg_hash 
+            CREATE INDEX IF NOT EXISTS idx_cfg_hash
             ON cfg_logs(cfg_hash_a)
         """
         )
@@ -80,8 +82,8 @@ def log_cfg_comparison(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO cfg_logs 
-                (document_a_id, document_b_id, cfg_hash_a, cfg_hash_b, 
+                INSERT INTO cfg_logs
+                (document_a_id, document_b_id, cfg_hash_a, cfg_hash_b,
                  edit_distance, structural_similarity, is_exact_clone, analyzed_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,

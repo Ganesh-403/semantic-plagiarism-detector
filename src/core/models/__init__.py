@@ -17,13 +17,3 @@ __all__ = [
     "TagSource",
     "TagCategory",
 ]
-
-
-
-"""
-Models module for the Semantic Plagiarism Detector
-"""
-
-from .document import Document, DocumentStatus, DocumentType, BatchUpload
-
-__all__ = ['Document', 'DocumentStatus', 'DocumentType', 'BatchUpload']

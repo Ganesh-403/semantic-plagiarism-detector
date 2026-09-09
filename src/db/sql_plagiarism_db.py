@@ -4,14 +4,17 @@ src/db/sql_plagiarism_db.py
 SQLite database manager for SQL Plagiarism Logs.
 """
 
-import sqlite3, logging
+import sqlite3
+import logging
 from pathlib import Path
 from typing import Optional
 from contextlib import contextmanager
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
-DEFAULT_DB_PATH = Path("data/sql_plagiarism.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "sql_plagiarism.db"
 
 
 @contextmanager

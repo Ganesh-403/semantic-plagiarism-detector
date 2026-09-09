@@ -641,154 +641,18 @@ def create_jwt_token_with_kid(
     return f"{encoded_header}.{encoded_payload}.{encoded_signature}"
 
 
-def create_access_token(
-    sub: str = "user",
-    scopes: list[str] | None = None,
-    expires_in: int = 3600,
-) -> str:
-    """Create a signed access token (default 60 min expiration)."""
-    return create_jwt_token(
-        {
-            "sub": sub,
-            "type": "access",
-            "scopes": scopes or ["read", "write"],
-        },
-        expires_in_seconds=expires_in,
-    )
+
+# Keep verification instrumentation at one boundary to avoid double counting.
+_verify_jwt_token_uninstrumented = _verify_jwt_token
 
 
-def create_refresh_token(
-    sub: str = "user",
-    scopes: list[str] | None = None,
-    expires_in: int = 604800,  # 7 days
-) -> str:
-    """Create a signed refresh token (default 7 days expiration)."""
-    return create_jwt_token(
-        {
-            "sub": sub,
-            "type": "refresh",
-            "scopes": scopes or ["read", "write"],
-        },
-        expires_in_seconds=expires_in,
-    )
-
-
-def _verify_jwt_token(
-    token: str,
-    expected_type: str,
-    secret_key: str | None = None,
-) -> dict[str, Any]:
-    """Shared implementation for verifying JWT signatures, expiration, and types."""
-    if not token or not isinstance(token, str):
-        raise ValueError(f"Invalid {expected_type} token: token cannot be empty.")
-
-    token = token.strip()
-
-    if secret_key is None:
-        secret_key = os.getenv("JWT_SECRET_KEY", JWT_SECRET_KEY)
-    if not secret_key:
-        raise ValueError(
-            "JWT_SECRET_KEY environment variable must be set. "
-            "Cannot verify tokens without a secret key."
-        )
-
-    parts = token.split(".")
-    if len(parts) != 3:
-        raise ValueError(f"Invalid {expected_type} token: malformed JWT structure.")
-
-    encoded_header, encoded_payload, encoded_signature = parts
-
-    signing_input = f"{encoded_header}.{encoded_payload}".encode("utf-8")
-    expected_sig = hmac.new(
-        secret_key.encode("utf-8"),
-        signing_input,
-        hashlib.sha256,
-    ).digest()
-
+def _verify_jwt_token(*args, **kwargs):
+    from src.core.metrics import record_auth_failure
     try:
-        actual_sig = base64url_decode(encoded_signature)
-    except Exception:
-        raise ValueError(
-            f"Invalid {expected_type} token: invalid base64 signature encoding."
-        )
-
-    if not hmac.compare_digest(expected_sig, actual_sig):
-        raise ValueError(
-            f"Invalid {expected_type} token: signature verification failed."
-        )
-
-    try:
-        payload_bytes = base64url_decode(encoded_payload)
-        payload = json.loads(payload_bytes.decode("utf-8"))
-    except Exception:
-        raise ValueError(f"Invalid {expected_type} token: malformed JSON payload.")
-
-    exp = payload.get("exp")
-    if exp is not None:
-        try:
-            exp_int = int(exp)
-        except (TypeError, ValueError):
-            raise ValueError(f"Invalid {expected_type} token: malformed exp claim.")
-        if int(time.time()) >= exp_int:
-            raise ValueError(f"{expected_type.capitalize()} token has expired.")
-
-    token_type = payload.get("type")
-    if token_type and token_type != expected_type:
-        raise ValueError(
-            f"Invalid token type: expected '{expected_type}', got '{token_type}'."
-        )
-
-    return payload
-
-
-def verify_refresh_token(
-    token: str,
-    secret_key: str | None = None,
-) -> dict[str, Any]:
-    """
-    Verify refresh token signature and expiration timestamp.
-
-    Args:
-        token: JWT refresh token or configured static testing refresh token.
-        secret_key: Secret key used to verify signature. Uses JWT_SECRET_KEY if None.
-
-    Returns:
-        Decoded token payload dict.
-
-    Raises:
-        ValueError: If token signature is invalid, expired, wrong type, or secret is missing.
-    """
-    if not token or not isinstance(token, str):
-        raise ValueError("Invalid refresh token: token cannot be empty.")
-
-    token = token.strip()
-
-    # Support static / testing refresh tokens only in test environment
-    if token in VALID_STATIC_REFRESH_TOKENS:
-        if not _IS_TEST:
-            raise ValueError(
-                "Invalid refresh token: static testing tokens are not allowed outside test environment."
-            )
-        return {"sub": "test_user", "type": "refresh", "scopes": ["read", "write"]}
-
-    return _verify_jwt_token(token, "refresh", secret_key)
-
-
-def verify_access_token(
-    token: str,
-    secret_key: str | None = None,
-) -> dict[str, Any]:
-    """
-    Verify access token signature and expiration timestamp.
-
-    Args:
-        token: JWT access token.
-        secret_key: Secret key used to verify signature. Uses JWT_SECRET_KEY if None.
-
-    Returns:
-        Decoded token payload dict.
-
-    Raises:
-        ValueError: If token signature is invalid, expired, wrong type, or secret is missing.
-    """
-    return _verify_jwt_token(token, "access", secret_key)
+        return _verify_jwt_token_uninstrumented(*args, **kwargs)
+    except JWTExpiredError:
+        record_auth_failure("expired_token")
+        raise
+    except (JWTDecodeError, JWTSignatureError, JWTNotYetValidError):
+        record_auth_failure("invalid_token")
+        raise

@@ -52,6 +52,7 @@ GITHUB_RELEASES_URL: str = (
 _REQUEST_TIMEOUT: float = 5.0
 
 # ── In-memory response cache ──────────────────────────────────────────────────
+_FAILURE_TTL_SECONDS: float = 900.0
 _CACHE_TTL_SECONDS: float = 3600.0  # 1 hour
 _version_cache: dict[str, tuple[float, Optional[str]]] = {}
 
@@ -110,7 +111,8 @@ async def fetch_latest_github_version(
     now = time.time()
     if use_cache and url in _version_cache:
         cached_time, cached_tag = _version_cache[url]
-        if now - cached_time < _CACHE_TTL_SECONDS:
+        ttl = _CACHE_TTL_SECONDS if cached_tag is not None else _FAILURE_TTL_SECONDS
+        if now - cached_time < ttl:
             return cached_tag
 
     headers = {"Accept": "application/vnd.github+json"}
@@ -178,7 +180,7 @@ def _parse_semver_tuple(version: str) -> tuple[int, int, int]:
     return (major, minor, patch)
 
 
-def is_update_available(local_version: str, remote_tag: str) -> bool:
+def is_update_available(local_version: str, remote_tag: str, allow_prereleases: bool = False) -> bool:
     """Return ``True`` when *remote_tag* is strictly newer than *local_version*.
 
     Both strings are normalised (leading ``v`` stripped) before comparison.
@@ -207,7 +209,10 @@ def is_update_available(local_version: str, remote_tag: str) -> bool:
     try:
         from packaging.version import Version  # type: ignore[import-untyped]
 
-        return Version(remote) > Version(local)
+        remote_version, local_version_parsed = Version(remote), Version(local)
+        if remote_version.is_prerelease and not (allow_prereleases or local_version_parsed.is_prerelease):
+            return False
+        return remote_version > local_version_parsed
     except Exception:  # noqa: BLE001 – packaging not installed or bad tag
         return _parse_semver_tuple(remote) > _parse_semver_tuple(local)
 

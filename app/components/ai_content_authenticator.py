@@ -11,6 +11,7 @@ Features:
 - AI model fingerprinting
 - Statistical anomaly detection for synthetic text
 """
+from __future__ import annotations
 
 import math
 import random

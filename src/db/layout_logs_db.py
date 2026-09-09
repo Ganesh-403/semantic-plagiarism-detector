@@ -16,7 +16,9 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/layout_logs.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "layout_logs.db"
 
 
 @contextmanager
@@ -69,7 +71,7 @@ def log_layout_comparison(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO layout_logs 
+                INSERT INTO layout_logs
                 (document_a_id, document_b_id, edit_distance, structural_similarity, is_structural_clone, analyzed_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,

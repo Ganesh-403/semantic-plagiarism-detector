@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from src.api.middleware import get_current_user_any
+
 import logging
 from typing import Optional
 
@@ -45,7 +47,7 @@ router = APIRouter(tags=["Document Health Scoring"])
 async def score_single_document(
     request: Request,
     filename: str = Query(..., description="Document filename to score"),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """
     Score a single document and persist the health report.
@@ -163,7 +165,7 @@ async def list_health_scores(
     sort_order: str = Query("DESC", description="Sort direction"),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """List document health scores with filtering and pagination."""
     try:
@@ -212,7 +214,7 @@ async def list_health_scores(
 async def get_document_score(
     filename: str,
     request: Request,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """Get the latest health score for a specific document."""
     try:
@@ -253,7 +255,7 @@ async def get_score_history(
     filename: str,
     request: Request,
     limit: int = Query(50, ge=1, le=200),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """Retrieve historical health scores for a document."""
     try:
@@ -330,7 +332,7 @@ async def update_gate_config(
 async def check_quality_gate(
     request: Request,
     filename: str = Query(..., description="Document filename"),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst"]),
 ):
     """Check if a document passes the quality gate based on its latest score."""
     try:
@@ -390,7 +392,7 @@ async def check_quality_gate(
 )
 async def get_health_summary(
     request: Request,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """Get aggregate health score statistics."""
     try:
@@ -414,7 +416,7 @@ async def get_health_summary(
 )
 async def get_dimension_averages(
     request: Request,
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """Get average score per health dimension."""
     try:
@@ -438,7 +440,7 @@ async def get_dimension_averages(
 async def get_worst_documents(
     request: Request,
     limit: int = Query(10, ge=1, le=50),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """Get the documents with the lowest health scores."""
     try:
@@ -462,7 +464,7 @@ async def get_worst_documents(
 async def get_best_documents(
     request: Request,
     limit: int = Query(10, ge=1, le=50),
-    _user: dict = Security(get_current_user, scopes=["admin", "analyst", "viewer"]),
+    _user: dict = Security(get_current_user_any, scopes=["admin", "analyst", "viewer"]),
 ):
     """Get the documents with the highest health scores."""
     try:

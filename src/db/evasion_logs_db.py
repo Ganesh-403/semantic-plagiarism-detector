@@ -14,7 +14,9 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/evasion_logs.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "evasion_logs.db"
 
 
 @contextmanager
@@ -65,7 +67,7 @@ def log_evasion_analysis(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO evasion_logs 
+                INSERT INTO evasion_logs
                 (document_id, evasion_risk_score, is_suspicious, evasion_patterns, analyzed_at)
                 VALUES (?, ?, ?, ?, ?)
                 """,

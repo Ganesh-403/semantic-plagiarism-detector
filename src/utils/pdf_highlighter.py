@@ -72,7 +72,7 @@ def transform_rect_for_rotation(
 
 def highlight_pdf_matches(
     pdf_bytes: bytes,
-    matching_phrases: Optional[list[str]] = None,
+    matching_phrases: Optional[list[str | tuple[str, float]]] = None,
     password: Optional[str] = None,
     source_doc: Optional[str] = None,
     similarity: Optional[float] = None,
@@ -110,8 +110,10 @@ def highlight_pdf_matches(
 
         # Iterate through pages and highlight matched text
         for page in doc:
-            for phrase in matching_phrases:
+            for item in matching_phrases:
+                phrase, score = item if isinstance(item, tuple) else (item, similarity)
                 phrase_clean = phrase.strip()
+                match_similarity = score if score is not None else s_sim
                 if not phrase_clean:
                     continue
 
@@ -123,13 +125,14 @@ def highlight_pdf_matches(
                     if len(sub_clean) >= 3:
                         matches = page.search_for(sub_clean)
                         for rect in matches:
-                            rect = transform_rect_for_rotation(rect, page)
+                            # search_for returns unrotated page coordinates, as required
+                            # by add_highlight_annot even for rotated pages.
                             annot = page.add_highlight_annot(rect)
                             annot.set_info(
-                                content=f"Matched with {s_doc} ({s_sim:.1%})",
+                                content=f"Matched with {s_doc} ({match_similarity:.1%})",
                                 title="Plagiarism Match",
                             )
-                            annot.set_colors(stroke=(1, 1, 0))  # Bright Yellow
+                            annot.set_colors(stroke=(1, 0, 0) if score is not None and score >= 0.9 else (1, 0.5, 0) if score is not None and score >= 0.7 else (1, 1, 0))
                             annot.update()
 
         # Return modified PDF bytes with compression and garbage collection

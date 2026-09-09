@@ -82,10 +82,7 @@ SOURCE_FILES = iter_source_files()
 # Remove an entry as soon as its fix merges. A stale entry is harmless (the
 # subset assertion below still passes), but it hides a real regression in that
 # file, so please keep this list empty.
-KNOWN_BROKEN: dict[str, str] = {
-    "src/utils/file_parser.py": "#2197",
-    "src/security/mime_validator.py": "#2196",
-}
+KNOWN_BROKEN: dict[str, str] = {}
 
 
 def test_source_files_were_discovered():

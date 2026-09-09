@@ -11,6 +11,7 @@ Features:
 - Rate limiting
 - Endpoint exposure
 """
+from collections import Counter
 
 import hashlib
 import json

@@ -40,10 +40,19 @@ T = TypeVar("T")
 # ============================================================================
 
 
+class LoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=128)
+    password: str = Field(min_length=1, max_length=128)
+    otp_code: str | None = Field(default=None, min_length=6, max_length=8)
+
+
 class LoginResponse(BaseModel):
     """Response schema for authentication login."""
 
-    token: str = Field(..., description="Authentication session token")
+    token: str = Field(..., description="Authentication access token")
+    access_token: str | None = None
+    refresh_token: str | None = None
+    token_type: str = "bearer"
     expires_in: int = Field(
         default=86400, description="Token validity duration in seconds (default: 86400 / 24 hours)"
     )
@@ -123,7 +132,8 @@ class RevokeResponse(BaseModel):
 class TwoFactorSetupRequest(BaseModel):
     """Request schema for 2FA setup."""
 
-    username: str | None = Field(default=None, description="Username to set up 2FA for")
+    username: str = Field(min_length=1, max_length=128, description="Username to set up 2FA for")
+    password: str = Field(min_length=1, max_length=128, description="Current account password")
     issuer: str | None = Field(
         default="SemanticPlagiarismDetector",
         description="TOTP Issuer name for authenticator apps",
@@ -652,6 +662,7 @@ class AsyncScanStatusResponse(BaseModel):
 class MetricSample(BaseModel):
     """Schema for an individual Prometheus metric sample."""
 
+    name: str = Field(..., description="Metric sample name")
     labels: dict[str, str] = Field(
         default_factory=dict, description="Label name/value pairs for this metric sample"
     )
@@ -670,7 +681,7 @@ class MetricFamily(BaseModel):
         default="gauge",
         description="Metric type: gauge, counter, histogram, summary, untyped",
     )
-    samples: list[MetricSample] = Field(
+    metrics: list[MetricSample] = Field(
         default_factory=list, description="List of metric samples in this family"
     )
 

@@ -17,7 +17,9 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/federation_registry.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "federation_registry.db"
 
 
 @contextmanager
@@ -77,7 +79,7 @@ def register_trusted_node(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO trusted_nodes 
+                INSERT OR REPLACE INTO trusted_nodes
                 (institution_id, name, public_key_hash, added_at)
                 VALUES (?, ?, ?, ?)
                 """,
@@ -100,7 +102,7 @@ def store_federated_signature(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO federated_signatures 
+                INSERT OR REPLACE INTO federated_signatures
                 (document_id, institution_id, lsh_bands_json, created_at)
                 VALUES (?, ?, ?, ?)
                 """,

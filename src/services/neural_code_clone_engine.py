@@ -8,6 +8,8 @@ import math
 import hashlib
 import re
 from typing import List, Dict, Any, Optional, Set
+from uuid import uuid4
+from src.models.neural_code_clone_model import CodeAstEmbedding, CodeCloneMatch
 
 
 class NeuralCodeCloneDetector:
@@ -16,6 +18,12 @@ class NeuralCodeCloneDetector:
     and semantic token hashes to identify plagiarized code blocks.
     """
 
+    def __init__(self, similarity_threshold: float = 0.7):
+        if not 0 <= similarity_threshold <= 1:
+            raise ValueError("similarity_threshold must be between 0 and 1")
+        self.similarity_threshold = similarity_threshold
+        self.indexed_code_repositories = {}
+
     @staticmethod
     def calculate_token_cosine_similarity(
         vec1: List[float], vec2: List[float]
@@ -23,6 +31,10 @@ class NeuralCodeCloneDetector:
         """Calculates cosine similarity between two vector embeddings."""
         if not vec1 or not vec2 or len(vec1) != len(vec2):
             return 0.0
+        if not all(math.isfinite(v) for v in (*vec1, *vec2)):
+            return 0.0
+        norm = math.sqrt(sum(v * v for v in vec1)) * math.sqrt(sum(v * v for v in vec2))
+        return max(-1.0, min(1.0, sum(a * b for a, b in zip(vec1, vec2)) / norm)) if norm else 0.0
 
     def index_repository_file(
         self, file_id: str, file_path: str, code_content: str, language: str = "python"
@@ -80,15 +92,14 @@ class NeuralCodeCloneDetector:
         query_tokens = self._extract_ast_structural_tokens(query_code)
         query_set = set(query_tokens)
 
-        # Simulated transformer neural semantic score
-        semantic_sim = round((ast_sim * 0.6) + (token_sim * 0.4), 4)
-        overall_score = round(
-            (ast_sim * 0.4) + (token_sim * 0.3) + (semantic_sim * 0.3), 4
-        )
-
-        clone_type, obfuscation = cls.classify_clone_type(
-            ast_sim, token_sim, semantic_sim
-        )
+        clone_matches = []
+        if not query_set:
+            return clone_matches
+        for file_id, repo in self.indexed_code_repositories.items():
+            if repo["language"] != language:
+                continue
+            intersection = len(query_set & repo["astTokenSet"])
+            union = len(query_set | repo["astTokenSet"])
 
             jaccard_similarity = round(intersection / union, 4)
 
@@ -133,3 +144,36 @@ class NeuralCodeCloneDetector:
 # - Generates deterministic, verifiable audit logs for university review boards.
 # - Integrates seamlessly with GitHub CI/CD PR checks to block plagiarized pull requests.
 # ==============================================================================
+
+
+class NeuralCodeCloneEngine:
+    """Compare supplied code embeddings with explicit, deterministic heuristics.
+
+    Scores describe structural similarity; they do not prove semantic equivalence.
+    """
+
+    calculate_token_cosine_similarity = staticmethod(NeuralCodeCloneDetector.calculate_token_cosine_similarity)
+
+    @staticmethod
+    def classify_clone_type(ast_sim: float, token_sim: float, semantic_sim: float) -> tuple[str, bool]:
+        if ast_sim >= 0.99 and token_sim >= 0.99:
+            return "Type-1 (Exact)", False
+        if ast_sim >= 0.9 and token_sim >= 0.8:
+            return "Type-2 (Renamed)", True
+        if ast_sim >= 0.6:
+            return "Type-3 (Modified AST)", True
+        if semantic_sim >= 0.8:
+            return "Type-4 (Semantic Equivalent)", True
+        return "No significant clone", False
+
+    @classmethod
+    def analyze_code_pair(cls, source_file_id: str, target_file_id: str,
+                          source: CodeAstEmbedding, target: CodeAstEmbedding) -> CodeCloneMatch:
+        ast_sim = max(0.0, cls.calculate_token_cosine_similarity(source.vector_embedding, target.vector_embedding))
+        maximum = max(source.ast_token_count, target.ast_token_count)
+        token_sim = min(source.ast_token_count, target.ast_token_count) / maximum if maximum else 0.0
+        semantic_sim = round(ast_sim * 0.6 + token_sim * 0.4, 4)
+        overall = round(ast_sim * 0.4 + token_sim * 0.3 + semantic_sim * 0.3, 4)
+        clone_type, obfuscation = cls.classify_clone_type(ast_sim, token_sim, semantic_sim)
+        return CodeCloneMatch(str(uuid4()), source_file_id, target_file_id, ast_sim,
+                              token_sim, semantic_sim, overall, clone_type, obfuscation)

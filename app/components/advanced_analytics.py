@@ -971,7 +971,7 @@ def run_pipeline_with_tracking(
 
     try:
         # Import the original run_pipeline function
-        from app.main import run_pipeline
+        from src.core.pipeline import run_pipeline
 
         # Run the original pipeline
         result = run_pipeline(

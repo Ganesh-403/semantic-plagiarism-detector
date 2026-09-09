@@ -19,7 +19,9 @@ from src.core.stylometry_engine import StylometricProfile
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path("data/stylometry_profiles.db")
+from src.core.app_config import DATA_DIR
+
+DEFAULT_DB_PATH = DATA_DIR / "stylometry_profiles.db"
 
 
 @contextmanager
@@ -58,7 +60,7 @@ def initialize_stylometry_db(db_path: Optional[Path] = None) -> None:
 
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_stylometry_user 
+            CREATE INDEX IF NOT EXISTS idx_stylometry_user
             ON stylometry_profiles(user_id)
         """
         )
@@ -79,7 +81,7 @@ def save_profile(
         with get_connection(db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO stylometry_profiles 
+                INSERT INTO stylometry_profiles
                 (user_id, document_id, profile_data, created_at)
                 VALUES (?, ?, ?, ?)
                 """,

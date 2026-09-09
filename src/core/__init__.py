@@ -1,144 +1,80 @@
-from typing import TYPE_CHECKING
+"""Public compatibility exports, loaded on demand without startup side effects."""
 
-from .config import (
-    BrandingConfig,
-    get_branding_config,
-    load_branding_config,
-    reload_branding_config,
-)
-from .document_parser import (
-    check_ocr_dependencies,
-    extract_text,
-    extract_text_from_pdf,
-    extract_texts,
-    extract_texts_from_pdfs,
-    sanitize_zero_width_characters,
-)
-from .embedding_model import embed_chunks, embed_documents, get_document_embedding
-from .faiss_index import (
-    FAISSIndex,
-    FaissIndexManager,
-    ChunkRecord,
-    FaissChunkRecord,
-    build_index,
-    build_index_from_matrix,
-    find_plagiarised_chunks,
-    format_faiss_memory_badge,
-    get_faiss_index_memory_bytes,
-    load_index,
-    rebuild_index_from_database,
-    rebuild_index_from_db,
-    save_index,
-    search_similar_chunks,
-)
-from .pipeline import (
-    PipelineChunkRecord,
-    run_extraction_pipeline,
-    run_pipeline,
-)
-from .similarity import (
-    PLAGIARISM_THRESHOLD,
-    calculate_paragraph_similarity_breakdown,
-    chunk_similarity_matrix,
-    document_similarity_matrix,
-    find_most_similar_chunks,
-    flag_plagiarism,
-    manhattan_similarity,
-)
-from .similarity_base import BaseSimilarityEngine
-from .similarity_engines import (
-    HybridSimilarityEngine,
-    LexicalSimilarityEngine,
-    SemanticSimilarityEngine,
-    SimilarityEngineFactory,
-)
-from .tag_manager import TagManager, sanitize_tag_name
-from .text_chunking import (
-    Chunk,
-    ChunkString,
-    chunk_by_sentences,
-    chunk_document,
-    chunk_document_by_tokens,
-    chunk_documents,
-)
-from .translator import translate_text
-from .webhook import (
-    EventDispatcher,
-    dispatch_plagiarism_alert,
-    send_plagiarism_alert,
-)
+from importlib import import_module
 
-# TYPE_CHECKING block for lazy imports (Issue #2363)
-# This satisfies static analysis tools (mypy, pylance) that would otherwise
-# complain that src.core has no attribute 'with_sqlite_retry', even though
-# it's dynamically resolved via __getattr__ and listed in __all__.
-if TYPE_CHECKING:
-    from .concurrency import with_sqlite_retry
-
-__all__ = [
-    "BaseSimilarityEngine",
-    "BrandingConfig",
-    "Chunk",
-    "ChunkRecord",
-    "ChunkString",
-    "EventDispatcher",
-    "FAISSIndex",
-    "FaissChunkRecord",
-    "FaissIndexManager",
-    "HybridSimilarityEngine",
-    "LexicalSimilarityEngine",
-    "PLAGIARISM_THRESHOLD",
-    "PipelineChunkRecord",
-    "SemanticSimilarityEngine",
-    "SimilarityEngineFactory",
-    "TagManager",
-    "build_index",
-    "build_index_from_matrix",
-    "calculate_paragraph_similarity_breakdown",
-    "chunk_by_sentences",
-    "chunk_document",
-    "chunk_document_by_tokens",
-    "chunk_documents",
-    "chunk_similarity_matrix",
-    "dispatch_plagiarism_alert",
-    "document_similarity_matrix",
-    "embed_chunks",
-    "embed_documents",
-    "extract_text",
-    "extract_text_from_pdf",
-    "extract_texts",
-    "extract_texts_from_pdfs",
-    "find_most_similar_chunks",
-    "find_plagiarised_chunks",
-    "flag_plagiarism",
-    "format_faiss_memory_badge",
-    "get_branding_config",
-    "get_document_embedding",
-    "get_faiss_index_memory_bytes",
-    "load_branding_config",
-    "load_index",
-    "manhattan_similarity",
-    "rebuild_index_from_database",
-    "rebuild_index_from_db",
-    "reload_branding_config",
-    "run_extraction_pipeline",
-    "run_pipeline",
-    "sanitize_tag_name",
-    "sanitize_zero_width_characters",
-    "save_index",
-    "search_similar_chunks",
-    "send_plagiarism_alert",
-    "translate_text",
-    "with_sqlite_retry",
-]
+_EXPORTS = {
+    "BrandingConfig": (".config", "BrandingConfig"),
+    "get_branding_config": (".config", "get_branding_config"),
+    "load_branding_config": (".config", "load_branding_config"),
+    "reload_branding_config": (".config", "reload_branding_config"),
+    "check_ocr_dependencies": (".document_parser", "check_ocr_dependencies"),
+    "extract_text": (".document_parser", "extract_text"),
+    "extract_text_from_pdf": (".document_parser", "extract_text_from_pdf"),
+    "extract_texts": (".document_parser", "extract_texts"),
+    "extract_texts_from_pdfs": (".document_parser", "extract_texts_from_pdfs"),
+    "sanitize_zero_width_characters": (
+        ".document_parser",
+        "sanitize_zero_width_characters",
+    ),
+    "embed_chunks": (".embedding_model", "embed_chunks"),
+    "embed_documents": (".embedding_model", "embed_documents"),
+    "get_document_embedding": (".embedding_model", "get_document_embedding"),
+    "FAISSIndex": (".faiss_index", "FAISSIndex"),
+    "FaissIndexManager": (".faiss_index", "FaissIndexManager"),
+    "ChunkRecord": (".faiss_index", "ChunkRecord"),
+    "FaissChunkRecord": (".faiss_index", "FaissChunkRecord"),
+    "build_index": (".faiss_index", "build_index"),
+    "build_index_from_matrix": (".faiss_index", "build_index_from_matrix"),
+    "find_plagiarised_chunks": (".faiss_index", "find_plagiarised_chunks"),
+    "format_faiss_memory_badge": (".faiss_index", "format_faiss_memory_badge"),
+    "get_faiss_index_memory_bytes": (".faiss_index", "get_faiss_index_memory_bytes"),
+    "load_index": (".faiss_index", "load_index"),
+    "rebuild_index_from_database": (".faiss_index", "rebuild_index_from_database"),
+    "rebuild_index_from_db": (".faiss_index", "rebuild_index_from_db"),
+    "save_index": (".faiss_index", "save_index"),
+    "search_similar_chunks": (".faiss_index", "search_similar_chunks"),
+    "PipelineChunkRecord": (".pipeline", "PipelineChunkRecord"),
+    "run_extraction_pipeline": (".pipeline", "run_extraction_pipeline"),
+    "run_pipeline": (".pipeline", "run_pipeline"),
+    "PLAGIARISM_THRESHOLD": (".similarity", "PLAGIARISM_THRESHOLD"),
+    "calculate_paragraph_similarity_breakdown": (
+        ".similarity",
+        "calculate_paragraph_similarity_breakdown",
+    ),
+    "chunk_similarity_matrix": (".similarity", "chunk_similarity_matrix"),
+    "document_similarity_matrix": (".similarity", "document_similarity_matrix"),
+    "find_most_similar_chunks": (".similarity", "find_most_similar_chunks"),
+    "flag_plagiarism": (".similarity", "flag_plagiarism"),
+    "manhattan_similarity": (".similarity", "manhattan_similarity"),
+    "BaseSimilarityEngine": (".similarity_base", "BaseSimilarityEngine"),
+    "HybridSimilarityEngine": (".similarity_engines", "HybridSimilarityEngine"),
+    "LexicalSimilarityEngine": (".similarity_engines", "LexicalSimilarityEngine"),
+    "SemanticSimilarityEngine": (".similarity_engines", "SemanticSimilarityEngine"),
+    "SimilarityEngineFactory": (".similarity_engines", "SimilarityEngineFactory"),
+    "TagManager": (".tag_manager", "TagManager"),
+    "sanitize_tag_name": (".tag_manager", "sanitize_tag_name"),
+    "Chunk": (".text_chunking", "Chunk"),
+    "ChunkString": (".text_chunking", "ChunkString"),
+    "chunk_by_sentences": (".text_chunking", "chunk_by_sentences"),
+    "chunk_document": (".text_chunking", "chunk_document"),
+    "chunk_document_by_tokens": (".text_chunking", "chunk_document_by_tokens"),
+    "chunk_documents": (".text_chunking", "chunk_documents"),
+    "translate_text": (".translator", "translate_text"),
+    "EventDispatcher": (".webhook", "EventDispatcher"),
+    "dispatch_plagiarism_alert": (".webhook", "dispatch_plagiarism_alert"),
+    "send_plagiarism_alert": (".webhook", "send_plagiarism_alert"),
+    "with_sqlite_retry": (".concurrency", "with_sqlite_retry"),
+}
+__all__ = list(_EXPORTS)
 
 
-# with_sqlite_retry is re-exported from src.core.concurrency (which lazily
-# re-exports it from src.db.common). A lazy lookup avoids the circular import
-# chain (src.db -> src.core -> src.db.common).
 def __getattr__(name):
-    if name == "with_sqlite_retry":
-        from .concurrency import with_sqlite_retry
+    if name not in _EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module, attribute = _EXPORTS[name]
+    value = getattr(import_module(module, __name__), attribute)
+    return value
 
-        return with_sqlite_retry
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+def __dir__():
+    return sorted(set(globals()) | set(__all__))

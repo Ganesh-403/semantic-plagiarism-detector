@@ -1,3 +1,4 @@
+from pathlib import Path
 import os
 import sys
 
@@ -35,7 +36,7 @@ def test_app_settings_reset_to_defaults(
     mock_get_all_docs_db.return_value = mock_docs
     mock_get_all_docs_app.return_value = mock_docs
 
-    at = AppTest.from_file("app/streamlit_app.py")
+    at = AppTest.from_file(str(Path(__file__).resolve().parents[2] / "app/streamlit_app.py"))
 
     # Simulate an authenticated admin session
     at.session_state["authenticated"] = True

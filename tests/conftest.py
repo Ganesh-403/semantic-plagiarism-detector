@@ -28,16 +28,23 @@ import shutil
 import sys
 import types
 import zipfile
+import tempfile
 from typing import Any
 from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
 
+# Set before importing application modules, once per xdist worker.
+os.environ["SPD_STATE_DIR"] = tempfile.mkdtemp(prefix="spd-tests-")
+
 # ── Redis Test Database Isolation ─────────────────────────────────────────────
 # Use a separate Redis database (1 instead of 0) during tests so that running
 # the test suite does not flush the active development session cache.
 os.environ.setdefault("REDIS_DB", "1")
+os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("ADMIN_BOOTSTRAP_PASSWORD", "Admin123!")
+os.environ.setdefault("JWT_SECRET_KEY", "test-only-secret-which-is-never-used-in-production")
 
 # ── Headless Renderer Configuration (Issue #504) ──────────────────────────────
 # Force Matplotlib to use the non-GUI Agg backend on headless CI workers
@@ -68,7 +75,11 @@ if str(_REPO_ROOT) not in sys.path:
 # ── Sentence Transformers Stub ────────────────────────────────────────────────
 if "sentence_transformers" not in sys.modules:
     stub = types.ModuleType("sentence_transformers")
-    stub.SentenceTransformer = MagicMock  # type: ignore[attr-defined]
+    def _sentence_transformer_stub(*args, **kwargs):
+        model = MagicMock()
+        model.get_sentence_embedding_dimension.return_value = 384
+        return model
+    stub.SentenceTransformer = _sentence_transformer_stub  # type: ignore[attr-defined]
     sys.modules["sentence_transformers"] = stub
 
 if "torch" not in sys.modules:
@@ -254,9 +265,9 @@ def clean_test_env():
         except Exception:
             pass
 
-    index_path = os.path.join(str(_REPO_ROOT), "corpus.index")
-    db_path = os.path.join(str(_REPO_ROOT), "corpus.db")
-    users_db_path = os.path.join(str(_REPO_ROOT), "users.db")
+    index_path = os.path.join(os.environ["SPD_STATE_DIR"], "corpus.index")
+    db_path = os.path.join(os.environ["SPD_STATE_DIR"], "data", "corpus.db")
+    users_db_path = os.path.join(os.environ["SPD_STATE_DIR"], "users.db")
 
     for path in [index_path, db_path, users_db_path]:
         if os.path.exists(path):
@@ -365,7 +376,7 @@ class ExponentialBackoffFileUnlinkStrategy(AbstractTeardownStrategy):
     def execute_teardown(self, target_path: Path) -> bool:
         if not target_path.exists():
             return True
-            
+
         for attempt in range(self.max_retries):
             try:
                 target_path.unlink()
@@ -398,7 +409,7 @@ class EnterpriseFixtureTeardownManager:
         # Step 1: Close connections first
         connection_strategy = self.strategies[0]
         connection_strategy.execute_teardown(Path("."))
-        
+
         # Step 2: Unlink all files
         unlink_strategy = self.strategies[1]
         for file_path in self.tracked_files:
@@ -413,7 +424,7 @@ def mock_db(tmp_path):
     """
     corpus_db_file = tmp_path / "test_corpus.db"
     auth_db_file = tmp_path / "test_users.db"
-    
+
     manager = EnterpriseFixtureTeardownManager()
     manager.track_database(corpus_db_file)
     manager.track_database(auth_db_file)
@@ -438,7 +449,7 @@ def mock_db(tmp_path):
             traceback.print_exc()
 
         yield str(corpus_db_file)
-        
+
         # Acceptance Criteria Teardown execution
         manager.execute_all()
 
@@ -572,7 +583,7 @@ def db_connection(tmp_path: Path) -> sqlite3.Connection:
             student_name TEXT,
             is_deleted INTEGER DEFAULT 0
         );
-        
+
         CREATE TABLE IF NOT EXISTS plagiarism_incidents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             incident_id TEXT UNIQUE NOT NULL,
@@ -584,8 +595,8 @@ def db_connection(tmp_path: Path) -> sqlite3.Connection:
             threshold_at_time_of_flag REAL,
             review_status TEXT DEFAULT 'Pending'
         );
-        
-        CREATE INDEX IF NOT EXISTS idx_incidents_docs 
+
+        CREATE INDEX IF NOT EXISTS idx_incidents_docs
         ON plagiarism_incidents(document_a, document_b);
     """)
     conn.commit()
@@ -623,7 +634,7 @@ def populated_db_connection(db_connection: sqlite3.Connection) -> sqlite3.Connec
 
     db_connection.executemany(
         """
-        INSERT INTO plagiarism_incidents 
+        INSERT INTO plagiarism_incidents
         (incident_id, document_a, document_b, similarity, severity, timestamp, threshold_at_time_of_flag, review_status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
@@ -649,54 +660,77 @@ def mock_fast_tokenizer(monkeypatch):
             self.pad_token_id = 0
             self.eos_token_id = 2
             self.bos_token_id = 1
-            
+
         def __call__(self, text, *args, **kwargs):
             if isinstance(text, str):
                 texts = [text]
             else:
                 texts = text
-                
+
             batch_size = len(texts)
             # Dummy fixed-length array
-            seq_len = 16 
-            
+            seq_len = 16
+
             input_ids = torch.ones((batch_size, seq_len), dtype=torch.long)
             attention_mask = torch.ones((batch_size, seq_len), dtype=torch.long)
-            
+
             # Make it deterministic based on input length
             for i, t in enumerate(texts):
                 length = min(len(t) // 4 + 1, seq_len)
                 input_ids[i, :length] = torch.arange(1, length + 1)
                 attention_mask[i, length:] = 0
-                
+
             return {
                 "input_ids": input_ids,
                 "attention_mask": attention_mask
             }
 
     tokenizer = MockFastTokenizer()
-    
+
     # Mock AutoModelForSequenceClassification to avoid loading it
     mock_model = MagicMock()
     mock_model.config.max_position_embeddings = 512
-    
+
     # Mock loss to return a tensor with a valid value so perplexity does not crash
     mock_outputs = MagicMock()
     mock_outputs.loss.item.return_value = 1.0
     type(mock_outputs.loss).__float__ = MagicMock(return_value=1.0)
     mock_model.return_value = mock_outputs
-    
+
     try:
         import transformers
         monkeypatch.setattr(transformers.AutoTokenizer, "from_pretrained", lambda *args, **kwargs: tokenizer)
         monkeypatch.setattr(transformers.AutoModelForSequenceClassification, "from_pretrained", lambda *args, **kwargs: mock_model)
     except ImportError:
         pass
-        
+
     try:
         import sentence_transformers
         monkeypatch.setattr(sentence_transformers, "SentenceTransformer", lambda *args, **kwargs: MagicMock())
     except ImportError:
         pass
-        
+
     return tokenizer
+
+
+@pytest.fixture(autouse=True)
+def isolate_embedding_singletons(monkeypatch):
+    """Prevent model-loading tests from leaving mocked models in later tests."""
+    import src.core.embedding_model as module
+    monkeypatch.setattr(module, "_model", None)
+    monkeypatch.setattr(module, "_quantized_model", None)
+    monkeypatch.setattr(module, "_active_model_name", None)
+    monkeypatch.setattr(module.EmbeddingModelManager, "_instance", None)
+
+
+@pytest.fixture(autouse=True)
+def isolate_cached_application_state(monkeypatch):
+    from src.i18n import translator
+    from src.api.dependencies import limiter
+    from src.api.middleware import get_valid_tokens
+    from src.security.rate_limiter import get_token_bucket_limiter
+    monkeypatch.setattr(translator, "_translations", {})
+    translator._load_translation_dictionary.clear()
+    get_valid_tokens.cache_clear()
+    limiter._storage.reset()
+    get_token_bucket_limiter().reset()
