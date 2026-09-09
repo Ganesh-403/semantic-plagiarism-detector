@@ -23,8 +23,10 @@ def compute_baseline(
     values = [f[feature_key] for f in features_list if feature_key in f]
     if not values:
         return 0.0, 1.0
-    mean_val = sum(values) / len(values)
-    variance = sum((x - mean_val) ** 2 for x in values) / len(values)
+    mean_val = math.fsum(values) / len(values)
+    if math.isclose(min(values), max(values), rel_tol=1e-12, abs_tol=1e-12):
+        return mean_val, 0.0
+    variance = math.fsum((x - mean_val) ** 2 for x in values) / len(values)
     std_dev = math.sqrt(variance) if variance > 0 else 1.0
     return mean_val, std_dev
 

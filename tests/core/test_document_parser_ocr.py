@@ -20,6 +20,9 @@ class FakePage:
     def extract_text(self):
         return self._text
 
+    def find_tables(self):
+        return []
+
 
 class FakePDF:
     def __init__(self, page_texts):

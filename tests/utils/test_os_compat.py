@@ -20,8 +20,17 @@ from src.utils.os_compat import (
 
 
 @pytest.fixture(autouse=True)
-def reset_state():
+def reset_state(monkeypatch):
     """Ensure patch state is reset before and after every test."""
+    # Exercise the Windows adapter on Unix without depending on Windows-only
+    # classes being exported by asyncio there. No real loop policy is changed.
+    if not hasattr(asyncio, "WindowsProactorEventLoopPolicy"):
+        class ProactorPolicy:
+            pass
+        class SelectorPolicy:
+            pass
+        monkeypatch.setattr(asyncio, "WindowsProactorEventLoopPolicy", ProactorPolicy, raising=False)
+        monkeypatch.setattr(asyncio, "WindowsSelectorEventLoopPolicy", SelectorPolicy, raising=False)
     reset_patches_state()
     yield
     reset_patches_state()

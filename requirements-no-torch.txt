@@ -43,6 +43,7 @@ reportlab>=5.0.0
 requests>=2.31.0
 rq>=2.10.0
 scikit-learn>=1.4.0
+setuptools>=83.0.0
 seaborn>=0.13.0
 slowapi
 streamlit>=1.61.1

@@ -733,7 +733,8 @@ def test_cli_scan_permission_error(temp_assignments_dir, capsys):
     2. An appropriate error message indicating read failure is written to stderr.
     3. The application does not crash with an unhandled exception trace.
     """
-    with patch("os.scandir") as mock_scandir:
+    with patch("os.scandir") as mock_scandir, patch("os.listdir", side_effect=PermissionError(13, "Permission denied")):
+        # pathlib uses listdir on Python 3.11/3.12 and scandir on 3.13.
         # Simulate OS PermissionError (Errno 13 - Permission Denied)
         mock_scandir.side_effect = PermissionError(13, "Permission denied")
 

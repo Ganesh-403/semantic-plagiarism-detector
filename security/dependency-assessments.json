@@ -10,7 +10,7 @@
       "justification": "The application exposes text inference only, never caller-selected NLTK model import/export paths. None of the six affected model-artifact APIs are called. Fixed-name corpus downloads do not use those APIs.",
       "advisory": "https://github.com/advisories/GHSA-8mgp-746c-j5xp",
       "source_sha256": {
-        "src/core/document_parser.py": "8708c3eeaac619f7d3a5c06aaeadab88260cd04dd0553c2da5397409d03d2ad5",
+        "src/core/document_parser.py": "ed33b2244f25617bd548ec30d9713b730234ebf2e5586c97321730161d5d532a",
         "src/core/lexical_similarity.py": "4ad1e261be2556f702ce3fe9fc79455ac0ca8bf84c6ac1bfa20c79f97a087faf",
         "src/core/pos_normalizer.py": "a4f02343daac77dd70d251f49f1ea09f2e83efc37e6e585687da1069bd2373c2",
         "src/core/text_chunking.py": "1689363697d46550b9389d7ff82edb5748fd6d30f4b130c9bd734b66d90df797",

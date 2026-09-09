@@ -38,7 +38,7 @@ import time
 import urllib.parse
 import zlib
 from enum import Enum
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, List, Optional, Union
 
 # CacheKeyPrefix has been consolidated into CacheNamespace below
@@ -253,20 +253,10 @@ class PayloadCompressor:
 
 
 def normalize_cache_key_path(p: Any) -> str:
-    r"""Normalize path strings for cross-platform Redis cache keys (Issue #2939, #3028).
-
-    Uses pathlib.Path(p).as_posix() explicitly whenever creating cache keys based on file paths
-    to convert backslashes (\) on Windows to POSIX forward slashes (/) for cross-platform
-    cache key compatibility.
-    """
-    if p is None:
+    """Use the same key for Windows and POSIX spellings on every host OS."""
+    if p is None or str(p) == "":
         return ""
-    if isinstance(p, Path):
-        return p.as_posix()
-    p_str = str(p)
-    if not p_str:
-        return ""
-    return Path(p_str).as_posix()
+    return PurePosixPath(str(p).replace("\\", "/")).as_posix()
 
 
 class CacheNamespace(str, Enum):

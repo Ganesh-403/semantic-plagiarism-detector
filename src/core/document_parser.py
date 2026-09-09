@@ -914,58 +914,34 @@ def _format_table_as_text(table: list[list[str | None]]) -> str:
     return "\n".join(lines)
 
 
-def _parse_pdf_page(
-    pdf_bytes: bytes,
-    page_index: int,
-    ocr_dpi: int,
-    ocr_language: str,
-) -> list[str]:
-    """Helper running in a subprocess to extract text from a single PDF page."""
-    import io
+def _extract_loaded_pdf_page(pdf_bytes, page_index, page, ocr_dpi, ocr_language):
+    """Extract a page while its shared PDF reader remains open."""
+    tables = page.find_tables()
+    text_page = page
+    for table in tables:
+        text_page = text_page.outside_bbox(table.bbox)
+    native_text = (text_page.extract_text() or "").strip()
+    if not _has_meaningful_text(native_text, page=page):
+        if _is_blank_scanned_page(pdf_bytes, page_index, dpi=ocr_dpi):
+            return []
+    table_texts = []
+    for table in tables:
+        extracted_rows = table.extract()
+        if extracted_rows:
+            formatted = _format_table_as_text(extracted_rows)
+            if formatted:
+                table_texts.append(formatted)
+    selected_text = "\n\n".join([native_text, *table_texts]).strip()
+    if not _has_meaningful_text(selected_text, page=page):
+        selected_text = _ocr_pdf_page(pdf_bytes, page_index, dpi=ocr_dpi, language=ocr_language)
+    return _clean_page_text(selected_text)
 
-    import pdfplumber
 
+def _parse_pdf_page(pdf_bytes: bytes, page_index: int, ocr_dpi: int, ocr_language: str) -> list[str]:
+    """Extract one explicitly requested page using the shared page implementation."""
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            page = pdf.pages[page_index]
-
-            tables = page.find_tables()
-
-            # Pull normal text, but exclude the regions covered by tables
-            # so table cells don't also show up mashed together in the
-            # regular text (which is what caused the chaotic strings).
-            text_page = page
-            for table in tables:
-                text_page = text_page.outside_bbox(table.bbox)
-            native_text = (text_page.extract_text() or "").strip()
-
-            if not _has_meaningful_text(native_text, page=page):
-                if _is_blank_scanned_page(pdf_bytes, page_index, dpi=ocr_dpi):
-                    return []
-
-            table_texts = []
-            for table in tables:
-                extracted_rows = table.extract()
-                if extracted_rows:
-                    formatted = _format_table_as_text(extracted_rows)
-                    if formatted:
-                        table_texts.append(formatted)
-
-            combined_text = native_text
-            if table_texts:
-                combined_text = "\n\n".join([combined_text, *table_texts]).strip()
-
-            selected_text = combined_text
-
-            if not _has_meaningful_text(selected_text, page=page):
-                selected_text = _ocr_pdf_page(
-                    pdf_bytes,
-                    page_index,
-                    dpi=ocr_dpi,
-                    language=ocr_language,
-                )
-
-            return _clean_page_text(selected_text)
+            return _extract_loaded_pdf_page(pdf_bytes, page_index, pdf.pages[page_index], ocr_dpi, ocr_language)
     except OCRDependencyError:
         raise
     except Exception as exc:
@@ -1228,57 +1204,13 @@ def extract_text_from_pdf(
             if num_pages == 0:
                 return ""
 
-            if _should_use_parallel() and num_pages > 1:
-                from concurrent.futures import ProcessPoolExecutor
-
-                page_lines = [[] for _ in range(num_pages)]
-                try:
-                    with ProcessPoolExecutor() as executor:
-                        futures = [
-                            executor.submit(
-                                _parse_pdf_page,
-                                pdf_bytes,
-                                page_index,
-                                ocr_dpi,
-                                ocr_language,
-                            )
-                            for page_index in range(num_pages)
-                        ]
-                        for page_index, future in enumerate(futures):
-                            page_lines[page_index] = future.result()
-                except OCRDependencyError:
-                    raise
-                except (RuntimeError, OSError) as exc:
-                    logger.warning(
-                        f"[document_parser] ProcessPoolExecutor failed ({exc}), falling back to sequential page parsing..."
-                    )
-                    page_lines = []
-                    for page_index in range(num_pages):
-                        page = pdf.pages[page_index]
-                        native_text = (page.extract_text() or "").strip()
-                        selected_text = native_text
-                        if not _has_meaningful_text(native_text, page=page):
-                            selected_text = _ocr_pdf_page(
-                                pdf_bytes,
-                                page_index,
-                                dpi=ocr_dpi,
-                                language=ocr_language,
-                            )
-                        page_lines.append(_clean_page_text(selected_text))
-            else:
-                page_lines = []
-                for page_index in range(num_pages):
-                    page = pdf.pages[page_index]
-                    native_text = (page.extract_text() or "").strip()
-                    selected_text = native_text
-                    if not _has_meaningful_text(native_text, page=page):
-                        selected_text = _ocr_pdf_page(
-                            pdf_bytes,
-                            page_index,
-                            dpi=ocr_dpi,
-                            language=ocr_language,
-                        )
-                    page_lines.append(_clean_page_text(selected_text))
+            # Reuse one reader for every page. Reopening the complete PDF in a
+            # worker for each page repeats document parsing and makes text-only
+            # PDFs much slower; batch-level parallelism remains in extract_texts.
+            page_lines = [
+                _extract_loaded_pdf_page(pdf_bytes, page_index, page, ocr_dpi, ocr_language)
+                for page_index, page in enumerate(pdf.pages)
+            ]
     except OCRDependencyError:
         raise
     except Exception as exc:

@@ -8,11 +8,16 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.metadata
 import json
 import subprocess
 import sys
+import tempfile
 from datetime import date
 from pathlib import Path
+
+from packaging.utils import canonicalize_name
+from packaging.version import Version
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -60,6 +65,51 @@ def evaluate(report, assessments, *, root=ROOT, today=None):
     return blocked, reviewed
 
 
+def installed_inventory(distributions=None):
+    """Pin every installed distribution, mapping only the official Torch CPU suffix.
+
+    CPU wheels share PyTorch's public release/advisories. PyPI cannot resolve the
+    +cpu index suffix. Preserve the installed version beside the audited version;
+    unknown local builds remain unmodified and fail closed if they cannot be audited.
+    """
+    if distributions is None:
+        distributions = [(d.metadata["Name"], d.version) for d in importlib.metadata.distributions()]
+    inventory = {}
+    for name, installed_version in distributions:
+        name = canonicalize_name(name)
+        parsed = Version(installed_version)
+        audit_version = parsed.public if name == "torch" and parsed.local == "cpu" else installed_version
+        item = {"name": name, "installed_version": installed_version, "audited_version": audit_version}
+        if name in inventory and inventory[name] != item:
+            raise ValueError(f"Conflicting installed versions for {name}")
+        inventory[name] = item
+    return [inventory[name] for name in sorted(inventory)]
+
+
+def audit_installed(output):
+    """Audit the full installed closure without asking pip to resolve it again."""
+    inventory = installed_inventory()
+    with tempfile.TemporaryDirectory(prefix="dependency-audit-") as directory:
+        requirements = Path(directory) / "installed.txt"
+        requirements.write_text("".join(f"{item['name']}=={item['audited_version']}\n" for item in inventory), encoding="utf-8")
+        result = subprocess.run(
+            [sys.executable, "-m", "pip_audit", "--no-deps", "--disable-pip",
+             "-r", str(requirements), "--format=json", "--output", str(output)],
+            check=False,
+        )
+    if result.returncode not in (0, 1) or not output.exists():
+        return None
+    report = json.loads(output.read_text(encoding="utf-8"))
+    report["installed_inventory"] = inventory
+    output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    # A tool result must account for every pinned package, including skipped ones.
+    inspected = {canonicalize_name(item["name"]) for item in report.get("dependencies", [])}
+    expected = {item["name"] for item in inventory}
+    if inspected != expected:
+        raise ValueError(f"Incomplete dependency inventory: missing={sorted(expected-inspected)}, unexpected={sorted(inspected-expected)}")
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True, type=Path)
@@ -67,13 +117,9 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     # Remove stale reports so a failed scan cannot reuse a previous clean result.
     args.output.unlink(missing_ok=True)
-    result = subprocess.run(
-        [sys.executable, "-m", "pip_audit", "--format=json", "--output", str(args.output)],
-        check=False,
-    )
-    if result.returncode not in (0, 1) or not args.output.exists():
+    report = audit_installed(args.output)
+    if report is None:
         return 2
-    report = json.loads(args.output.read_text(encoding="utf-8"))
     assessments = json.loads((ROOT / "security/dependency-assessments.json").read_text())["assessments"]
     blocked, reviewed = evaluate(report, assessments)
     for item in reviewed:
