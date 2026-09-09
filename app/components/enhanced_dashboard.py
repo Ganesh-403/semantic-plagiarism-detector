@@ -281,6 +281,8 @@ def render_document_activity_heatmap(history_data: list[dict]) -> None:
         return
 
     df = pd.DataFrame(history_data)
+    if "doc_count" not in df and "document_count" in df:
+        df = df.rename(columns={"document_count": "doc_count"})
     df["date"] = pd.to_datetime(df["timestamp"]).dt.date
     df["hour"] = pd.to_datetime(df["timestamp"]).dt.hour
 

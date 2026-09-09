@@ -11,6 +11,7 @@ Features:
 - Batch digests
 - Priority levels
 """
+from plotly.subplots import make_subplots
 
 import json
 import queue

@@ -1,8 +1,9 @@
 """Centralized Session State Keys for the Streamlit Application."""
 
-from enum import Enum
+from enum import Enum, unique
 
 
+@unique
 class SessionKeys(str, Enum):
     """Every key this application stores in ``st.session_state``.
 

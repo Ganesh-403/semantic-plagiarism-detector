@@ -208,7 +208,7 @@ def _run_backup_daemon():
             cache = get_cache()
             timeout = get_backup_idle_timeout()
             now = time.time()
-            
+
             # Establish a safe startup state: wait for at least one timeout interval
             # after daemon startup before allowing ANY backups to trigger.
             # We track this explicit condition rather than using an arbitrary sleep/continue.
@@ -301,7 +301,7 @@ def init_session_state():
     if SessionKeys.SESSION_START_TIME not in st.session_state:
         st.session_state[SessionKeys.SESSION_START_TIME] = time.time()
 
-    if SessionKeys.MODEL_LOAD_TIME not in st.session_state:
+    if os.getenv("PRELOAD_EMBEDDING_MODEL", "false").lower() == "true" and SessionKeys.MODEL_LOAD_TIME not in st.session_state:
         from src.core.embedding_model import EmbeddingModelManager
 
         with st.spinner("Initializing Vector Embedding Model..."):
@@ -312,7 +312,8 @@ def init_session_state():
             )
 
     update_global_activity()
-    init_api_server_daemon()
+    if os.getenv("ENABLE_EMBEDDED_API", "false").lower() == "true":
+        init_api_server_daemon()
     init_backup_daemon()
 
     return st.session_state[SessionKeys.SESSION_ID]
@@ -459,4 +460,3 @@ def reset_analysis_session_state() -> None:
     ):
         if key in st.session_state:
             del st.session_state[key]
-

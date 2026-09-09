@@ -38,9 +38,9 @@ def handle_oauth_callbacks(session_id: str):
             _user_info, _error_msg = None, None
             try:
                 if _state.startswith("google_"):
-                    _user_info, _error_msg = exchange_google_code(_code)
+                    _user_info, _error_msg = exchange_google_code(_code, state=_state)
                 elif _state.startswith("github_"):
-                    _user_info, _error_msg = exchange_github_code(_code)
+                    _user_info, _error_msg = exchange_github_code(_code, state=_state)
             except (SSOConfigurationError, ValueError) as _exc:
                 _user_info, _error_msg = None, f"Configuration Error: {_exc}"
 

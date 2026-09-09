@@ -11,6 +11,7 @@ Features:
 - Batch risk assessment with priority queuing
 - Risk mitigation recommendations
 """
+from __future__ import annotations
 
 import hashlib
 import json

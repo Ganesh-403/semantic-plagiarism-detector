@@ -3,6 +3,7 @@ Threshold Optimization UI Components.
 
 Provides UI elements for automated threshold optimization.
 """
+import numpy as np
 
 from typing import Any, Dict, List, Optional  # noqa: F401
 

@@ -806,6 +806,8 @@ def render_clustering_tab(
             # Display metrics
             st.success("✅ Clustering completed!")
 
+            metrics = clusterer.cluster_metrics
+
             # Metrics dashboard
             col1, col2, col3, col4 = st.columns(4)
             col1.metric("Number of Clusters", metrics["n_clusters"])
