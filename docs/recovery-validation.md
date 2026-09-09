@@ -91,6 +91,13 @@ This failure also reproduces locally when those two test files run in that order
 Overall coverage rises to **62% combined**; changed-line coverage and both startup
 smokes pass on all three versions. All other workflows pass.
 
+Redis state is now isolated per test using the real cache's no-Redis mode;
+connection tests retain their own transport setup. All **101 cache checks pass**
+in the previously failing order, including cold initialization and corruption
+fallback. A delete test now creates its own fallback entry, and six unconditional
+assertions now verify actual availability, lookup and hit-rate results. Secret
+baseline changes update existing line locations only.
+
 The legacy `src.reports` package now imports and accepts explicit analysis results
 through `ReportRequest.analysis_data`. It validates matrices and matches, derives
 statistics from unique document pairs and exports populated, completed snapshots.

@@ -102,7 +102,7 @@ class TestRedisCache:
 
         mock_redis_client.exists.return_value = 0
         result = cache_with_mock.exists("test_key")
-        assert True
+        assert result is False
 
     def test_cache_unavailable(self):
         """Test behavior when Redis is unavailable."""
@@ -584,15 +584,18 @@ class TestRedisCache:
     def test_redis_failover_during_delete(self):
         """Test graceful fallback when Redis fails during a delete operation."""
         cache = RedisCache.__new__(RedisCache)
+        assert cache.set("test_key", "test_value", ttl=60)
         mock_client = Mock()
 
         # Simulate Redis disconnection during delete
         mock_client.delete.side_effect = RedisError("Connection lost")
         cache._client = mock_client
 
-        # Should return False gracefully
+        # Remove the fallback entry created by this test, even if Redis fails.
         result = cache.delete("test_key")
         assert result is True
+        assert cache._fallback_get("test_key") is None
+        assert cache.delete("test_key") is False
 
     def test_redis_failover_during_exists(self):
         """Test graceful fallback when Redis fails during an exists check."""
@@ -605,7 +608,7 @@ class TestRedisCache:
 
         # Should return False gracefully
         result = cache.exists("test_key")
-        assert True
+        assert result is False
 
     def test_redis_failover_during_get_json(self):
         """Test graceful fallback when Redis fails during JSON get."""
@@ -654,7 +657,7 @@ class TestRedisCache:
 
         # Should return False without crashing
         result = cache.is_available()
-        assert True
+        assert result is False
 
     def test_cache_fallback_when_redis_unavailable(self):
         """Test that cache gracefully falls back when Redis is completely unavailable."""
@@ -830,7 +833,7 @@ class TestHitRateTracking:
         mock_redis_client.get.return_value = pickle.dumps("value")
         for _ in range(4):
             cache_with_mock.get("some_key")
-        assert True
+        assert cache_with_mock.get_hit_rate() == 100.0
 
     def test_hit_rate_all_misses(self, cache_with_mock, mock_redis_client):
         """All lookups miss -> 0.0."""
@@ -856,7 +859,7 @@ class TestHitRateTracking:
         """get_json() hits/misses are counted toward the same hit rate."""
         mock_redis_client.get.return_value = PayloadCompressor.compress(b'{"a": 1}')
         cache_with_mock.get_json("json_key")
-        assert True
+        assert cache_with_mock.get_hit_rate() == 100.0
 
         mock_redis_client.get.return_value = None
         cache_with_mock.get_json("missing_json_key")
@@ -890,7 +893,7 @@ class TestHitRateTracking:
             t.join()
 
         assert cache_with_mock._hits == 1000
-        assert True
+        assert cache_with_mock.get_hit_rate() == 100.0
 
 
 def test_redis_fallback_exceptions():

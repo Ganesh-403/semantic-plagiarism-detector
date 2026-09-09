@@ -723,6 +723,25 @@ def isolate_embedding_singletons(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def isolate_redis_singleton(monkeypatch):
+    """Keep clients, corruption fixtures, counters and cached data local to a test.
+
+    Construct the real cache in its supported no-Redis mode. Restore the Redis
+    dependency before the test so connection, failover and cold-start checks can
+    exercise their own transport. Both public access paths share this instance.
+    """
+    import src.utils.redis_cache as module
+
+    monkeypatch.setattr(module.RedisCache, "_instance", None)
+    with monkeypatch.context() as initialization:
+        initialization.setattr(module, "redis", None)
+        cache = module.RedisCache()
+    monkeypatch.setattr(module, "_cache", cache)
+    yield
+    cache.close()
+
+
+@pytest.fixture(autouse=True)
 def isolate_cached_application_state(monkeypatch):
     from src.i18n import translator
     from src.api.dependencies import limiter
