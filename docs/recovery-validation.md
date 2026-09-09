@@ -60,6 +60,12 @@ and rate-limit fallback. The 76-test translation module passes locally; its fina
 five HTTP/cache checks and pre-commit also pass. The latest-head matrix must verify
 this test isolation change before relying on its final counts.
 
+Trend-chart regressions add **14 passing checks**, with **96.53% line coverage and
+98.39% branch coverage** for `src/visualization/trend_charts.py`. Tests inspect real
+Plotly traces, decode generated PNGs and verify figures close when saving fails.
+Forecast values now align with their timestamps, nonpositive result limits return
+empty charts, and invalid moving-average periods raise a clear error.
+
 ## Runtime, dependency and quality checks
 
 - Fresh Streamlit process: password login and authenticated dashboard pass.
@@ -101,5 +107,10 @@ and comparison. Five standalone dashboards explicitly label illustrative data an
 retain it across navigation; they do not analyze uploaded documents.
 
 Container deployment and the updated public hosted app still require verification.
+The separate legacy `src.reports` package also fails to import because
+`src.models.report` is absent. Its generator contains placeholder analysis data;
+restoring that unused package requires a real data contract and regression tests.
+The working Streamlit export paths use other report implementations. This legacy
+package remains unresolved and is not excluded from coverage.
 For configuration, backups, SMTP and Cloud reboot/redeployment, use the
 [Streamlit redeployment guide](streamlit-redeploy.md).

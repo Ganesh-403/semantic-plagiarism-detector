@@ -123,10 +123,12 @@ def create_incident_timeline(
 
     # Forecast bars
     if forecast_values and forecast_timestamps:
-        forecast_labels = [f"Forecast {i + 1}" for i in range(len(forecast_values))]
+        if len(forecast_values) != len(forecast_timestamps):
+            raise ValueError("Each forecast value needs a timestamp")
+        forecast_labels = [stamp.isoformat() for stamp in forecast_timestamps]
         fig.add_trace(go.Bar(
             x=labels[-1:] + forecast_labels,
-            y=[0] * max(0, len(labels) - 1) + [counts[-1]] + forecast_values,
+            y=[counts[-1]] + list(forecast_values),
             name="Forecast",
             marker_color=COLORS["info"],
             marker_opacity=0.5,
@@ -276,7 +278,7 @@ def create_offender_bar_chart(
     """Create a horizontal bar chart of top offenders."""
     if not HAS_PLOTLY:
         return None
-    if not offenders:
+    if not offenders or top_n <= 0:
         return _empty_figure("No offender data available")
 
     top = offenders[:top_n]
@@ -507,8 +509,10 @@ def create_static_severity_pie(
 
     ax.set_title("Severity Distribution", fontsize=14, fontweight="bold", pad=20)
     fig.tight_layout()
-    fig.savefig(output_path, dpi=dpi, bbox_inches="tight", facecolor="white")
-    plt.close(fig)
+    try:
+        fig.savefig(output_path, dpi=dpi, bbox_inches="tight", facecolor="white")
+    finally:
+        plt.close(fig)
 
     return output_path
 
@@ -551,8 +555,10 @@ def create_static_incident_bar(
 
     plt.xticks(rotation=45, ha="right", fontsize=9)
     fig.tight_layout()
-    fig.savefig(output_path, dpi=dpi, bbox_inches="tight", facecolor="white")
-    plt.close(fig)
+    try:
+        fig.savefig(output_path, dpi=dpi, bbox_inches="tight", facecolor="white")
+    finally:
+        plt.close(fig)
 
     return output_path
 
@@ -561,6 +567,8 @@ def create_static_incident_bar(
 
 def _compute_moving_average(values: List[float], period: int) -> List[float]:
     """Compute a simple moving average."""
+    if period <= 0:
+        raise ValueError("Moving average period must be positive")
     result = []
     for i in range(len(values)):
         start = max(0, i - period + 1)
