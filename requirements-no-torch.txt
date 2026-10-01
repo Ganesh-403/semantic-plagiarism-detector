@@ -18,7 +18,7 @@ nltk==3.10.3  # Reassess security/dependency-assessments.json on upgrade.
 numpy>=2.0.0
 openpyxl>=3.1.5
 opentelemetry-api>=1.29.0
-opentelemetry-exporter-otlp-proto-http>=1.29.0
+opentelemetry-exporter-otlp-proto-http>=1.45.0
 opentelemetry-sdk>=1.29.0
 pandas>=2.2.0
 pdfplumber>=0.11.0
