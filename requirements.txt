@@ -2,6 +2,6 @@
 # Prefer CPU wheels on hosted deployments to avoid installing CUDA runtimes.
 --extra-index-url https://download.pytorch.org/whl/cpu
 -r requirements-no-torch.txt
-sentence-transformers>=5.6.0
+sentence-transformers>=6.1.0
 torch>=2.0.0
 transformers>=4.30.0
