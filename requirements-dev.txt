@@ -15,6 +15,6 @@ pyfakefs>=5.4
 yamllint>=1.35
 pip-audit>=2.7
 
-pygit2>=1.17
+pygit2>=1.20.1
 web3>=7
 pytest-mock>=3.14
