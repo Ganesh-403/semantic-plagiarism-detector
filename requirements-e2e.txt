@@ -8,4 +8,4 @@
 # These are intentionally kept OUT of requirements-dev.txt so that CI
 # unit-test jobs don't pull the (large) Chromium binary.
 playwright>=1.45.0
-pytest-playwright>=0.5.0
+pytest-playwright>=0.10.0
