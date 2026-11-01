@@ -58,4 +58,4 @@ zxcvbn>=4.4.28
 
 defusedxml>=0.7.1
 
-email-validator>=2.2
+email-validator>=2.3.0
